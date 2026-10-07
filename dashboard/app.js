@@ -13,11 +13,13 @@ function setupNavigation(){
       history.replaceState(null,"","#"+target.id.replace("Section",""));
     }
   }
+  window.showPage=show;
   links.forEach(a=>a.addEventListener("click",e=>{
     e.preventDefault();
     show(a.dataset.section);
   }));
   const initial=(location.hash||"").slice(1);
+  if(initial.startsWith("job/")) setTimeout(()=>showJobDetail(decodeURIComponent(initial.slice(4))),0);
   show(initial==="filters"?"filtersSection":initial==="settings"?"settingsSection":initial==="sources"?"sourcesSection":initial==="applied"?"appliedSection":"jobsSection");
 }
 const REPO = "AvinashBhalla/job-beeper";
@@ -49,6 +51,39 @@ function populateSources(jobs){
   $("source").value = names.includes(current) ? current : "";
 }
 
+function showJobDetail(id){
+  const j=state.jobs.find(x=>String(x.id)===String(id));
+  if(!j) return;
+  document.querySelectorAll(".page-section").forEach(s=>{
+    const active=s.id==="jobDetailSection";
+    s.classList.toggle("hidden-section",!active);
+    s.classList.toggle("active-section",active);
+  });
+  document.querySelectorAll(".nav-link").forEach(a=>a.classList.remove("active"));
+  $("detailSource").textContent=(j.source||"").toUpperCase();
+  $("detailTitle").textContent=j.title||"Untitled job";
+  $("detailCompany").textContent=j.company||"";
+  $("detailScore").innerHTML="<b>"+esc(j.score ?? 0)+"%</b><small>MATCH</small>";
+  $("detailExperience").textContent=j.experience?.label || "Not specified";
+  $("detailLocation").textContent=j.jd_location || j.location || "Not specified";
+  $("detailWorkMode").textContent=j.work_mode || "Not specified";
+  $("detailPosted").textContent=j.posted ? new Date(j.posted).toLocaleString() : "Not specified";
+  $("detailApply").href=j.url||"#";
+  $("detailMatch").textContent=(j.score ?? 0)+"% match";
+  const reasons=(j.reasons||[]).map(x=>"<div class='reason'><span>✓</span>"+esc(x)+"</div>").join("");
+  $("detailReasons").innerHTML=reasons || "<div class='empty'>No specific match reasons were recorded.</div>";
+  const skills=j.skills_detected||[];
+  $("detailSkillCount").textContent=skills.length+" skills";
+  $("detailSkills").innerHTML=skills.map(x=>"<span>"+esc(x)+"</span>").join("") || "<span>Not detected</span>";
+  $("detailDescription").textContent=j.description || "The source did not expose the full job description during this scan. Use Apply now to view the original posting.";
+  history.pushState(null,"","#job/"+encodeURIComponent(id));
+  window.scrollTo({top:0,behavior:"instant"});
+}
+function closeJobDetail(){
+  if(window.showPage) window.showPage("jobsSection");
+  history.pushState(null,"","#jobs");
+}
+
 function render(){
   const q = $("search").value.toLowerCase().trim();
   const src = $("source").value;
@@ -64,7 +99,7 @@ function render(){
   $("jobs").innerHTML = jobs.map(j=>`
     <article class="card">
       <div class="cardmain">
-        <div class="titleline"><h2>${esc(j.title)}</h2><span class="new">${ageHours(j.posted)<1 ? "NEW" : fmtAge(j.posted)}</span></div>
+        <div class="titleline"><h2><button class="job-title-link" data-job-id="${esc(j.id)}">${esc(j.title)}</button></h2><span class="new">${ageHours(j.posted)<1 ? "NEW" : fmtAge(j.posted)}</span></div>
         <div class="company">${esc(j.company)}</div>
         <div class="meta">⌖ ${esc(j.location || "Location not listed")} · ◷ ${fmtAge(j.posted)} · <b>${esc(j.source)}</b></div>
         <div class="chips">${(j.reasons||[]).slice(0,7).map(x=>'<span>'+esc(x)+'</span>').join("")}</div>
@@ -181,6 +216,8 @@ $("clearToken").onclick=()=>{sessionStorage.removeItem("jobbeeper_github_token")
 $("saveConfig").onclick=saveAndRun;
 ["search","source","score","age"].forEach(id=>$(id).addEventListener("input",render));
 $("refresh").onclick=load;
+$("backToJobs").onclick=closeJobDetail;
+document.addEventListener("click",e=>{const b=e.target.closest(".job-title-link");if(b)showJobDetail(b.dataset.jobId);});
 setupNavigation();
 loadConfig().catch(e=>{ if ($("saveStatus")) $("saveStatus").textContent="Could not load config."; });
 load();
