@@ -22,6 +22,8 @@
     "title_exclude": [
       "senior",
       "sr.",
+      "sr ",
+      "sr-",
       "staff",
       "principal",
       "director",
