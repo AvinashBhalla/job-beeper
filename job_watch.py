@@ -6,6 +6,7 @@ import json, os, re, pathlib, datetime as dt, requests
 from concurrent.futures import ThreadPoolExecutor
 from job_sources_extra import linkedin_guest, naukri_public, instahyre_public
 from apify_sources import linkedin as apify_linkedin, naukri as apify_naukri, instahyre as apify_instahyre
+from jd_extract import enrich_job
 
 ROOT = pathlib.Path(__file__).parent
 CFG = json.loads((ROOT / "config.json").read_text())
@@ -373,11 +374,18 @@ def run_board_source(task):
         return name, arg, [], e
 
 def serial_job(j, source, score=None, reasons=None):
+    experience = j.get("experience") or {"min": None, "max": None, "label": "Not specified", "source": "not_found"}
     return {
         "id": j["id"], "source": source, "company": j["company"], "title": j["title"],
-        "location": j["location"], "url": j["url"],
+        "location": j["location"], "jd_location": j.get("jd_location") or j["location"],
+        "url": j["url"],
         "posted": j["posted"].isoformat() if j["posted"] else None,
-        "score": score, "reasons": reasons or []
+        "score": score, "reasons": reasons or [],
+        "description": j.get("description") or j.get("desc") or "",
+        "experience": experience,
+        "skills_detected": j.get("skills_detected", []),
+        "work_mode": j.get("work_mode", "Not specified"),
+        "jd_enriched": bool(j.get("jd_enriched")),
     }
 
 def write_dashboard(jobs, source_status, sent):
@@ -507,13 +515,43 @@ def main():
         known_sources.add(key)
         for j in jobs:
             j["source"] = name
+
+            # First apply cheap source-level filters. Only likely matches get
+            # JD enrichment so a free run does not fetch every job page.
+            if not passes(j, f):
+                if j["id"] in seen:
+                    continue
+                seen.add(j["id"])
+                continue
+
+            # Enrich the likely match from its public job page. This supplies
+            # structured experience, skills, work mode, location and the full JD.
+            enriched = enrich_job(j)
+            j.update({
+                "desc": enriched.get("description") or j.get("desc", ""),
+                "description": enriched.get("description", ""),
+                "experience": enriched.get("experience"),
+                "skills_detected": enriched.get("skills_detected", []),
+                "work_mode": enriched.get("work_mode", "Not specified"),
+                "jd_location": enriched.get("jd_location") or j.get("location", ""),
+                "jd_enriched": enriched.get("jd_enriched", False),
+            })
+
+            # Re-check after enrichment because the JD may reveal an experience
+            # requirement that was not present in the source listing card.
+            if not passes(j, f):
+                if j["id"] in seen:
+                    continue
+                seen.add(j["id"])
+                continue
+
             score, reasons = score_job(j, f)
-            if passes(j, f):
-                dashboard_jobs.append(serial_job(j, name, score, reasons))
+            dashboard_jobs.append(serial_job(j, name, score, reasons))
+
             if j["id"] in seen:
                 continue
             seen.add(j["id"])
-            if (not silent and passes(j, f) and f.get("notifications_enabled", True) and
+            if (not silent and f.get("notifications_enabled", True) and
                     os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
                 notify(j, score, reasons)
                 alerts.append(j["id"])
