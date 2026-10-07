@@ -168,14 +168,13 @@ function apiHeaders(t){
 }
 
 async function waitForWorkflow(t, startedAt){
-  if(scanPollTimer) clearTimeout(scanPollTimer);
   const deadline=Date.now()+10*60*1000;
   scanning=true;
   const button=$("scanNow");
   if(button) button.disabled=true;
 
-  async function poll(){
-    try{
+  try{
+    while(Date.now()<deadline){
       const url=API+"/repos/"+REPO+"/actions/runs?branch=main&event=workflow_dispatch&per_page=10";
       const r=await fetch(url,{headers:apiHeaders(t),cache:"no-store"});
       if(!r.ok) throw new Error(await githubError(r,"Could not read GitHub workflow status."));
@@ -200,31 +199,22 @@ async function waitForWorkflow(t, startedAt){
         }else{
           $("statusText").textContent="Scan "+(run.conclusion||"finished")+". Check GitHub Actions for details.";
         }
-        scanning=false;
-        if(button) button.disabled=false;
-        scanPollTimer=null;
         return run.conclusion==="success";
       }
 
-      if(Date.now()>=deadline){
-        $("statusText").textContent="Scan is still running on GitHub. The feed will refresh when it finishes.";
-        scanning=false;
-        if(button) button.disabled=false;
-        scanPollTimer=null;
-        return false;
-      }
-      scanPollTimer=setTimeout(poll,5000);
-    }catch(e){
-      $("statusText").textContent=e.message;
-      scanning=false;
-      if(button) button.disabled=false;
-      scanPollTimer=null;
-      return false;
+      await new Promise(resolve=>setTimeout(resolve,5000));
     }
-  }
-  return await poll();
-}
 
+    $("statusText").textContent="Scan is still running on GitHub. The feed will refresh when it finishes.";
+    return false;
+  }catch(e){
+    $("statusText").textContent=e.message;
+    return false;
+  }finally{
+    scanning=false;
+    if(button) button.disabled=false;
+  }
+}
 async function dispatchScan(){
   const t=token();
   if(!t){
