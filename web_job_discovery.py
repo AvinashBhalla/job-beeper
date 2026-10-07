@@ -9,6 +9,7 @@ No login or credential is required.
 """
 from __future__ import annotations
 import re
+import hashlib
 import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
@@ -123,7 +124,7 @@ def discover_platform(item):
             path=urlparse(url).path.strip("/")
             if not path or len(path)<4:
                 continue
-            ident=f"web-{platform.lower().replace(' ','-')}-{abs(hash(url))}"
+            ident=f"web-{platform.lower().replace(' ','-')}-{hashlib.sha1(url.encode('utf-8')).hexdigest()[:16]}"
             jobs.append({"id":ident,"company":_company(url),"title":title,"location":"","url":url,"posted":_posted(title+" "+body),"desc":body.lower()})
         return platform,jobs,None
     except Exception as exc:
