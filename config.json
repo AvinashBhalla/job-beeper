@@ -40,9 +40,7 @@
       "gurgaon",
       "delhi",
       "remote india",
-      "remote, india",
-      "hybrid",
-      "india"
+      "remote, india"
     ],
     "remote_only": false,
     "max_age_hours": 72,
