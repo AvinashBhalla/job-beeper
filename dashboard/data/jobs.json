@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-10-07T12:39:20.418443+00:00",
-  "last_run": "2026-10-07T12:39:20.418443+00:00",
-  "new_alerts": 2,
+  "updated_at": "2026-10-07T19:04:01.737148+00:00",
+  "last_run": "2026-10-07T19:04:01.737148+00:00",
+  "new_alerts": 9,
   "source_status": {
     "greenhouse:\"groww\"": {
       "ok": true,
@@ -17,37 +17,37 @@
     },
     "greenhouse:\"stripe\"": {
       "ok": true,
-      "count": 718,
+      "count": 719,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"airbnb\"": {
       "ok": true,
-      "count": 160,
+      "count": 161,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"cloudflare\"": {
       "ok": true,
-      "count": 421,
+      "count": 426,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"coinbase\"": {
       "ok": true,
-      "count": 225,
+      "count": 224,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"datadog\"": {
       "ok": true,
-      "count": 433,
+      "count": 437,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"elastic\"": {
       "ok": true,
-      "count": 420,
+      "count": 418,
       "error": null,
       "provider": "direct"
     },
@@ -59,13 +59,13 @@
     },
     "greenhouse:\"gitlab\"": {
       "ok": true,
-      "count": 210,
+      "count": 217,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"mongodb\"": {
       "ok": true,
-      "count": 392,
+      "count": 393,
       "error": null,
       "provider": "direct"
     },
@@ -77,37 +77,37 @@
     },
     "greenhouse:\"pinterest\"": {
       "ok": true,
-      "count": 178,
+      "count": 177,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"reddit\"": {
       "ok": true,
-      "count": 149,
+      "count": 151,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"robinhood\"": {
       "ok": true,
-      "count": 163,
+      "count": 165,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"samsara\"": {
       "ok": true,
-      "count": 241,
+      "count": 243,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"twilio\"": {
       "ok": true,
-      "count": 131,
+      "count": 130,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"zscaler\"": {
       "ok": true,
-      "count": 365,
+      "count": 368,
       "error": null,
       "provider": "direct"
     },
@@ -119,25 +119,25 @@
     },
     "greenhouse:\"webflow\"": {
       "ok": true,
-      "count": 24,
+      "count": 22,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"discord\"": {
       "ok": true,
-      "count": 48,
+      "count": 49,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"dropbox\"": {
       "ok": true,
-      "count": 35,
+      "count": 28,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"lyft\"": {
       "ok": true,
-      "count": 195,
+      "count": 193,
       "error": null,
       "provider": "direct"
     },
@@ -149,13 +149,13 @@
     },
     "greenhouse:\"asana\"": {
       "ok": true,
-      "count": 99,
+      "count": 100,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"brex\"": {
       "ok": true,
-      "count": 284,
+      "count": 283,
       "error": null,
       "provider": "direct"
     },
@@ -173,7 +173,7 @@
     },
     "greenhouse:\"mixpanel\"": {
       "ok": true,
-      "count": 53,
+      "count": 49,
       "error": null,
       "provider": "direct"
     },
@@ -185,7 +185,7 @@
     },
     "greenhouse:\"grafanalabs\"": {
       "ok": true,
-      "count": 129,
+      "count": 122,
       "error": null,
       "provider": "direct"
     },
@@ -203,7 +203,7 @@
     },
     "greenhouse:\"rubrik\"": {
       "ok": true,
-      "count": 132,
+      "count": 133,
       "error": null,
       "provider": "direct"
     },
@@ -215,13 +215,13 @@
     },
     "greenhouse:\"newrelic\"": {
       "ok": true,
-      "count": 47,
+      "count": 50,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"toast\"": {
       "ok": true,
-      "count": 320,
+      "count": 303,
       "error": null,
       "provider": "direct"
     },
@@ -233,7 +233,7 @@
     },
     "lever:\"paytm\"": {
       "ok": true,
-      "count": 174,
+      "count": 175,
       "error": null,
       "provider": "direct"
     },
@@ -250,10 +250,12 @@
       "provider": "direct"
     },
     "lever:\"zeta\"": {
-      "ok": true,
-      "count": 25,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "HTTPSConnectionPool(host='api.lever.co', port=443): Read timed out. (read timeout=25)",
+      "provider": "direct",
+      "retry_at": "2026-10-07T19:24:01.737148+00:00",
+      "failures": 1
     },
     "lever:\"mindtickle\"": {
       "ok": true,
@@ -263,7 +265,7 @@
     },
     "ashby:\"openai\"": {
       "ok": true,
-      "count": 823,
+      "count": 820,
       "error": null,
       "provider": "direct"
     },
@@ -311,7 +313,7 @@
     },
     "ashby:\"cohere\"": {
       "ok": true,
-      "count": 126,
+      "count": 125,
       "error": null,
       "provider": "direct"
     },
@@ -416,8 +418,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/walmartexternal/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T18:39:20.418443+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T01:04:01.737148+00:00",
+      "failures": 7
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
@@ -430,8 +432,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T18:39:20.418443+00:00",
-      "failures": 9
+      "retry_at": "2026-10-08T01:04:01.737148+00:00",
+      "failures": 10
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -450,8 +452,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T18:39:20.418443+00:00",
-      "failures": 9
+      "retry_at": "2026-10-08T01:04:01.737148+00:00",
+      "failures": 10
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
       "ok": true,
@@ -542,361 +544,321 @@
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Avature:": {
-      "ok": true,
-      "count": 2,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-07T19:24:01.737148+00:00",
+      "failures": 1
     },
     "web:BambooHR:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:19:20.418443+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T20:24:01.737148+00:00",
+      "failures": 3
     },
     "web:Breezy:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Cutshort:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Darwinbox:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T12:59:20.418443+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T19:44:01.737148+00:00",
+      "failures": 2
     },
     "web:Eightfold AI:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T12:59:20.418443+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T19:44:01.737148+00:00",
+      "failures": 2
     },
     "web:Freshteam:": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "No results found.",
-      "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "error": null,
+      "provider": "direct"
     },
     "web:Greenhouse:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Hireology:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Hirist:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:HRsmart:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:iCIMS:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Instahyre:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Jibe (iCIMS):": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Jobvite:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Keka:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Lever:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:LinkedIn:": {
-      "ok": true,
-      "count": 2,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-07T19:24:01.737148+00:00",
+      "failures": 1
     },
     "web:Naukri:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Oracle Cloud Recruiting:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Paycom:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:PeopleStrong:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Phenom People:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Recruitee:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Rippling ATS:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:SmartRecruiters:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:SAP SuccessFactors:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Oracle Taleo:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Teamtailor:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:UKG Pro / UltiPro:": {
-      "ok": true,
-      "count": 1,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-07T19:24:01.737148+00:00",
+      "failures": 1
     },
     "web:Wellfound:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Workable:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Workday:": {
       "ok": false,
       "count": 0,
-      "error": "error sending request for url (https://www.google.com/wml/search?q=%28%22software+engineer%22+OR+%22software+developer%22+OR+%22full+stack+developer%22+OR+%22frontend+developer%22+OR+%22backend+developer%22+OR+%22react+developer%22+OR+%22python+developer%22+OR+%22automation+engineer%22%29+%28%22bengaluru%22+OR+%22bangalore%22+OR+%22gurugram%22+OR+%22gurgaon%22+OR+%22delhi%22+OR+%22remote+india%22+OR+%22remote%22+OR+%22india%22%29+%28site%3Amyworkdayjobs.com%29&sca_esv=1&filter=1&start=0&hl=en-IN&lr=lang_en&cr=countryIN&tbs=qdr%3Aw) > operation timed out",
+      "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Y Combinator:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:59:20.418443+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T21:44:01.737148+00:00",
+      "failures": 4
     },
     "web:Zoho Recruit:": {
-      "ok": true,
-      "count": 1,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-07T19:24:01.737148+00:00",
+      "failures": 1
     }
   },
   "jobs": [
     {
-      "id": "an-data-analyst-automation-engineer-100-remote-hamburg-331696",
-      "source": "arbeitnow",
-      "company": "hey contact heroes GmbH",
-      "title": "Data Analyst & Automation Engineer (m/w/d) | 100 % remote",
-      "location": "Remote Hamburg",
-      "jd_location": "Remote Hamburg",
-      "url": "https://www.arbeitnow.com/jobs/companies/hey-contact-heroes-gmbh/data-analyst-automation-engineer-100-remote-hamburg-331696",
-      "posted": "2026-10-07T10:31:56+00:00",
-      "score": 79,
+      "id": "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-cite-ai-4475485064",
+      "source": "linkedin",
+      "company": "Cite AI",
+      "title": "Associate Software Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "jd_location": "Bangalore</span></p><p><span>Compensation: As per industry standards</span></p><p><br></p><p><br></p",
+      "url": "https://in.linkedin.com/jobs/view/associate-software-engineer-at-cite-ai-4475485064",
+      "posted": "2026-10-07T18:39:01.737148+00:00",
+      "score": 73,
       "reasons": [
-        "automation engineer",
-        "automation",
+        "software engineer",
         "python",
         "javascript",
-        "n8n",
-        "workflow",
+        "typescript",
+        "ai",
         "location fit",
-        "remote"
+        "experience fit"
       ],
-      "description": " wir sind hey contact heroes, ein kundenservice-dienstleister aus dem herzen von hamburg, im zentrum der hafencity. seit 2021 betreuen wir f\u00fcr marken wie telef\u00f3nica, 1&#x26;1, universal music, check24, hamburg wasser und enviam deren kundinnen und kunden am telefon, per mail und im chat. mehr als 500 teammitglieder arbeiten bei uns europaweit remote, und in den letzten jahren sind wir jedes jahr um 8 bis 10 prozent gewachsen. \n bei uns entstehen jeden tag sehr viele daten: anrufvolumen, bearbeitungszeiten, qualit\u00e4tswerte, schichtpl\u00e4ne, ums\u00e4tze pro projekt. damit wir daraus noch mehr machen, suchen wir jemanden, der zahlen liebt und gleichzeitig spa\u00df daran hat, dinge zu bauen. die stelle ist zu 100 % remote und kann von \u00fcberall in europa besetzt werden. \n aufgaben \n du wertest unsere daten aus allen projekten aus und machst daraus reports und dashboards, mit denen gesch\u00e4ftsf\u00fchrung, projektmanagement und kunden wirklich arbeiten k\u00f6nnen. du richtest datenbanken ein, pflegst sie und sorgst daf\u00fcr, dass daten aus telefonie-, ticket- und crm-systemen sauber zusammenlaufen. du liest daten \u00fcber schnittstellen und exporte aus, bereinigst sie und bringst sie in eine struktur, auf die man sich verlassen kann. \n ein gro\u00dfer teil deiner arbeit ist automatisierung. du baust workflows und automatisierte prozesse, zum beispiel mit n8n, make oder eigenen skripten, damit wiederkehrende auswertungen, datenabgleiche und meldungen ohne handarbeit laufen. dabei arbeitest du eng mit unseren projektleitungen und unserer it zusammen und bringst eigene ideen ein, was sich noch einfacher und schneller l\u00f6sen l\u00e4sst. \n qualifikation \n du hast ein tiefes zahlenverst\u00e4ndnis und erkennst schnell, ob eine kennzahl stimmt oder ob etwas nicht passt. sql beherrschst du sicher, und du hast erfahrung mit relationalen datenbanken wie mysql, postgresql oder ms sql. mit g\u00e4ngigen datenformaten wie csv, json, xml und excel gehst du routiniert um, und rest-schnittstellen sind f\u00fcr dich nichts neues. \n du kannst programmieren, idealerweise in python oder javascript, und hast schon workflows oder automatisierungen gebaut, gern mit tools wie n8n, make oder zapier. erfahrung mit bi-tools wie power bi, looker studio oder metabase ist ein plus. ob du ein studium in informatik, mathematik, wirtschaftsinformatik oder statistik hast oder dir das wissen in der praxis angeeignet hast, ist uns nicht so wichtig. entscheidend ist, was du kannst. \n du arbeitest selbstst\u00e4ndig und strukturiert, dokumentierst sauber und erkl\u00e4rst auch komplexe zusammenh\u00e4nge so, dass sie jeder versteht. deutsch sprichst du auf muttersprachlichem niveau oder mindestens auf c1/c2, gutes englisch rundet dein profil ab. \n benefits \n du arbeitest zu 100 % remote, egal ob du in deutschland, spanien, polen oder einem anderen europ\u00e4ischen land lebst. du bekommst spannende daten aus vielen unterschiedlichen kundenprojekten und viel gestaltungsspielraum, weil du bei uns strukturen mit aufbaust statt nur zu verwalten. unsere wege sind kurz, entscheidungen fallen schnell, und du arbeitest direkt mit der gesch\u00e4ftsf\u00fchrung zusammen. dazu kommt ein team, das sich gegenseitig unterst\u00fctzt, und ein arbeitgeber, der w\u00e4chst. \n klingt nach dir? dann bewirb dich direkt hier \u00fcber join mit deinem lebenslauf und gern ein paar s\u00e4tzen oder beispielen dazu, welche auswertungen oder automatisierungen du schon gebaut hast. alles weitere zu vertragsform, stundenumfang und verg\u00fctung besprechen wir gemeinsam im ersten gespr\u00e4ch. wir freuen uns auf dich! \n find  jobs in germany  on arbeitnow ",
+      "description": "<p><span>Cite AI is the fastest-growing AI marketing platform, used by 1000+ marketing teams and agencies to track and grow their visibility in AI search.</span></p><p><br></p><p><span>Cite AI is looking for an Associate Software Engineer who'll build and ship features across the product, from the data pipelines that collect AI answers to the dashboards customers use every day.</span></p><p><br></p><p><strong>What you'll do:</strong></p><ul><li><span>Build and ship features across Cite AI's visibility tracking, citation analysis, and reporting</span></li><li><span>Work on the systems that run prompts across AI engines and process the responses at scale</span></li><li><span>Build APIs and dashboard components that turn raw AI answers into clear insights for brands and agencies</span></li><li><span>Work with product and design to take features from spec to release</span></li><li><span>Write clean, tested code and fix issues in production</span></li><li><span>Improve the speed, reliability, and cost of the product's data pipelines</span></li></ul><p><br></p><p><strong>What we are looking for:</strong></p><ul><li><span>0-2 years of software engineering experience</span></li><li><span>Strong programming fundamentals in Python, JavaScript, or TypeScript</span></li><li><span>Good understanding of data structures, APIs, and databases</span></li><li><span>Comfortable learning new tools and debugging unfamiliar code</span></li><li><span>Clear communicator who works well with product and design</span></li><li><span>Experience with a SaaS product, cloud services, or data pipelines is a plus</span></li></ul><p><br></p><p><span>If you're passionate about building products that shape how brands get discovered in AI search, Cite AI would love to hear from you.</span></p><p><br></p><p><span>Location: Bangalore</span></p><p><span>Compensation: As per industry standards</span></p><p><br></p><p><br></p>",
       "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
+        "min": 0,
+        "max": 2,
+        "label": "0-2 years",
+        "source": "job_description"
       },
       "skills_detected": [
         "python",
         "javascript",
-        "sql",
-        "postgresql",
-        "mysql",
-        "n8n",
-        "automation"
+        "typescript"
       ],
-      "work_mode": "Remote",
-      "jd_enriched": true
-    },
-    {
-      "id": "an-remote-platform-boosters-backend-engineer-berlin-232578",
-      "source": "arbeitnow",
-      "company": "shopware AG",
-      "title": "Platform Boosters - Backend Engineer (m/w/d)",
-      "location": "Remote Homeoffice",
-      "jd_location": "Remote Homeoffice",
-      "url": "https://www.arbeitnow.com/jobs/companies/shopware-ag/remote-platform-boosters-backend-engineer-berlin-232578",
-      "posted": "2026-10-07T08:30:29+00:00",
-      "score": 59,
-      "reasons": [
-        "backend",
-        "node.js",
-        "typescript",
-        "api",
-        "location fit",
-        "remote"
-      ],
-      "description": "  shopware ist ein f\u00fchrendes e-commerce-system, das unternehmen weltweit dabei unterst\u00fctzt, im digitalen handel schnell und effizient zu skalieren. als wegweisende open-source-l\u00f6sung wird shopware bereits von einigen der gr\u00f6\u00dften europ\u00e4ischen marken, h\u00e4ndlern und herstellern im b2c- und b2b-umfeld eingesetzt.    wir bauen derzeit ein neues    team    auf, das f\u00fcr den produktbereich    shopware pulse    verantwortlich sein wird. dieser umfasst alle themen rund um das management von abonnements, zahlungen und \u00fcbernutzungen (overages) unserer shopware services.    als    backend engineer    verantwortest du zentrale service-zu-service-infrastrukturen, datenpipelines und apis, die sowohl interne abl\u00e4ufe als auch merchant-seitige funktionen antreiben. die rolle richtet sich an engineers mit begeisterung f\u00fcr skalierbare, verteilte systeme, api-getriebene architekturen und cloud-native l\u00f6sungen, die ihr skillset perspektivisch in richtung full-stack-entwicklung erweitern m\u00f6chten.    egal von wo aus du arbeitest, du bist ein fester bestandteil des teams. daher suchen wir    deutschlandweit/europaweit    nach einem    backend engineer    (m/w/d) f\u00fcr unser service enablement team!          entwurf, entwicklung und kontinuierliche weiterentwicklung von go-basierten grpc-services   , einschlie\u00dflich oauth-flows, integrationen und caching-strategien       entwicklung und betrieb von service-backends in typescript/    node.js    (z. b. mit hono), einschlie\u00dflich interner und merchant-apis, background-workern und geplanten jobs       gestaltung von contract-first-apis    (protobuf/openapi), inklusive versionierungsstrategien und sicherer rollouts \u00fcber mehrere konsumierende services hinweg       verantwortung f\u00fcr datenzuverl\u00e4ssigkeit und -konsistenz    \u00fcber redis-caches, mysql-persistenz und asynchrone job-queues (z. b. sqs)       implementierung von sicherheits- und multi-tenant-zugriffsmustern   , darunter m2m-authentifizierung, signierte query-parameter und interne authentifizierungsmechanismen       aufbau und weiterentwicklung von observability und resilienz   , einschlie\u00dflich strukturierter logs, metriken, tracing, retry-mechanismen und backpressure-strategien       enge zusammenarbeit mit platform- und infrastruktur-teams    zur optimierung aws-basierter deployments (ecs, terraform, ci/cd, secret-management)        das bringst du mit:        mehr als 5 jahre erfahrung in der backend-entwicklung    mit go und/oder typescript (node.js)       fundierte erfahrung im einsatz ki-gest\u00fctzter coding-tools    wie cursor, claude code und antigravity, inklusive klar definierter prozesse zur sicherstellung hochwertiger code-generierung       starker hintergrund in verteilten systemen   , apis (grpc/rest) und service-zu-service-integrationen       erfahrung mit relationalen datenbanken    (mysql) sowie caching-systemen (redis) im produktiven einsatz und bei hoher last       vertrautheit mit asynchroner verarbeitung    und job-queues (sqs oder vergleichbare systeme)       erfahrung mit cloud-infrastrukturen    (aws), containerisierten deployments (docker, ecs) und infrastructure as code mit terraform       klare kommunikationsf\u00e4higkeiten, ausgepr\u00e4gtes ownership-mindset und flie\u00dfende englischkenntnisse         das bieten wir dir:       unternehmenskultur:    offene kultur, flache hierarchien, eigeninitiative wird gef\u00f6rdert.       arbeitsvertr\u00e4ge:    unbefristete anstellungen bieten langfristige sicherheit.       flexibilit\u00e4t:    flexible arbeitszeiten und optionen f\u00fcr mobiles arbeiten und full-remote-vertr\u00e4ge.       ausstattung:    freie wahl der arbeits-hardware.       onboarding:    gut strukturiertes onboarding mit unterst\u00fctzung durch einen pers\u00f6nlichen \"buddy\".       arbeitsumfeld:    inspirierendes umfeld mit engagierten kollegen und einer dynamischen gemeinschaft.       entwicklungsm\u00f6glichkeiten:    vielf\u00e4ltige chancen f\u00fcr pers\u00f6nliches wachstum und entwicklung.       zusatzleistungen:    attraktive benefits wie betriebliche altersvorsorge, gesundheitsprogramme und regelm\u00e4\u00dfige teamevents.      ... und vieles mehr! einen detaillierten einblick bekommst du auf unserer    karriereseite   .       deine ansprechperson f\u00fcr diese stelle ist yanina schr\u00f6er und steht dir bei fragen gerne zur verf\u00fcgung!       der schutz deiner pers\u00f6nlichen daten hat f\u00fcr uns oberste priorit\u00e4t. unsere bewerberinformationen findest du    hier   .   find  jobs in germany  on arbeitnow ",
-      "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
-      },
-      "skills_detected": [
-        "typescript",
-        "node.js",
-        "node",
-        "go",
-        "mysql",
-        "redis",
-        "aws",
-        "docker",
-        "ci/cd",
-        "api",
-        "terraform"
-      ],
-      "work_mode": "Remote",
+      "work_mode": "Not specified",
       "jd_enriched": true
     },
     {
@@ -907,8 +869,8 @@
       "location": "Bengaluru, Karnataka, India",
       "jd_location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/software-engineering-specialist-python-fullstack-at-ge-vernova-4475425340",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 81,
+      "posted": "2026-10-07T14:04:01.737148+00:00",
+      "score": 89,
       "reasons": [
         "software engineer",
         "fullstack",
@@ -946,6 +908,336 @@
       "jd_enriched": true
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/l1-%E2%80%93-junior-software-developer-the-builder-at-wonder-worth-solutions-4476769047",
+      "source": "linkedin",
+      "company": "Wonder Worth Solutions",
+      "title": "L1 \u2013 Junior Software Developer ( THE BUILDER )",
+      "location": "Vellore, Tamil Nadu, India",
+      "jd_location": "Vellore, Tamil Nadu, India",
+      "url": "https://in.linkedin.com/jobs/view/l1-%E2%80%93-junior-software-developer-the-builder-at-wonder-worth-solutions-4476769047",
+      "posted": "2026-10-07T14:04:01.737148+00:00",
+      "score": 63,
+      "reasons": [
+        "software developer",
+        "react",
+        "node.js",
+        "workflow",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "<strong>The Role<br><br></strong><ul><li>You build the tools WWS runs on and the products the healthcare industry depends on. Your code supports real users and critical workflows.</li><li>At WWS, development is responsibility \u2014 not just delivery. You handle end-to-end development, from building and testing to deployment and monitoring, ensuring reliable, production-ready software in collaboration with WIT, STT, and Product teams.<br><br></li></ul><strong>What You Will Own \u2013 Your Responsibilities<br><br></strong><ul><li>Frontend development \u2014 Building UI components based on WIT design specifications</li><li>Backend development \u2014 Developing APIs, server-side logic, and database integrations</li><li>Integration \u2014 Connecting frontend and backend with complete functional accuracy</li><li>Unit testing \u2014 Writing and executing tests to ensure code reliability and stability</li><li>CI/CD pipeline \u2014 Managing deployments and ensuring smooth release cycles</li><li>Post-deployment monitoring \u2014 Identifying and resolving production issues within SLAs</li><li>Code reviews \u2014 Maintaining quality through timely peer reviews<br><br></li></ul><strong>Non-Negotiable Metrics<br><br></strong><ul><li>Unit Test Pass Rate \u2265 95%</li><li>Deployment Error Reduction \u2265 15% YoY<br><br></li></ul><strong>The Fight: What You Will Fight:<br><br></strong>Unreliable and untested software.<br><br><strong>The Enemy Is<br><br></strong><ul><li>Code that works temporarily but fails in production</li><li>Skipping testing for speed</li><li>Poor integrations and unclear handoffs</li><li>\u201cFix it later\u201d mindset creating technical debt<br><br></li></ul><strong>On the SDT team \u2013 Code is not done until it is tested, stable, and production-ready.<br><br></strong>Who Thrives Here: Three Traits We Cannot Teach<br><br><ul><li>Write for maintainability \u2014 You build code that lasts and scales</li><li>Test before delivery \u2014 You validate your work before handing it off</li><li>Own beyond deployment \u2014 You stay accountable until production is stable<br><br></li></ul><strong>The WWS Perks<br><br></strong><ul><li>Full Training \u2014 MERN stack, CI/CD practices, and product workflows</li><li>End-to-End Ownership \u2014 Work across the full development lifecycle</li><li>Career Growth \u2014 Exposure to design, testing, and product collaboration</li><li>Impact Visibility \u2014 Your code directly impacts real-world healthcare operations</li><li>Ownership Culture \u2014 We reward quality, accountability, and reliability<br><br></li></ul><strong>Qualifications<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree in Computer Science, Software Engineering, or related field</li><li>1+ Years Of Experience in Development </li><li>Proficient in React.js, Node.js, and Express.js</li><li>Good communication, problem-solving, debugging, and collaboration skills</li><li>Ability to write clean, scalable, and maintainable code</li><li>Passion for continuous learning and modern web development trends<br><br></li></ul>Contact us on jobs@wonderws.co / 9047477375<br><br>To Apply: https://careers.wonderws.com",
+      "experience": {
+        "min": 1,
+        "max": null,
+        "label": "1+ years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "react",
+        "node.js",
+        "node",
+        "express",
+        "ci/cd"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336",
+      "source": "linkedin",
+      "company": "Transportation Outlook",
+      "title": "Junior Software Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "jd_location": "Bengaluru",
+      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336",
+      "posted": "2026-10-07T14:04:01.737148+00:00",
+      "score": 48,
+      "reasons": [
+        "software engineer",
+        "python",
+        "javascript",
+        "location fit"
+      ],
+      "description": "<p><strong>Company Description</strong> Pharma Business Outlook is a specialized publication that connects pharmaceutical companies, healthcare providers, and key decision-makers across the industry. It focuses on critical topics such as regulatory compliance, emerging market opportunities, and digital transformation in the pharma sector. By fostering informed discussions, it helps stakeholders navigate complex challenges and identify strategic growth areas. The magazine plays an active role in shaping the future of the pharmaceutical ecosystem, making it an engaging environment for professionals interested in healthcare, technology, and innovation.</p><p><strong>Role Description</strong> The Junior Software Engineer will support the development and maintenance of software solutions that power Pharma Business Outlook\u2019s digital platforms and internal tools. Day-to-day responsibilities include writing clean, efficient code, participating in back-end web development tasks, debugging and resolving technical issues, and assisting in the implementation of new features under the guidance of senior engineers. The role involves collaborating with cross-functional teams to understand requirements, contributing to code reviews, and helping improve system performance and reliability. This is a full-time, on-site role based in Bengaluru.</p><p><strong>Qualifications</strong></p><ul><li>Strong foundational knowledge in Computer Science, including data structures, algorithms, and software engineering principles.</li><li>Practical experience or coursework in Software Development and Programming using modern languages (e.g., Java, Python, JavaScript, or similar).</li><li>Understanding of Back-End Web Development concepts such as APIs, databases, and server-side frameworks.</li><li>Familiarity with Object-Oriented Programming (OOP) and ability to apply OOP principles to real-world problems.</li><li>Bachelor\u2019s degree in Computer Science, Information Technology, or a closely related field (or equivalent practical experience).</li><li>Ability to work collaboratively in a team, follow coding standards, and learn from feedback.</li><li>Strong problem-solving skills, attention to detail, and willingness to learn new technologies.</li><li>Exposure to version control systems (e.g., Git) and basic software development lifecycle concepts is beneficial.</li></ul><p><br></p><p>Onsite Only</p>",
+      "experience": {
+        "min": null,
+        "max": null,
+        "label": "Not specified",
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "java",
+        "git"
+      ],
+      "work_mode": "On-site",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
+      "source": "linkedin",
+      "company": "Minfy",
+      "title": "Associate Software Engineer",
+      "location": "Gurugram, Haryana, India",
+      "jd_location": "Gurugram, Haryana, India",
+      "url": "https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
+      "posted": "2026-10-07T12:04:01.737148+00:00",
+      "score": 46,
+      "reasons": [
+        "software engineer",
+        "python",
+        "javascript",
+        "location fit"
+      ],
+      "description": "The Associate Engineer is responsible for executing defined coding tasks and ensuring basic code quality.<br><br><strong>Code Implementation:</strong> Write and modify <strong>clean, testable, and efficient code</strong> for low-to-medium complexity features and bug fixes, primarily using the required programming language (e.g., Java, Python, JavaScript, C#).<br><br><strong>Debugging and Testing:</strong> Conduct thorough <strong>unit testing</strong> on assigned components and participate actively in debugging applications to identify and resolve defects reported by Quality Assurance (QA) or end-users.<br><br><strong>Documentation:</strong> Assist in creating and maintaining <strong>technical documentation</strong>, including code comments, design specifications for small features, and developer runbooks.<br><br><strong>Version Control:</strong> Utilize <strong>version control systems (e.g., Git/GitHub/GitLab)</strong> effectively for branching, merging, and managing code changes within the team codebase.<br><br><strong>Database Interaction:</strong> Write basic <strong>SQL queries</strong> or interact with NoSQL databases to support application functionality, data fetching, and simple data manipulation.<br><br><ul><li> Operational &amp; Collaborative Duties<br><br></li></ul>This role requires strong teamwork and adherence to established development processes.<br><br><strong>SDLC Participation:</strong> Actively participate in all phases of the <strong>Software Development Lifecycle (SDLC)</strong>, with a focus on implementation, testing, and deployment support.<br><br><strong>Agile/Scrum:</strong> Participate in <strong>Agile ceremonies</strong> (Daily Standups, Sprint Planning, Retrospectives) and accurately update task status and progress in project management tools (e.g., Jira, Azure DevOps).<br><br><strong>Code Review:</strong> Participate in and learn from the code review process by providing basic feedback and incorporating feedback from senior developers into their own code.<br><br><strong>Troubleshooting &amp; Support:</strong> Provide <strong>Level 1 (L1) technical support</strong> for applications, assisting in diagnosing and escalating production issues as needed.<br><br><strong>Requirements Interpretation:</strong> Work with senior developers and business analysts to understand technical requirements derived from user stories and functional specifications.",
+      "experience": {
+        "label": "Not specified",
+        "max": null,
+        "min": null,
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "java",
+        "c#",
+        "sql",
+        "azure",
+        "git"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/java-software-engineer-at-mphasis-4476715143",
+      "source": "linkedin",
+      "company": "Mphasis",
+      "title": "Java Software Engineer",
+      "location": "Mumbai, Maharashtra, India",
+      "jd_location": "Mumbai, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/java-software-engineer-at-mphasis-4476715143",
+      "posted": "2026-10-07T12:04:01.737148+00:00",
+      "score": 41,
+      "reasons": [
+        "software engineer",
+        "ai",
+        "location fit"
+      ],
+      "description": "<p>Key Responsibilities</p><ul><li>Design, develop, test, and maintain scalable backend applications using Java and Spring Boot.</li><li>Develop and maintain microservices-based applications and RESTful APIs.</li><li>Implement event-driven architectures and asynchronous processing using Apache Kafka.</li><li>Design, develop, and deploy applications on AWS cloud services.</li><li>Work with SQL and NoSQL databases to design schemas, optimize queries, and improve performance.</li><li>Identify and resolve performance bottlenecks, production issues, and technical challenges.</li><li>Write clean, reusable, maintainable, and well-tested code following industry best practices.</li><li>Implement unit testing, code reviews, and debugging to ensure application quality.</li><li>Collaborate with architects, product managers, QA engineers, and cross-functional teams.</li><li>Use AI-assisted development tools to improve coding productivity, testing, debugging, and documentation.</li><li>Participate in Agile ceremonies and contribute to continuous improvement of development processes.</li></ul><p>Mandatory Skills</p><ul><li>Java: Strong knowledge of Core Java, OOP concepts, Collections, Exception Handling, Multithreading, and concurrency.</li><li>Spring Boot: Hands-on experience developing enterprise applications using Spring Boot and the Spring Framework.</li><li>Microservices: Experience designing, developing, and maintaining microservices architectures.</li><li>Apache Kafka: Experience with producers, consumers, topics, partitions, and event-driven systems.</li><li>AWS: Practical experience deploying or managing applications using AWS services.</li><li>SQL / NoSQL Databases: Experience with relational databases and NoSQL databases, including query optimization and data modelling.</li><li>REST APIs: Experience designing and integrating RESTful web services.</li><li>Testing: Familiarity with JUnit, Mockito, and unit testing practices.</li><li>Build &amp; Version Control: Experience with Maven or Gradle and Git.</li></ul><p><br></p>",
+      "experience": {
+        "min": null,
+        "max": null,
+        "label": "Not specified",
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "java",
+        "sql",
+        "aws",
+        "git",
+        "kafka"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "gh-7996774",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Machine Learning Engineer",
+      "location": "Remote - Ireland",
+      "jd_location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/7996774",
+      "posted": "2026-10-07T10:32:47-04:00",
+      "score": 68,
+      "reasons": [
+        "machine learning",
+        "python",
+        "llm",
+        "ai",
+        "location fit",
+        "remote",
+        "experience fit"
+      ],
+      "description": "Back to jobs Machine Learning Engineer Remote - Ireland Apply Who we are At Twilio, we\u2019re shaping the future of communications, all from the comfort of our homes. We deliver innovative solutions to hundreds of thousands of businesses and empower millions of developers worldwide to craft personalized customer experiences. Our dedication to remote-first work , and strong culture of connection and global inclusion means that no matter your location, you\u2019re part of a vibrant team with diverse experiences making a global impact each day. As we continue to revolutionize how the world interacts, we\u2019re acquiring new skills and experiences that make work feel truly rewarding. Your career at Twilio is in your hands. . Hiring and how we work We use Artificial Intelligence (AI) to help make our hiring process efficient. That said, every hiring decision is made by real Twilions! Also, while we are a remote-first company, you may be asked to report in person on an ad-hoc basis for team gatherings, functional off-sites or customer meetings. . See yourself at Twilio Join the team as Twilio\u2019s next Machine Learning Engineer. About the job This position is to design and engineer AI powered features that makes every customer conversation smarter. As a Machine Learning Engineer on the Conversation Intelligence team, you'll develop and deploy solutions that extract meaning from voice and messaging data at Twilio scale. You'll work alongside experienced ML practitioners to ship real features - from model pipelines to production inference - that directly shape how businesses understand their customers. Responsibilities In this role, you\u2019ll: Design and development of machine learning solutions, ensuring accuracy, performance, security, and scalability. Implement and maintain end-to-end AI/ML pipelines - from data ingestion and feature engineering through to model development, validation, and deployment with guidance from senior engineers on complex architectural decisions Instrument AI/ML services with appropriate metrics, logging, and telemetry to monitor model performance and operational health against defined SLOs Participate in on-call rotations, executing progressive rollouts and applying standard mitigation strategies to keep production inference services healthy Collaborate across planning, design, and code review phases contributing to product and technical discussions, while helping raise overall code quality through thoughtful review feedback Qualifications Twilio values diverse experiences from all kinds of industries, and we encourage everyone who meets the required qualifications to apply. If your career is just starting or hasn't followed a traditional path, don't let that stop you from considering Twilio. We are always looking for people who will bring something new to the table! *Required: Bachelor's degree in Computer Science, Mathematics, Statistics, or a related quantitative field, or equivalent practical experience 2+ years of experience in machine learning engineering or applied ML, with demonstrated proficiency in Python and at least one ML framework (PyTorch, TensorFlow, or JAX) and familiarity with NLP libraries such as Hugging Face Transformers, NLTK, or SpaCy. Experience developing, testing, and deploying small-to-medium scoped ML services or features in a collaborative engineering environment, including model versioning, experiment tracking, and cloud-based infrastructure (AWS, GCP, or Azure) Proficiency in Python (preferred) or similar OO language. Experience utilizing Large (or Small) Language Models within software systems. Excellent written and verbal communication skills with the ability to articulate complex technical concepts to both technical and non-technical audiences. Desired: Hands-on experience with conversational AI, or LLM fine-tuning and prompt engineering in a production context Exposure to agentic AI frameworks such as LangGraph, AutoGen, CrewAI Familiarity with MLOps/LLMOps tooling related to maintaining models in production such as testing, versioning, model registry, retraining, and monitoring. Location This role will be remote from Ireland. Travel We prioritize connection and opportunities to build relationships with our customers and each other. For this role, you may be required to travel occasionally to participate in project or team in-person meetings. What We Offer Working at Twilio offers many benefits, including competitive pay, generous time off, ample parental and wellness leave, healthcare, a retirement savings program, and much more. Offerings vary by location. Twilio thinks big. Do you? We like to solve problems, take initiative, pitch in when needed, and are always up for trying new things. That's why we seek out colleagues who embody our values \u2014 something we call Twilio Magic . Additionally, we empower employees to build positive change in their communities by supporting their volunteering and donation efforts. So, if you're ready to unleash your full potential, do your best work, and be the best version of yourself, apply now! If this role isn't what you're looking for, please consider other open positions. . Stay alert to recruitment fraud We care about your safety. Scammers sometimes impersonate Twilio recruiters through fake job postings, emails, websites, or messages. Please ensure you are engaging with an official @ twilio.com email address. We will never ask for payment, gift cards, cryptocurrency, or banking information during the recruiting process. We do not make job offers without a formal interview process or conduct interviews exclusively through text-based messaging apps. . Twilio is proud to be an equal opportunity employer. We do not discriminate based upon race, religion, color, national origin, sex (including pregnancy, childbirth, reproductive health decisions, or related medical conditions), sexual orientation, gender identity, gender expression, age, status as a protected veteran, status as an individual with a disability, genetic information, political views or activity, or other applicable legally protected characteristics. We also consider qualified applicants with criminal histories, consistent with applicable federal, state and local law. Qualified applicants with arrest or conviction records will be considered for employment in accordance with the Los Angeles County Fair Chance Ordinance for Employers and the California Fair Chance Act. Additionally, Twilio participates in the E-Verify program in certain locations, as required by law. Apply for this job * indicates a required field First Name * Last Name * Preferred First Name * Email * Phone Country * Phone * Location (City) * Locate me Resume/CV * Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf Cover Letter Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf LinkedIn Profile How did you hear about Twilio? * Careers Website LinkedIn Twitter Glassdoor Indeed Twilio Blog Conference or Event Content (e.g. videos, ads, billboards etc) Other Please click all that apply Are you legally authorized to work in the country in which this role is located? * Select... What is the source of your right to work where this role is listed? * Select... By clicking the \"Acknowledge\" button, you acknowledge that Twilio processes data in accordance with the Twilio Applicant Privacy Policy. * Acknowledge Twilio Applicant Privacy Policy By checking this box, I confirm I have read, reviewed and understood the guidelines outlined in the Candidate AI Responsible Use Policy. I affirm that all the information and materials I submit throughout my application and candidacy will reflect my own work and experience. * Acknowledge Candidate AI Responsible Use Policy International - Self-Identification of Demographic Information Twilio invites you to self-identify certain personal demographic information to help continue our mission to foster inclusivity in our workplace. Completing this survey is voluntary, but we do hope that you will participate because your responses help us measure the effectiveness of our outreach and recruitment activities. Responding is completely optional and voluntary and will not be used for the purposes of any employment decision. Any information you provide is confidential and is not accessible by recruiters, hiring managers or the interview team at any time. This data is collected, stored and otherwise processed in accordance with legal requirements. We hope you will join us in our commitment and enthusiasm for making Twilio a place where everyone belongs! Voluntary Self-Identification of Gender * Select... Submit application",
+      "experience": {
+        "label": "2+ years",
+        "max": null,
+        "min": 2,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "next",
+        "aws",
+        "gcp",
+        "azure",
+        "llm",
+        "machine learning",
+        "pytorch",
+        "tensorflow"
+      ],
+      "work_mode": "Remote",
+      "jd_enriched": true
+    },
+    {
+      "id": "gh-8007455",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Machine Learning Engineer",
+      "location": "Remote - Spain",
+      "jd_location": "Remote - Spain",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8007455",
+      "posted": "2026-10-07T10:30:26-04:00",
+      "score": 68,
+      "reasons": [
+        "machine learning",
+        "python",
+        "llm",
+        "ai",
+        "location fit",
+        "remote",
+        "experience fit"
+      ],
+      "description": "Back to jobs Machine Learning Engineer Remote - Spain Apply Who we are At Twilio, we\u2019re shaping the future of communications, all from the comfort of our homes. We deliver innovative solutions to hundreds of thousands of businesses and empower millions of developers worldwide to craft personalized customer experiences. Our dedication to remote-first work , and strong culture of connection and global inclusion means that no matter your location, you\u2019re part of a vibrant team with diverse experiences making a global impact each day. As we continue to revolutionize how the world interacts, we\u2019re acquiring new skills and experiences that make work feel truly rewarding. Your career at Twilio is in your hands. . Hiring and how we work We use Artificial Intelligence (AI) to help make our hiring process efficient. That said, every hiring decision is made by real Twilions! Also, while we are a remote-first company, you may be asked to report in person on an ad-hoc basis for team gatherings, functional off-sites or customer meetings. . See yourself at Twilio Join the team as Twilio\u2019s next Machine Learning Engineer. About the job This position is to design and engineer AI powered features that makes every customer conversation smarter. As a Machine Learning Engineer on the Conversation Intelligence team, you'll develop and deploy solutions that extract meaning from voice and messaging data at Twilio scale. You'll work alongside experienced ML practitioners to ship real features - from model pipelines to production inference - that directly shape how businesses understand their customers. Responsibilities In this role, you\u2019ll: Design and development of machine learning solutions, ensuring accuracy, performance, security, and scalability. Implement and maintain end-to-end AI/ML pipelines - from data ingestion and feature engineering through to model development, validation, and deployment with guidance from senior engineers on complex architectural decisions Instrument AI/ML services with appropriate metrics, logging, and telemetry to monitor model performance and operational health against defined SLOs Participate in on-call rotations, executing progressive rollouts and applying standard mitigation strategies to keep production inference services healthy Collaborate across planning, design, and code review phases contributing to product and technical discussions, while helping raise overall code quality through thoughtful review feedback Qualifications Twilio values diverse experiences from all kinds of industries, and we encourage everyone who meets the required qualifications to apply. If your career is just starting or hasn't followed a traditional path, don't let that stop you from considering Twilio. We are always looking for people who will bring something new to the table! *Required: Bachelor's degree in Computer Science, Mathematics, Statistics, or a related quantitative field, or equivalent practical experience 2+ years of experience in machine learning engineering or applied ML, with demonstrated proficiency in Python and at least one ML framework (PyTorch, TensorFlow, or JAX) and familiarity with NLP libraries such as Hugging Face Transformers, NLTK, or SpaCy. Experience developing, testing, and deploying small-to-medium scoped ML services or features in a collaborative engineering environment, including model versioning, experiment tracking, and cloud-based infrastructure (AWS, GCP, or Azure) Proficiency in Python (preferred) or similar OO language. Experience utilizing Large (or Small) Language Models within software systems. Excellent written and verbal communication skills with the ability to articulate complex technical concepts to both technical and non-technical audiences. Desired: Hands-on experience with conversational AI, or LLM fine-tuning and prompt engineering in a production context Exposure to agentic AI frameworks such as LangGraph, AutoGen, CrewAI Familiarity with MLOps/LLMOps tooling related to maintaining models in production such as testing, versioning, model registry, retraining, and monitoring. Location This role will be remote from Spain. Travel We prioritize connection and opportunities to build relationships with our customers and each other. For this role, you may be required to travel occasionally to participate in project or team in-person meetings. What We Offer Working at Twilio offers many benefits, including competitive pay, generous time off, ample parental and wellness leave, healthcare, a retirement savings program, and much more. Offerings vary by location. Twilio thinks big. Do you? We like to solve problems, take initiative, pitch in when needed, and are always up for trying new things. That's why we seek out colleagues who embody our values \u2014 something we call Twilio Magic . Additionally, we empower employees to build positive change in their communities by supporting their volunteering and donation efforts. So, if you're ready to unleash your full potential, do your best work, and be the best version of yourself, apply now! If this role isn't what you're looking for, please consider other open positions. . Stay alert to recruitment fraud We care about your safety. Scammers sometimes impersonate Twilio recruiters through fake job postings, emails, websites, or messages. Please ensure you are engaging with an official @ twilio.com email address. We will never ask for payment, gift cards, cryptocurrency, or banking information during the recruiting process. We do not make job offers without a formal interview process or conduct interviews exclusively through text-based messaging apps. . Twilio is proud to be an equal opportunity employer. We do not discriminate based upon race, religion, color, national origin, sex (including pregnancy, childbirth, reproductive health decisions, or related medical conditions), sexual orientation, gender identity, gender expression, age, status as a protected veteran, status as an individual with a disability, genetic information, political views or activity, or other applicable legally protected characteristics. We also consider qualified applicants with criminal histories, consistent with applicable federal, state and local law. Qualified applicants with arrest or conviction records will be considered for employment in accordance with the Los Angeles County Fair Chance Ordinance for Employers and the California Fair Chance Act. Additionally, Twilio participates in the E-Verify program in certain locations, as required by law. Apply for this job * indicates a required field First Name * Last Name * Preferred First Name * Email * Phone Country * Phone * Location (City) * Locate me Resume/CV * Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf Cover Letter Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf LinkedIn Profile How did you hear about Twilio? * Careers Website LinkedIn Twitter Glassdoor Indeed Twilio Blog Conference or Event Content (e.g. videos, ads, billboards etc) Other Please click all that apply Are you legally authorized to work in the country in which this role is located? * Select... What is the source of your right to work where this role is listed? * Select... By clicking the \"Acknowledge\" button, you acknowledge that Twilio processes data in accordance with the Twilio Applicant Privacy Policy. * Acknowledge Twilio Applicant Privacy Policy By checking this box, I confirm I have read, reviewed and understood the guidelines outlined in the Candidate AI Responsible Use Policy. I affirm that all the information and materials I submit throughout my application and candidacy will reflect my own work and experience. * Acknowledge Candidate AI Responsible Use Policy International - Self-Identification of Demographic Information Twilio invites you to self-identify certain personal demographic information to help continue our mission to foster inclusivity in our workplace. Completing this survey is voluntary, but we do hope that you will participate because your responses help us measure the effectiveness of our outreach and recruitment activities. Responding is completely optional and voluntary and will not be used for the purposes of any employment decision. Any information you provide is confidential and is not accessible by recruiters, hiring managers or the interview team at any time. This data is collected, stored and otherwise processed in accordance with legal requirements. We hope you will join us in our commitment and enthusiasm for making Twilio a place where everyone belongs! Voluntary Self-Identification of Gender * Select... Submit application",
+      "experience": {
+        "label": "2+ years",
+        "max": null,
+        "min": 2,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "next",
+        "aws",
+        "gcp",
+        "azure",
+        "llm",
+        "machine learning",
+        "pytorch",
+        "tensorflow"
+      ],
+      "work_mode": "Remote",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
+      "source": "linkedin",
+      "company": "Hunar.AI",
+      "title": "Full Stack Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "jd_location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
+      "posted": "2026-10-07T09:04:01.737148+00:00",
+      "score": 68,
+      "reasons": [
+        "full stack",
+        "react",
+        "node.js",
+        "python",
+        "javascript",
+        "typescript",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "<p><strong>Junior Full Stack Engineer</strong></p><p><strong>Location:</strong> Bengaluru</p><p><strong>Employment type:</strong> Full-time</p><p><strong>Experience level:</strong> 1-2 years</p><p><br></p>About the role<p><strong>You\u2019ll work across the stack TypeScript, React, and Python - shipping real features with</strong></p><p><strong>mentorship from experienced engineers.</strong></p><p><strong>This is an in-office role</strong>. You will need to come to our office in <strong>HSR Layout, Bengaluru</strong> on</p><p>working days.</p><p>This role is designed for someone early in their career who learns quickly, communicates</p><p>clearly, and wants ownership that grows with skill. You don\u2019t need to know everything on day</p><p>one. Curiosity, solid fundamentals, and a habit of asking good questions matter more than a</p><p>long tool checklist.</p><p><br></p>What you'll do<ul><li><span>Build and ship user-facing features in React and TypeScript, with guidance on design and code quality</span></li><li><span>Contribute to Python APIs and services that power Hunar Connect, including REST endpoints and basic data access with SQL</span></li><li><span>Work from well-scoped tickets: clarify requirements, propose a simple approach, implement, and open pull requests for review</span></li><li><span>Write clear, maintainable code and add basic tests where they protect important behavior</span></li><li><span>Debug issues across the frontend, API, and database with help from teammates when you\u2019re stuck</span></li><li><span>Participate in code review - both receiving feedback and, over time, giving thoughtful review to peers</span></li><li><span>Collaborate with product and design to understand the \u201cwhy\u201d behind features, not only the \u201cwhat\u201d</span></li><li><span>Improve docs, small tooling, or developer experience when you spot friction (with support)</span></li></ul><p><br></p>Requirements (must-haves)<ul><li>0\u20132 years of professional software experience, or equivalent through internships, bootcamps, coursework, open source, or substantial personal projects</li><li>Working knowledge of <strong>TypeScript</strong> and <strong>JavaScript</strong></li><li>Experience building UIs with <strong>React</strong> (or a similar modern UI framework)</li><li>Familiarity with <strong>Node.js</strong> and building or consuming <strong>REST APIs</strong></li><li>Basic <strong>SQL</strong> skills (reading queries, simple joins, understanding tables and relationships)</li><li>Comfort with <strong>Git</strong> (branching, commits, pull requests)</li><li>Ability to break a problem into steps, communicate progress, and ask for help early</li><li>Willingness to learn in public: take feedback, iterate, and document what you learn</li></ul><p><br></p>Nice-to-haves<ul><li>Exposure to testing (unit or integration) in a JS/TS codebase</li><li>Familiarity with cloud basics, CI/CD, or deploying a small app end-to-end</li><li>Experience with relational databases beyond simple queries (indexes, migrations)</li><li>Interest in accessibility, performance, or product analytics</li><li>Contributions to open source, hackathons, or teaching/mentoring others</li></ul><p>None of these are required. They\u2019re signals of curiosity, not filters.</p><p><br></p>How to apply<p>Apply via https://apply.hunar.ai/job/nRWg3SAV?utm=jq_ot</p>",
+      "experience": {
+        "label": "1-2 years",
+        "max": 2,
+        "min": 1,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "sql",
+        "ci/cd",
+        "git",
+        "api"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
+      "source": "linkedin",
+      "company": "Application Software Centre- IIT Bombay",
+      "title": "Software Developer",
+      "location": "Mumbai, Maharashtra, India",
+      "jd_location": "Mumbai, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
+      "posted": "2026-10-07T09:04:01.737148+00:00",
+      "score": 58,
+      "reasons": [
+        "software developer",
+        "python",
+        "javascript",
+        "automation",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "<p><strong>Essential Qualifications &amp; Experience: </strong></p><p>BE /BTech or equivalent degree with minimum 1 year of relevant experience </p><p>OR </p><p>B.Sc./BCS or equivalent degree with CS/ IT specialization with minimum 2 years of relevant experience. </p><p><br></p><p><strong>Required Technical Skills</strong>: Languages: Proficiency in Java (J2EE or Spring) for legacy application support, with the technical agility to transition into Python for upcoming product modernization. Frameworks: Basic understanding of Spring Boot or similar Java frameworks. Databases: Strong foundation in SQL and relational database concepts. Tools: Familiarity with Git for version control. Web Basics: Understanding of RESTful APIs and basic front-end technologies (HTML/CSS/JavaScript). </p><p><br></p><p><strong>Desirable criteria</strong>: Degree in Computer Science, Information Technology, or a related field. Strong analytical and logic-building skills. Ability to communicate technical concepts clearly to both technical and non-technical team members. A proactive learner who is comfortable working in a collaborative, fast-paced environment. Job Profile: We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply.</p><p><br></p><p><strong>Job Profile:</strong> We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply. \u2022 Feature Development: Write clean, scalable code in Java (J2EE or Spring Boot) and Python to support student and administrative modules. \u2022 System Maintenance: Assist in maintaining legacy systems while contributing to modern microservices migration. \u2022 Database Management: Write and optimize SQL queries (PostgreSQL/Oracle) and assist with data integrity tasks. \u2022 Testing &amp; Debugging: Perform unit testing and troubleshoot application bottlenecks to ensure high system availability. \u2022 Documentation: Maintain clear functional and technical documentation for all developed modules.</p><p><br></p><p><strong>PLEASE NOTE THAT IT IS MANDATORY TO APPLY FOR THIS POSITION ON IIT BOMBAY JOB PORTAL TO CONSIDER YOUR APPLICATION, PLEASE USE BELOW LINK. </strong></p><p><strong>Kindly use the APPLY button on the top left of the page.</strong></p><p>https://ep.iitb.ac.in/sap/bc/webdynpro/sap/hrrcf_a_posting_apply?PARAM=cG9zdF9pbnN0X2d1aWQ9Q0Q4QTdDRUFERjI0MUZEMUFFRTM5RDI2NDZFMTQzMTAmY2FuZF90eXBlPUVYVA%3d%3d&amp;sap-theme=sap_corbu&amp;sap-client=300&amp;sap-language=EN#</p><p><br></p><p><strong>Regards,</strong></p><p><strong>ASC IIT Bombay</strong></p>",
+      "experience": {
+        "label": "1+ years",
+        "max": null,
+        "min": 1,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "java",
+        "sql",
+        "postgresql",
+        "git",
+        "automation"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
+      "source": "linkedin",
+      "company": "SkilloVilla",
+      "title": "Java Backend Developer",
+      "location": "Greater Bengaluru Area",
+      "jd_location": "Greater Bengaluru Area",
+      "url": "https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
+      "posted": "2026-10-07T07:04:01.737148+00:00",
+      "score": 54,
+      "reasons": [
+        "backend developer",
+        "backend",
+        "python",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "<p>What you\u2019ll do</p><p><br></p><p>Technology is at the heart of our organization. We have a strong engineering team, and we're looking to expand our tech team. As part of the tech team, you\u2019ll be:</p><ol><li>Partnering with the product/business teams to understand the product features and specifications, translate them into high-level and low-level design</li><li>Participating in all stages of the Software Development Lifecycle - design, development, testing, deployment, and maintenance</li><li>Writing elegant, effective, and scalable code while maintaining the highest level of coding standards</li><li>Taking ownership of the work and ensuring timely deliveries</li><li>Driving innovation while relentlessly improving performance</li></ol><p><br></p><p>What you'll need</p><p><br></p><p>Must-haves</p><ul><li>1+ years of experience as a Java backend developer with strong knowledge of Java web frameworks like Spring Boot, and experience working in Microservices architecture</li><li>Hands-on experience working with Linux/Unix platform</li><li>Strong knowledge of SQL and RDBMS like PostgreSQL/MySQL, etc.</li><li>Experience in Python, Git</li><li>Strong technical aptitude and good knowledge of CS fundamentals</li><li>Strong design skills involving data modelling and low-level class design</li><li>Follow industry coding standards and be responsible for writing maintainable, scalable, and efficient code to solve business problems</li></ul><p><br></p><p>Good to have</p><ul><li>BTech. / MTech. in Computer Science or equivalent degree</li><li>Prior experience working in a start-up environment</li></ul><p><br></p><p>Why us?</p><p>We're hiring a set of highly skilled, enthusiastic, and passionate people who thrive in a high-growth environment.</p><p><br></p><ul><li>Skyrocket your career and salary: be part of our growth rocket ship</li><li>Explosive learning: learn multiple things in a very short duration and get to work directly with the CTO</li><li>Get to work things from an end-to-end perspective</li><li>Be a part-owner of the company: we\u2019ll also be offering a healthy amount of ESOPs over and above the salary !!</li></ul><p><br></p><p>About us</p><p>SkilloVilla is building the next-generation platform to prepare students, fresh graduates, and</p><p>working professionals for the rapidly changing employment landscape through a</p><p>technology-enabled advanced curriculum.</p><p><br></p><p>In a world where technology evolves by the day, and educational institutions\u2019 curriculums</p><p>find it difficult to upgrade to rapidly changing industry needs, upskilling becomes the need</p><p>of the hour for young graduates who are ready to enter the real world of opportunities. We</p><p>strive to bridge the skills gap and propel a person's career with an industry-aligned</p><p>curriculum that is not included in regular college syllabi. While we support novice</p><p>professionals to become job-ready, our team of hiring experts connects them to employers</p><p>from top-tier partner companies to help explore opportunities and secure the jobs of their</p><p>dreams.</p><p><br></p><p>Started by seasoned entrepreneurs from IIT Delhi and IIIT Hyderabad, we are passionate</p><p>about creating something unique, innovative, and big from India. We're backed by Titan</p><p>Capital, a prominent VC fund, along with 10+ marquee angel investors.</p><p><br></p><p>Know more about our founding team:</p><ul><li>Ronak Agrawal (CEO): IIT Delhi, Ex- Business Head, Cuemath</li><li>Rajat Agrawal (CTO): IIIT Hyderabad, Ex-Tech Lead, Swiggy</li><li>Deepak Kharol (COO): IIT Delhi, Ex-Sr. Growth Manager, Swiggy</li></ul>",
+      "experience": {
+        "label": "1+ years",
+        "max": null,
+        "min": 1,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "next",
+        "java",
+        "sql",
+        "postgresql",
+        "mysql",
+        "git",
+        "linux"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
       "id": "nk-nk-071026501970",
       "source": "naukri",
       "company": "Cafs Infotech",
@@ -954,7 +1246,7 @@
       "jd_location": "Chennai, India",
       "url": "https://www.naukri.com/job-listings-frontend-developer-react-js-node-js-cafs-infotech-chennai-1-to-5-years-071026501970",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 74,
+      "score": 68,
       "reasons": [
         "frontend developer",
         "frontend",
@@ -987,7 +1279,7 @@
       "jd_location": "Hyderabad, Chennai, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-automation-engineer-pwc-hyderabad-chennai-bengaluru-2-to-4-years-071026023451",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 73,
+      "score": 67,
       "reasons": [
         "automation engineer",
         "automation",
@@ -1025,6 +1317,48 @@
       "jd_enriched": true
     },
     {
+      "id": "nk-nk-071026019017",
+      "source": "naukri",
+      "company": "Hindavi Technologies",
+      "title": "Full Stack / Backend Developer (.NET & Azure)",
+      "location": "Pune(Kothrud), India",
+      "jd_location": "Pune(Kothrud), India",
+      "url": "https://www.naukri.com/job-listings-full-stack-backend-developer-net-azure-hindavi-technologies-pune-2-to-4-years-071026019017",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 65,
+      "reasons": [
+        "backend developer",
+        "backend",
+        "full stack",
+        "react",
+        "next.js",
+        "automation",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "full stack / backend developer (.net & azure) about the role: we are looking for a full stack / backend developer to design, build, and support scalable cloud-native applications on microsoft azure. the role is primarily focused on backend engineering, apis, databases, cloud services, integrations, and technical solution design, with the ability to contribute to frontend development when required. responsibilities: develop and maintain applications using .net, c#, sql server, and azure services. design, build, and support rest apis and backend services. develop secure, scalable, and maintainable application architectures. design and optimise database structures, queries, and integrations. build and maintain cloud-native solutions using microsoft azure. collaborate with product, ux, qa, and devops teams throughout the delivery lifecycle. participate in solution design, estimation, code reviews, testing, and release activities. troubleshoot and resolve application, integration, and production issues. contribute to frontend development using react and next.js where required. take ownership of features from requirements through production deployment and support. required skills backend engineering: 2+ years of software development experience. strong experience with c# and .net/.net core. strong experience designing and developing rest apis. strong knowledge of sql server, database design, and query optimisation. experience integrating with third-party apis and services. understanding of authentication, authorisation, and application security best practices. experience trouble shooting and supporting production applications. strong understanding of software design principles, patterns, and clean code practices. azure & cloud experience with microsoft azure. experience with azure app services. experience with azure sql. experience with azure storage accounts. experience with azure key vault. experience with azure functions. understanding of cloud architecture, scalability, monitoring, and operational best practices. development practices: experience with git, pull requests, and code review practices. experience using visual studio and/or visual studio code. experience writing maintainable, testable, and reusable code. understanding of ci/cd concepts and automated deployments. strong analytical and problem-solving skills. preferred skills: experience with azure devops, deployment pipelines, and infrastructure automation. experience with azure service bus and event-driven architectures. experience with react and next.js. experience with docker and containerised deployments. experience with automated testing and quality engineering practices. experience working in saas or product-led environments. what we expect: strong ownership and accountability. ability to understand product requirements and propose technical solutions. ability to independently analyse, design, build, test, and support features. strong attention to quality, security, scalability, and maintainability. willingness to challenge assumptions and improve solutions. focus on engineering excellence and continuous improvement. technology stack: .net, c#, sql server, azure app services, azure sql, azure functions, azure storage, azure key vault, rest apis, git, azure devops, react, next.js, visual studio, visual studio code. 2-4 yrs sql azure, .net, azure app service, nextjs, azure devops, rest apis, azure key vault, react",
+      "experience": {
+        "label": "2-4 years",
+        "max": 4,
+        "min": 2,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "react",
+        "next.js",
+        "next",
+        "c#",
+        "sql",
+        "azure",
+        "docker",
+        "ci/cd",
+        "git",
+        "automation"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
       "id": "nk-nk-071026502167",
       "source": "naukri",
       "company": "Cafs Infotech",
@@ -1033,7 +1367,7 @@
       "jd_location": "Chennai, India",
       "url": "https://www.naukri.com/job-listings-backend-developer-node-js-mongodb-mysql-cafs-infotech-chennai-0-to-1-years-071026502167",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 69,
+      "score": 63,
       "reasons": [
         "backend developer",
         "backend",
@@ -1059,48 +1393,6 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
-      "source": "linkedin",
-      "company": "Hunar.AI",
-      "title": "Full Stack Engineer",
-      "location": "Bengaluru, Karnataka, India",
-      "jd_location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 65,
-      "reasons": [
-        "full stack",
-        "react",
-        "node.js",
-        "python",
-        "javascript",
-        "typescript",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "<p><strong>Junior Full Stack Engineer</strong></p><p><strong>Location:</strong> Bengaluru</p><p><strong>Employment type:</strong> Full-time</p><p><strong>Experience level:</strong> 1-2 years</p><p><br></p>About the role<p><strong>You\u2019ll work across the stack TypeScript, React, and Python - shipping real features with</strong></p><p><strong>mentorship from experienced engineers.</strong></p><p><strong>This is an in-office role</strong>. You will need to come to our office in <strong>HSR Layout, Bengaluru</strong> on</p><p>working days.</p><p>This role is designed for someone early in their career who learns quickly, communicates</p><p>clearly, and wants ownership that grows with skill. You don\u2019t need to know everything on day</p><p>one. Curiosity, solid fundamentals, and a habit of asking good questions matter more than a</p><p>long tool checklist.</p><p><br></p>What you'll do<ul><li><span>Build and ship user-facing features in React and TypeScript, with guidance on design and code quality</span></li><li><span>Contribute to Python APIs and services that power Hunar Connect, including REST endpoints and basic data access with SQL</span></li><li><span>Work from well-scoped tickets: clarify requirements, propose a simple approach, implement, and open pull requests for review</span></li><li><span>Write clear, maintainable code and add basic tests where they protect important behavior</span></li><li><span>Debug issues across the frontend, API, and database with help from teammates when you\u2019re stuck</span></li><li><span>Participate in code review - both receiving feedback and, over time, giving thoughtful review to peers</span></li><li><span>Collaborate with product and design to understand the \u201cwhy\u201d behind features, not only the \u201cwhat\u201d</span></li><li><span>Improve docs, small tooling, or developer experience when you spot friction (with support)</span></li></ul><p><br></p>Requirements (must-haves)<ul><li>0\u20132 years of professional software experience, or equivalent through internships, bootcamps, coursework, open source, or substantial personal projects</li><li>Working knowledge of <strong>TypeScript</strong> and <strong>JavaScript</strong></li><li>Experience building UIs with <strong>React</strong> (or a similar modern UI framework)</li><li>Familiarity with <strong>Node.js</strong> and building or consuming <strong>REST APIs</strong></li><li>Basic <strong>SQL</strong> skills (reading queries, simple joins, understanding tables and relationships)</li><li>Comfort with <strong>Git</strong> (branching, commits, pull requests)</li><li>Ability to break a problem into steps, communicate progress, and ask for help early</li><li>Willingness to learn in public: take feedback, iterate, and document what you learn</li></ul><p><br></p>Nice-to-haves<ul><li>Exposure to testing (unit or integration) in a JS/TS codebase</li><li>Familiarity with cloud basics, CI/CD, or deploying a small app end-to-end</li><li>Experience with relational databases beyond simple queries (indexes, migrations)</li><li>Interest in accessibility, performance, or product analytics</li><li>Contributions to open source, hackathons, or teaching/mentoring others</li></ul><p>None of these are required. They\u2019re signals of curiosity, not filters.</p><p><br></p>How to apply<p>Apply via https://apply.hunar.ai/job/nRWg3SAV?utm=jq_ot</p>",
-      "experience": {
-        "label": "1-2 years",
-        "max": 2,
-        "min": 1,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "javascript",
-        "typescript",
-        "react",
-        "node.js",
-        "node",
-        "sql",
-        "ci/cd",
-        "git",
-        "api"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
       "id": "nk-nk-071026502903",
       "source": "naukri",
       "company": "Expert Web Designing",
@@ -1109,7 +1401,7 @@
       "jd_location": "ahmedabad responsibilities build and maintain web applications, apis and integrations for client pro",
       "url": "https://www.naukri.com/job-listings-software-developer-expert-web-designing-ahmedabad-1-to-6-years-071026502903",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 65,
+      "score": 59,
       "reasons": [
         "software developer",
         "react",
@@ -1144,6 +1436,78 @@
       "jd_enriched": true
     },
     {
+      "id": "nk-nk-071026504326",
+      "source": "naukri",
+      "company": "Smartzen Solutions",
+      "title": "Full Stack Developer",
+      "location": "Chennai, India",
+      "jd_location": "Chennai, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-smartzen-solutions-private-limited-chennai-0-to-2-years-071026504326",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 57,
+      "reasons": [
+        "full stack developer",
+        "full stack",
+        "node.js",
+        "python",
+        "javascript",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "; ;we are looking for a passionate and enthusiastic full stack developer who is a fresher or recent graduate and eager to build a career in web application development. the ideal candidate should have a good understanding of front-end and back-end technologies and a strong willingness to learn and work on real-world projects. ;responsibilities ;develop and maintain responsive websites and web applications. ;work on both front-end and back-end development tasks. ;write clean, reusable, and maintainable code. ;collaborate with designers and developers to implement new features. ;integrate rest apis and third-party services into web applications. ;debug, test, and troubleshoot application issues. ;optimize applications for performance, security, and responsiveness. ;participate in code reviews and continuously improve technical skills. ;requirements ;bachelors degree in computer science, information technology, or a related field. ;freshers and recent graduates are encouraged to apply. ;basic knowledge of html, css, javascript, and bootstrap. ;basic understanding of any back-end technology such as php, laravel, node.js, or python. ;understanding of databases such as mysql or mongodb is an advantage. ;basic knowledge of rest apis and git/github is an advantage. ;strong problem-solving and logical thinking skills. ;passion for learning new technologies and developing web applications. disclaimer: this job posting and location has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 0-2 yrs css, github, laravel, python, debug, information technology, web application, full stack developer",
+      "experience": {
+        "min": 0,
+        "max": 2,
+        "label": "0-2 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "node.js",
+        "node",
+        "mysql",
+        "mongodb",
+        "git"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "nk-nk-071026504319",
+      "source": "naukri",
+      "company": "Smartzen Solutions",
+      "title": "React Developer",
+      "location": "Chennai, India",
+      "jd_location": "Chennai, India",
+      "url": "https://www.naukri.com/job-listings-react-developer-smartzen-solutions-private-limited-chennai-2-to-3-years-071026504319",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 57,
+      "reasons": [
+        "react developer",
+        "react",
+        "javascript",
+        "api",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "we are looking for a passionate and motivated react developer who is a fresher or recent graduate and interested in building modern, responsive, and user-friendly web applications. the ideal candidate should have a basic understanding of react.js, javascript, and front-end development and be willing to learn and grow with the team. responsibilities develop responsive and interactive web applications using react.js. build reusable and maintainable react components. convert ui designs into functional and responsive web interfaces. integrate rest apis and handle api responses in react applications. debug and resolve front-end issues and application errors. collaborate with designers and backend developers to implement new features. optimize applications for performance and cross-browser compatibility. stay updated with modern front-end technologies and best practices. requirements bachelors degree in computer science, information technology, or a related field. freshers and recent graduates are encouraged to apply. basic knowledge of html, css, javascript, and react.js. understanding of react components, props, state, and hooks is an advantage. basic knowledge of rest apis and json. knowledge of git/github is an advantage. good problem-solving and logical thinking skills. strong interest in learning modern web development technologies. disclaimer: this job posting and location has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 2-3 yrs css, github, debug, information technology, react developer, js, react, web applications",
+      "experience": {
+        "min": 2,
+        "max": 3,
+        "label": "2-3 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "javascript",
+        "react",
+        "git",
+        "api"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
       "id": "nk-nk-071026500861",
       "source": "naukri",
       "company": "Zion Infosystem",
@@ -1152,7 +1516,7 @@
       "jd_location": "Noida, India",
       "url": "https://www.naukri.com/job-listings-react-frontend-developer-zion-infosystem-noida-2-to-6-years-071026500861",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 61,
+      "score": 55,
       "reasons": [
         "frontend developer",
         "frontend",
@@ -1174,75 +1538,38 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
-      "source": "linkedin",
-      "company": "Application Software Centre- IIT Bombay",
-      "title": "Software Developer",
-      "location": "Mumbai, Maharashtra, India",
-      "jd_location": "Mumbai, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
+      "id": "nk-nk-071026049318",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": ".Net Developer (React)",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "jd_location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-net-developer-react-infosys-hyderabad-pune-bengaluru-2-to-5-years-071026049318",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 55,
+      "score": 49,
       "reasons": [
-        "software developer",
-        "python",
+        "react",
         "javascript",
-        "automation",
+        "api",
         "location fit",
         "experience fit"
       ],
-      "description": "<p><strong>Essential Qualifications &amp; Experience: </strong></p><p>BE /BTech or equivalent degree with minimum 1 year of relevant experience </p><p>OR </p><p>B.Sc./BCS or equivalent degree with CS/ IT specialization with minimum 2 years of relevant experience. </p><p><br></p><p><strong>Required Technical Skills</strong>: Languages: Proficiency in Java (J2EE or Spring) for legacy application support, with the technical agility to transition into Python for upcoming product modernization. Frameworks: Basic understanding of Spring Boot or similar Java frameworks. Databases: Strong foundation in SQL and relational database concepts. Tools: Familiarity with Git for version control. Web Basics: Understanding of RESTful APIs and basic front-end technologies (HTML/CSS/JavaScript). </p><p><br></p><p><strong>Desirable criteria</strong>: Degree in Computer Science, Information Technology, or a related field. Strong analytical and logic-building skills. Ability to communicate technical concepts clearly to both technical and non-technical team members. A proactive learner who is comfortable working in a collaborative, fast-paced environment. Job Profile: We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply.</p><p><br></p><p><strong>Job Profile:</strong> We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply. \u2022 Feature Development: Write clean, scalable code in Java (J2EE or Spring Boot) and Python to support student and administrative modules. \u2022 System Maintenance: Assist in maintaining legacy systems while contributing to modern microservices migration. \u2022 Database Management: Write and optimize SQL queries (PostgreSQL/Oracle) and assist with data integrity tasks. \u2022 Testing &amp; Debugging: Perform unit testing and troubleshoot application bottlenecks to ensure high system availability. \u2022 Documentation: Maintain clear functional and technical documentation for all developed modules.</p><p><br></p><p><strong>PLEASE NOTE THAT IT IS MANDATORY TO APPLY FOR THIS POSITION ON IIT BOMBAY JOB PORTAL TO CONSIDER YOUR APPLICATION, PLEASE USE BELOW LINK. </strong></p><p><strong>Kindly use the APPLY button on the top left of the page.</strong></p><p>https://ep.iitb.ac.in/sap/bc/webdynpro/sap/hrrcf_a_posting_apply?PARAM=cG9zdF9pbnN0X2d1aWQ9Q0Q4QTdDRUFERjI0MUZEMUFFRTM5RDI2NDZFMTQzMTAmY2FuZF90eXBlPUVYVA%3d%3d&amp;sap-theme=sap_corbu&amp;sap-client=300&amp;sap-language=EN#</p><p><br></p><p><strong>Regards,</strong></p><p><strong>ASC IIT Bombay</strong></p>",
+      "description": "key responsibilities design, develop, and maintain web applications using asp.net core / asp.net mvc and react.js . build restful apis using .net web api and integrate them with react front-end. collaborate with ui/ux designers to implement responsive and user-friendly interfaces. write clean, maintainable, and testable code following best practices. optimize application performance and ensure scalability. work with sql server or other relational databases for data storage and retrieval. participate in code reviews, troubleshooting, and debugging. collaborate with cross-functional teams in agile/scrum environments. implement security best practices in application development. required skills & qualifications strong proficiency in .net technologies : c#, asp.net core, mvc, web api. front-end expertise : react.js, javascript (es6+), html5, css3, bootstrap/tailwind. experience with entity framework core or dapper. strong knowledge of sql (t-sql, stored procedures, database design, optimization). familiarity with azure or aws cloud services (preferred). experience with git or other version control systems. understanding of restful api design and integration. knowledge of unit testing frameworks (xunit, nunit, jest, etc.). 2-5 yrs react.js, .net core, sql, c#, .net, asp.net mvc",
       "experience": {
-        "label": "1+ years",
-        "max": null,
-        "min": 1,
+        "min": 2,
+        "max": 5,
+        "label": "2-5 years",
         "source": "job_description"
       },
       "skills_detected": [
-        "python",
         "javascript",
-        "java",
+        "react",
+        "c#",
         "sql",
-        "postgresql",
+        "aws",
+        "azure",
         "git",
-        "automation"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
-      "source": "linkedin",
-      "company": "SkilloVilla",
-      "title": "Java Backend Developer",
-      "location": "Greater Bengaluru Area",
-      "jd_location": "Greater Bengaluru Area",
-      "url": "https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 53,
-      "reasons": [
-        "backend developer",
-        "backend",
-        "python",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "<p>What you\u2019ll do</p><p><br></p><p>Technology is at the heart of our organization. We have a strong engineering team, and we're looking to expand our tech team. As part of the tech team, you\u2019ll be:</p><ol><li>Partnering with the product/business teams to understand the product features and specifications, translate them into high-level and low-level design</li><li>Participating in all stages of the Software Development Lifecycle - design, development, testing, deployment, and maintenance</li><li>Writing elegant, effective, and scalable code while maintaining the highest level of coding standards</li><li>Taking ownership of the work and ensuring timely deliveries</li><li>Driving innovation while relentlessly improving performance</li></ol><p><br></p><p>What you'll need</p><p><br></p><p>Must-haves</p><ul><li>1+ years of experience as a Java backend developer with strong knowledge of Java web frameworks like Spring Boot, and experience working in Microservices architecture</li><li>Hands-on experience working with Linux/Unix platform</li><li>Strong knowledge of SQL and RDBMS like PostgreSQL/MySQL, etc.</li><li>Experience in Python, Git</li><li>Strong technical aptitude and good knowledge of CS fundamentals</li><li>Strong design skills involving data modelling and low-level class design</li><li>Follow industry coding standards and be responsible for writing maintainable, scalable, and efficient code to solve business problems</li></ul><p><br></p><p>Good to have</p><ul><li>BTech. / MTech. in Computer Science or equivalent degree</li><li>Prior experience working in a start-up environment</li></ul><p><br></p><p>Why us?</p><p>We're hiring a set of highly skilled, enthusiastic, and passionate people who thrive in a high-growth environment.</p><p><br></p><ul><li>Skyrocket your career and salary: be part of our growth rocket ship</li><li>Explosive learning: learn multiple things in a very short duration and get to work directly with the CTO</li><li>Get to work things from an end-to-end perspective</li><li>Be a part-owner of the company: we\u2019ll also be offering a healthy amount of ESOPs over and above the salary !!</li></ul><p><br></p><p>About us</p><p>SkilloVilla is building the next-generation platform to prepare students, fresh graduates, and</p><p>working professionals for the rapidly changing employment landscape through a</p><p>technology-enabled advanced curriculum.</p><p><br></p><p>In a world where technology evolves by the day, and educational institutions\u2019 curriculums</p><p>find it difficult to upgrade to rapidly changing industry needs, upskilling becomes the need</p><p>of the hour for young graduates who are ready to enter the real world of opportunities. We</p><p>strive to bridge the skills gap and propel a person's career with an industry-aligned</p><p>curriculum that is not included in regular college syllabi. While we support novice</p><p>professionals to become job-ready, our team of hiring experts connects them to employers</p><p>from top-tier partner companies to help explore opportunities and secure the jobs of their</p><p>dreams.</p><p><br></p><p>Started by seasoned entrepreneurs from IIT Delhi and IIIT Hyderabad, we are passionate</p><p>about creating something unique, innovative, and big from India. We're backed by Titan</p><p>Capital, a prominent VC fund, along with 10+ marquee angel investors.</p><p><br></p><p>Know more about our founding team:</p><ul><li>Ronak Agrawal (CEO): IIT Delhi, Ex- Business Head, Cuemath</li><li>Rajat Agrawal (CTO): IIIT Hyderabad, Ex-Tech Lead, Swiggy</li><li>Deepak Kharol (COO): IIT Delhi, Ex-Sr. Growth Manager, Swiggy</li></ul>",
-      "experience": {
-        "label": "1+ years",
-        "max": null,
-        "min": 1,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "next",
-        "java",
-        "sql",
-        "postgresql",
-        "mysql",
-        "git",
-        "linux"
+        "api"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
@@ -1256,7 +1583,7 @@
       "jd_location": "Mohali, India",
       "url": "https://www.naukri.com/job-listings-python-developer-exotica-it-solutions-mohali-0-to-1-years-071026500899",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 53,
+      "score": 47,
       "reasons": [
         "python developer",
         "python",
@@ -1277,15 +1604,15 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
-      "source": "linkedin",
+      "id": "nk-nk-071026502658",
+      "source": "naukri",
       "company": "Rubrik",
-      "title": "Software Engineer - Cloud: Azure",
-      "location": "Bengaluru, Karnataka, India",
-      "jd_location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
+      "title": "Software Engineer- SaaS O365",
+      "location": "Bengaluru, India",
+      "jd_location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-software-engineer-saas-o365-rubrik-bengaluru-0-to-2-years-071026502658",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 50,
+      "score": 44,
       "reasons": [
         "software engineer",
         "python",
@@ -1293,7 +1620,7 @@
         "location fit",
         "experience fit"
       ],
-      "description": "<strong>About The Team<br><br></strong>The Rubrik Cloud Native Protection team helps customers secure their data on the cloud. Cloud data is growing at an ever growing pace and so are the risks with cyber attacks targeted towards cloud data. We make it easy for businesses to protect, search, analyze all of their cloud data simply and scalably.<br><br>Cloud Native Protection is one of the fastest growing businesses and teams within Rubrik. We consider ourselves a startup inside a startup! Join us in this journey where there are ever widening avenues to explore, opportunities to innovate, deep engineering problems to tackle. We believe in fostering a culture with strong engineering values and teamwork as the key to building a great company and product.<br><br><strong>About Role<br><br></strong>Rubrik Software Engineers are self-starters, driven, and can manage themselves. We believe in giving engineers responsibility, not tasks. Our goal is to motivate and challenge people to do their best work. Bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history!<br><br><strong>What You\u2019ll Do<br><br></strong><ul><li>Build software using your strong background in distributed systems and cloud.</li><li>Design, develop, test, deploy, maintain and improve the software.</li><li>Manage individual projects priorities, deadlines and deliverables with your technical expertise.<br><br></li></ul><strong>Experience You\u2019ll Need<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree or equivalent in computer science or related field</li><li>0-2 years of relevant work experience, </li><li>Proficiency in one or more general purpose programming languages like Go, Java, C/C++, Scala, Python</li><li>Experience with AWS/Azure/GCP or other public cloud technologies is a plus.</li><li>Knowledge of Docker, Containers, Kubernetes, microservice architectures is a plus.</li><li>Excellent problem-solving skills and attention to detail. </li><li>Strong understanding of System Development Life Cycle (SDLC) methodology, design patterns, and software engineering principles</li><li>Strong collaboration and communication skills. Ability to work independently or as part of a team on complex, time-sensitive projects.<br><br></li></ul>Join Us in Securing and Accelerating the World's AI Transformation<br><br>Rubrik (RBRK), the Security and AI Operations Company, leads at the intersection of data protection, cyber resilience, and enterprise AI acceleration. Rubrik Security Cloud delivers complete cyber resilience by securing, monitoring, and recovering data, identities, and workloads across clouds. Rubrik Agent Cloud accelerates trusted AI agent deployments at scale by monitoring and auditing agentic actions, enforcing real-time guardrails, fine-tuning for accuracy and undoing agentic mistakes.<br><br>Linkedin | X (formerly Twitter) | Instagram | Rubrik.com<br><br>Inclusion @ Rubrik<br><br>At Rubrik, we are dedicated to fostering a culture where people from all backgrounds are valued, feel they belong, and believe they can succeed. Our commitment to inclusion is at the heart of our mission to secure the world\u2019s data.<br><br>Our goal is to hire and promote the best talent, regardless of background. We continually review our hiring practices to ensure fairness and strive to create an environment where every employee has equal access to opportunities for growth and excellence. We believe in empowering everyone to bring their authentic selves to work and achieve their fullest potential.<br><br>Our inclusion strategy focuses on three core areas of our business and culture:<br><br><ul><li>Our Company: We are committed to building a merit-based organization that offers equal access to growth and success for all employees globally. Your potential is limitless here. </li><li>Our Culture: We strive to create an inclusive atmosphere where individuals from all backgrounds feel a strong sense of belonging, can thrive, and do their best work. Your contributions help us innovate and break boundaries. </li><li>Our Communities: We are dedicated to expanding our engagement with the communities we operate in, creating opportunities for underrepresented talent and driving greater innovation for our clients. Your impact extends beyond Rubrik, contributing to safer and stronger communities. <br><br></li></ul>Equal Opportunity Employer/Veterans/Disabled<br><br>Rubrik is an Equal Opportunity Employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, protected veteran status, or any other status protected by applicable law. Rubrik provides equal employment opportunities to employees and applicants in all terms and conditions of employment, including recruiting, hiring, promotion, compensation, training, leave, and termination.<br><br>Rubrik provides reasonable accommodations to qualified applicants and employees with disabilities in accordance with applicable law. If you need an accommodation to participate in the application process or to perform your job, please contact hr@rubrik.com. Accommodations may include changes to the application process, documents in an alternate format, a sign language interpreter, or specialized equipment.<br><br>EEO IS THE LAW<br><br>NOTIFICATION OF EMPLOYEE RIGHTS UNDER FEDERAL LABOR LAWS<br><br>",
+      "description": "job summary rubrik software engineers are self-starters, driven, and can manage themselves. we believe in giving engineers responsibility, not tasks. our goal is to motivate and challenge people to do their best work. bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history! responsibilities build software using your strong background in distributed systems and cloud. design, develop, test, deploy, maintain and improve the software. manage individual projects priorities, deadlines and deliverables with your technical expertise. requirements bachelor's or master's degree or equivalent in computer science or related field 0-2 years of relevant work experience proficiency in one or more general purpose programming languages like go, java, c/c++, scala, python experience with aws/azure/gcp or other public cloud technologies is a plus knowledge of docker, containers, kubernetes, microservice architectures is a plus excellent problem-solving skills and attention to detail strong understanding of system development life cycle (sdlc) methodology, design patterns, and software engineering principles strong collaboration and communication skills. ability to work independently or as part of a team on complex, time-sensitive projects disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 0-2 yrs kubernetes, python, ai, auditing, programming languages, cloud technologies, docker, labor laws",
       "experience": {
         "label": "0-2 years",
         "max": 2,
@@ -1323,7 +1650,7 @@
       "jd_location": "Mumbai, Mumbai Suburban, India",
       "url": "https://www.naukri.com/job-listings-frontend-web-developer-susania-opc-private-lt-mumbai-mumbai-suburban-1-to-3-years-071026500897",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 50,
+      "score": 44,
       "reasons": [
         "frontend",
         "react",
@@ -1346,73 +1673,37 @@
       "jd_enriched": true
     },
     {
-      "id": "nk-nk-071026502658",
+      "id": "nk-nk-071026013638",
       "source": "naukri",
-      "company": "Rubrik",
-      "title": "Software Engineer- SaaS O365",
-      "location": "Bengaluru, India",
-      "jd_location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-software-engineer-saas-o365-rubrik-bengaluru-0-to-2-years-071026502658",
+      "company": "Infosys",
+      "title": "Java Angular/React Js Developer",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "jd_location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-angular-react-js-developer-infosys-hyderabad-pune-bengaluru-2-to-5-years-071026013638",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 50,
+      "score": 44,
       "reasons": [
-        "software engineer",
-        "python",
-        "ai",
+        "react",
+        "javascript",
         "location fit",
         "experience fit"
       ],
-      "description": "job summary rubrik software engineers are self-starters, driven, and can manage themselves. we believe in giving engineers responsibility, not tasks. our goal is to motivate and challenge people to do their best work. bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history! responsibilities build software using your strong background in distributed systems and cloud. design, develop, test, deploy, maintain and improve the software. manage individual projects priorities, deadlines and deliverables with your technical expertise. requirements bachelor's or master's degree or equivalent in computer science or related field 0-2 years of relevant work experience proficiency in one or more general purpose programming languages like go, java, c/c++, scala, python experience with aws/azure/gcp or other public cloud technologies is a plus knowledge of docker, containers, kubernetes, microservice architectures is a plus excellent problem-solving skills and attention to detail strong understanding of system development life cycle (sdlc) methodology, design patterns, and software engineering principles strong collaboration and communication skills. ability to work independently or as part of a team on complex, time-sensitive projects disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 0-2 yrs kubernetes, python, ai, auditing, programming languages, cloud technologies, docker, labor laws",
+      "description": "key responsibilities develop and maintain full-stack applications using java for back-end and frameworks like react, angular, or jsp for front-end development geeksforgeeks+1. design, build, and maintain apis and server-side logic using spring, spring boot, restful services, and servlets . database management including mysql, postgresql, mongodb, and orm tools like hibernate/jpa for data persistence . implement security, authentication, and authorization mechanisms for web applications velvet jobs. participate in the full software development lifecycle (sdlc) from requirement analysis, design, coding, testing, deployment, to maintenance interviewguy.com. collaborate with cross-functional teams including ui/ux designers, qa engineers, and devops for seamless project delivery optimize performance and ensure scalability of applications while following coding best practices interviewguy.com. stay updated with emerging technologies and propose improvements for existing systems interviewguy.com. required skills and technologies programming languages: java (java 8+), javascript, html, css . front-end frameworks: react.js, angular, jsp geeksforgeeks+1. back-end frameworks: spring, spring boot, servlets, rest apis . database & orm: mysql, postgresql, mongodb, hibernate, jpa version control & tools: git, maven, jenkins, docker (optional), interviewguy.com. testing: junit, integration testing, and unit testing practices . other skills: agile methodologies, problem-solving, debugging, and performance optimization workable.com. 2-5 yrs java, react.js, angular, hibernate, spring boot, microservices",
       "experience": {
-        "min": 0,
-        "max": 2,
-        "label": "0-2 years",
+        "min": 2,
+        "max": 5,
+        "label": "2-5 years",
         "source": "job_description"
       },
       "skills_detected": [
-        "python",
+        "javascript",
+        "react",
         "java",
-        "c++",
-        "go",
-        "aws",
-        "gcp",
-        "azure",
+        "postgresql",
+        "mysql",
+        "mongodb",
         "docker",
-        "kubernetes"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
-      "source": "linkedin",
-      "company": "Minfy",
-      "title": "Associate Software Engineer",
-      "location": "Gurugram, Haryana, India",
-      "jd_location": "Gurugram, Haryana, India",
-      "url": "https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 40,
-      "reasons": [
-        "software engineer",
-        "python",
-        "javascript",
-        "location fit"
-      ],
-      "description": "The Associate Engineer is responsible for executing defined coding tasks and ensuring basic code quality.<br><br><strong>Code Implementation:</strong> Write and modify <strong>clean, testable, and efficient code</strong> for low-to-medium complexity features and bug fixes, primarily using the required programming language (e.g., Java, Python, JavaScript, C#).<br><br><strong>Debugging and Testing:</strong> Conduct thorough <strong>unit testing</strong> on assigned components and participate actively in debugging applications to identify and resolve defects reported by Quality Assurance (QA) or end-users.<br><br><strong>Documentation:</strong> Assist in creating and maintaining <strong>technical documentation</strong>, including code comments, design specifications for small features, and developer runbooks.<br><br><strong>Version Control:</strong> Utilize <strong>version control systems (e.g., Git/GitHub/GitLab)</strong> effectively for branching, merging, and managing code changes within the team codebase.<br><br><strong>Database Interaction:</strong> Write basic <strong>SQL queries</strong> or interact with NoSQL databases to support application functionality, data fetching, and simple data manipulation.<br><br><ul><li> Operational &amp; Collaborative Duties<br><br></li></ul>This role requires strong teamwork and adherence to established development processes.<br><br><strong>SDLC Participation:</strong> Actively participate in all phases of the <strong>Software Development Lifecycle (SDLC)</strong>, with a focus on implementation, testing, and deployment support.<br><br><strong>Agile/Scrum:</strong> Participate in <strong>Agile ceremonies</strong> (Daily Standups, Sprint Planning, Retrospectives) and accurately update task status and progress in project management tools (e.g., Jira, Azure DevOps).<br><br><strong>Code Review:</strong> Participate in and learn from the code review process by providing basic feedback and incorporating feedback from senior developers into their own code.<br><br><strong>Troubleshooting &amp; Support:</strong> Provide <strong>Level 1 (L1) technical support</strong> for applications, assisting in diagnosing and escalating production issues as needed.<br><br><strong>Requirements Interpretation:</strong> Work with senior developers and business analysts to understand technical requirements derived from user stories and functional specifications.",
-      "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
-      },
-      "skills_detected": [
-        "python",
-        "javascript",
-        "java",
-        "c#",
-        "sql",
-        "azure",
+        "jenkins",
         "git"
       ],
       "work_mode": "Not specified",
@@ -1715,50 +2006,6 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
-      "source": "linkedin",
-      "company": "Auric AI Labs",
-      "title": "Junior Software Engineer",
-      "location": "Bengaluru, Karnataka, India",
-      "jd_location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 58,
-      "reasons": [
-        "software engineer",
-        "python",
-        "llm",
-        "ai",
-        "workflow",
-        "orchestration",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "<p><strong>About the Role</strong></p><p>We're looking for a motivated and technically strong Junior Software Engineer to join our engineering team. You'll work on robust systems and workflows that enable internal users and the overall development of the product. You will build backend services, integrate with external APIs, and collaborate with the team to meet their use cases. This is a hands-on role where you'll have the agency to think and act to drive fast/iterative progress across multiple fronts.</p><p><strong>What You'll Do</strong></p><ul><li>Design and build backend services and APIs that are accessible, fault-tolerant, and well-tested.</li><li>Integrate with third-party and internal APIs to extend product capabilities.</li><li>Work with AI agents and LLM-powered workflows, applying sound engineering practices (testing, validation, guardrails) to ensure robustness.</li><li>Write and reason through unit and integration tests, thinking critically about coverage, edge cases, and failure modes.</li><li>Collaborate with senior engineers on system design, service orchestration, and architectural decisions.</li><li>Take ownership of small-to-medium scoped features end-to-end, from design through deployment and monitoring.</li><li>Work with data stores and infrastructure tooling relevant to the stack.</li></ul><p><strong>What We're Looking For</strong></p><p><strong>Must Have</strong></p><ul><li>0\u20132 years of professional experience or a strong portfolio of shipped personal or academic projects with a clear backend focus (bonus if live or deployed).</li><li>Proficiency in Python and/or a solid grasp of an end-to-end backend stack; full-stack experience is a plus.</li><li>Experience integrating with external APIs (REST, GraphQL, webhooks, etc.).</li><li>A testing mindset \u2014 ability to think about how to validate, test, and harden implementations rather than just writing code that works on the happy path.</li><li>Comfort working in a collaborative codebase using Git and standard development workflows.</li></ul><p><strong>Good to Have</strong></p><ul><li>Hands-on familiarity with common backend tooling: SQL/NoSQL databases, Redis (caching), message queues (e.g. Kafka, RabbitMQ, SQS), and search platforms like OpenSearch/Elasticsearch.</li><li>Exposure to AI agents or LLM-based systems, with an understanding of how they work and where they can fail.</li><li>Experience with Docker and container basics in a development or production context.</li><li>Familiarity with any cloud provider (AWS, GCP, Azure) and basic deployment/infrastructure concepts.</li></ul><p><strong>Bonus Points</strong></p><ul><li>Experience building MCP (Model Context Protocol) servers.</li><li>Experience designing fault-tolerant or resilient workflows that recover gracefully from failures without data loss (e.g. idempotent jobs, retry logic, dead-letter queues).</li><li>General understanding of ML concepts, enough to engage meaningfully with product requirements and the models powering our systems.</li><li>Prior experience in a startup or fast-paced engineering environment.</li></ul><p><strong>What You'll Gain</strong></p><ul><li>Ownership of features aimed at varying use cases, with real production impact.</li><li>Agency to make technical decisions and drive solutions end-to-end.</li><li>Exposure to modern AI/LLM engineering practices.</li><li>Mentorship from senior engineers across backend, ML, and platform.</li><li>Experience working within an agile team on meaningful, high-visibility work.</li><li>A clear growth path toward a mid-level engineering role.</li></ul><p><strong>Why Join Us</strong></p><ul><li>Work on one of the hardest, most impactful problems in defense AI.</li><li>Collaborate with a small, world-class team of researchers and engineers.</li><li>High ownership from day one shapes the platform, not just maintains it.</li><li>Move fast, learn fast, we build, test, and iterate aggressively.</li><li>Be part of a mission-driven company where AI meets national security.</li></ul><p>Auric AI is building the future of defense intelligence. If you\u2019re an AI-native product builder who thrives in a fast-paced, high-ownership environment, we\u2019d love to hear from you.</p>",
-      "experience": {
-        "label": "0-2 years",
-        "max": 2,
-        "min": 0,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "sql",
-        "redis",
-        "aws",
-        "gcp",
-        "azure",
-        "docker",
-        "git",
-        "graphql",
-        "orchestration",
-        "llm",
-        "kafka"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
       "id": "nk-nk-061026503539",
       "source": "naukri",
       "company": "Starkenn Technologies",
@@ -1992,37 +2239,6 @@
       },
       "skills_detected": [
         "react"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
-      "id": "nk-nk-061026501626",
-      "source": "naukri",
-      "company": "Syrohchem Laboratories",
-      "title": "full stack developer",
-      "location": "Mumbai, India",
-      "jd_location": "Mumbai, India",
-      "url": "https://www.naukri.com/job-listings-full-stack-developer-syrohchem-laboratories-pvt-ltd-mumbai-2-to-6-years-061026501626",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "full stack developer",
-        "full stack",
-        "javascript",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "design and develop high-quality software applications using java and other programming languages. collaborate with cross-functional teams to identify and prioritize project requirements. develop and maintain large-scale web applications using html, css, and javascript. troubleshoot and resolve technical issues efficiently. participate in code reviews and contribute to improving overall code quality. stay updated with industry trends and emerging technologies to enhance skills and knowledge. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 2-6 yrs emerging technologies, css, version control, full stack developer, agile development, communication and interpersonal skills, programming languages, code quality",
-      "experience": {
-        "label": "2-6 years",
-        "max": 6,
-        "min": 2,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "javascript",
-        "java"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
@@ -2312,86 +2528,6 @@
         "automation",
         "workflow",
         "linux"
-      ],
-      "work_mode": "Remote",
-      "jd_enriched": true
-    },
-    {
-      "id": "gh-7996774",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Machine Learning Engineer",
-      "location": "Remote - Ireland",
-      "jd_location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/7996774",
-      "posted": "2026-10-05T10:32:44-04:00",
-      "score": 53,
-      "reasons": [
-        "machine learning",
-        "python",
-        "llm",
-        "ai",
-        "location fit",
-        "remote",
-        "experience fit"
-      ],
-      "description": "Back to jobs Machine Learning Engineer Remote - Ireland Apply Who we are At Twilio, we\u2019re shaping the future of communications, all from the comfort of our homes. We deliver innovative solutions to hundreds of thousands of businesses and empower millions of developers worldwide to craft personalized customer experiences. Our dedication to remote-first work , and strong culture of connection and global inclusion means that no matter your location, you\u2019re part of a vibrant team with diverse experiences making a global impact each day. As we continue to revolutionize how the world interacts, we\u2019re acquiring new skills and experiences that make work feel truly rewarding. Your career at Twilio is in your hands. . Hiring and how we work We use Artificial Intelligence (AI) to help make our hiring process efficient. That said, every hiring decision is made by real Twilions! Also, while we are a remote-first company, you may be asked to report in person on an ad-hoc basis for team gatherings, functional off-sites or customer meetings. . See yourself at Twilio Join the team as Twilio\u2019s next Machine Learning Engineer. About the job This position is to design and engineer AI powered features that makes every customer conversation smarter. As a Machine Learning Engineer on the Conversation Intelligence team, you'll develop and deploy solutions that extract meaning from voice and messaging data at Twilio scale. You'll work alongside experienced ML practitioners to ship real features - from model pipelines to production inference - that directly shape how businesses understand their customers. Responsibilities In this role, you\u2019ll: Design and development of machine learning solutions, ensuring accuracy, performance, security, and scalability. Implement and maintain end-to-end AI/ML pipelines - from data ingestion and feature engineering through to model development, validation, and deployment with guidance from senior engineers on complex architectural decisions Instrument AI/ML services with appropriate metrics, logging, and telemetry to monitor model performance and operational health against defined SLOs Participate in on-call rotations, executing progressive rollouts and applying standard mitigation strategies to keep production inference services healthy Collaborate across planning, design, and code review phases contributing to product and technical discussions, while helping raise overall code quality through thoughtful review feedback Qualifications Twilio values diverse experiences from all kinds of industries, and we encourage everyone who meets the required qualifications to apply. If your career is just starting or hasn't followed a traditional path, don't let that stop you from considering Twilio. We are always looking for people who will bring something new to the table! *Required: Bachelor's degree in Computer Science, Mathematics, Statistics, or a related quantitative field, or equivalent practical experience 2+ years of experience in machine learning engineering or applied ML, with demonstrated proficiency in Python and at least one ML framework (PyTorch, TensorFlow, or JAX) and familiarity with NLP libraries such as Hugging Face Transformers, NLTK, or SpaCy. Experience developing, testing, and deploying small-to-medium scoped ML services or features in a collaborative engineering environment, including model versioning, experiment tracking, and cloud-based infrastructure (AWS, GCP, or Azure) Proficiency in Python (preferred) or similar OO language. Experience utilizing Large (or Small) Language Models within software systems. Excellent written and verbal communication skills with the ability to articulate complex technical concepts to both technical and non-technical audiences. Desired: Hands-on experience with conversational AI, or LLM fine-tuning and prompt engineering in a production context Exposure to agentic AI frameworks such as LangGraph, AutoGen, CrewAI Familiarity with MLOps/LLMOps tooling related to maintaining models in production such as testing, versioning, model registry, retraining, and monitoring. Location This role will be remote from Ireland. Travel We prioritize connection and opportunities to build relationships with our customers and each other. For this role, you may be required to travel occasionally to participate in project or team in-person meetings. What We Offer Working at Twilio offers many benefits, including competitive pay, generous time off, ample parental and wellness leave, healthcare, a retirement savings program, and much more. Offerings vary by location. Twilio thinks big. Do you? We like to solve problems, take initiative, pitch in when needed, and are always up for trying new things. That's why we seek out colleagues who embody our values \u2014 something we call Twilio Magic . Additionally, we empower employees to build positive change in their communities by supporting their volunteering and donation efforts. So, if you're ready to unleash your full potential, do your best work, and be the best version of yourself, apply now! If this role isn't what you're looking for, please consider other open positions. . Stay alert to recruitment fraud We care about your safety. Scammers sometimes impersonate Twilio recruiters through fake job postings, emails, websites, or messages. Please ensure you are engaging with an official @ twilio.com email address. We will never ask for payment, gift cards, cryptocurrency, or banking information during the recruiting process. We do not make job offers without a formal interview process or conduct interviews exclusively through text-based messaging apps. . Twilio is proud to be an equal opportunity employer. We do not discriminate based upon race, religion, color, national origin, sex (including pregnancy, childbirth, reproductive health decisions, or related medical conditions), sexual orientation, gender identity, gender expression, age, status as a protected veteran, status as an individual with a disability, genetic information, political views or activity, or other applicable legally protected characteristics. We also consider qualified applicants with criminal histories, consistent with applicable federal, state and local law. Qualified applicants with arrest or conviction records will be considered for employment in accordance with the Los Angeles County Fair Chance Ordinance for Employers and the California Fair Chance Act. Additionally, Twilio participates in the E-Verify program in certain locations, as required by law. Apply for this job * indicates a required field First Name * Last Name * Preferred First Name * Email * Phone Country * Phone * Location (City) * Locate me Resume/CV * Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf Cover Letter Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf LinkedIn Profile How did you hear about Twilio? * Careers Website LinkedIn Twitter Glassdoor Indeed Twilio Blog Conference or Event Content (e.g. videos, ads, billboards etc) Other Please click all that apply Are you legally authorized to work in the country in which this role is located? * Select... What is the source of your right to work where this role is listed? * Select... By clicking the \"Acknowledge\" button, you acknowledge that Twilio processes data in accordance with the Twilio Applicant Privacy Policy. * Acknowledge Twilio Applicant Privacy Policy By checking this box, I confirm I have read, reviewed and understood the guidelines outlined in the Candidate AI Responsible Use Policy. I affirm that all the information and materials I submit throughout my application and candidacy will reflect my own work and experience. * Acknowledge Candidate AI Responsible Use Policy International - Self-Identification of Demographic Information Twilio invites you to self-identify certain personal demographic information to help continue our mission to foster inclusivity in our workplace. Completing this survey is voluntary, but we do hope that you will participate because your responses help us measure the effectiveness of our outreach and recruitment activities. Responding is completely optional and voluntary and will not be used for the purposes of any employment decision. Any information you provide is confidential and is not accessible by recruiters, hiring managers or the interview team at any time. This data is collected, stored and otherwise processed in accordance with legal requirements. We hope you will join us in our commitment and enthusiasm for making Twilio a place where everyone belongs! Voluntary Self-Identification of Gender * Select... Submit application",
-      "experience": {
-        "label": "2+ years",
-        "max": null,
-        "min": 2,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "next",
-        "aws",
-        "gcp",
-        "azure",
-        "llm",
-        "machine learning",
-        "pytorch",
-        "tensorflow"
-      ],
-      "work_mode": "Remote",
-      "jd_enriched": true
-    },
-    {
-      "id": "gh-8007455",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Machine Learning Engineer",
-      "location": "Remote - Spain",
-      "jd_location": "Remote - Spain",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8007455",
-      "posted": "2026-10-05T10:32:25-04:00",
-      "score": 53,
-      "reasons": [
-        "machine learning",
-        "python",
-        "llm",
-        "ai",
-        "location fit",
-        "remote",
-        "experience fit"
-      ],
-      "description": "Back to jobs Machine Learning Engineer Remote - Spain Apply Who we are At Twilio, we\u2019re shaping the future of communications, all from the comfort of our homes. We deliver innovative solutions to hundreds of thousands of businesses and empower millions of developers worldwide to craft personalized customer experiences. Our dedication to remote-first work , and strong culture of connection and global inclusion means that no matter your location, you\u2019re part of a vibrant team with diverse experiences making a global impact each day. As we continue to revolutionize how the world interacts, we\u2019re acquiring new skills and experiences that make work feel truly rewarding. Your career at Twilio is in your hands. . Hiring and how we work We use Artificial Intelligence (AI) to help make our hiring process efficient. That said, every hiring decision is made by real Twilions! Also, while we are a remote-first company, you may be asked to report in person on an ad-hoc basis for team gatherings, functional off-sites or customer meetings. . See yourself at Twilio Join the team as Twilio\u2019s next Machine Learning Engineer. About the job This position is to design and engineer AI powered features that makes every customer conversation smarter. As a Machine Learning Engineer on the Conversation Intelligence team, you'll develop and deploy solutions that extract meaning from voice and messaging data at Twilio scale. You'll work alongside experienced ML practitioners to ship real features - from model pipelines to production inference - that directly shape how businesses understand their customers. Responsibilities In this role, you\u2019ll: Design and development of machine learning solutions, ensuring accuracy, performance, security, and scalability. Implement and maintain end-to-end AI/ML pipelines - from data ingestion and feature engineering through to model development, validation, and deployment with guidance from senior engineers on complex architectural decisions Instrument AI/ML services with appropriate metrics, logging, and telemetry to monitor model performance and operational health against defined SLOs Participate in on-call rotations, executing progressive rollouts and applying standard mitigation strategies to keep production inference services healthy Collaborate across planning, design, and code review phases contributing to product and technical discussions, while helping raise overall code quality through thoughtful review feedback Qualifications Twilio values diverse experiences from all kinds of industries, and we encourage everyone who meets the required qualifications to apply. If your career is just starting or hasn't followed a traditional path, don't let that stop you from considering Twilio. We are always looking for people who will bring something new to the table! *Required: Bachelor's degree in Computer Science, Mathematics, Statistics, or a related quantitative field, or equivalent practical experience 2+ years of experience in machine learning engineering or applied ML, with demonstrated proficiency in Python and at least one ML framework (PyTorch, TensorFlow, or JAX) and familiarity with NLP libraries such as Hugging Face Transformers, NLTK, or SpaCy. Experience developing, testing, and deploying small-to-medium scoped ML services or features in a collaborative engineering environment, including model versioning, experiment tracking, and cloud-based infrastructure (AWS, GCP, or Azure) Proficiency in Python (preferred) or similar OO language. Experience utilizing Large (or Small) Language Models within software systems. Excellent written and verbal communication skills with the ability to articulate complex technical concepts to both technical and non-technical audiences. Desired: Hands-on experience with conversational AI, or LLM fine-tuning and prompt engineering in a production context Exposure to agentic AI frameworks such as LangGraph, AutoGen, CrewAI Familiarity with MLOps/LLMOps tooling related to maintaining models in production such as testing, versioning, model registry, retraining, and monitoring. Location This role will be remote from Spain. Travel We prioritize connection and opportunities to build relationships with our customers and each other. For this role, you may be required to travel occasionally to participate in project or team in-person meetings. What We Offer Working at Twilio offers many benefits, including competitive pay, generous time off, ample parental and wellness leave, healthcare, a retirement savings program, and much more. Offerings vary by location. Twilio thinks big. Do you? We like to solve problems, take initiative, pitch in when needed, and are always up for trying new things. That's why we seek out colleagues who embody our values \u2014 something we call Twilio Magic . Additionally, we empower employees to build positive change in their communities by supporting their volunteering and donation efforts. So, if you're ready to unleash your full potential, do your best work, and be the best version of yourself, apply now! If this role isn't what you're looking for, please consider other open positions. . Stay alert to recruitment fraud We care about your safety. Scammers sometimes impersonate Twilio recruiters through fake job postings, emails, websites, or messages. Please ensure you are engaging with an official @ twilio.com email address. We will never ask for payment, gift cards, cryptocurrency, or banking information during the recruiting process. We do not make job offers without a formal interview process or conduct interviews exclusively through text-based messaging apps. . Twilio is proud to be an equal opportunity employer. We do not discriminate based upon race, religion, color, national origin, sex (including pregnancy, childbirth, reproductive health decisions, or related medical conditions), sexual orientation, gender identity, gender expression, age, status as a protected veteran, status as an individual with a disability, genetic information, political views or activity, or other applicable legally protected characteristics. We also consider qualified applicants with criminal histories, consistent with applicable federal, state and local law. Qualified applicants with arrest or conviction records will be considered for employment in accordance with the Los Angeles County Fair Chance Ordinance for Employers and the California Fair Chance Act. Additionally, Twilio participates in the E-Verify program in certain locations, as required by law. Apply for this job * indicates a required field First Name * Last Name * Preferred First Name * Email * Phone Country * Phone * Location (City) * Locate me Resume/CV * Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf Cover Letter Attach Attach Dropbox Google Drive Enter manually Enter manually Accepted file types: pdf, doc, docx, txt, rtf LinkedIn Profile How did you hear about Twilio? * Careers Website LinkedIn Twitter Glassdoor Indeed Twilio Blog Conference or Event Content (e.g. videos, ads, billboards etc) Other Please click all that apply Are you legally authorized to work in the country in which this role is located? * Select... What is the source of your right to work where this role is listed? * Select... By clicking the \"Acknowledge\" button, you acknowledge that Twilio processes data in accordance with the Twilio Applicant Privacy Policy. * Acknowledge Twilio Applicant Privacy Policy By checking this box, I confirm I have read, reviewed and understood the guidelines outlined in the Candidate AI Responsible Use Policy. I affirm that all the information and materials I submit throughout my application and candidacy will reflect my own work and experience. * Acknowledge Candidate AI Responsible Use Policy International - Self-Identification of Demographic Information Twilio invites you to self-identify certain personal demographic information to help continue our mission to foster inclusivity in our workplace. Completing this survey is voluntary, but we do hope that you will participate because your responses help us measure the effectiveness of our outreach and recruitment activities. Responding is completely optional and voluntary and will not be used for the purposes of any employment decision. Any information you provide is confidential and is not accessible by recruiters, hiring managers or the interview team at any time. This data is collected, stored and otherwise processed in accordance with legal requirements. We hope you will join us in our commitment and enthusiasm for making Twilio a place where everyone belongs! Voluntary Self-Identification of Gender * Select... Submit application",
-      "experience": {
-        "label": "2+ years",
-        "max": null,
-        "min": 2,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "next",
-        "aws",
-        "gcp",
-        "azure",
-        "llm",
-        "machine learning",
-        "pytorch",
-        "tensorflow"
       ],
       "work_mode": "Remote",
       "jd_enriched": true
@@ -2738,38 +2874,6 @@
       "jd_enriched": true
     },
     {
-      "id": "nk-nk-051026500235",
-      "source": "naukri",
-      "company": "ION",
-      "title": "Software Developer",
-      "location": "Noida, India",
-      "jd_location": "Noida, India",
-      "url": "https://www.naukri.com/job-listings-software-developer-ion-trading-noida-1-to-5-years-051026500235",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 48,
-      "reasons": [
-        "software developer",
-        "automation",
-        "ai",
-        "workflow",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "your role as a software developer, you will be instrumental in designing, developing, and maintaining robust software solutions for a global client base, including tier 1 banks and fortune 100 companies. this role demands strong problem-solving abilities, excellent communication skills, and adaptability in a dynamic, fast-paced environment. you will work as part of an agile team responsible for the end-to-end product development lifecycle, including: - business analysis solutioning : interpreting business requirements and contributing to effective product solutions. - architecture design : applying modern software engineering principles and design patterns to create scalable and maintainable systems. - development integration : writing clean, efficient code and integrating solutions using current and emerging technologies, following best practices, focusing on scalability, performance, and security. your contribution design and deliver innovative solutions that: simplify complex business processes enhance organizational efficiency through intelligent automation eliminate repetitive manual tasks, empowering teams to focus on higher-value work provide ion s clients with a competitive edge through cutting-edge product innovation tackle complex challenges: analyze and resolve intricate technical and business problems, while effectively communicating solutions to internal teams and ion clients. drive automation: streamline and automate sophisticated business workflows, delivering measurable impact and value to client operations. bring ideas technical innovation: bring fresh ideas to the team on technologies, tools, or features that can enhance the product and/or process. stay updated with emerging trends in software engineering and evaluate their relevance to ongoing projects. share innovative solutions to technical challenges that can improve product quality, scalability, or usability. bring ideas technical innovation: bring fresh ideas to the team on technologies, tools, or features that can enhance the product and/or process. stay updated with emerging trends in software engineering and evaluate their relevance to ongoing projects. share innovative solutions to technical challenges that can improve product quality, scalability, or usability. your growth you will collaborate closely with ion product teams and clients, gaining expertise in the following areas: in-depth knowledge development: a broad spectrum of technologies, development methodologies, and processes essential for building complex, mission-critical systems using distributed architectures. the financial domain, enabling the creation of world-class products. the end-to-end software product development lifecycle. technical expertise: develop a strong foundation in core technologies and stay ahead of the curve in a rapidly evolving tech landscape by working alongside subject matter experts. cultural and personal growth: thrive in an imaginative and positive work culture that values: passion: a drive to innovate and excel. expressiveness: the ability to communicate ideas clearly and creatively. intelligence: a commitment to continuous learning and smart problem-solving. our company: we re a diverse group of visionary innovators who provide trading and workflow automation software, high-value analytics, and strategic consulting to corporations, central banks, financial institutions, and governments. founded in 1999, we ve achieved tremendous growth by bringing together some of the best and most successful financial technology companies in the world. learn more at iongroup.com . we may use artificial intelligence (ai) tools to support parts of the hiring process, such as reviewing applications, analyzing resumes, or assessing responses and identifying potential inconsistencies or verification signals in application materials based on available information. these tools assist our recruitment team but do not replace human judgment. final hiring decisions are ultimately made by humans. if you would like more information about how your data is processed, please contact us. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 1-5 yrs product quality, automation, leadership development, business analysis, product innovation, artificial intelligence, agile, workflow",
-      "experience": {
-        "label": "1-5 years",
-        "max": 5,
-        "min": 1,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "automation",
-        "workflow"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
       "id": "nk-nk-051026500234",
       "source": "naukri",
       "company": "ION",
@@ -2802,34 +2906,33 @@
       "jd_enriched": true
     },
     {
-      "id": "nk-nk-051026039873",
+      "id": "nk-nk-051026500235",
       "source": "naukri",
-      "company": "Nxtwave Disruptive Technologies(Hiring for a Client)",
-      "title": "React JS Developer",
-      "location": "Bengaluru, India",
-      "jd_location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-react-js-developer-nxtwave-disruptive-technologies-hiring-for-a-client-bengaluru-2-to-4-years-051026039873",
+      "company": "ION",
+      "title": "Software Developer",
+      "location": "Noida, India",
+      "jd_location": "Noida, India",
+      "url": "https://www.naukri.com/job-listings-software-developer-ion-trading-noida-1-to-5-years-051026500235",
       "posted": "2026-10-05T00:00:00+00:00",
       "score": 48,
       "reasons": [
-        "react",
-        "react native",
-        "javascript",
+        "software developer",
+        "automation",
+        "ai",
+        "workflow",
         "location fit",
         "experience fit"
       ],
-      "description": "responsibilities develop high-quality javascript (es6) code for react applications. coordinate with backend engineers to establish and integrate json-based apis. optimize applications for maximum speed, performance, and browser compatibility. integrate third-party dependencies and troubleshoot dependency conflicts. multitask effectively while maintaining a positive attitude and a client-first mentality. incorporate engineering best practices, methodologies, and standards into all deliverables. pay close attention to detail and follow specifications and ui/ux mockups to deliver pixel-perfect interfaces. identify ui/ux issues and provide recommendations for improvement. requirements strong understanding of web application development. strong experience with react, javascript (es6), and css3. good experience with react or react native and redux. experience building complex features and interfaces for react applications. familiarity with restful apis. experience with version control tools such as git and package management tools such as npm. deep understanding of data structures, data flow, ajax, and crud operations. solid knowledge of modern web application development practices. excellent spoken and written english. 2-4 yrs frontend development, javascript, react.js, redux, react native, restful apis, front end, rest",
+      "description": "your role as a software developer, you will be instrumental in designing, developing, and maintaining robust software solutions for a global client base, including tier 1 banks and fortune 100 companies. this role demands strong problem-solving abilities, excellent communication skills, and adaptability in a dynamic, fast-paced environment. you will work as part of an agile team responsible for the end-to-end product development lifecycle, including: - business analysis solutioning : interpreting business requirements and contributing to effective product solutions. - architecture design : applying modern software engineering principles and design patterns to create scalable and maintainable systems. - development integration : writing clean, efficient code and integrating solutions using current and emerging technologies, following best practices, focusing on scalability, performance, and security. your contribution design and deliver innovative solutions that: simplify complex business processes enhance organizational efficiency through intelligent automation eliminate repetitive manual tasks, empowering teams to focus on higher-value work provide ion s clients with a competitive edge through cutting-edge product innovation tackle complex challenges: analyze and resolve intricate technical and business problems, while effectively communicating solutions to internal teams and ion clients. drive automation: streamline and automate sophisticated business workflows, delivering measurable impact and value to client operations. bring ideas technical innovation: bring fresh ideas to the team on technologies, tools, or features that can enhance the product and/or process. stay updated with emerging trends in software engineering and evaluate their relevance to ongoing projects. share innovative solutions to technical challenges that can improve product quality, scalability, or usability. bring ideas technical innovation: bring fresh ideas to the team on technologies, tools, or features that can enhance the product and/or process. stay updated with emerging trends in software engineering and evaluate their relevance to ongoing projects. share innovative solutions to technical challenges that can improve product quality, scalability, or usability. your growth you will collaborate closely with ion product teams and clients, gaining expertise in the following areas: in-depth knowledge development: a broad spectrum of technologies, development methodologies, and processes essential for building complex, mission-critical systems using distributed architectures. the financial domain, enabling the creation of world-class products. the end-to-end software product development lifecycle. technical expertise: develop a strong foundation in core technologies and stay ahead of the curve in a rapidly evolving tech landscape by working alongside subject matter experts. cultural and personal growth: thrive in an imaginative and positive work culture that values: passion: a drive to innovate and excel. expressiveness: the ability to communicate ideas clearly and creatively. intelligence: a commitment to continuous learning and smart problem-solving. our company: we re a diverse group of visionary innovators who provide trading and workflow automation software, high-value analytics, and strategic consulting to corporations, central banks, financial institutions, and governments. founded in 1999, we ve achieved tremendous growth by bringing together some of the best and most successful financial technology companies in the world. learn more at iongroup.com . we may use artificial intelligence (ai) tools to support parts of the hiring process, such as reviewing applications, analyzing resumes, or assessing responses and identifying potential inconsistencies or verification signals in application materials based on available information. these tools assist our recruitment team but do not replace human judgment. final hiring decisions are ultimately made by humans. if you would like more information about how your data is processed, please contact us. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 1-5 yrs product quality, automation, leadership development, business analysis, product innovation, artificial intelligence, agile, workflow",
       "experience": {
-        "min": 2,
-        "max": 4,
-        "label": "2-4 years",
+        "label": "1-5 years",
+        "max": 5,
+        "min": 1,
         "source": "job_description"
       },
       "skills_detected": [
-        "javascript",
-        "react",
-        "react native",
-        "git"
+        "automation",
+        "workflow"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
@@ -2865,31 +2968,32 @@
       "jd_enriched": true
     },
     {
-      "id": "sr-744000153372859",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "Software Developer",
-      "location": "hosur road bangalore, IN",
-      "jd_location": "hosur road bangalore, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153372859",
-      "posted": "2026-10-04T13:16:38.537000+00:00",
-      "score": 33,
+      "id": "nk-nk-051026005245",
+      "source": "naukri",
+      "company": "Creative Hands HR",
+      "title": "Software Engineer",
+      "location": "Hyderabad, Chennai, Bengaluru, India",
+      "jd_location": "Hyderabad, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-software-engineer-creative-hands-hr-hyderabad-chennai-bengaluru-0-to-2-years-051026005245",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 38,
       "reasons": [
-        "software developer",
-        "python",
-        "automation",
-        "location fit"
+        "software engineer",
+        "ai",
+        "location fit",
+        "experience fit"
       ],
-      "description": "Software Developer Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description Responsibilities :Development of Autosar base software communication stack predominantly in driver & transceiver development activities (Can/Lin/Fr/Ethernet)Development of Test framework for Simulation environment.Development of Test cases, Test automation scripts.Development of Configuration validation & Code generation scripts.Handling of change requests tools (e.g. ALM, CSCRM), issues tracking tool, Component release (Documentations like release note, quality metrics verification).Required Skills:Good knowledge in TCP/IP and socket programmingGood knowledge on autosar layered architecture in communication base software including CAN, Lin and FlexrayWorking experience on communication stack developmentStrong expertise in Embedded C Programing.Experience in SW development & Testing.Experience of scripting languages \u2013 Perl, OAW, Python Basics.Experience in debugging software and hardware issueAdditional Skills:Good analytical & communication skills (oral & written)Self-learning with steep learning curveWillingness to take up responsibility & accountability of deliverablesAdaptive to challenging situations Qualifications BE (EC & CS) Additional Information 4 to 8 By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+      "description": "job description software engineer key responsibilities: assist in the design, development, and implementation of software applications. write clean, efficient, and well-documented code. participate in code reviews and contribute to team learning. test and debug applications to ensure optimal performance. collaborate with senior engineers, product teams, and qa teams to deliver high-quality solutions. learn and adopt new technologies, tools, and best practices. support maintenance activities, including bug fixes and enhancements. requirements: bachelors degree in computer science, information technology, engineering, or related fields. strong understanding of programming fundamentals (oop, data structures, algorithms). knowledge of at least one programming language write clean, modular, and reusable code following solid and oop principles basic understanding of databases (sql/nosql). familiarity with web technologies or software development concepts is an added advantage. good analytical and problem solving skills. strong communication and teamwork abilities. willingness to learn and adapt to new tools and technologies. what we offer opportunities for learning, mentorship, and career growth. exposure to real-world projects and modern technologies. supportive work culture that encourages innovation and creativity. please apply for the job in naukri.com. we will check & will update you. do not search the number in google and do not call us. the requirements are not yet active from client's side. please apply for the job in naukri.com. we will check & will update you. do not search the number in google and do not call us. the requirements are not yet active from client's side. 0-2 yrs java, c++, btech, be, engineering, application programming, programming, ai",
       "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
+        "min": 0,
+        "max": 2,
+        "label": "0-2 years",
+        "source": "job_description"
       },
       "skills_detected": [
-        "python",
-        "automation"
+        "java",
+        "c++",
+        "sql"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true

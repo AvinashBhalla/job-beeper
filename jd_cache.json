@@ -386,6 +386,49 @@
     ],
     "work_mode": "Not specified"
   },
+  "gh-8829029002": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "GAQ327R265 About the Role At Databricks Information Technology, we are a product-led organisation transforming the way we work, from how easy it is to use our IT services to the applications we develop to help us scale seamlessly amid incredible growth. As an IT Software Engineer (Infrastructure) , you will be a core technical contributor on the IT CorpEng Infrastructure team, owning and driving the evolution of our core infrastructure and observability platforms. This role requires a strong software engineering mindset, deep technical breadth across SRE and infrastructure worlds, and the ability to deliver high-quality, scalable solutions for currently \"immature\" system problems. You will be responsible for building resilient, scalable, and automated infrastructure that empowers our development teams. As a member of the team, you will bridge the gap between software engineering and systems architecture, ensuring our AWS environment is cost-optimised, secure, and highly available. The impact you will have: Automate: Develop and deploy production-grade infrastructure on cloud platforms (AWS preferred) using Infrastructure as Code tools like Terraform or Pulumi. Orchestration: Deploy, manage, and scale containerised workloads using Kubernetes (EKS/AKS), focusing on security, reliability, and resource efficiency. CI/CD Excellence: Build and maintain robust deployment pipelines using GitHub Actions, including both cloud-hosted and self-hosted runners for specialised build requirements. Drive \"Observable by Default\" Frameworks: Implement infrastructure standards to ensure new internal applications are secure, with logging, metrics, and tracing configured out of the box. Tooling, Scripting & AI: Build internal CLI tools, AI-assisted workflows, and automation scripts to streamline developer workflows and reduce manual toil. Partner Cross-Functionally: Collaborate with Security, Engineering, Infrastructure, and Support teams to execute technical projects aligned with business outcomes. Document & Knowledge Share: Participate in peer code reviews, maintain operational playbooks/failure triage guides, and help onboard team members onto platforms you maintain. What we look for: Software Engineering Expertise: 3\u20135 years of hands-on software engineering experience, with strong proficiency in Python for scripting, automation, and tooling (required). Infrastructure as Code (IaC): Solid working knowledge of Terraform (modules, state management) or Pulumi (preferred). Cloud & Containerization: Hands-on experience building and supporting production workloads in AWS (or Azure/GCP), along with Kubernetes and Docker fundamentals. CI/CD & Automation: Practical experience designing, maintaining, and troubleshooting pipelines using GitHub Actions or similar modern CI/CD tools. Observability Foundations: Practical understanding of observability pillars (logging, metrics, tracing) and hands-on experience integrating tools such as Datadog, Prometheus, or Grafana. Independent Execution: Proven ability to own end-to-end tasks with guidance from Tech Leads, breaking down broader technical goals into actionable technical solutions. About Databricks Databricks is the Data and AI company. More than 20,000 organizations worldwide \u2014 including adidas, AT&T, Bayer, Block, Mastercard, Rivian, Unilever, and 70% of the Fortune 500 \u2014 rely on the Databricks Data + AI Platform to build and scale data and AI apps, analytics and agents. Headquartered in San Francisco with 30+ offices around the globe, Databricks offers a unified platform that includes Genie, Lakebase, Agent Bricks, Lakeflow, Lakehouse, and Unity Catalog. To learn more, follow Databricks on LinkedIn , X , YouTube , and Instagram . Benefits At Databricks, we strive to provide comprehensive benefits and perks that meet the needs of all of our employees. For specific details on the benefits offered in your region click here . Our Commitment to Diversity and Inclusion At Databricks, we are committed to fostering a diverse and inclusive culture where everyone can excel. We take great care to ensure that our hiring practices are inclusive and meet equal employment opportunity standards. Individuals looking for employment at Databricks are considered without regard to age, color, disability, ethnicity, family or marital status, gender identity or expression, language, national origin, physical and mental ability, political affiliation, race, religion, sexual orientation, socio-economic status, veteran status, and other protected characteristics. Compliance If access to export-controlled technology or source code is required for performance of job duties, it is within Employer's discretion whether to apply for a U.S. government license for such positions, and Employer may decline to proceed with an applicant on this basis alone. Applicant Privacy Notice",
+    "experience": {
+      "label": "3-5 years",
+      "max": 5,
+      "min": 3,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, India",
+    "skills_detected": [
+      "python",
+      "aws",
+      "gcp",
+      "azure",
+      "docker",
+      "kubernetes",
+      "ci/cd",
+      "automation",
+      "orchestration",
+      "terraform"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-cite-ai-4475485064": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "<p><span>Cite AI is the fastest-growing AI marketing platform, used by 1000+ marketing teams and agencies to track and grow their visibility in AI search.</span></p><p><br></p><p><span>Cite AI is looking for an Associate Software Engineer who'll build and ship features across the product, from the data pipelines that collect AI answers to the dashboards customers use every day.</span></p><p><br></p><p><strong>What you'll do:</strong></p><ul><li><span>Build and ship features across Cite AI's visibility tracking, citation analysis, and reporting</span></li><li><span>Work on the systems that run prompts across AI engines and process the responses at scale</span></li><li><span>Build APIs and dashboard components that turn raw AI answers into clear insights for brands and agencies</span></li><li><span>Work with product and design to take features from spec to release</span></li><li><span>Write clean, tested code and fix issues in production</span></li><li><span>Improve the speed, reliability, and cost of the product's data pipelines</span></li></ul><p><br></p><p><strong>What we are looking for:</strong></p><ul><li><span>0-2 years of software engineering experience</span></li><li><span>Strong programming fundamentals in Python, JavaScript, or TypeScript</span></li><li><span>Good understanding of data structures, APIs, and databases</span></li><li><span>Comfortable learning new tools and debugging unfamiliar code</span></li><li><span>Clear communicator who works well with product and design</span></li><li><span>Experience with a SaaS product, cloud services, or data pipelines is a plus</span></li></ul><p><br></p><p><span>If you're passionate about building products that shape how brands get discovered in AI search, Cite AI would love to hear from you.</span></p><p><br></p><p><span>Location: Bangalore</span></p><p><span>Compensation: As per industry standards</span></p><p><br></p><p><br></p>",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bangalore</span></p><p><span>Compensation: As per industry standards</span></p><p><br></p><p><br></p",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "typescript"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405": {
     "attempted_at": "2026-10-07T12:20:17.370953+00:00",
     "description": "The Associate Engineer is responsible for executing defined coding tasks and ensuring basic code quality.<br><br><strong>Code Implementation:</strong> Write and modify <strong>clean, testable, and efficient code</strong> for low-to-medium complexity features and bug fixes, primarily using the required programming language (e.g., Java, Python, JavaScript, C#).<br><br><strong>Debugging and Testing:</strong> Conduct thorough <strong>unit testing</strong> on assigned components and participate actively in debugging applications to identify and resolve defects reported by Quality Assurance (QA) or end-users.<br><br><strong>Documentation:</strong> Assist in creating and maintaining <strong>technical documentation</strong>, including code comments, design specifications for small features, and developer runbooks.<br><br><strong>Version Control:</strong> Utilize <strong>version control systems (e.g., Git/GitHub/GitLab)</strong> effectively for branching, merging, and managing code changes within the team codebase.<br><br><strong>Database Interaction:</strong> Write basic <strong>SQL queries</strong> or interact with NoSQL databases to support application functionality, data fetching, and simple data manipulation.<br><br><ul><li> Operational &amp; Collaborative Duties<br><br></li></ul>This role requires strong teamwork and adherence to established development processes.<br><br><strong>SDLC Participation:</strong> Actively participate in all phases of the <strong>Software Development Lifecycle (SDLC)</strong>, with a focus on implementation, testing, and deployment support.<br><br><strong>Agile/Scrum:</strong> Participate in <strong>Agile ceremonies</strong> (Daily Standups, Sprint Planning, Retrospectives) and accurately update task status and progress in project management tools (e.g., Jira, Azure DevOps).<br><br><strong>Code Review:</strong> Participate in and learn from the code review process by providing basic feedback and incorporating feedback from senior developers into their own code.<br><br><strong>Troubleshooting &amp; Support:</strong> Provide <strong>Level 1 (L1) technical support</strong> for applications, assisting in diagnosing and escalating production issues as needed.<br><br><strong>Requirements Interpretation:</strong> Work with senior developers and business analysts to understand technical requirements derived from user stories and functional specifications.",
@@ -489,6 +532,37 @@
     ],
     "work_mode": "Not specified"
   },
+  "li-https://in.linkedin.com/jobs/view/full-stack-java-developer-junior-at-citi-4475459287": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Citi is seeking a talented and driven <strong>Full Stack Software Engineer</strong> to design, develop, and maintain high-performance, scalable enterprise applications. In this role, you will play a key part in delivering end-to-end solutions by building responsive, modern user interfaces using <strong>Angular</strong> and robust, resilient backend microservices using <strong>Java &amp; Spring Boot</strong>.<br><br><strong>Key Responsibilities<br><br></strong><ul><li>End-to-End Application Development: Design, develop, test, and deploy resilient, scalable full-stack applications with Angular on the front end and Java / Spring Boot microservices on the backend.</li><li>Frontend Architecture: Build modern, responsive, and accessible web interfaces using Angular (v14+), TypeScript, HTML5/SCSS, and state management libraries (NgRx/RxJS).</li><li>Backend &amp; Microservices Engineering: Architect and implement RESTful APIs, event-driven architectures, and microservices following cloud-native principles, secure coding practices, and clean architecture standards.</li><li>Database &amp; Data Management: Design data models, write optimized queries, and interact with relational databases (e.g., Oracle, PostgreSQL) and NoSQL stores (e.g., MongoDB, Cassandra).</li><li>CI/CD &amp; DevOps: Integrate code into automated CI/CD pipelines, containerize applications using Docker, and support deployment onto container orchestration platforms (Kubernetes / OpenShift).</li><li>Quality Assurance &amp; Testing: Write comprehensive unit, integration, and end-to-end tests using frameworks such as JUnit, Mockito, Jasmine, Karma, or Cypress to maintain high code coverage and quality gates.</li><li>Code Reviews &amp; Collaboration: Participate in active peer code reviews, architectural discussions, sprint planning, and Agile ceremonies.</li><li>Security &amp; Compliance: Ensure software aligns with enterprise security standards, data privacy mandates, vulnerability remediation (e.g., SAST/DAST, SonarQube, Snyk), and regulatory compliance requirements.<br><br></li></ul><strong>Qualifications &amp; Skills<br><br></strong><strong>Required Technical Qualifications:<br><br></strong><ul><li>Core Experience: 2-4 years of professional software development experience in enterprise-grade applications.</li><li>Frontend Expertise:</li></ul><ul><li></li><ul><li>Proficiency in Angular (v12+ / latest versions), TypeScript, JavaScript (ES6+), HTML5, and CSS3/SCSS.</li><li>Experience in responsive UI design, modular architecture, and frontend performance optimization.</li><li>Backend Expertise:<br><br></li></ul><ul><li></li><ul><li>Strong foundation in Java (Java 11/17+) and core object-oriented programming concepts.</li><li>In-depth experience with the Spring Framework ecosystem (Spring Boot, Spring MVC, Spring Data, Spring Security, Spring Cloud).</li><li>Proven track record of designing, building, and consuming RESTful APIs and microservices.</li><li>Database Systems:<br><br></li></ul><ul><li></li><ul><li>Practical experience with relational databases (PostgreSQL, Oracle, or MySQL) including schema design, indexing, and SQL optimization.</li><li>Familiarity with ORM frameworks such as Hibernate / Spring Data JPA.<br></li></ul><strong>Preferred Qualifications:<br><br></strong><ul><li>Experience with containerization and orchestration platforms (Docker, Kubernetes, Red Hat OpenShift).</li><li>Experience with messaging/streaming platforms (e.g., Apache Kafka, RabbitMQ).</li><li>Knowledge of Cloud platforms (AWS, GCP, or Azure) and cloud-native architecture patterns.</li><li>Familiarity with caching technologies (e.g., Redis, Hazelcast).</li><li>Experience working in Agile/Scrum delivery environments with Jira/Confluence.</li><li>Financial services or banking domain knowledge is a plus.<br><br></li></ul><strong>Education:<br><br></strong><ul><li>Bachelor\u2019s/University degree or equivalent experience<br><br></li></ul>------------------------------------------------------<br><br><strong>Job Family Group: <br><br></strong>Technology<br><br>------------------------------------------------------<br><br><strong>Job Family:<br><br></strong>Digital Software Engineering<br><br>------------------------------------------------------<br><br><strong>Time Type:<br><br></strong>Full time<br><br>------------------------------------------------------<br><br><strong>Most Relevant Skills<br><br></strong>Please see the requirements listed above.<br><br>------------------------------------------------------<br><br><strong>Other Relevant Skills<br><br></strong>For complementary skills, please see above and/or contact the recruiter.<br><br>------------------------------------------------------<br><br><em>Citi is an equal opportunity employer, and qualified candidates will receive consideration without regard to their race, color, religion, sex, sexual orientation, gender identity, national origin, disability, status as a protected veteran, or any other characteristic protected by law.<br><br></em><em>If you are a person with a disability and need a reasonable accommodation to use our search tools and/or apply for a career opportunity review </em><em>Accessibility at Citi.<br><br></em><em>View Citi\u2019s EEO Policy Statement and the Know Your Rights poster.</em></ul></ul></ul>",
+    "experience": {
+      "label": "2-4 years",
+      "max": 4,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Chennai, Tamil Nadu, India",
+    "skills_detected": [
+      "javascript",
+      "typescript",
+      "java",
+      "sql",
+      "postgresql",
+      "mysql",
+      "mongodb",
+      "redis",
+      "aws",
+      "gcp",
+      "azure",
+      "docker",
+      "kubernetes",
+      "ci/cd",
+      "orchestration",
+      "kafka"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "<p>What you\u2019ll do</p><p><br></p><p>Technology is at the heart of our organization. We have a strong engineering team, and we're looking to expand our tech team. As part of the tech team, you\u2019ll be:</p><ol><li>Partnering with the product/business teams to understand the product features and specifications, translate them into high-level and low-level design</li><li>Participating in all stages of the Software Development Lifecycle - design, development, testing, deployment, and maintenance</li><li>Writing elegant, effective, and scalable code while maintaining the highest level of coding standards</li><li>Taking ownership of the work and ensuring timely deliveries</li><li>Driving innovation while relentlessly improving performance</li></ol><p><br></p><p>What you'll need</p><p><br></p><p>Must-haves</p><ul><li>1+ years of experience as a Java backend developer with strong knowledge of Java web frameworks like Spring Boot, and experience working in Microservices architecture</li><li>Hands-on experience working with Linux/Unix platform</li><li>Strong knowledge of SQL and RDBMS like PostgreSQL/MySQL, etc.</li><li>Experience in Python, Git</li><li>Strong technical aptitude and good knowledge of CS fundamentals</li><li>Strong design skills involving data modelling and low-level class design</li><li>Follow industry coding standards and be responsible for writing maintainable, scalable, and efficient code to solve business problems</li></ul><p><br></p><p>Good to have</p><ul><li>BTech. / MTech. in Computer Science or equivalent degree</li><li>Prior experience working in a start-up environment</li></ul><p><br></p><p>Why us?</p><p>We're hiring a set of highly skilled, enthusiastic, and passionate people who thrive in a high-growth environment.</p><p><br></p><ul><li>Skyrocket your career and salary: be part of our growth rocket ship</li><li>Explosive learning: learn multiple things in a very short duration and get to work directly with the CTO</li><li>Get to work things from an end-to-end perspective</li><li>Be a part-owner of the company: we\u2019ll also be offering a healthy amount of ESOPs over and above the salary !!</li></ul><p><br></p><p>About us</p><p>SkilloVilla is building the next-generation platform to prepare students, fresh graduates, and</p><p>working professionals for the rapidly changing employment landscape through a</p><p>technology-enabled advanced curriculum.</p><p><br></p><p>In a world where technology evolves by the day, and educational institutions\u2019 curriculums</p><p>find it difficult to upgrade to rapidly changing industry needs, upskilling becomes the need</p><p>of the hour for young graduates who are ready to enter the real world of opportunities. We</p><p>strive to bridge the skills gap and propel a person's career with an industry-aligned</p><p>curriculum that is not included in regular college syllabi. While we support novice</p><p>professionals to become job-ready, our team of hiring experts connects them to employers</p><p>from top-tier partner companies to help explore opportunities and secure the jobs of their</p><p>dreams.</p><p><br></p><p>Started by seasoned entrepreneurs from IIT Delhi and IIIT Hyderabad, we are passionate</p><p>about creating something unique, innovative, and big from India. We're backed by Titan</p><p>Capital, a prominent VC fund, along with 10+ marquee angel investors.</p><p><br></p><p>Know more about our founding team:</p><ul><li>Ronak Agrawal (CEO): IIT Delhi, Ex- Business Head, Cuemath</li><li>Rajat Agrawal (CTO): IIIT Hyderabad, Ex-Tech Lead, Swiggy</li><li>Deepak Kharol (COO): IIT Delhi, Ex-Sr. Growth Manager, Swiggy</li></ul>",
@@ -509,6 +583,26 @@
       "mysql",
       "git",
       "linux"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/java-software-engineer-at-mphasis-4476715143": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "<p>Key Responsibilities</p><ul><li>Design, develop, test, and maintain scalable backend applications using Java and Spring Boot.</li><li>Develop and maintain microservices-based applications and RESTful APIs.</li><li>Implement event-driven architectures and asynchronous processing using Apache Kafka.</li><li>Design, develop, and deploy applications on AWS cloud services.</li><li>Work with SQL and NoSQL databases to design schemas, optimize queries, and improve performance.</li><li>Identify and resolve performance bottlenecks, production issues, and technical challenges.</li><li>Write clean, reusable, maintainable, and well-tested code following industry best practices.</li><li>Implement unit testing, code reviews, and debugging to ensure application quality.</li><li>Collaborate with architects, product managers, QA engineers, and cross-functional teams.</li><li>Use AI-assisted development tools to improve coding productivity, testing, debugging, and documentation.</li><li>Participate in Agile ceremonies and contribute to continuous improvement of development processes.</li></ul><p>Mandatory Skills</p><ul><li>Java: Strong knowledge of Core Java, OOP concepts, Collections, Exception Handling, Multithreading, and concurrency.</li><li>Spring Boot: Hands-on experience developing enterprise applications using Spring Boot and the Spring Framework.</li><li>Microservices: Experience designing, developing, and maintaining microservices architectures.</li><li>Apache Kafka: Experience with producers, consumers, topics, partitions, and event-driven systems.</li><li>AWS: Practical experience deploying or managing applications using AWS services.</li><li>SQL / NoSQL Databases: Experience with relational databases and NoSQL databases, including query optimization and data modelling.</li><li>REST APIs: Experience designing and integrating RESTful web services.</li><li>Testing: Familiarity with JUnit, Mockito, and unit testing practices.</li><li>Build &amp; Version Control: Experience with Maven or Gradle and Git.</li></ul><p><br></p>",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Mumbai, Maharashtra, India",
+    "skills_detected": [
+      "java",
+      "sql",
+      "aws",
+      "git",
+      "kafka"
     ],
     "work_mode": "Not specified"
   },
@@ -590,6 +684,45 @@
       "orchestration",
       "llm",
       "kafka"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "<p><strong>Company Description</strong> Pharma Business Outlook is a specialized publication that connects pharmaceutical companies, healthcare providers, and key decision-makers across the industry. It focuses on critical topics such as regulatory compliance, emerging market opportunities, and digital transformation in the pharma sector. By fostering informed discussions, it helps stakeholders navigate complex challenges and identify strategic growth areas. The magazine plays an active role in shaping the future of the pharmaceutical ecosystem, making it an engaging environment for professionals interested in healthcare, technology, and innovation.</p><p><strong>Role Description</strong> The Junior Software Engineer will support the development and maintenance of software solutions that power Pharma Business Outlook\u2019s digital platforms and internal tools. Day-to-day responsibilities include writing clean, efficient code, participating in back-end web development tasks, debugging and resolving technical issues, and assisting in the implementation of new features under the guidance of senior engineers. The role involves collaborating with cross-functional teams to understand requirements, contributing to code reviews, and helping improve system performance and reliability. This is a full-time, on-site role based in Bengaluru.</p><p><strong>Qualifications</strong></p><ul><li>Strong foundational knowledge in Computer Science, including data structures, algorithms, and software engineering principles.</li><li>Practical experience or coursework in Software Development and Programming using modern languages (e.g., Java, Python, JavaScript, or similar).</li><li>Understanding of Back-End Web Development concepts such as APIs, databases, and server-side frameworks.</li><li>Familiarity with Object-Oriented Programming (OOP) and ability to apply OOP principles to real-world problems.</li><li>Bachelor\u2019s degree in Computer Science, Information Technology, or a closely related field (or equivalent practical experience).</li><li>Ability to work collaboratively in a team, follow coding standards, and learn from feedback.</li><li>Strong problem-solving skills, attention to detail, and willingness to learn new technologies.</li><li>Exposure to version control systems (e.g., Git) and basic software development lifecycle concepts is beneficial.</li></ul><p><br></p><p>Onsite Only</p>",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "java",
+      "git"
+    ],
+    "work_mode": "On-site"
+  },
+  "li-https://in.linkedin.com/jobs/view/l1-%E2%80%93-junior-software-developer-the-builder-at-wonder-worth-solutions-4476769047": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "<strong>The Role<br><br></strong><ul><li>You build the tools WWS runs on and the products the healthcare industry depends on. Your code supports real users and critical workflows.</li><li>At WWS, development is responsibility \u2014 not just delivery. You handle end-to-end development, from building and testing to deployment and monitoring, ensuring reliable, production-ready software in collaboration with WIT, STT, and Product teams.<br><br></li></ul><strong>What You Will Own \u2013 Your Responsibilities<br><br></strong><ul><li>Frontend development \u2014 Building UI components based on WIT design specifications</li><li>Backend development \u2014 Developing APIs, server-side logic, and database integrations</li><li>Integration \u2014 Connecting frontend and backend with complete functional accuracy</li><li>Unit testing \u2014 Writing and executing tests to ensure code reliability and stability</li><li>CI/CD pipeline \u2014 Managing deployments and ensuring smooth release cycles</li><li>Post-deployment monitoring \u2014 Identifying and resolving production issues within SLAs</li><li>Code reviews \u2014 Maintaining quality through timely peer reviews<br><br></li></ul><strong>Non-Negotiable Metrics<br><br></strong><ul><li>Unit Test Pass Rate \u2265 95%</li><li>Deployment Error Reduction \u2265 15% YoY<br><br></li></ul><strong>The Fight: What You Will Fight:<br><br></strong>Unreliable and untested software.<br><br><strong>The Enemy Is<br><br></strong><ul><li>Code that works temporarily but fails in production</li><li>Skipping testing for speed</li><li>Poor integrations and unclear handoffs</li><li>\u201cFix it later\u201d mindset creating technical debt<br><br></li></ul><strong>On the SDT team \u2013 Code is not done until it is tested, stable, and production-ready.<br><br></strong>Who Thrives Here: Three Traits We Cannot Teach<br><br><ul><li>Write for maintainability \u2014 You build code that lasts and scales</li><li>Test before delivery \u2014 You validate your work before handing it off</li><li>Own beyond deployment \u2014 You stay accountable until production is stable<br><br></li></ul><strong>The WWS Perks<br><br></strong><ul><li>Full Training \u2014 MERN stack, CI/CD practices, and product workflows</li><li>End-to-End Ownership \u2014 Work across the full development lifecycle</li><li>Career Growth \u2014 Exposure to design, testing, and product collaboration</li><li>Impact Visibility \u2014 Your code directly impacts real-world healthcare operations</li><li>Ownership Culture \u2014 We reward quality, accountability, and reliability<br><br></li></ul><strong>Qualifications<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree in Computer Science, Software Engineering, or related field</li><li>1+ Years Of Experience in Development </li><li>Proficient in React.js, Node.js, and Express.js</li><li>Good communication, problem-solving, debugging, and collaboration skills</li><li>Ability to write clean, scalable, and maintainable code</li><li>Passion for continuous learning and modern web development trends<br><br></li></ul>Contact us on jobs@wonderws.co / 9047477375<br><br>To Apply: https://careers.wonderws.com",
+    "experience": {
+      "label": "1+ years",
+      "max": null,
+      "min": 1,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Vellore, Tamil Nadu, India",
+    "skills_detected": [
+      "react",
+      "node.js",
+      "node",
+      "express",
+      "ci/cd"
     ],
     "work_mode": "Not specified"
   },
@@ -690,6 +823,27 @@
       "postgresql",
       "git",
       "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/software-engineer-at-deqode-4474460153": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "\ud83d\ude80 \ud835\udc16\ud835\udc1e\u2019\ud835\udc2b\ud835\udc1e \ud835\udc07\ud835\udc22\ud835\udc2b\ud835\udc22\ud835\udc27\ud835\udc20 \u2013 \ud835\udc12\ud835\udc28\ud835\udc1f\ud835\udc2d\ud835\udc30\ud835\udc1a\ud835\udc2b\ud835\udc1e \ud835\udc03\ud835\udc1e\ud835\udc2f\ud835\udc1e\ud835\udc25\ud835\udc28\ud835\udc29\ud835\udc1e\ud835\udc2b | \ud835\udc08\ud835\udc27\ud835\udc1d\ud835\udc28\ud835\udc2b\ud835\udc1e<br><br>We are looking for Software Developers with 0\u20133 years of experience for our Indore location.<br><br>\ud83d\udccc \ud835\udc0d\ud835\udc2e\ud835\udc26\ud835\udc1b\ud835\udc1e\ud835\udc2b \ud835\udc28\ud835\udc1f \ud835\udc0f\ud835\udc28\ud835\udc2c\ud835\udc22\ud835\udc2d\ud835\udc22\ud835\udc28\ud835\udc27\ud835\udc2c<br><br>10+ Openings<br><br>\ud83d\udcbb \ud835\udc12\ud835\udc24\ud835\udc22\ud835\udc25\ud835\udc25\ud835\udc2c \ud835\udc11\ud835\udc1e\ud835\udc2a\ud835\udc2e\ud835\udc22\ud835\udc2b\ud835\udc1e\ud835\udc1d<br><br><strong>Experience In \ud835\udc1a\ud835\udc27\ud835\udc32 \ud835\udc29\ud835\udc2b\ud835\udc28\ud835\udc20\ud835\udc2b\ud835\udc1a\ud835\udc26\ud835\udc26\ud835\udc22\ud835\udc27\ud835\udc20 \ud835\udc25\ud835\udc1a\ud835\udc27\ud835\udc20\ud835\udc2e\ud835\udc1a\ud835\udc20\ud835\udc1e, Such As<br><br></strong>Java<br><br>Python<br><br><ul><li>NET / C#<br><br></li></ul>JavaScript<br><br>C++<br><br>C<br><br>PHP<br><br>Go<br><br>Ruby<br><br>Or any other programming language<br><br>\ud83d\udccd \ud835\udc0b\ud835\udc28\ud835\udc1c\ud835\udc1a\ud835\udc2d\ud835\udc22\ud835\udc28\ud835\udc27: Indore<br><br>\u26a1 \ud835\udc0f\ud835\udc2b\ud835\udc1e\ud835\udc1f\ud835\udc1e\ud835\udc2b\ud835\udc1e\ud835\udc27\ud835\udc1c\ud835\udc1e: Immediate joiners are preferred.<br><br>\u26a0\ufe0f \ud835\udc06\ud835\udc2b\ud835\udc1a\ud835\udc1d\ud835\udc2e\ud835\udc1a\ud835\udc2d\ud835\udc22\ud835\udc28\ud835\udc27: 2022 \ud835\udc1b\ud835\udc1a\ud835\udc2d\ud835\udc1c\ud835\udc21 \ud835\udc1a\ud835\udc27\ud835\udc1d \ud835\udc25\ud835\udc1a\ud835\udc2d\ud835\udc1e\ud835\udc2b \ud835\udc1a\ud835\udc2b\ud835\udc1e \ud835\udc27\ud835\udc28\ud835\udc2d \ud835\udc1e\ud835\udc25\ud835\udc22\ud835\udc20\ud835\udc22\ud835\udc1b\ud835\udc25\ud835\udc1e \ud835\udc2d\ud835\udc28 \ud835\udc1a\ud835\udc29\ud835\udc29\ud835\udc25\ud835\udc32.<br><br><strong>\ud83d\udcdd \ud835\udc08\ud835\udc27\ud835\udc2d\ud835\udc1e\ud835\udc2b\ud835\udc1e\ud835\udc2c\ud835\udc2d\ud835\udc1e\ud835\udc1d \ud835\udc1c\ud835\udc1a\ud835\udc27\ud835\udc1d\ud835\udc22\ud835\udc1d\ud835\udc1a\ud835\udc2d\ud835\udc1e\ud835\udc2c, Please Apply Through The Form Below<br><br></strong>Skills:- Java and Python",
+    "experience": {
+      "label": "0-3 years",
+      "max": 3,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Indore, Madhya Pradesh, India",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "java",
+      "c++",
+      "c#",
+      "go"
     ],
     "work_mode": "Not specified"
   },
@@ -869,6 +1023,24 @@
       "postgresql",
       "git",
       "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-051026005245": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "job description software engineer key responsibilities: assist in the design, development, and implementation of software applications. write clean, efficient, and well-documented code. participate in code reviews and contribute to team learning. test and debug applications to ensure optimal performance. collaborate with senior engineers, product teams, and qa teams to deliver high-quality solutions. learn and adopt new technologies, tools, and best practices. support maintenance activities, including bug fixes and enhancements. requirements: bachelors degree in computer science, information technology, engineering, or related fields. strong understanding of programming fundamentals (oop, data structures, algorithms). knowledge of at least one programming language write clean, modular, and reusable code following solid and oop principles basic understanding of databases (sql/nosql). familiarity with web technologies or software development concepts is an added advantage. good analytical and problem solving skills. strong communication and teamwork abilities. willingness to learn and adapt to new tools and technologies. what we offer opportunities for learning, mentorship, and career growth. exposure to real-world projects and modern technologies. supportive work culture that encourages innovation and creativity. please apply for the job in naukri.com. we will check & will update you. do not search the number in google and do not call us. the requirements are not yet active from client's side. please apply for the job in naukri.com. we will check & will update you. do not search the number in google and do not call us. the requirements are not yet active from client's side. 0-2 yrs java, c++, btech, be, engineering, application programming, programming, ai",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Hyderabad, Chennai, Bengaluru, India",
+    "skills_detected": [
+      "java",
+      "c++",
+      "sql"
     ],
     "work_mode": "Not specified"
   },
@@ -1428,6 +1600,30 @@
     ],
     "work_mode": "Not specified"
   },
+  "nk-nk-071026013638": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "key responsibilities develop and maintain full-stack applications using java for back-end and frameworks like react, angular, or jsp for front-end development geeksforgeeks+1. design, build, and maintain apis and server-side logic using spring, spring boot, restful services, and servlets . database management including mysql, postgresql, mongodb, and orm tools like hibernate/jpa for data persistence . implement security, authentication, and authorization mechanisms for web applications velvet jobs. participate in the full software development lifecycle (sdlc) from requirement analysis, design, coding, testing, deployment, to maintenance interviewguy.com. collaborate with cross-functional teams including ui/ux designers, qa engineers, and devops for seamless project delivery optimize performance and ensure scalability of applications while following coding best practices interviewguy.com. stay updated with emerging technologies and propose improvements for existing systems interviewguy.com. required skills and technologies programming languages: java (java 8+), javascript, html, css . front-end frameworks: react.js, angular, jsp geeksforgeeks+1. back-end frameworks: spring, spring boot, servlets, rest apis . database & orm: mysql, postgresql, mongodb, hibernate, jpa version control & tools: git, maven, jenkins, docker (optional), interviewguy.com. testing: junit, integration testing, and unit testing practices . other skills: agile methodologies, problem-solving, debugging, and performance optimization workable.com. 2-5 yrs java, react.js, angular, hibernate, spring boot, microservices",
+    "experience": {
+      "label": "2-5 years",
+      "max": 5,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Hyderabad, Pune, Bengaluru, India",
+    "skills_detected": [
+      "javascript",
+      "react",
+      "java",
+      "postgresql",
+      "mysql",
+      "mongodb",
+      "docker",
+      "jenkins",
+      "git"
+    ],
+    "work_mode": "Not specified"
+  },
   "nk-nk-071026019017": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "full stack / backend developer (.net & azure) about the role: we are looking for a full stack / backend developer to design, build, and support scalable cloud-native applications on microsoft azure. the role is primarily focused on backend engineering, apis, databases, cloud services, integrations, and technical solution design, with the ability to contribute to frontend development when required. responsibilities: develop and maintain applications using .net, c#, sql server, and azure services. design, build, and support rest apis and backend services. develop secure, scalable, and maintainable application architectures. design and optimise database structures, queries, and integrations. build and maintain cloud-native solutions using microsoft azure. collaborate with product, ux, qa, and devops teams throughout the delivery lifecycle. participate in solution design, estimation, code reviews, testing, and release activities. troubleshoot and resolve application, integration, and production issues. contribute to frontend development using react and next.js where required. take ownership of features from requirements through production deployment and support. required skills backend engineering: 2+ years of software development experience. strong experience with c# and .net/.net core. strong experience designing and developing rest apis. strong knowledge of sql server, database design, and query optimisation. experience integrating with third-party apis and services. understanding of authentication, authorisation, and application security best practices. experience trouble shooting and supporting production applications. strong understanding of software design principles, patterns, and clean code practices. azure & cloud experience with microsoft azure. experience with azure app services. experience with azure sql. experience with azure storage accounts. experience with azure key vault. experience with azure functions. understanding of cloud architecture, scalability, monitoring, and operational best practices. development practices: experience with git, pull requests, and code review practices. experience using visual studio and/or visual studio code. experience writing maintainable, testable, and reusable code. understanding of ci/cd concepts and automated deployments. strong analytical and problem-solving skills. preferred skills: experience with azure devops, deployment pipelines, and infrastructure automation. experience with azure service bus and event-driven architectures. experience with react and next.js. experience with docker and containerised deployments. experience with automated testing and quality engineering practices. experience working in saas or product-led environments. what we expect: strong ownership and accountability. ability to understand product requirements and propose technical solutions. ability to independently analyse, design, build, test, and support features. strong attention to quality, security, scalability, and maintainability. willingness to challenge assumptions and improve solutions. focus on engineering excellence and continuous improvement. technology stack: .net, c#, sql server, azure app services, azure sql, azure functions, azure storage, azure key vault, rest apis, git, azure devops, react, next.js, visual studio, visual studio code. 2-4 yrs sql azure, .net, azure app service, nextjs, azure devops, rest apis, azure key vault, react",
@@ -1496,6 +1692,29 @@
     "skills_detected": [
       "c#",
       "sql"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-071026049318": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "key responsibilities design, develop, and maintain web applications using asp.net core / asp.net mvc and react.js . build restful apis using .net web api and integrate them with react front-end. collaborate with ui/ux designers to implement responsive and user-friendly interfaces. write clean, maintainable, and testable code following best practices. optimize application performance and ensure scalability. work with sql server or other relational databases for data storage and retrieval. participate in code reviews, troubleshooting, and debugging. collaborate with cross-functional teams in agile/scrum environments. implement security best practices in application development. required skills & qualifications strong proficiency in .net technologies : c#, asp.net core, mvc, web api. front-end expertise : react.js, javascript (es6+), html5, css3, bootstrap/tailwind. experience with entity framework core or dapper. strong knowledge of sql (t-sql, stored procedures, database design, optimization). familiarity with azure or aws cloud services (preferred). experience with git or other version control systems. understanding of restful api design and integration. knowledge of unit testing frameworks (xunit, nunit, jest, etc.). 2-5 yrs react.js, .net core, sql, c#, .net, asp.net mvc",
+    "experience": {
+      "label": "2-5 years",
+      "max": 5,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Hyderabad, Pune, Bengaluru, India",
+    "skills_detected": [
+      "javascript",
+      "react",
+      "c#",
+      "sql",
+      "aws",
+      "azure",
+      "git",
+      "api"
     ],
     "work_mode": "Not specified"
   },
@@ -1635,6 +1854,61 @@
     ],
     "work_mode": "Not specified"
   },
+  "nk-nk-071026504319": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "we are looking for a passionate and motivated react developer who is a fresher or recent graduate and interested in building modern, responsive, and user-friendly web applications. the ideal candidate should have a basic understanding of react.js, javascript, and front-end development and be willing to learn and grow with the team. responsibilities develop responsive and interactive web applications using react.js. build reusable and maintainable react components. convert ui designs into functional and responsive web interfaces. integrate rest apis and handle api responses in react applications. debug and resolve front-end issues and application errors. collaborate with designers and backend developers to implement new features. optimize applications for performance and cross-browser compatibility. stay updated with modern front-end technologies and best practices. requirements bachelors degree in computer science, information technology, or a related field. freshers and recent graduates are encouraged to apply. basic knowledge of html, css, javascript, and react.js. understanding of react components, props, state, and hooks is an advantage. basic knowledge of rest apis and json. knowledge of git/github is an advantage. good problem-solving and logical thinking skills. strong interest in learning modern web development technologies. disclaimer: this job posting and location has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 2-3 yrs css, github, debug, information technology, react developer, js, react, web applications",
+    "experience": {
+      "label": "2-3 years",
+      "max": 3,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Chennai, India",
+    "skills_detected": [
+      "javascript",
+      "react",
+      "git",
+      "api"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-071026504326": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "; ;we are looking for a passionate and enthusiastic full stack developer who is a fresher or recent graduate and eager to build a career in web application development. the ideal candidate should have a good understanding of front-end and back-end technologies and a strong willingness to learn and work on real-world projects. ;responsibilities ;develop and maintain responsive websites and web applications. ;work on both front-end and back-end development tasks. ;write clean, reusable, and maintainable code. ;collaborate with designers and developers to implement new features. ;integrate rest apis and third-party services into web applications. ;debug, test, and troubleshoot application issues. ;optimize applications for performance, security, and responsiveness. ;participate in code reviews and continuously improve technical skills. ;requirements ;bachelors degree in computer science, information technology, or a related field. ;freshers and recent graduates are encouraged to apply. ;basic knowledge of html, css, javascript, and bootstrap. ;basic understanding of any back-end technology such as php, laravel, node.js, or python. ;understanding of databases such as mysql or mongodb is an advantage. ;basic knowledge of rest apis and git/github is an advantage. ;strong problem-solving and logical thinking skills. ;passion for learning new technologies and developing web applications. disclaimer: this job posting and location has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 0-2 yrs css, github, laravel, python, debug, information technology, web application, full stack developer",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Chennai, India",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "node.js",
+      "node",
+      "mysql",
+      "mongodb",
+      "git"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-071026940615": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "software development engineering (high tech) focus on developing multiple types/categories of software including end-user applications and operating systems/utility software, that provides a platform for running end user applications for sale to external customers. the work includes:conducting requirements gathering and analysis to understand the domain of the software problem and/or functionality, the interfaces between hardware and software, and the overall software characteristicsusing programming, scripting, and/or database languages to write the software codesupporting software testing, deployment, maintenance, and evolution activities by correcting programming errors, responding to scope changes, and coding software enhancementsapplying knowledge of software development best practices, including coding standards, code reviews, source control management, build processes, testing, and operationspositions on this level are fully proficient in executing established standards. works independently within set frames and follows set course. has a knowledge base typically acquired from a professional/university degree and approximately 1-2 years of practical professional experience in a particular area. develops own knowledge, shares best practice and develops relevant/appropriate solutions. positions at this level are expected to continuously improve the day-to-day activities/processes. can be a formal team leader of more junior co-workers and may set day-to-day operational objectives. 1-2 yrs software development, scripting, operations, software testing, operating systems, maintenance, programming, requirements gathering",
+    "experience": {
+      "label": "1-2 years",
+      "max": 2,
+      "min": 1,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, India",
+    "skills_detected": [],
+    "work_mode": "Not specified"
+  },
   "rm-2091149": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "  who should apply  \n \u00a0 \n we are looking for developers from all technical backgrounds and language specializations. if you write clean code and understand software design, you are a fit: \n \n \n  software engineers &amp; computer scientists  specializing in algorithms, data structures, or system design. \n \n \n  full-stack &amp; web developers  working with modern front-end or back-end frameworks (javascript, typescript, react, node.js, python, php, ruby, etc.). \n \n \n  backend &amp; systems developers  experienced in languages such as c++, java, go, rust, or python. \n \n \n  devops &amp; database engineers  familiar with api design, sql/nosql databases, or scripting. \n \n \n \u00a0 \n  role &amp; responsibilities  \n as an  ai code trainer , you will evaluate model-generated code, author reference solutions, and stress-test ai reasoning across various engineering domains. \n \n \n  code auditing &amp; quality analysis:  critique ai-generated solutions for logic, performance, security vulnerabilities, syntax, and coding best practices. \n \n \n  gold-standard solutions:  write clean, production-grade reference code and clear technical explanations for complex programming prompts. \n \n \n  test design:  build unit tests and edge-case scenarios to evaluate model accuracy and expose edge-case failures. \n \n \n  technical feedback:  write structured explanations detailing why an ai solution succeeds, fails, or produces bugs. \n \n \n  \u00a0  \n  requirements  \n \n \n  software engineering proficiency:  strong core fundamentals in at least one major programming language or web stack (e.g., python, javascript/typescript, java, c++, go, c#, rust, php). \n \n \n  debugging &amp; code review:  ability to quickly analyze third-party code, catch subtle logical errors, and evaluate efficiency. \n \n \n  technical communication:  clear written english to explain technical concepts and code review rationales effectively. \n \n \n  eligible locations:  resident of  usa, uk, canada, australia, new zealand, india, pakistan, or philippines . \n \n \n  \u00a0  \n  why join us?  \n \n \n  $50\u2013$125/hr  commensurate with your technical domain expertise and task complexity. \n \n \n  weekly guaranteed payouts  directly to your choice of  paypal  or  payoneer . \n \n \n  100% remote &amp; asynchronous:  total schedule control\u2014work whenever and wherever you choose with no fixed minimum hours. \n \n \n how to apply \n apply directly on our website at  https://codeforai.tech/  \n ",
@@ -1704,6 +1978,162 @@
       "linux"
     ],
     "work_mode": "Hybrid"
+  },
+  "sr-744000154169689": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Java Full Stack with Java & Angular Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description 7 to 10 years of experience in development and maintenance of Angular 16/ higher and Java17/J2EE.Expertise in software development and enterprise web applicationsExpertise in DevOps area like working with pipeline, deployment of applications and monitoring of production applications (using tools like Docker, Kubernetes, Jenkins, New Relic and App Dynamics)Sound working knowledge in Angular1.x / Angular 2.Expertise in client-server application development (both Windows and web applications). Strong in Object oriented programmingStrong in Springs framework (Spring MVC, Spring security, spring boot)Strong experience with RDBMS conceptsHands-on experience with RESTful APIExpertise in Database design \u2013 Oracle / SQL Server / MySQLKnowledge of unit testing frameworks (test-automation) like Junit and Jest/JasmineKnowledge of automation testing framework like PlaywrightProvide solution to migrate the traditional web applications to cloud native architecture (Azure/AWS), digital and sustainable developmentStrong analytical skills Structured approach towards problem solving.Bachelor of engineering in CS/EE, MCA or BE Information Science. Qualifications B.E Additional Information 7 to 10 years experience By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "7-10 years",
+      "max": 10,
+      "min": 7,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "hosur road bangalore, IN",
+    "skills_detected": [
+      "java",
+      "sql",
+      "aws",
+      "azure",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "sr-744000154170834": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Java Full Stack with Java & Angular Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description 7 to 10 years of experience in development and maintenance of Angular 16/ higher and Java17/J2EE.Expertise in software development and enterprise web applicationsExpertise in DevOps area like working with pipeline, deployment of applications and monitoring of production applications (using tools like Docker, Kubernetes, Jenkins, New Relic and App Dynamics)Sound working knowledge in Angular1.x / Angular 2.Expertise in client-server application development (both Windows and web applications). Strong in Object oriented programmingStrong in Springs framework (Spring MVC, Spring security, spring boot)Strong experience with RDBMS conceptsHands-on experience with RESTful APIExpertise in Database design \u2013 Oracle / SQL Server / MySQLKnowledge of unit testing frameworks (test-automation) like Junit and Jest/JasmineKnowledge of automation testing framework like PlaywrightProvide solution to migrate the traditional web applications to cloud native architecture (Azure/AWS), digital and sustainable developmentStrong analytical skills Structured approach towards problem solving.Bachelor of engineering in CS/EE, MCA or BE Information Science. Qualifications B.E Additional Information 7 to 10 years experience By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "7-10 years",
+      "max": 10,
+      "min": 7,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "hosur road bangalore, IN",
+    "skills_detected": [
+      "java",
+      "sql",
+      "aws",
+      "azure",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "sr-744000154171898": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Full Stack with C# & Angular Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description Develop and maintain web applications using Angular framework.Develop and maintain web applications using ASP.NET, C#, and related technologies.Collaborate with front-end developers to integrate user-facing elements with server-side logic.Collaborate with UX/UI designers to implement design specifications.Write clean, maintainable, and efficient code.Optimize applications for maximum speed and scalability.Troubleshoot and debug applications to ensure optimal performance.Participate in code reviews and contribute to team knowledge sharing.Stay updated with the latest industry trends and technologies.Experience:Proven experience as an Angular Developer or similar role.7 to 10 years experienceStrong proficiency in HTML, CSS, and JavaScript.Experience with Angular (version 2 and above) and its core principles.Familiarity with RESTful APIs and asynchronous programming.Proven experience as an ASP.NET Developer or similar role.Strong proficiency in C#, ASP.NET MVC, and Web API.Experience with front-end technologies such as HTML, CSS, and JavaScript.Familiarity with database management systems (e.g., SQL Server, MySQL).Knowledge of version control systems (e.g., Git).Excellent problem-solving skills and attention to detail.Good to have skills:Experience with state management libraries (e.g., NgRx).Familiarity with testing frameworks (e.g., Jasmine, Karma).Understanding of responsive design principles.Knowledge of Agile methodologies. Qualifications B.E Additional Information 7 to 10 years experience By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "7-10 years",
+      "max": 10,
+      "min": 7,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "hosur road bangalore, IN",
+    "skills_detected": [
+      "javascript",
+      "c#",
+      "sql",
+      "mysql",
+      "git",
+      "api"
+    ],
+    "work_mode": "Not specified"
+  },
+  "sr-744000154172468": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Full Stack with C# & Angular Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description Develop and maintain web applications using Angular framework.Develop and maintain web applications using ASP.NET, C#, and related technologies.Collaborate with front-end developers to integrate user-facing elements with server-side logic.Collaborate with UX/UI designers to implement design specifications.Write clean, maintainable, and efficient code.Optimize applications for maximum speed and scalability.Troubleshoot and debug applications to ensure optimal performance.Participate in code reviews and contribute to team knowledge sharing.Stay updated with the latest industry trends and technologies.Experience:Proven experience as an Angular Developer or similar role.7 to 10 years experienceStrong proficiency in HTML, CSS, and JavaScript.Experience with Angular (version 2 and above) and its core principles.Familiarity with RESTful APIs and asynchronous programming.Proven experience as an ASP.NET Developer or similar role.Strong proficiency in C#, ASP.NET MVC, and Web API.Experience with front-end technologies such as HTML, CSS, and JavaScript.Familiarity with database management systems (e.g., SQL Server, MySQL).Knowledge of version control systems (e.g., Git).Excellent problem-solving skills and attention to detail.Good to have skills:Experience with state management libraries (e.g., NgRx).Familiarity with testing frameworks (e.g., Jasmine, Karma).Understanding of responsive design principles.Knowledge of Agile methodologies. Qualifications B.E Additional Information 7 to 10 years experience By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "7-10 years",
+      "max": 10,
+      "min": 7,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "hosur road bangalore, IN",
+    "skills_detected": [
+      "javascript",
+      "c#",
+      "sql",
+      "mysql",
+      "git",
+      "api"
+    ],
+    "work_mode": "Not specified"
+  },
+  "sr-744000154172758": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Manual & Automation Testing Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description Must Have Skills\u00b7 6\u20138 years of experience in Manual and Automation Testing\u00b7 Strong understanding of SDLC, STLC, Agile & Scrum methodologies\u00b7 Hands-on with automation tools: Selenium WebDriver, TestNG, Cucumber, JUnit, or similar\u00b7 Experience in Java/Python/JavaScript for automation scripting\u00b7 Proficient in API testing using Postman, REST Assured, or similar\u00b7 Familiarity with test management and bug tracking tools (e.g., JIRA, TestRail)\u00b7 Experience with CI/CD tools like Jenkins, Git, Maven, or similarMust have experience in maintaining the code repository.\u00b7 Must have worked on Agile/Scrum projects.Good to have Skillso Good to have knowledge / experience in Python scripts. o Good to have experience in Microsoft Azure Toolo Good to have knowledge in API automation using Cypress. o Requirements Engineering, Communication and presentation, Team Work Qualifications B.E Additional Information 6+ years By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "6-8 years",
+      "max": 8,
+      "min": 6,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "bangalore, IN",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "java",
+      "azure",
+      "jenkins",
+      "ci/cd",
+      "git",
+      "api",
+      "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "sr-744000154173553": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Java Full Stack with Java & Angular Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description 7 to 10 years of experience in development and maintenance of Angular 16/ higher and Java17/J2EE.Expertise in software development and enterprise web applicationsExpertise in DevOps area like working with pipeline, deployment of applications and monitoring of production applications (using tools like Docker, Kubernetes, Jenkins, New Relic and App Dynamics)Sound working knowledge in Angular1.x / Angular 2.Expertise in client-server application development (both Windows and web applications). Strong in Object oriented programmingStrong in Springs framework (Spring MVC, Spring security, spring boot)Strong experience with RDBMS conceptsHands-on experience with RESTful APIExpertise in Database design \u2013 Oracle / SQL Server / MySQLKnowledge of unit testing frameworks (test-automation) like Junit and Jest/JasmineKnowledge of automation testing framework like PlaywrightProvide solution to migrate the traditional web applications to cloud native architecture (Azure/AWS), digital and sustainable developmentStrong analytical skills Structured approach towards problem solving.Bachelor of engineering in CS/EE, MCA or BE Information Science. Qualifications B.E Additional Information 7 to 10 years experience By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "7-10 years",
+      "max": 10,
+      "min": 7,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "hosur road bangalore, IN",
+    "skills_detected": [
+      "java",
+      "sql",
+      "aws",
+      "azure",
+      "docker",
+      "kubernetes",
+      "jenkins",
+      "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "sr-744000154173617": {
+    "attempted_at": "2026-10-07T19:04:01.737148+00:00",
+    "description": "Full Stack with C# & Angular Full-time Legal Entity: Bosch Global Software Technologies Private Limited Company Description Bosch Global Software Technologies Private Limited is a 100% owned subsidiary of Robert Bosch GmbH, one of the world's leading global supplier of technology and services, offering end-to-end Engineering, IT and Business Solutions. With over 27,000+ associates, it\u2019s the largest software development center of Bosch, outside Germany, indicating that it is the Technology Powerhouse of Bosch in India with a global footprint and presence in the US, Europe and the Asia Pacific region. Job Description Develop and maintain web applications using Angular framework.Develop and maintain web applications using ASP.NET, C#, and related technologies.Collaborate with front-end developers to integrate user-facing elements with server-side logic.Collaborate with UX/UI designers to implement design specifications.Write clean, maintainable, and efficient code.Optimize applications for maximum speed and scalability.Troubleshoot and debug applications to ensure optimal performance.Participate in code reviews and contribute to team knowledge sharing.Stay updated with the latest industry trends and technologies.Experience:Proven experience as an Angular Developer or similar role.7 to 10 years experienceStrong proficiency in HTML, CSS, and JavaScript.Experience with Angular (version 2 and above) and its core principles.Familiarity with RESTful APIs and asynchronous programming.Proven experience as an ASP.NET Developer or similar role.Strong proficiency in C#, ASP.NET MVC, and Web API.Experience with front-end technologies such as HTML, CSS, and JavaScript.Familiarity with database management systems (e.g., SQL Server, MySQL).Knowledge of version control systems (e.g., Git).Excellent problem-solving skills and attention to detail.Good to have skills:Experience with state management libraries (e.g., NgRx).Familiarity with testing frameworks (e.g., Jasmine, Karma).Understanding of responsive design principles.Knowledge of Agile methodologies. Qualifications B.E Additional Information 7 to 10 years experience By clicking the link above or any third-party link within this posting, you are leaving this site and going to a third-party website where the third-party website's terms and privacy policy apply I'm interested I'm interested Privacy Notice Imprint",
+    "experience": {
+      "label": "7-10 years",
+      "max": 10,
+      "min": 7,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "hosur road bangalore, IN",
+    "skills_detected": [
+      "javascript",
+      "c#",
+      "sql",
+      "mysql",
+      "git",
+      "api"
+    ],
+    "work_mode": "Not specified"
   },
   "wd-intel-/job/India-Bangalore/AI-ML-Technologist_JR0285263": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
