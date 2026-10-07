@@ -1,23 +1,6 @@
 {
   "filters": {
-    "title_include": [
-      "software",
-      "developer",
-      "full stack",
-      "fullstack",
-      "backend",
-      "frontend",
-      "automation",
-      "python",
-      "react",
-      "react native",
-      "node",
-      "next",
-      "ai",
-      "ml",
-      "llm",
-      "forward deployed"
-    ],
+    "title_include": [],
     "title_exclude": [
       "senior",
       "sr.",
