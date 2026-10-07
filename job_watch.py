@@ -14,7 +14,7 @@ SOURCE_STATE_FILE = ROOT / "source_state.json"
 DASH_FILE = ROOT / "dashboard" / "data" / "jobs.json"
 UA = {"User-Agent": "Mozilla/5.0 (personal-job-watcher)"}
 NOW = dt.datetime.now(dt.timezone.utc)
-SOURCE_GENERATION = 2
+SOURCE_GENERATION = 3
 strip = lambda h: re.sub("<[^>]+>", " ", h or "")
 
 def get(url, **kw):
@@ -205,9 +205,49 @@ def text_matches(value, phrase):
         return bool(re.search(rf"\b{re.escape(phrase)}\b", value))
     return phrase in value
 
+
+FIELD_TERMS = {
+    "frontend": ["frontend", "front end", "react", "react native", "next.js", "next"],
+    "backend": ["backend", "back end", "node.js", "node", "express", "fastapi", "django"],
+    "full_stack": ["full stack", "fullstack"],
+    "automation": ["automation", "workflow", "n8n", "orchestration"],
+    "ai_ml": ["ai", "machine learning", "ml", "llm", "genai", "generative ai"],
+    "python": ["python"],
+    "javascript_typescript": ["javascript", "typescript"],
+    "devops": ["devops", "ci/cd", "jenkins", "docker", "kubernetes"],
+    "mobile": ["mobile", "react native", "flutter", "android", "ios"],
+    "data": ["data engineer", "data science", "analytics", "pandas", "sql"],
+}
+
+def configured_title_terms(f):
+    terms = list(f.get("title_include", []))
+    terms.extend(f.get("keywords", []))
+    for field in f.get("fields", []):
+        terms.extend(FIELD_TERMS.get(str(field).lower(), [str(field)]))
+    seen = set()
+    return [x for x in terms if x and not (x.lower() in seen or seen.add(x.lower()))]
+
+def board_queries(name, source_cfg, f):
+    if not f.get("search_from_filters", True):
+        return source_cfg.get(name, [])
+    terms = []
+    terms.extend(f.get("keywords", []))
+    for field in f.get("fields", []):
+        terms.extend(FIELD_TERMS.get(str(field).lower(), [str(field)]))
+    terms = list(dict.fromkeys(x.strip() for x in terms if x and x.strip()))
+    if not terms:
+        return source_cfg.get(name, [])
+    if name == "linkedin":
+        return ["(" + " OR ".join(terms[:10]) + ")"]
+    if name == "naukri":
+        return terms[:8]
+    if name == "instahyre":
+        return [terms[0]]
+    return source_cfg.get(name, [])
+
 def passes(j, f):
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
-    if f["title_include"] and not any(text_matches(t, k) for k in f["title_include"]):
+    title_terms = configured_title_terms(f)\n    if title_terms and not any(text_matches(t, k) for k in title_terms):
         return False
     if any(text_matches(t, x) for x in f["title_exclude"]):
         return False
@@ -230,7 +270,7 @@ def score_job(j, f):
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
     score = 0
     reasons = []
-    for k in f.get("title_include", []):
+    for k in configured_title_terms(f):
         if text_matches(t, k):
             score += 8
             reasons.append(k)
@@ -448,7 +488,7 @@ def main():
             if j["id"] in seen:
                 continue
             seen.add(j["id"])
-            if not silent and passes(j, f) and os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID"):
+            if (not silent and passes(j, f) and f.get("notifications_enabled", True) and\n                    os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
                 notify(j, score, reasons)
                 alerts.append(j["id"])
 
