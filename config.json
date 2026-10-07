@@ -39,9 +39,10 @@
       "gurugram",
       "gurgaon",
       "delhi",
-      "remote",
-      "india",
-      "hybrid"
+      "remote india",
+      "remote, india",
+      "hybrid",
+      "india"
     ],
     "remote_only": false,
     "max_age_hours": 72,
