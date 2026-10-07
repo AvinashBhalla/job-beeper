@@ -14,6 +14,7 @@ SOURCE_STATE_FILE = ROOT / "source_state.json"
 DASH_FILE = ROOT / "dashboard" / "data" / "jobs.json"
 UA = {"User-Agent": "Mozilla/5.0 (personal-job-watcher)"}
 NOW = dt.datetime.now(dt.timezone.utc)
+SOURCE_GENERATION = 2
 strip = lambda h: re.sub("<[^>]+>", " ", h or "")
 
 def get(url, **kw):
@@ -173,11 +174,20 @@ def location_matches(loc, allowed):
         )
     return False
 
+def text_matches(value, phrase):
+    value = re.sub(r"\\s+", " ", (value or "").lower()).strip()
+    phrase = re.sub(r"\\s+", " ", (phrase or "").lower()).strip()
+    if not phrase:
+        return False
+    if re.fullmatch(r"[a-z0-9]+", phrase) and len(phrase) <= 4:
+        return bool(re.search(rf"\\b{re.escape(phrase)}\\b", value))
+    return phrase in value
+
 def passes(j, f):
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
-    if f["title_include"] and not any(k.lower() in t for k in f["title_include"]):
+    if f["title_include"] and not any(text_matches(t, k) for k in f["title_include"]):
         return False
-    if any(x.lower() in t for x in f["title_exclude"]):
+    if any(text_matches(t, x) for x in f["title_exclude"]):
         return False
     if f["locations"] and not location_matches(loc, f["locations"]):
         return False
@@ -187,9 +197,9 @@ def passes(j, f):
         return False
     if any(c.lower() in j["company"].lower() for c in f["company_exclude"]):
         return False
-    if f["description_include_any"] and d and not any(k.lower() in d for k in f["description_include_any"]):
+    if f["description_include_any"] and d and not any(text_matches(d, k) for k in f["description_include_any"]):
         return False
-    if any(k.lower() in d for k in f["description_exclude_any"]):
+    if any(text_matches(d, k) for k in f["description_exclude_any"]):
         return False
     yrs = max_years_required(d)
     return not (f["max_experience_years"] is not None and yrs is not None and yrs > f["max_experience_years"])
@@ -199,14 +209,14 @@ def score_job(j, f):
     score = 0
     reasons = []
     for k in f.get("title_include", []):
-        if k.lower() in t:
+        if text_matches(t, k):
             score += 8
             reasons.append(k)
     for k in f.get("skills", []):
-        if k.lower() in t or k.lower() in d:
+        if text_matches(t, k) or text_matches(d, k):
             score += 5
             reasons.append(k)
-    if any(l.lower() in loc for l in f.get("locations", [])):
+    if location_matches(loc, f.get("locations", [])):
         score += 15
     if "remote" in loc:
         score += 10
@@ -379,6 +389,7 @@ def main():
                 "last_error": str(err),
                 "last_failure": NOW.isoformat(),
                 "skip_until": retry_at.isoformat(),
+                "generation": SOURCE_GENERATION,
             }
             source_status[key] = {
                 "ok": False,
@@ -391,11 +402,13 @@ def main():
             print(f"[warn] {key}: {err} (retry after {retry_at.isoformat()})")
             continue
 
+        previous_generation = source_state.get(key, {}).get("generation")
         source_state[key] = {
             "failures": 0,
             "last_success": NOW.isoformat(),
             "last_count": len(jobs),
             "skip_until": None,
+            "generation": SOURCE_GENERATION,
         }
         source_status[key] = {
             "ok": True,
@@ -403,7 +416,7 @@ def main():
             "error": None,
             "provider": provider,
         }
-        silent = (not exists) or key not in known_sources
+        silent = ((not exists) or key not in known_sources or previous_generation != SOURCE_GENERATION)
         known_sources.add(key)
         for j in jobs:
             j["source"] = name
