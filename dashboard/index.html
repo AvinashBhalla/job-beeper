@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JobBeeper Local</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand"><span class="logo">⚡</span><div><b>JobBeeper</b><small>Your job search</small></div></div>
+  <nav>
+    <a class="active">▦ <span>Jobs</span></a>
+    <a href="#applied">◷ <span>Applied</span></a>
+    <a href="#filters">☷ <span>Filters</span></a>
+    <a href="#sources">▤ <span>Sources</span></a>
+  </nav>
+  <div class="profile"><div class="avatar">AB</div><div><b>Avinash Bhalla</b><small>Personal job watcher</small></div></div>
+  <div class="live"><span class="dot"></span> Live feed <small id="lastRun">waiting…</small></div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <h1>Jobs</h1>
+      <p>Fresh jobs from multiple sources, ranked for your profile.</p>
+    </div>
+    <div class="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
+  </header>
+
+  <section class="stats">
+    <div><b id="total">0</b><span>Total jobs</span></div>
+    <div><b id="today">0</b><span>Fresh feed</span></div>
+    <div><b id="notified">0</b><span>Alerts this run</span></div>
+  </section>
+
+  <section class="toolbar">
+    <input id="search" placeholder="Role, company, location, skill…">
+    <select id="source"><option value="">All sources</option></select>
+    <select id="score"><option value="0">All matches</option><option value="80">80%+</option><option value="90">90%+</option></select>
+    <select id="age"><option value="72">Last 72h</option><option value="24">Last 24h</option><option value="6">Last 6h</option><option value="1">Last hour</option></select>
+  </section>
+
+  <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh now</button><span id="auto">Auto-refresh: 30s</span></div>
+  <section id="jobs" class="jobs"></section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

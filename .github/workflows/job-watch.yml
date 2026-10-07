@@ -1,7 +1,7 @@
 name: job-watch
 on:
   schedule:
-    - cron: "*/10 * * * *"   # GitHub may delay scheduled runs by a few minutes
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 permissions:
   contents: write
@@ -14,17 +14,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install requests
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
       - run: python job_watch.py
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
-      - name: Save seen jobs
+      - name: Save state and dashboard feed
         run: |
           git config user.name "job-watch-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add seen.json
-          git diff --staged --quiet || (git commit -m "update seen jobs" && git push)
+          git add seen.json dashboard/data/jobs.json
+          git diff --staged --quiet || (git commit -m "refresh job feed" && git push)
