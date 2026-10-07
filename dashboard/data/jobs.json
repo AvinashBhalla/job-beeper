@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-10-07T09:56:23.258243+00:00",
-  "last_run": "2026-10-07T09:56:23.258243+00:00",
-  "new_alerts": 0,
+  "updated_at": "2026-10-07T09:59:05.536509+00:00",
+  "last_run": "2026-10-07T09:59:05.536509+00:00",
+  "new_alerts": 1,
   "source_status": {
     "greenhouse:\"groww\"": {
       "ok": true,
@@ -416,12 +416,12 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/walmartexternal/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T10:16:23.258243+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T10:39:05.536509+00:00",
+      "failures": 2
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
-      "count": 29,
+      "count": 30,
       "error": null,
       "provider": "direct"
     },
@@ -430,8 +430,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T12:36:23.258243+00:00",
-      "failures": 4
+      "retry_at": "2026-10-07T15:19:05.536509+00:00",
+      "failures": 5
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -450,8 +450,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T12:36:23.258243+00:00",
-      "failures": 4
+      "retry_at": "2026-10-07T15:19:05.536509+00:00",
+      "failures": 5
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
       "ok": true,
@@ -528,7 +528,7 @@
       "title": "AI/ML Technologist",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
-      "posted": "2026-10-07T09:56:23.258243+00:00",
+      "posted": "2026-10-07T09:59:05.536509+00:00",
       "score": 56,
       "reasons": [
         "ai",
@@ -536,42 +536,16 @@
       ]
     },
     {
-      "id": "sr-744000154007219",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "India Sales Leader - IT Services & Digital Engineering",
-      "location": "bengaluru, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000154007219",
-      "posted": "2026-10-07T05:27:54.852000+00:00",
-      "score": 39,
+      "id": "wd-intel-/job/India-Bangalore/GPU-Software-Development-Engineer_JR0287726",
+      "source": "workday",
+      "company": "intel",
+      "title": "GPU Software Development Engineer",
+      "location": "India, Bangalore",
+      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/GPU-Software-Development-Engineer_JR0287726",
+      "posted": "2026-10-07T09:59:05.536509+00:00",
+      "score": 43,
       "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "sr-744000154002399",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "IN_RBAI_Engineer - SMT Team Leader Production_IN",
-      "location": "Bengaluru, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000154002399",
-      "posted": "2026-10-07T04:14:30.668000+00:00",
-      "score": 37,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8237463",
-      "source": "greenhouse",
-      "company": "elastic",
-      "title": "UX Engineer",
-      "location": "Bangalore, India",
-      "url": "https://jobs.elastic.co/jobs?gh_jid=8237463&gh_jid=8237463",
-      "posted": "2026-10-07T02:13:51-04:00",
-      "score": 39,
-      "reasons": [
-        "engineer"
+        "software"
       ]
     },
     {
@@ -582,25 +556,9 @@
       "location": "Bangalore ",
       "url": "https://www.rubrik.com/company/careers/departments/job.8258200?gh_jid=8258200",
       "posted": "2026-10-07T01:44:29-04:00",
-      "score": 47,
+      "score": 39,
       "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
-      "source": "linkedin",
-      "company": "Hunar.AI",
-      "title": "Full Stack Engineer",
-      "location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "engineer",
-        "full stack",
-        "ai"
+        "software"
       ]
     },
     {
@@ -632,6 +590,20 @@
       ]
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
+      "source": "linkedin",
+      "company": "Hunar.AI",
+      "title": "Full Stack Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 38,
+      "reasons": [
+        "full stack",
+        "ai"
+      ]
+    },
+    {
       "id": "nk-nk-071026023451",
       "source": "naukri",
       "company": "PwC",
@@ -639,9 +611,8 @@
       "location": "Hyderabad, Chennai, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-automation-engineer-pwc-hyderabad-chennai-bengaluru-2-to-4-years-071026023451",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
+      "score": 38,
       "reasons": [
-        "engineer",
         "automation"
       ]
     },
@@ -653,9 +624,8 @@
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-automation-engineer-nable-solutions-bengaluru-4-to-6-years-071026020775",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
+      "score": 38,
       "reasons": [
-        "engineer",
         "automation"
       ]
     },
@@ -667,9 +637,8 @@
       "location": "New Delhi, Delhi, India",
       "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-crimson-energy-experts-pvt-ltd-4475186371",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "engineer",
         "full stack"
       ]
     },
@@ -681,10 +650,9 @@
       "location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-cedric-4475412108",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -695,10 +663,9 @@
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-6-years-071026925777",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -709,10 +676,9 @@
       "location": "Pune, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-software-engineer-maersk-global-service-centres-india-private-limited-pune-bengaluru-3-to-8-years-071026921232",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -723,10 +689,9 @@
       "location": "Pune, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-software-engineer-data-aiml-maersk-global-service-centres-india-private-limited-pune-bengaluru-4-to-9-years-071026920915",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -737,10 +702,9 @@
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-7-to-12-years-071026925876",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -751,10 +715,9 @@
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-071026925784",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -765,10 +728,9 @@
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-4-to-9-years-071026925782",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 33,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -779,23 +741,9 @@
       "location": "Bangalore ",
       "url": "https://www.rubrik.com/company/careers/departments/job.8256407?gh_jid=8256407",
       "posted": "2026-10-06T13:30:23-04:00",
-      "score": 35,
+      "score": 27,
       "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "sr-744000153701418",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "Autosar Communication engineer",
-      "location": "hosur road bangalore, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153701418",
-      "posted": "2026-10-06T09:03:42.212000+00:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
+        "software"
       ]
     },
     {
@@ -806,23 +754,9 @@
       "location": "hosur road bangalore, IN",
       "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153674539",
       "posted": "2026-10-06T07:05:29.306000+00:00",
-      "score": 36,
+      "score": 28,
       "reasons": [
-        "engineer",
         "automation"
-      ]
-    },
-    {
-      "id": "gh-8243101",
-      "source": "greenhouse",
-      "company": "okta",
-      "title": "Site Reliability Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.okta.com/company/careers/opportunity/8243101?gh_jid=8243101",
-      "posted": "2026-10-06T03:04:07-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
       ]
     },
     {
@@ -833,9 +767,8 @@
       "location": "Bangalore, India",
       "url": "https://jobs.elastic.co/jobs?gh_jid=8247206&gh_jid=8247206",
       "posted": "2026-10-06T01:57:48-04:00",
-      "score": 36,
+      "score": 28,
       "reasons": [
-        "engineer",
         "ai"
       ]
     },
@@ -847,11 +780,10 @@
       "location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/software-engineer-1-2-years-of-exp-as-agentic-ai-developer-python-at-visa-4476170799",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 75,
+      "score": 67,
       "reasons": [
         "software",
         "developer",
-        "engineer",
         "python",
         "ai"
       ]
@@ -873,21 +805,6 @@
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428",
-      "source": "linkedin",
-      "company": "Visa",
-      "title": "SW Engineer (Java/Python Full stack, GenAI - 6 months to 2 years' experience only)",
-      "location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 54,
-      "reasons": [
-        "engineer",
-        "full stack",
-        "python"
-      ]
-    },
-    {
       "id": "nk-nk-061026030574",
       "source": "naukri",
       "company": "Infosys",
@@ -903,6 +820,20 @@
       ]
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428",
+      "source": "linkedin",
+      "company": "Visa",
+      "title": "SW Engineer (Java/Python Full stack, GenAI - 6 months to 2 years' experience only)",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "full stack",
+        "python"
+      ]
+    },
+    {
       "id": "nk-nk-061026505486",
       "source": "naukri",
       "company": "Aziro",
@@ -910,9 +841,8 @@
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-ai-automation-engineer-msys-tech-india-pvt-ltd-bengaluru-3-to-8-years-061026505486",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 49,
+      "score": 41,
       "reasons": [
-        "engineer",
         "automation",
         "ai"
       ]
@@ -925,9 +855,8 @@
       "location": "Chandigarh, New Delhi, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-ai-automation-engineer-snowrelic-inc-chandigarh-new-delhi-bengaluru-5-to-10-years-061026503342",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 49,
+      "score": 41,
       "reasons": [
-        "engineer",
         "automation",
         "ai"
       ]
@@ -940,10 +869,9 @@
       "location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-backend-leaning-fullstack-at-rippling-4476170898",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 47,
+      "score": 39,
       "reasons": [
         "software",
-        "engineer",
         "fullstack",
         "backend"
       ]
@@ -956,25 +884,9 @@
       "location": "Hyderabad, Gurugram, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-generative-ai-software-engineer-pwc-hyderabad-gurugram-bengaluru-4-to-8-years-061026009782",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 44,
-      "reasons": [
-        "software",
-        "engineer",
-        "ai"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
-      "source": "linkedin",
-      "company": "Auric AI Labs",
-      "title": "Junior Software Engineer",
-      "location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
-      "posted": "2026-10-06T00:00:00+00:00",
       "score": 36,
       "reasons": [
         "software",
-        "engineer",
         "ai"
       ]
     },
@@ -1035,244 +947,6 @@
       ]
     },
     {
-      "id": "nk-nk-061026015550",
-      "source": "naukri",
-      "company": "Tech Mahindra",
-      "title": "Urgently required - SAP Automation Engineer - Tech Mahindra Ltd - PAN",
-      "location": "Hyderabad, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-urgently-required-sap-automation-engineer-tech-mahindra-ltd-pan-tech-mahindra-hyderabad-pune-bengaluru-8-to-13-years-061026015550",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "engineer",
-        "automation"
-      ]
-    },
-    {
-      "id": "nk-nk-061026909534",
-      "source": "naukri",
-      "company": "CGI",
-      "title": "Detection & Response Automation Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-detection-response-automation-engineer-cgi-information-systems-and-management-consultants-bengaluru-2-to-6-years-061026909534",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "engineer",
-        "automation"
-      ]
-    },
-    {
-      "id": "nk-nk-061026024940",
-      "source": "naukri",
-      "company": "ABB",
-      "title": "IS Observability - Event Driven Automation Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-is-observability-event-driven-automation-engineer-abb-india-limited-bengaluru-5-to-8-years-061026024940",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "engineer",
-        "automation"
-      ]
-    },
-    {
-      "id": "nk-nk-061026003808",
-      "source": "naukri",
-      "company": "Qualitest",
-      "title": "Automation Engineer",
-      "location": "Pune, Chennai, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-automation-engineer-qualitest-pune-chennai-bengaluru-5-to-12-years-061026003808",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "engineer",
-        "automation"
-      ]
-    },
-    {
-      "id": "nk-nk-061026505231",
-      "source": "naukri",
-      "company": "Algoshack Technologies",
-      "title": "Automation Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-automation-engineer-algoshack-technologies-bengaluru-4-to-9-years-061026505231",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "engineer",
-        "automation"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/software-development-engineer-at-fiserv-4474969558",
-      "source": "linkedin",
-      "company": "Fiserv",
-      "title": "Software Development Engineer",
-      "location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/software-development-engineer-at-fiserv-4474969558",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-saarthee-4476303066",
-      "source": "linkedin",
-      "company": "Saarthee",
-      "title": "Full Stack Engineer",
-      "location": "Gurugram, Haryana, India",
-      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-saarthee-4476303066",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "engineer",
-        "full stack"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925820",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925820",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925777",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925777",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925768",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925768",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925752",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-12-to-17-years-061026925752",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925748",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925748",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925744",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925744",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925721",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-6-to-11-years-061026925721",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925679",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-2-to-7-years-061026925679",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925643",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925643",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "nk-nk-061026925580",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "Custom Software Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-7-to-12-years-061026925580",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
       "id": "nk-nk-061026505011",
       "source": "naukri",
       "company": "Aon",
@@ -1329,6 +1003,241 @@
       ]
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
+      "source": "linkedin",
+      "company": "Auric AI Labs",
+      "title": "Junior Software Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "software",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-061026015550",
+      "source": "naukri",
+      "company": "Tech Mahindra",
+      "title": "Urgently required - SAP Automation Engineer - Tech Mahindra Ltd - PAN",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-urgently-required-sap-automation-engineer-tech-mahindra-ltd-pan-tech-mahindra-hyderabad-pune-bengaluru-8-to-13-years-061026015550",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026909534",
+      "source": "naukri",
+      "company": "CGI",
+      "title": "Detection & Response Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-detection-response-automation-engineer-cgi-information-systems-and-management-consultants-bengaluru-2-to-6-years-061026909534",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026024940",
+      "source": "naukri",
+      "company": "ABB",
+      "title": "IS Observability - Event Driven Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-is-observability-event-driven-automation-engineer-abb-india-limited-bengaluru-5-to-8-years-061026024940",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026003808",
+      "source": "naukri",
+      "company": "Qualitest",
+      "title": "Automation Engineer",
+      "location": "Pune, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-qualitest-pune-chennai-bengaluru-5-to-12-years-061026003808",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026505231",
+      "source": "naukri",
+      "company": "Algoshack Technologies",
+      "title": "Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-algoshack-technologies-bengaluru-4-to-9-years-061026505231",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "automation"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-development-engineer-at-fiserv-4474969558",
+      "source": "linkedin",
+      "company": "Fiserv",
+      "title": "Software Development Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-development-engineer-at-fiserv-4474969558",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-saarthee-4476303066",
+      "source": "linkedin",
+      "company": "Saarthee",
+      "title": "Full Stack Engineer",
+      "location": "Gurugram, Haryana, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-saarthee-4476303066",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925820",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925820",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925777",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925777",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925768",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925768",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925752",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-12-to-17-years-061026925752",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925748",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925748",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925744",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925744",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925721",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-6-to-11-years-061026925721",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925679",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-2-to-7-years-061026925679",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925643",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925643",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925580",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-7-to-12-years-061026925580",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "software"
+      ]
+    },
+    {
       "id": "gh-8111979",
       "source": "greenhouse",
       "company": "mongodb",
@@ -1336,10 +1245,9 @@
       "location": "Gurugram",
       "url": "https://www.mongodb.com/careers/job/?gh_jid=8111979",
       "posted": "2026-10-05T19:30:53-04:00",
-      "score": 44,
+      "score": 36,
       "reasons": [
         "software",
-        "engineer",
         "ai"
       ]
     },
@@ -1351,10 +1259,9 @@
       "location": "Gurugram",
       "url": "https://www.mongodb.com/careers/job/?gh_jid=8127772",
       "posted": "2026-10-05T19:30:53-04:00",
-      "score": 44,
+      "score": 36,
       "reasons": [
         "software",
-        "engineer",
         "ai"
       ]
     },
@@ -1366,38 +1273,9 @@
       "location": "Gurugram",
       "url": "https://www.mongodb.com/careers/job/?gh_jid=8153125",
       "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
+      "score": 23,
       "reasons": [
-        "engineer",
         "forward deployed"
-      ]
-    },
-    {
-      "id": "gh-8239047",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Software Engineer 3",
-      "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8083366",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Software Engineer 3",
-      "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8083366",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
       ]
     },
     {
@@ -1408,24 +1286,22 @@
       "location": "Gurugram",
       "url": "https://www.mongodb.com/careers/job/?gh_jid=7993984",
       "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
+      "score": 23,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
-      "id": "gh-7597723",
+      "id": "gh-8083366",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=7597723",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8083366",
       "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
+      "score": 23,
       "reasons": [
-        "software",
-        "engineer"
+        "software"
       ]
     },
     {
@@ -1436,114 +1312,35 @@
       "location": "Gurugram",
       "url": "https://www.mongodb.com/careers/job/?gh_jid=8208074",
       "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8143980",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Application Engineer",
-      "location": "Bengaluru",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8143980",
-      "posted": "2026-10-05T19:30:53-04:00",
       "score": 23,
       "reasons": [
-        "engineer"
+        "software"
       ]
     },
     {
-      "id": "gh-8184637",
+      "id": "gh-7597723",
       "source": "greenhouse",
       "company": "mongodb",
-      "title": "Cloud Operations Engineer",
-      "location": "Bengaluru",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8184637",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8122751",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Engineer 3 - Business Systems",
+      "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8122751",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7597723",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 23,
       "reasons": [
-        "engineer"
+        "software"
       ]
     },
     {
-      "id": "gh-7943868",
+      "id": "gh-8239047",
       "source": "greenhouse",
       "company": "mongodb",
-      "title": "Engineer 3 - GTM Tech",
+      "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=7943868",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 23,
       "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-7779016",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Salesforce CPQ engineer 3",
-      "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=7779016",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8170628",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Technical Services Engineer",
-      "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170628",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8170631",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Technical Services Engineer",
-      "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170631",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "sr-744000153588459",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "HiL Test Engineer",
-      "location": "bangalore, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153588459",
-      "posted": "2026-10-05T18:30:28.401000+00:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
+        "software"
       ]
     },
     {
@@ -1566,50 +1363,10 @@
       "title": "Software Application Development Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "posted": "2026-10-05T09:56:23.258243+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "wd-intel-/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "source": "workday",
-      "company": "intel",
-      "title": "Memory Electrical Validation Engineer",
-      "location": "India, Bangalore",
-      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "posted": "2026-10-05T09:56:23.258243+00:00",
+      "posted": "2026-10-05T09:59:05.536509+00:00",
       "score": 23,
       "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "sr-744000153410028",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "Design for Environment - Regulatory Product/ Material Compliance Engineer",
-      "location": "bangalore, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153410028",
-      "posted": "2026-10-05T06:26:05.400000+00:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "sr-744000153404468",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "Cost Engineering & Benchmarking",
-      "location": "bangalore, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153404468",
-      "posted": "2026-10-05T05:25:14.335000+00:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
+        "software"
       ]
     },
     {
@@ -1620,10 +1377,9 @@
       "location": "Remote USA, UK, India, Australia, Ireland, New Zealand, Philippines, Pakistan, Singapore, Mexico",
       "url": "https://remotive.com/remote-jobs/software-development/software-engineer-ai-code-trainer-python-web-full-stack-2091149",
       "posted": "2026-10-05T05:15:43+00:00",
-      "score": 100,
+      "score": 92,
       "reasons": [
         "software",
-        "engineer",
         "full stack",
         "python",
         "ai",
@@ -1632,32 +1388,6 @@
         "javascript",
         "typescript",
         "api"
-      ]
-    },
-    {
-      "id": "sr-744000153402679",
-      "source": "smartrecruiters",
-      "company": "BoschGroup",
-      "title": "IN_Bosch Rexroth India_Engineer / Executive_Logistics (Imports)",
-      "location": "Bangalore, IN",
-      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153402679",
-      "posted": "2026-10-05T04:34:55.979000+00:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-7960365",
-      "source": "greenhouse",
-      "company": "samsara",
-      "title": "Product Support Engineer III-1",
-      "location": "Bengaluru - BLR1",
-      "url": "https://www.samsara.com/company/careers/roles/7960365?gh_jid=7960365",
-      "posted": "2026-10-05T03:48:35-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
       ]
     },
     {
@@ -1688,21 +1418,6 @@
         "developer",
         "react",
         "react native"
-      ]
-    },
-    {
-      "id": "nk-nk-051026937544",
-      "source": "naukri",
-      "company": "Accenture",
-      "title": "AI & Automation Engineer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-ai-automation-engineer-accenture-solutions-pvt-ltd-bengaluru-10-to-12-years-051026937544",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 49,
-      "reasons": [
-        "engineer",
-        "automation",
-        "ai"
       ]
     },
     {
@@ -1748,6 +1463,20 @@
         "software",
         "developer",
         "python"
+      ]
+    },
+    {
+      "id": "nk-nk-051026937544",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "AI & Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-ai-automation-engineer-accenture-solutions-pvt-ltd-bengaluru-10-to-12-years-051026937544",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 41,
+      "reasons": [
+        "automation",
+        "ai"
       ]
     },
     {
