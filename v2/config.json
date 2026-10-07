@@ -1,0 +1,47 @@
+{
+  "poll_seconds": {
+    "linkedin": 120,
+    "naukri": 600,
+    "instahyre": 600
+  },
+  "locations": [
+    "Bengaluru, Karnataka, India",
+    "Gurugram, Haryana, India",
+    "Delhi, India",
+    "Remote, India"
+  ],
+  "naukri_locations": [
+    "Bangalore",
+    "Gurgaon",
+    "Delhi"
+  ],
+  "linkedin_queries": [
+    "software engineer OR software developer",
+    "full stack developer OR frontend developer OR backend developer",
+    "react developer OR python developer OR automation engineer",
+    "AI engineer OR LLM engineer OR AI developer"
+  ],
+  "naukri_queries": [
+    "software engineer",
+    "full stack developer",
+    "react developer",
+    "python developer",
+    "automation engineer",
+    "AI engineer"
+  ],
+  "title_exclude": [
+    "senior",
+    "sr.",
+    "sr ",
+    "sr-",
+    "staff",
+    "principal",
+    "director",
+    "manager",
+    "lead",
+    "head",
+    "architect",
+    "intern"
+  ],
+  "max_experience_years": 3
+}
