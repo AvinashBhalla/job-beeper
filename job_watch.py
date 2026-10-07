@@ -388,7 +388,7 @@ def main():
     all_tasks += [(n, fn, None) for n, fn in FLAG_SOURCES.items() if s.get(n)]
     all_board_tasks = []
     for name in BOARD_SOURCES:
-        for query in s.get(name, []):
+        for query in board_queries(name, s, f):
             if use_apify:
                 all_board_tasks.append((name, APIFY_BOARD_SOURCES[name], query, apify_cfg))
             else:
