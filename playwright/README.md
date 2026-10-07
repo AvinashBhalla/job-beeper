@@ -1,45 +1,28 @@
-# Playwright inspection
+# Playwright inspection and JobBeeper discovery
 
-This folder is for local browser inspection and future end-to-end automation.
+## Automatic discovery
 
-## Install
+Run from the repository root:
 
-From the repository root:
-
-```powershell
 python -m pip install -r requirements.txt
 python -m playwright install chromium
-```
+python playwright/discover_jobbeeper.py
 
-Playwright launches headed locally so you can watch every action. The persistent
-profile lives in `.playwright-profile/`, which keeps the browser session/cookies
-between runs.
+The headed browser reuses the local .playwright-profile. If JobBeeper asks for login, complete it manually in the browser. After authentication the crawler continues automatically.
 
-## Inspect JobBeeper
+It discovers safe navigation sections and records rendered headings, text, links, buttons, inputs, textareas, selects, URLs, HTML and screenshots.
 
-```powershell
-python playwright/inspect_jobbeeper.py
-```
+It intentionally does not export cookies, localStorage, sessionStorage, passwords, tokens, or other authentication state. It also avoids Apply, Save, Delete, Logout, Submit and other state-changing actions.
 
-Or pass a specific page:
+Outputs:
+- playwright/knowledge/jobbeeper_snapshot.json — machine-readable evidence for the IDE
+- playwright/knowledge/jobbeeper_snapshot.md — human-readable evidence
+- playwright/artifacts/*.html — rendered DOM snapshots
+- playwright/artifacts/*.png — screenshots
 
-```powershell
-python playwright/inspect_jobbeeper.py --url https://jobbeeper.com
-```
+For repeated discovery while developing:
 
-The script does not contain or request a password. If the site asks you to log
-in, complete that interactively in the headed browser.
+python playwright/discover_jobbeeper.py --watch --interval 1800
 
-## VS Code
-
-Install the Playwright VS Code extension if you want locator picking, debugging,
-and trace inspection. Keep the Python inspector script as the source of truth
-for repeatable flows.
-
-## Planned automation
-
-1. Inspect JobBeeper filters and interaction behavior.
-2. Record the filter model and page states.
-3. Map those controls to our local dashboard.
-4. Add configurable filters without hard-coding them into the scraper.
-5. Add browser-based source adapters where HTTP scraping cannot expose a usable JD.
+The generated snapshot is the handoff between JobBeeper and the IDE:
+JobBeeper -> Playwright -> evidence -> IDE -> local dashboard implementation.
