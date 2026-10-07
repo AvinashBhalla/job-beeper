@@ -1,3 +1,21 @@
+function setupNavigation(){
+  const links=[...document.querySelectorAll(".nav-link")];
+  const sections=[...document.querySelectorAll(".page-section")];
+  function show(id){
+    const target=document.getElementById(id)||document.getElementById("jobsSection");
+    sections.forEach(s=>s.classList.toggle("hidden-section",s!==target));
+    links.forEach(a=>a.classList.toggle("active",a.dataset.section===target.id));
+    if(target.id!=="jobsSection" && location.hash!=="#"+target.id.replace("Section","")){
+      history.replaceState(null,"","#"+target.id.replace("Section",""));
+    }
+  }
+  links.forEach(a=>a.addEventListener("click",e=>{
+    e.preventDefault();
+    show(a.dataset.section);
+  }));
+  const initial=(location.hash||"").slice(1);
+  show(initial==="filters"?"filtersSection":initial==="settings"?"settingsSection":initial==="sources"?"sourcesSection":initial==="applied"?"appliedSection":"jobsSection");
+}
 const REPO = "AvinashBhalla/job-beeper";
 const RAW = "https://raw.githubusercontent.com/" + REPO + "/main/";
 const API = "https://api.github.com";
@@ -123,7 +141,7 @@ async function saveAndRun(){
     if(!runr.ok) throw new Error("Workflow dispatch failed: "+runr.status);
     config=next;
     sessionStorage.setItem("jobbeeper_github_token",t);
-    $("githubToken").value="";
+    if ($("githubToken")) $("githubToken").value="";
     $("saveStatus").textContent="Saved. Scan started — Telegram will receive only jobs matching these filters.";
   }catch(e){ $("saveStatus").textContent=e.message; }
 }
@@ -156,6 +174,7 @@ $("clearToken").onclick=()=>{sessionStorage.removeItem("jobbeeper_github_token")
 $("saveConfig").onclick=saveAndRun;
 ["search","source","score","age"].forEach(id=>$(id).addEventListener("input",render));
 $("refresh").onclick=load;
-loadConfig().catch(()=>{});
+setupNavigation();
+loadConfig().catch(e=>{ if ($("saveStatus")) $("saveStatus").textContent="Could not load config."; });
 load();
 setInterval(load,30000);
