@@ -5,6 +5,7 @@ and writes dashboard/data/jobs.json for the live UI.
 import json, os, re, pathlib, datetime as dt, requests
 from concurrent.futures import ThreadPoolExecutor
 from job_sources_extra import linkedin_guest, naukri_public, instahyre_public
+from apify_sources import linkedin as apify_linkedin, naukri as apify_naukri, instahyre as apify_instahyre
 
 ROOT = pathlib.Path(__file__).parent
 CFG = json.loads((ROOT / "config.json").read_text())
@@ -28,6 +29,17 @@ def parse_time(v):
         d = dt.datetime.fromisoformat(str(v).replace("Z", "+00:00"))
         return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
     except Exception:
+        raw = str(v).lower()
+        if raw in {"today", "just now"}:
+            return NOW
+        if raw == "yesterday":
+            return NOW - dt.timedelta(days=1)
+        m = re.search(r"(\d+)\s*(minute|min|hour|hr|day|week)s?\s*(?:ago)?", raw)
+        if m:
+            amount = int(m.group(1))
+            seconds = {"minute": 60, "min": 60, "hour": 3600, "hr": 3600,
+                       "day": 86400, "week": 604800}[m.group(2)]
+            return NOW - dt.timedelta(seconds=amount * seconds)
         return None
 
 def job(id, company, title, location, url, posted=None, desc=""):
@@ -129,6 +141,7 @@ LIST_SOURCES = {"greenhouse": greenhouse, "lever": lever, "ashby": ashby,
                 "smartrecruiters": smartrecruiters, "workable": workable, "workday": workday}
 FLAG_SOURCES = {"remotive": remotive, "remoteok": remoteok, "arbeitnow": arbeitnow}
 BOARD_SOURCES = {"linkedin": linkedin_guest, "naukri": naukri_public, "instahyre": instahyre_public}
+APIFY_BOARD_SOURCES = {"linkedin": apify_linkedin, "naukri": apify_naukri, "instahyre": apify_instahyre}
 
 def max_years_required(desc):
     nums = [int(n) for n in re.findall(r"(\d{1,2})\s*\+?\s*(?:-\s*\d+\s*)?(?:years|yrs)", desc)]
@@ -198,6 +211,13 @@ def run_source(task):
     except Exception as e:
         return name, arg, [], e
 
+def run_board_source(task):
+    name, fn, arg, cfg = task
+    try:
+        return name, arg, list(fn(cfg, arg)), None
+    except Exception as e:
+        return name, arg, [], e
+
 def serial_job(j, source, score=None, reasons=None):
     return {
         "id": j["id"], "source": source, "company": j["company"], "title": j["title"],
@@ -228,23 +248,39 @@ def notify(j, score, reasons):
 def main():
     exists, seen, known_sources = load_state()
     s, f = CFG["sources"], CFG["filters"]
+    apify_cfg = CFG.get("apify", {})
+    use_apify = bool(os.environ.get("APIFY_API_TOKEN")) and apify_cfg.get("enabled", True)
+
     tasks = [(n, fn, a) for n, fn in LIST_SOURCES.items() for a in s.get(n, [])]
     tasks += [(n, fn, None) for n, fn in FLAG_SOURCES.items() if s.get(n)]
-    for name, fn in BOARD_SOURCES.items():
+    board_tasks = []
+    for name in BOARD_SOURCES:
         for query in s.get(name, []):
-            tasks.append((name, fn, query))
+            if use_apify:
+                board_tasks.append((name, APIFY_BOARD_SOURCES[name], query, apify_cfg))
+            else:
+                board_tasks.append((name, BOARD_SOURCES[name], query, None))
     if s.get("adzuna", {}).get("enabled"):
         tasks.append(("adzuna", adzuna, s["adzuna"]))
 
-    with ThreadPoolExecutor(max_workers=min(16, max(1, len(tasks)))) as pool:
+    with ThreadPoolExecutor(max_workers=min(16, max(1, len(tasks) + len(board_tasks)))) as pool:
         results = list(pool.map(run_source, tasks))
+        if use_apify:
+            results += list(pool.map(run_board_source, board_tasks))
+        else:
+            results += list(pool.map(lambda x: run_source((x[0], x[1], x[2])), board_tasks))
 
     alerts = []
     dashboard_jobs = []
     source_status = {}
     for name, arg, jobs, err in results:
         key = f"{name}:{json.dumps(arg, sort_keys=True) if arg else ''}"
-        source_status[key] = {"ok": err is None, "count": len(jobs), "error": str(err) if err else None}
+        source_status[key] = {
+            "ok": err is None,
+            "count": len(jobs),
+            "error": str(err) if err else None,
+            "provider": "apify" if use_apify and name in APIFY_BOARD_SOURCES else "direct"
+        }
         if err:
             print(f"[warn] {key}: {err}")
             continue
