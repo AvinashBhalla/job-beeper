@@ -1,0 +1,37 @@
+{
+  "filters": {
+    "title_include": ["software", "developer", "engineer", "full stack", "fullstack", "backend", "frontend", "automation", "python", "react", "node", "ai", "ml", "llm"],
+    "title_exclude": ["senior", "sr.", "staff", "principal", "director", "manager", "lead", "head", "architect", "intern"],
+    "locations": ["bengaluru", "bangalore", "remote", "india", "hybrid"],
+    "remote_only": false,
+    "max_age_hours": 48,
+    "max_experience_years": 3,
+    "description_include_any": [],
+    "description_exclude_any": ["security clearance"],
+    "company_exclude": []
+  },
+  "sources": {
+    "greenhouse": ["razorpay", "postman", "groww", "databricks", "stripe", "airbnb", "cloudflare", "coinbase", "datadog", "elastic", "figma", "gitlab", "mongodb", "okta", "pinterest", "reddit", "robinhood", "samsara", "twilio", "zscaler", "vercel", "webflow", "discord", "dropbox", "lyft", "instacart", "asana", "brex", "carta", "duolingo", "mixpanel", "amplitude", "fivetran", "grafanalabs", "thoughtspot", "moengage", "browserstack", "chargebee", "uniphore", "observeai", "sumologic", "rubrik", "druva", "newrelic", "toast", "sprinklr", "freshworks"],
+    "lever": ["cred", "paytm", "palantir", "clevertap", "whatfix", "upgrad", "slice", "plaid", "hasura", "dreamsports", "spotify", "zeta", "gojek", "mindtickle", "leadsquared"],
+    "ashby": ["openai", "ramp", "notion", "linear", "retool", "deel", "supabase", "posthog", "mercury", "anysphere", "cohere", "replit", "hightouch", "sardine"],
+    "smartrecruiters": ["Freshworks", "ServiceNow", "BoschGroup", "Visa", "Ubisoft2", "McDonaldsCorporation"],
+    "workable": ["cashfree", "zoomcar", "sharechat", "toddle", "simpl"],
+    "workday": [
+      {"url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "search": "software engineer india"},
+      {"url": "https://adobe.wd5.myworkdayjobs.com/external_experienced", "search": "software engineer bangalore"},
+      {"url": "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site", "search": "software engineer bengaluru"},
+      {"url": "https://walmart.wd5.myworkdayjobs.com/WalmartExternal", "search": "software engineer bengaluru"},
+      {"url": "https://intel.wd1.myworkdayjobs.com/External", "search": "software engineer bangalore"},
+      {"url": "https://dell.wd1.myworkdayjobs.com/External", "search": "software engineer bangalore"},
+      {"url": "https://workday.wd5.myworkdayjobs.com/Workday", "search": "software engineer"},
+      {"url": "https://mastercard.wd1.myworkdayjobs.com/CorporateCareers", "search": "software engineer pune bangalore"},
+      {"url": "https://capitalone.wd12.myworkdayjobs.com/Capital_One", "search": "software engineer bangalore"},
+      {"url": "https://qualcomm.wd5.myworkdayjobs.com/External", "search": "software engineer bangalore"},
+      {"url": "https://target.wd5.myworkdayjobs.com/targetcareers", "search": "software engineer bengaluru"}
+    ],
+    "remotive": true,
+    "remoteok": true,
+    "arbeitnow": true,
+    "adzuna": { "enabled": false, "country": "in", "what": "software developer", "where": "bengaluru" }
+  }
+}
