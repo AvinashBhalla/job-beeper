@@ -47,6 +47,39 @@
   <section id="jobs" class="jobs"></section>
   </section>
 
+  <section id="jobDetailSection" class="page-section hidden-section">
+    <div class="job-detail">
+      <button id="backToJobs" class="back-link">← Back to Jobs</button>
+      <div class="detail-hero">
+        <div>
+          <div class="detail-source" id="detailSource"></div>
+          <h1 id="detailTitle">Job</h1>
+          <div class="detail-company" id="detailCompany"></div>
+        </div>
+        <div class="detail-score" id="detailScore"></div>
+      </div>
+      <div class="detail-stats">
+        <div><span>EXPERIENCE</span><b id="detailExperience">Not specified</b></div>
+        <div><span>LOCATION</span><b id="detailLocation">Not specified</b></div>
+        <div><span>WORK MODE</span><b id="detailWorkMode">Not specified</b></div>
+        <div><span>POSTED</span><b id="detailPosted">Not specified</b></div>
+      </div>
+      <div class="detail-actions"><a id="detailApply" class="apply" target="_blank" rel="noopener">Apply now ↗</a></div>
+      <section class="detail-box">
+        <div class="detail-box-head"><h2>Why this matched</h2><span id="detailMatch"></span></div>
+        <div id="detailReasons" class="reason-list"></div>
+      </section>
+      <section class="detail-box">
+        <div class="detail-box-head"><h2>Detected Skills &amp; Technologies</h2><span id="detailSkillCount"></span></div>
+        <div id="detailSkills" class="chips detail-chips"></div>
+      </section>
+      <section class="detail-box">
+        <h2>About this job</h2>
+        <div id="detailDescription" class="detail-description"></div>
+      </section>
+    </div>
+  </section>
+
   <section id="appliedSection" class="page-section hidden-section">
     <div class="settings-panel"><div class="section-title"><h2>Applied</h2><p>Applied-job tracking will appear here.</p></div><div class="empty">No applied jobs have been recorded yet.</div></div>
   </section>
