@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
-from job_watch import job  # type: ignore
 
 try:
     from ddgs import DDGS
@@ -113,7 +112,7 @@ def discover_platform(item):
             if not path or len(path)<4:
                 continue
             ident=f"web-{platform.lower().replace(' ','-')}-{abs(hash(url))}"
-            jobs.append(job(ident,_company(url),title,"",url,None,body))
+            jobs.append({"id":ident,"company":_company(url),"title":title,"location":"","url":url,"posted":None,"desc":body.lower()})
         return platform,jobs,None
     except Exception as exc:
         return platform,[],str(exc)
