@@ -200,11 +200,11 @@ def title_allowed(title: str) -> bool:
 def location_allowed(location: str) -> bool:
     value = normalize_phrase(location)
     return (
-        re.search(r"\\bbengaluru\\b", value) is not None
-        or re.search(r"\\bbangalore\\b", value) is not None
-        or re.search(r"\\bgurugram\\b", value) is not None
-        or re.search(r"\\bgurgaon\\b", value) is not None
-        or re.search(r"\\bdelhi\\b", value) is not None
+        re.search(r"\bbengaluru\b", value) is not None
+        or re.search(r"\bbangalore\b", value) is not None
+        or re.search(r"\bgurugram\b", value) is not None
+        or re.search(r"\bgurgaon\b", value) is not None
+        or re.search(r"\bdelhi\b", value) is not None
         or (
             "remote" in value
             and ("india" in value or not any(
@@ -385,47 +385,134 @@ def linkedin_collect() -> list[dict[str, Any]]:
     return jobs
 
 
-def naukri_collect() -> list[dict[str, Any]]:
+def _naukri_search_urls(query: str, location: str) -> list[str]:
+    query_slug = re.sub(r"[^a-z0-9]+", "-", query.lower()).strip("-")
+    location_slug = re.sub(r"[^a-z0-9]+", "-", location.lower()).strip("-")
+    if not location_slug:
+        return [f"https://www.naukri.com/{query_slug}-jobs"]
+    return [f"https://www.naukri.com/{query_slug}-jobs-in-{location_slug}"]
+
+
+def naukri_browser_collect() -> list[dict[str, Any]]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise RuntimeError("Playwright is not installed for the Naukri browser collector") from exc
+
     jobs: list[dict[str, Any]] = []
-    for query in CONFIG["naukri_queries"]:
-        for location in CONFIG["naukri_locations"]:
-            frame = scrape_jobs(
-                site_name=["naukri"],
-                search_term=query,
-                location=location,
-                results_wanted=30,
-                hours_old=24,
-                fetch_description=True,
-                description_format="plain",
-                verbose=0,
-            )
-            if frame is None or frame.empty:
-                continue
-            for row in frame.to_dict("records"):
-                url = str(row.get("job_url") or "")
-                if not url:
-                    continue
-                source_id = str(row.get("id") or url)
-                posted = row.get("date_posted")
-                posted_at = None
-                if hasattr(posted, "to_pydatetime"):
-                    posted_at = posted.to_pydatetime().replace(tzinfo=UTC)
-                elif hasattr(posted, "isoformat"):
-                    posted_at = parse_relative(posted.isoformat())
-                description = " ".join(
-                    str(x) for x in [
-                        row.get("description"), row.get("experience_range"), row.get("skills")
-                    ] if x
-                )
-                jobs.append(normalize_job(
-                    "naukri", source_id,
-                    str(row.get("company") or row.get("company_name") or ""),
-                    str(row.get("title") or ""),
-                    str(row.get("location") or ""),
-                    url, posted_at, "date" if posted_at else "unknown",
-                    description,
-                ))
+    seen_ids: set[str] = set()
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            executable_path="/usr/bin/chromium",
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-background-networking",
+                "--disable-extensions",
+                "--disable-sync",
+            ],
+        )
+        context = browser.new_context(
+            user_agent=UA["User-Agent"],
+            locale="en-IN",
+            viewport={"width": 1280, "height": 900},
+        )
+        page = context.new_page()
+        page.route("**/*", lambda route: route.abort() if route.request.resource_type in {"image", "font", "media"} else route.continue_())
+
+        try:
+            for query in CONFIG["naukri_queries"]:
+                for location in CONFIG["naukri_locations"]:
+                    url = _naukri_search_urls(query, location)[0]
+                    try:
+                        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                        try:
+                            page.wait_for_selector("div.srp-jobtuple-wrapper", timeout=12000)
+                        except Exception:
+                            pass
+
+                        cards = page.locator("div.srp-jobtuple-wrapper")
+                        count = min(cards.count(), 25)
+                        for index in range(count):
+                            card = cards.nth(index)
+                            title_el = card.locator("a.title").first
+                            if not title_el.count():
+                                continue
+                            title = (title_el.inner_text() or "").strip()
+                            href = title_el.get_attribute("href") or ""
+                            if href.startswith("/"):
+                                href = "https://www.naukri.com" + href
+                            if not href or not title:
+                                continue
+
+                            job_id_attr = card.get_attribute("data-job-id") or ""
+                            id_match = re.search(r"(\d{8,})", job_id_attr) or re.search(r"(\d{8,})", href)
+                            source_id = id_match.group(1) if id_match else hashlib.sha1(href.encode()).hexdigest()[:20]
+                            if source_id in seen_ids:
+                                continue
+                            seen_ids.add(source_id)
+
+                            card_text = " ".join((card.inner_text() or "").split())
+                            lowered = card_text.lower()
+
+                            location_text = ""
+                            for candidate in [
+                                "Bengaluru", "Bangalore", "Gurugram", "Gurgaon",
+                                "Delhi", "New Delhi", "Remote"
+                            ]:
+                                if candidate.lower() in lowered:
+                                    location_text = candidate
+                                    break
+
+                            company = ""
+                            for selector in [
+                                "a.sub-title",
+                                "a.comp-name",
+                                "[class*='comp-name'] a",
+                                "[class*='company'] a",
+                            ]:
+                                locator = card.locator(selector).first
+                                if locator.count():
+                                    value = (locator.inner_text() or "").strip()
+                                    if value and value.lower() != title.lower():
+                                        company = value
+                                        break
+
+                            posted_at = None
+                            posted_precision = "unknown"
+                            age_match = re.search(
+                                r"\b(?:just now|\d+\s*(?:minute|min|hour|hr|day|week)s?\s*ago)\b",
+                                lowered,
+                            )
+                            if age_match:
+                                posted_at = parse_relative(age_match.group(0))
+                                posted_precision = "minute"
+
+                            jobs.append(normalize_job(
+                                "naukri",
+                                source_id,
+                                company,
+                                title,
+                                location_text,
+                                href,
+                                posted_at,
+                                posted_precision,
+                                card_text,
+                            ))
+                    except Exception as exc:
+                        log.warning("naukri browser search failed for %s / %s: %s", query, location, exc)
+        finally:
+            context.close()
+            browser.close()
+
     return jobs
+
+
+def naukri_collect() -> list[dict[str, Any]]:
+    return naukri_browser_collect()
 
 
 def instahyre_collect() -> list[dict[str, Any]]:
