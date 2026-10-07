@@ -76,7 +76,8 @@
     "search_from_filters": true,
     "notifications_enabled": true,
     "web_discovery_enabled": true,
-    "web_discovery_results": 8
+    "web_discovery_results": 8,
+    "min_experience_years": null
   },
   "apify": {
     "enabled": true,
