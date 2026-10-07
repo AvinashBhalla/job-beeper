@@ -46,6 +46,7 @@ def main():
         print("\n=== JobBeeper inspector ===")
         print("URL:", page.url)
         print("TITLE:", page.title())
+        input("\nUse the headed browser to log in and navigate through the UI. Press Enter here when you want to capture the current page...")
 
         print("\nVisible headings:")
         for heading in page.locator("h1,h2,h3").all_inner_texts():
