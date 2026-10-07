@@ -148,13 +148,38 @@ def max_years_required(desc):
     nums = [int(n) for n in re.findall(r"(\d{1,2})\s*\+?\s*(?:-\s*\d+\s*)?(?:years|yrs)", desc)]
     return max(nums) if nums else None
 
+def location_matches(loc, allowed):
+    """Match geography deliberately; 'remote' alone must not mean worldwide remote.
+    For this India-focused profile, remote is accepted when the listing says India
+    (or gives no conflicting country). City/location tokens remain exact-ish
+    substring matches because source formatting varies.
+    """
+    loc = (loc or "").strip().lower()
+    allowed = {x.strip().lower() for x in allowed}
+    if not loc:
+        return False
+    if any(x in loc for x in ("united states", "usa", "canada", "uk", "united kingdom",
+                              "europe", "germany", "france", "australia", "singapore")):
+        return any(x in loc for x in ("india", "bengaluru", "bangalore", "gurugram",
+                                      "gurgaon", "delhi"))
+    for token in allowed - {"remote"}:
+        if token in loc:
+            return True
+    if "remote" in allowed and "remote" in loc:
+        return "india" in loc or not any(
+            country in loc for country in ("united states", "usa", "canada", "uk",
+                                           "united kingdom", "europe", "germany",
+                                           "france", "australia", "singapore")
+        )
+    return False
+
 def passes(j, f):
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
     if f["title_include"] and not any(k.lower() in t for k in f["title_include"]):
         return False
     if any(x.lower() in t for x in f["title_exclude"]):
         return False
-    if f["locations"] and not any(l.lower() in loc for l in f["locations"]):
+    if f["locations"] and not location_matches(loc, f["locations"]):
         return False
     if f["remote_only"] and "remote" not in loc:
         return False

@@ -36,3 +36,8 @@ Create a bot with BotFather, then add `TG_TOKEN` and `TG_CHAT_ID` as GitHub Acti
 
 ## Free-first architecture
 GitHub Actions + static GitHub Pages + repository JSON state. No paid server is required for the personal version.
+
+
+## Engineering reference
+
+Changes are evaluated against the public JobBeeper product behavior documented in docs/JOBBEEPER_REFERENCE.md. This is a product-behavior reference, not a claim about JobBeeper's private implementation.
