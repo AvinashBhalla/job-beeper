@@ -1,15 +1,25 @@
 """Best-effort public job-board adapters.
-Uses public unauthenticated pages/endpoints only. These adapters are optional because
-public HTML/API shapes can change or be rate-limited.
+
+Board strategy:
+- LinkedIn: small public guest window, deliberately low request volume.
+- Naukri: JobSpy's current Naukri adapter, which uses Naukri's structured
+  /jobapi/v3/search path and generates the required nkparam token.
+- Instahyre: public /api/v1/job_search/ JSON feed; HTML is not used.
 """
 import re
 import time
 import requests
 from bs4 import BeautifulSoup
 
+try:
+    from jobspy import scrape_jobs
+except ImportError:
+    scrape_jobs = None
+
 UA = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36",
     "Accept-Language": "en-IN,en;q=0.9",
+    "Referer": "https://www.instahyre.com/",
 }
 
 def _text(node):
@@ -55,50 +65,121 @@ def linkedin_guest(keyword):
             title = card.select_one("h3.base-search-card__title")
             company = card.select_one("h4.base-search-card__subtitle")
             loc = card.select_one("span.job-search-card__location")
-            time = card.select_one("time")
+            posted = card.select_one("time")
             if not link or not title:
                 continue
             url = link.get("href", "").split("?")[0]
             jid = re.search(r"jobs/view/(\d+)", url)
             yield _job(
                 f"li-{jid.group(1) if jid else url}", _text(company), _text(title),
-                _text(loc), url, time.get("datetime") if time else None, _text(card)
+                _text(loc), url, posted.get("datetime") if posted else None, _text(card)
             )
 
 def naukri_public(keyword):
-    slug = re.sub(r"[^a-z0-9]+", "-", keyword.lower()).strip("-")
-    soup = _soup(f"https://www.naukri.com/{slug}-jobs-in-india")
-    cards = soup.select("article.jobTuple, article.jobTupleHeader, div.jobTuple")
-    for card in cards:
-        link = card.select_one("a.title") or card.select_one("a[href*='/job-listings-']")
-        company = card.select_one("a.subTitle")
-        loc = card.select_one("span.locWdth") or card.select_one("span[title]")
-        exp = card.select_one("span.expwdth")
-        posted = card.select_one("span.job-post-day")
-        desc = card.select_one("div.job-description")
-        if not link:
+    """Use JobSpy's Naukri-only adapter; it targets the structured search API."""
+    if scrape_jobs is None:
+        raise RuntimeError("python-jobspy is not installed")
+    frame = scrape_jobs(
+        site_name=["naukri"],
+        search_term=keyword,
+        location="India",
+        results_wanted=20,
+        hours_old=72,
+        verbose=0,
+    )
+    if frame is None or frame.empty:
+        return
+    for row in frame.to_dict("records"):
+        job_id = str(row.get("id") or row.get("job_url") or "")
+        url = row.get("job_url") or row.get("job_url_direct") or ""
+        if not url:
             continue
-        href = link.get("href")
+        location = row.get("location") or ""
+        company = row.get("company") or row.get("company_name") or ""
+        title = row.get("title") or ""
+        desc = row.get("description") or ""
+        posted = row.get("date_posted")
+        if hasattr(posted, "isoformat"):
+            posted = posted.isoformat()
         yield _job(
-            f"nk-{href}", _text(company), _text(link), _text(loc), href,
-            _text(posted), f"{_text(desc)} {_text(exp)}"
+            f"nk-{job_id}",
+            str(company),
+            str(title),
+            str(location),
+            str(url),
+            posted,
+            str(desc),
         )
 
-def instahyre_public(keyword):
-    soup = _soup("https://www.instahyre.com/search-jobs/",
-                 {"q": keyword, "location": "India"})
+def _instahyre_items(payload):
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+    for key in ("jobs", "jobDetails", "results", "data", "job_details"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            for nested in ("jobs", "results", "data"):
+                if isinstance(value.get(nested), list):
+                    return value[nested]
+    return []
+
+def _instahyre_location(item):
+    value = item.get("locations") or item.get("location") or item.get("locationsRaw")
+    if isinstance(value, list):
+        return ", ".join(str(x.get("name") if isinstance(x, dict) else x) for x in value)
+    return str(value or "")
+
+def _instahyre_url(item, job_id):
+    value = item.get("url") or item.get("publicUrl") or item.get("jobUrl")
+    if value:
+        return str(value)
+    return f"https://www.instahyre.com/job-{job_id}-"
+
+def instahyre_public(_keyword=None):
+    """Fetch the public JSON feed once; keyword matching happens downstream.
+
+    The feed is intentionally fetched once per run rather than once per keyword:
+    repeated keyword calls return overlapping pages and waste request budget.
+    """
+    url = "https://www.instahyre.com/api/v1/job_search/"
+    params = {
+        "jobLocations": "Bangalore",
+        "limit": 35,
+    }
+    response = requests.get(url, params=params, headers=UA, timeout=30)
+    response.raise_for_status()
+    items = _instahyre_items(response.json())
     seen = set()
-    for a in soup.select("a[href]"):
-        href = a.get("href", "")
-        if not re.search(r"/job[s]?/", href, re.I):
+    for item in items:
+        if not isinstance(item, dict):
             continue
-        if href.startswith("/"):
-            href = "https://www.instahyre.com" + href
-        if href in seen:
+        job_id = item.get("jobId") or item.get("id") or item.get("jobID")
+        if not job_id or str(job_id) in seen:
             continue
-        seen.add(href)
-        title = _text(a)
-        if len(title) < 3:
-            continue
-        card = a.find_parent(lambda x: x.name in ("article", "li", "div") and len(_text(x)) > 40)
-        yield _job(f"ih-{href}", "Instahyre", title, "India", href, None, _text(card or a))
+        seen.add(str(job_id))
+        title = item.get("title") or item.get("candidateTitle") or item.get("jobTitle") or ""
+        company = item.get("companyName") or item.get("company") or ""
+        location = _instahyre_location(item)
+        url = _instahyre_url(item, job_id)
+        posted = (
+            item.get("postedAt") or item.get("posted_at") or item.get("postedDate")
+            or item.get("createdAt") or item.get("created_at") or item.get("scrapedAt")
+        )
+        skills = item.get("skills") or item.get("tags") or []
+        functions = item.get("jobFunctions") or item.get("job_functions") or []
+        exp_min = item.get("experienceMin")
+        exp_max = item.get("experienceMax")
+        exp = ""
+        if exp_min is not None or exp_max is not None:
+            exp = f" {exp_min or 0}-{exp_max or ''} years"
+        desc = " ".join([
+            str(item.get("description") or ""),
+            str(item.get("descriptionText") or ""),
+            _text(skills) if isinstance(skills, dict) else " ".join(map(str, skills)) if isinstance(skills, list) else str(skills),
+            _text(functions) if isinstance(functions, dict) else " ".join(map(str, functions)) if isinstance(functions, list) else str(functions),
+            exp,
+        ])
+        yield _job(f"ih-{job_id}", str(company), str(title), location, url, posted, desc)
