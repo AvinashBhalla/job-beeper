@@ -13,7 +13,7 @@ concurrency:
 jobs:
   relay:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 8
 
     steps:
       - name: Checkout source
