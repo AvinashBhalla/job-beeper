@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-10-07T08:18:55.007885+00:00",
-  "last_run": "2026-10-07T08:18:55.007885+00:00",
-  "new_alerts": 0,
+  "updated_at": "2026-10-07T09:48:05.584738+00:00",
+  "last_run": "2026-10-07T09:48:05.584738+00:00",
+  "new_alerts": 99,
   "source_status": {
     "greenhouse:\"groww\"": {
       "ok": true,
@@ -11,7 +11,7 @@
     },
     "greenhouse:\"databricks\"": {
       "ok": true,
-      "count": 888,
+      "count": 889,
       "error": null,
       "provider": "direct"
     },
@@ -29,7 +29,7 @@
     },
     "greenhouse:\"cloudflare\"": {
       "ok": true,
-      "count": 419,
+      "count": 420,
       "error": null,
       "provider": "direct"
     },
@@ -41,13 +41,13 @@
     },
     "greenhouse:\"datadog\"": {
       "ok": true,
-      "count": 433,
+      "count": 432,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"elastic\"": {
       "ok": true,
-      "count": 417,
+      "count": 421,
       "error": null,
       "provider": "direct"
     },
@@ -65,13 +65,13 @@
     },
     "greenhouse:\"mongodb\"": {
       "ok": true,
-      "count": 395,
+      "count": 394,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"okta\"": {
       "ok": true,
-      "count": 371,
+      "count": 372,
       "error": null,
       "provider": "direct"
     },
@@ -83,13 +83,13 @@
     },
     "greenhouse:\"reddit\"": {
       "ok": true,
-      "count": 148,
+      "count": 149,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"robinhood\"": {
       "ok": true,
-      "count": 161,
+      "count": 162,
       "error": null,
       "provider": "direct"
     },
@@ -107,7 +107,7 @@
     },
     "greenhouse:\"zscaler\"": {
       "ok": true,
-      "count": 364,
+      "count": 366,
       "error": null,
       "provider": "direct"
     },
@@ -179,13 +179,13 @@
     },
     "greenhouse:\"fivetran\"": {
       "ok": true,
-      "count": 195,
+      "count": 196,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"grafanalabs\"": {
       "ok": true,
-      "count": 134,
+      "count": 129,
       "error": null,
       "provider": "direct"
     },
@@ -215,13 +215,13 @@
     },
     "greenhouse:\"newrelic\"": {
       "ok": true,
-      "count": 47,
+      "count": 48,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"toast\"": {
       "ok": true,
-      "count": 325,
+      "count": 323,
       "error": null,
       "provider": "direct"
     },
@@ -245,7 +245,7 @@
     },
     "lever:\"spotify\"": {
       "ok": true,
-      "count": 74,
+      "count": 76,
       "error": null,
       "provider": "direct"
     },
@@ -416,8 +416,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T08:38:55.007885+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T10:28:05.584738+00:00",
+      "failures": 2
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
@@ -430,8 +430,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T08:38:55.007885+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T10:28:05.584738+00:00",
+      "failures": 2
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -450,14 +450,16 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T08:38:55.007885+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T10:28:05.584738+00:00",
+      "failures": 2
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
-      "ok": true,
-      "count": 21,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "'externalPath'",
+      "provider": "direct",
+      "retry_at": "2026-10-07T10:08:05.584738+00:00",
+      "failures": 1
     },
     "remotive:": {
       "ok": true,
@@ -485,59 +487,35 @@
     },
     "naukri:\"software engineer\"": {
       "ok": true,
-      "count": 0,
+      "count": 20,
       "error": null,
       "provider": "direct"
     },
     "naukri:\"full stack developer\"": {
       "ok": true,
-      "count": 0,
+      "count": 20,
       "error": null,
       "provider": "direct"
     },
     "naukri:\"react developer\"": {
       "ok": true,
-      "count": 0,
+      "count": 20,
       "error": null,
       "provider": "direct"
     },
     "naukri:\"python developer\"": {
       "ok": true,
-      "count": 0,
+      "count": 20,
       "error": null,
       "provider": "direct"
     },
     "naukri:\"automation engineer\"": {
       "ok": true,
-      "count": 0,
+      "count": 20,
       "error": null,
       "provider": "direct"
     },
-    "instahyre:\"software engineer\"": {
-      "ok": true,
-      "count": 0,
-      "error": null,
-      "provider": "direct"
-    },
-    "instahyre:\"full stack developer\"": {
-      "ok": true,
-      "count": 0,
-      "error": null,
-      "provider": "direct"
-    },
-    "instahyre:\"react developer\"": {
-      "ok": true,
-      "count": 0,
-      "error": null,
-      "provider": "direct"
-    },
-    "instahyre:\"python developer\"": {
-      "ok": true,
-      "count": 0,
-      "error": null,
-      "provider": "direct"
-    },
-    "instahyre:\"automation engineer\"": {
+    "instahyre:\"software\"": {
       "ok": true,
       "count": 0,
       "error": null,
@@ -552,67 +530,11 @@
       "title": "AI/ML Technologist",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
-      "posted": "2026-10-07T08:18:55.007885+00:00",
+      "posted": "2026-10-07T09:48:05.584738+00:00",
       "score": 56,
       "reasons": [
         "ai",
         "ml"
-      ]
-    },
-    {
-      "id": "an-product-owner-digital-products-ai-hamburg-151254",
-      "source": "arbeitnow",
-      "company": "Boardwise GmbH",
-      "title": "Product Owner Digital Products & AI (m/w/d)",
-      "location": "Remote Hamburg",
-      "url": "https://www.arbeitnow.com/jobs/companies/boardwise-gmbh/product-owner-digital-products-ai-hamburg-151254",
-      "posted": "2026-10-07T05:31:03+00:00",
-      "score": 60,
-      "reasons": [
-        "ai",
-        "llm"
-      ]
-    },
-    {
-      "id": "an-devops-engineer-berlin-317808",
-      "source": "arbeitnow",
-      "company": "Interlead GmbH",
-      "title": "DevOps Engineer (m/w/d)",
-      "location": "Remote Berlin",
-      "url": "https://www.arbeitnow.com/jobs/companies/interlead-gmbh/devops-engineer-berlin-317808",
-      "posted": "2026-10-07T05:31:00+00:00",
-      "score": 55,
-      "reasons": [
-        "engineer",
-        "ai"
-      ]
-    },
-    {
-      "id": "gh-8214910",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Software Engineer, Ingestion Platform",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8214910",
-      "posted": "2026-10-07T02:51:00-04:00",
-      "score": 60,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8189317",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Backend Engineer, IAM",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8189317",
-      "posted": "2026-10-07T02:40:51-04:00",
-      "score": 59,
-      "reasons": [
-        "engineer",
-        "backend"
       ]
     },
     {
@@ -623,23 +545,9 @@
       "location": "Bangalore, India",
       "url": "https://jobs.elastic.co/jobs?gh_jid=8237463&gh_jid=8237463",
       "posted": "2026-10-07T02:13:51-04:00",
-      "score": 41,
+      "score": 39,
       "reasons": [
         "engineer"
-      ]
-    },
-    {
-      "id": "gh-8194576",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Frontend Engineer, Ads",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8194576",
-      "posted": "2026-10-07T01:51:28-04:00",
-      "score": 59,
-      "reasons": [
-        "engineer",
-        "frontend"
       ]
     },
     {
@@ -650,26 +558,71 @@
       "location": "Bangalore ",
       "url": "https://www.rubrik.com/company/careers/departments/job.8258200?gh_jid=8258200",
       "posted": "2026-10-07T01:44:29-04:00",
-      "score": 48,
+      "score": 47,
       "reasons": [
         "software",
         "engineer"
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-requirement-mumbai-tier-1-institutes-preferred-at-willware-technologies-4476568052",
-      "source": "linkedin",
-      "company": "WillWare Technologies",
-      "title": "Python Full Stack Developer Requirement | Mumbai | Tier 1 Institutes Preferred",
-      "location": "Mumbai, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/python-full-stack-developer-requirement-mumbai-tier-1-institutes-preferred-at-willware-technologies-4476568052",
+      "id": "nk-nk-071026920915",
+      "source": "naukri",
+      "company": "A.P. Moller Maersk",
+      "title": "Software Engineer (Data & AIML)",
+      "location": "Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-software-engineer-data-aiml-maersk-global-service-centres-india-private-limited-pune-bengaluru-4-to-9-years-071026920915",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 69,
+      "score": 62,
+      "reasons": [
+        "software",
+        "engineer",
+        "ai",
+        "ml"
+      ]
+    },
+    {
+      "id": "nk-nk-300926927385",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Mainframe Automation Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-mainframe-automation-engineer-infosys-limited-hyderabad-7-to-12-years-300926927385",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 59,
+      "reasons": [
+        "engineer",
+        "automation",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-051026040407",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "React + Node Developer",
+      "location": "Hyderabad, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-react-node-developer-infosys-hyderabad-chennai-bengaluru-5-to-9-years-051026040407",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 54,
       "reasons": [
         "developer",
-        "full stack",
-        "python",
-        "ai"
+        "react",
+        "node"
+      ]
+    },
+    {
+      "id": "nk-nk-051026040389",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "React + Node Developer",
+      "location": "Hyderabad, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-react-node-developer-infosys-hyderabad-chennai-bengaluru-3-to-5-years-051026040389",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 54,
+      "reasons": [
+        "developer",
+        "react",
+        "node"
       ]
     },
     {
@@ -680,11 +633,236 @@
       "location": "Chennai, Tamil Nadu, India",
       "url": "https://in.linkedin.com/jobs/view/python-developer-at-ari-4475169815",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 53,
+      "score": 51,
       "reasons": [
         "developer",
         "python",
         "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
+      "source": "linkedin",
+      "company": "Hunar.AI",
+      "title": "Full Stack Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "full stack",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-071026925268",
+      "source": "naukri",
+      "company": "Bitbybit Solutions",
+      "title": ".Net + React Developer",
+      "location": "Mumbai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-net-react-developer-bitbybit-solutions-mumbai-bengaluru-7-to-10-years-071026925268",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-071026015531",
+      "source": "naukri",
+      "company": "Hexaware Technologies",
+      "title": ".NET React Azure Developer",
+      "location": "Hyderabad, Bengaluru, Mumbai (All Areas), India",
+      "url": "https://www.naukri.com/job-listings-net-react-azure-developer-hexaware-technologies-hyderabad-bengaluru-mumbai-all-areas-9-to-12-years-071026015531",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-200926014684",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java React Developer",
+      "location": "Pune, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-react-developer-infosys-pune-chennai-bengaluru-2-to-6-years-200926014684",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-160926046096",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer (5 To 8 Years)",
+      "location": "Noida, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-pune-bengaluru-5-to-8-years-160926046096",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-110926010576",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-infosys-hyderabad-pune-bengaluru-5-to-8-years-110926010576",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-250926035861",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer (5 To 8 Years)",
+      "location": "Noida, Hyderabad, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-hyderabad-bengaluru-5-to-8-years-250926035861",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-111225012381",
+      "source": "naukri",
+      "company": "Hexaware Technologies",
+      "title": "Python Developer (Location - Bangalore)",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-location-bangalore-hexaware-technologies-bengaluru-5-to-10-years-111225012381",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-071026023451",
+      "source": "naukri",
+      "company": "PwC",
+      "title": "Automation Engineer",
+      "location": "Hyderabad, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-pwc-hyderabad-chennai-bengaluru-2-to-4-years-071026023451",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-300926927464",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Patch & Automation Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-patch-automation-engineer-infosys-limited-hyderabad-5-to-10-years-300926927464",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-300926927361",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Patch & Automation Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-patch-automation-engineer-infosys-limited-hyderabad-3-to-4-years-300926927361",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-300926927332",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Patch & Automation Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-patch-automation-engineer-infosys-limited-hyderabad-11-to-15-years-300926927332",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-110926024181",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Automation Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-infosys-hyderabad-5-to-10-years-110926024181",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-070726906973",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Automation Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-infosys-limited-hyderabad-5-to-8-years-070726906973",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-071026026527",
+      "source": "naukri",
+      "company": "Utthunga Technologies",
+      "title": "Automation Engineer",
+      "location": "Ballari, Sandur, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-utthunga-technologies-ballari-sandur-3-to-7-years-071026026527",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-071026020775",
+      "source": "naukri",
+      "company": "Nable Solutions",
+      "title": "Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-nable-solutions-bengaluru-4-to-6-years-071026020775",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "automation"
       ]
     },
     {
@@ -695,51 +873,107 @@
       "location": "New Delhi, Delhi, India",
       "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-crimson-energy-experts-pvt-ltd-4475186371",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 43,
+      "score": 41,
       "reasons": [
         "engineer",
         "full stack"
       ]
     },
     {
-      "id": "gh-8139781",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Software Engineer, Content Platform",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8139781",
-      "posted": "2026-10-06T19:12:22-04:00",
-      "score": 52,
+      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-cedric-4475412108",
+      "source": "linkedin",
+      "company": "Cedric",
+      "title": "Junior Software Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-cedric-4475412108",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 41,
       "reasons": [
         "software",
         "engineer"
       ]
     },
     {
-      "id": "gh-8147559",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Front End Software Engineer, Consumer Engineering",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8147559",
-      "posted": "2026-10-06T16:14:08-04:00",
-      "score": 49,
+      "id": "nk-nk-071026925777",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-6-years-071026925777",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 41,
       "reasons": [
         "software",
         "engineer"
       ]
     },
     {
-      "id": "gh-8649994002",
-      "source": "greenhouse",
-      "company": "gitlab",
-      "title": "Public Sector Strategic Account Executive, SLED - Mountain Plains",
-      "location": "Remote, United States",
-      "url": "https://job-boards.greenhouse.io/gitlab/jobs/8649994002",
-      "posted": "2026-10-06T14:49:11-04:00",
-      "score": 45,
+      "id": "nk-nk-071026921232",
+      "source": "naukri",
+      "company": "A.P. Moller Maersk",
+      "title": "Software Engineer",
+      "location": "Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-software-engineer-maersk-global-service-centres-india-private-limited-pune-bengaluru-3-to-8-years-071026921232",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 41,
       "reasons": [
-        "ai"
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-071026925876",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-7-to-12-years-071026925876",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-071026925784",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-071026925784",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-071026925782",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-4-to-9-years-071026925782",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/dotnet-developer-at-webplat-technologies-pvt-ltd-4475173598",
+      "source": "linkedin",
+      "company": "Webplat Technologies Pvt. Ltd.",
+      "title": "Dotnet Developer",
+      "location": "Pune City, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/dotnet-developer-at-webplat-technologies-pvt-ltd-4475173598",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 33,
+      "reasons": [
+        "developer"
       ]
     },
     {
@@ -750,91 +984,7 @@
       "location": "Bangalore ",
       "url": "https://www.rubrik.com/company/careers/departments/job.8256407?gh_jid=8256407",
       "posted": "2026-10-06T13:30:23-04:00",
-      "score": 36,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8198102",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Front End Software Engineer, Media Player",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8198102",
-      "posted": "2026-10-06T13:20:28-04:00",
-      "score": 46,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8250125",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "iOS Software Engineer, Consumer Engineering",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8250125",
-      "posted": "2026-10-06T13:20:28-04:00",
-      "score": 46,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-6469397",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Software Engineer, Ads",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/6469397",
-      "posted": "2026-10-06T13:20:28-04:00",
-      "score": 46,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-6512458",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Software Engineer, Ads",
-      "location": "Remote - Ontario, Canada",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/6512458",
-      "posted": "2026-10-06T13:20:28-04:00",
-      "score": 46,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8172457",
-      "source": "greenhouse",
-      "company": "reddit",
-      "title": "Software Engineer, Consumer Engineering",
-      "location": "Remote - United States",
-      "url": "https://job-boards.greenhouse.io/reddit/jobs/8172457",
-      "posted": "2026-10-06T13:20:28-04:00",
-      "score": 46,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8026211",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Software Engineer, Platform Access (L2)",
-      "location": "Remote - US",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8026211",
-      "posted": "2026-10-06T12:34:32-04:00",
-      "score": 45,
+      "score": 35,
       "reasons": [
         "software",
         "engineer"
@@ -848,7 +998,7 @@
       "location": "Hybrid",
       "url": "https://boards.greenhouse.io/cloudflare/jobs/8214470?gh_jid=8214470",
       "posted": "2026-10-06T12:03:14-04:00",
-      "score": 27,
+      "score": 25,
       "reasons": [
         "engineer"
       ]
@@ -861,59 +1011,7 @@
       "location": "Remote - India",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/7781659",
       "posted": "2026-10-06T10:28:05-04:00",
-      "score": 35,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8114393",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Solution Engineer",
-      "location": "Remote - Singapore",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8114393",
-      "posted": "2026-10-06T10:27:11-04:00",
-      "score": 35,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8055481",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Security Engineer, Incident Response",
-      "location": "Remote - United Kingdom",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8055481",
-      "posted": "2026-10-06T10:27:03-04:00",
-      "score": 35,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8023560",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Security Engineer, Incident Response",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8023560",
-      "posted": "2026-10-06T10:27:03-04:00",
-      "score": 35,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8000178",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Presales Engineer (German Speaking) ",
-      "location": "Remote - United Kingdom",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8000178",
-      "posted": "2026-10-06T10:26:55-04:00",
-      "score": 35,
+      "score": 34,
       "reasons": [
         "engineer"
       ]
@@ -926,35 +1024,9 @@
       "location": "Remote - India",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8079801",
       "posted": "2026-10-06T10:26:06-04:00",
-      "score": 43,
+      "score": 42,
       "reasons": [
         "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8157509",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Presales Engineer ",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8157509",
-      "posted": "2026-10-06T10:25:54-04:00",
-      "score": 35,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8243073",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Presales Engineer",
-      "location": "Remote - United Kingdom",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8243073",
-      "posted": "2026-10-06T10:25:46-04:00",
-      "score": 35,
-      "reasons": [
         "engineer"
       ]
     },
@@ -966,7 +1038,7 @@
       "location": "Remote - India",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8239751",
       "posted": "2026-10-06T10:25:05-04:00",
-      "score": 35,
+      "score": 34,
       "reasons": [
         "engineer"
       ]
@@ -982,19 +1054,6 @@
       "score": 23,
       "reasons": [
         "engineer"
-      ]
-    },
-    {
-      "id": "gh-8855804002",
-      "source": "greenhouse",
-      "company": "databricks",
-      "title": "Strategic Account Executive - Retail vertical ",
-      "location": "Remote - California",
-      "url": "https://databricks.com/company/careers/open-positions/job?gh_jid=8855804002",
-      "posted": "2026-10-06T07:42:56-04:00",
-      "score": 38,
-      "reasons": [
-        "ai"
       ]
     },
     {
@@ -1072,6 +1131,22 @@
       ]
     },
     {
+      "id": "nk-nk-061026030574",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer | GenAI | LLM | RAG",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-genai-llm-rag-infosys-hyderabad-pune-bengaluru-9-to-14-years-061026030574",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 62,
+      "reasons": [
+        "developer",
+        "python",
+        "ai",
+        "llm"
+      ]
+    },
+    {
       "id": "li-https://in.linkedin.com/jobs/view/full-stack-developer-python%2Breact-at-mott-macdonald-4458586868",
       "source": "linkedin",
       "company": "Mott MacDonald",
@@ -1104,18 +1179,32 @@
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-at-indium-4474903135",
-      "source": "linkedin",
-      "company": "Indium",
-      "title": "Python Full Stack Developer",
-      "location": "Chennai, Tamil Nadu, India",
-      "url": "https://in.linkedin.com/jobs/view/python-full-stack-developer-at-indium-4474903135",
+      "id": "nk-nk-061026505486",
+      "source": "naukri",
+      "company": "Aziro",
+      "title": "AI Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-ai-automation-engineer-msys-tech-india-pvt-ltd-bengaluru-3-to-8-years-061026505486",
       "posted": "2026-10-06T00:00:00+00:00",
       "score": 49,
       "reasons": [
-        "developer",
-        "full stack",
-        "python",
+        "engineer",
+        "automation",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503342",
+      "source": "naukri",
+      "company": "Snowrelic",
+      "title": "AI & Automation Engineer",
+      "location": "Chandigarh, New Delhi, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-ai-automation-engineer-snowrelic-inc-chandigarh-new-delhi-bengaluru-5-to-10-years-061026503342",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "engineer",
+        "automation",
         "ai"
       ]
     },
@@ -1151,18 +1240,33 @@
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-at-zemoso-technologies-4474095163",
-      "source": "linkedin",
-      "company": "Zemoso Technologies",
-      "title": "Python Full Stack Developer",
-      "location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/python-full-stack-developer-at-zemoso-technologies-4474095163",
+      "id": "nk-nk-061026009782",
+      "source": "naukri",
+      "company": "PwC",
+      "title": "Generative AI Software Engineer",
+      "location": "Hyderabad, Gurugram, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-generative-ai-software-engineer-pwc-hyderabad-gurugram-bengaluru-4-to-8-years-061026009782",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 44,
+      "reasons": [
+        "software",
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503540",
+      "source": "naukri",
+      "company": "Starkenn Technologies",
+      "title": "Full Stack Developer (AWS) - Telematics & Vision AI",
+      "location": "Pune, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-aws-telematics-vision-ai-starkenn-technologies-pune-0-to-2-years-061026503540",
       "posted": "2026-10-06T00:00:00+00:00",
       "score": 44,
       "reasons": [
         "developer",
         "full stack",
-        "python"
+        "ai"
       ]
     },
     {
@@ -1178,6 +1282,258 @@
         "software",
         "engineer",
         "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-190926012151",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java React Developer (5-12 yrs) @ Infosys",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-react-developer-5-12-yrs-infosys-infosys-hyderabad-pune-bengaluru-5-to-10-years-190926012151",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-190926012138",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java React Developer (3-5 yrs) @ Infosys",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-react-developer-3-5-yrs-infosys-infosys-hyderabad-pune-bengaluru-3-to-5-years-190926012138",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-190926012110",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java React Developer (2-3 yrs) @ Infosys",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-react-developer-2-3-yrs-infosys-infosys-hyderabad-pune-bengaluru-2-to-3-years-190926012110",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-061026504447",
+      "source": "naukri",
+      "company": "Envision Technology Solutions",
+      "title": "Python Developer",
+      "location": "Hubballi, Mangaluru, Mysuru, Bengaluru, Belagavi, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-envision-technology-solutions-tech-think-infotech-hubballi-mangaluru-mysuru-bengaluru-belagavi-2-to-4-years-061026504447",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026030562",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-infosys-hyderabad-pune-bengaluru-5-to-10-years-061026030562",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026013740",
+      "source": "naukri",
+      "company": "Genpact",
+      "title": "Python developer-PAN INDIA",
+      "location": "Bengaluru, Delhi / NCR, Mumbai (All Areas), India",
+      "url": "https://www.naukri.com/job-listings-python-developer-pan-india-genpact-bengaluru-delhi-ncr-mumbai-all-areas-7-to-12-years-061026013740",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026013285",
+      "source": "naukri",
+      "company": "Genpact",
+      "title": "Python developer",
+      "location": "Bengaluru, Delhi / NCR, Mumbai (All Areas), India",
+      "url": "https://www.naukri.com/job-listings-python-developer-genpact-bengaluru-delhi-ncr-mumbai-all-areas-7-to-12-years-061026013285",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026030570",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer",
+      "location": "Noida, Hyderabad, Chennai, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-infosys-noida-hyderabad-chennai-5-to-10-years-061026030570",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503654",
+      "source": "naukri",
+      "company": "Envision Technology Solutions",
+      "title": "Python Developer",
+      "location": "Mumbai, Nagpur, Thane, Nashik, Pune, Chhatrapati Sambhajinagar, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-envision-technology-solutions-tech-think-infotech-mumbai-nagpur-thane-nashik-pune-chhatrapati-sambhajinagar-2-to-4-years-061026503654",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503951",
+      "source": "naukri",
+      "company": "Envision Technology Solutions",
+      "title": "Python Developer",
+      "location": "Warangal, Hyderabad, Nizamabad, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-envision-technology-solutions-tech-think-infotech-warangal-hyderabad-nizamabad-3-to-8-years-061026503951",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026501099",
+      "source": "naukri",
+      "company": "Zensar",
+      "title": "Python Developer",
+      "location": "Pune, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-zensar-technologies-pune-6-to-11-years-061026501099",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-061026015550",
+      "source": "naukri",
+      "company": "Tech Mahindra",
+      "title": "Urgently required - SAP Automation Engineer - Tech Mahindra Ltd - PAN",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-urgently-required-sap-automation-engineer-tech-mahindra-ltd-pan-tech-mahindra-hyderabad-pune-bengaluru-8-to-13-years-061026015550",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026909534",
+      "source": "naukri",
+      "company": "CGI",
+      "title": "Detection & Response Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-detection-response-automation-engineer-cgi-information-systems-and-management-consultants-bengaluru-2-to-6-years-061026909534",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026024940",
+      "source": "naukri",
+      "company": "ABB",
+      "title": "IS Observability - Event Driven Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-is-observability-event-driven-automation-engineer-abb-india-limited-bengaluru-5-to-8-years-061026024940",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503772",
+      "source": "naukri",
+      "company": "Envision Technology Solutions",
+      "title": "Automation Engineer",
+      "location": "Warangal, Hyderabad, Nizamabad, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-envision-technology-solutions-tech-think-infotech-warangal-hyderabad-nizamabad-4-to-7-years-061026503772",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026024930",
+      "source": "naukri",
+      "company": "Nexa Office Infosystems Llp",
+      "title": "Automation Engineer",
+      "location": "Coimbatore(Vellakinar), India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-nexa-office-infosystems-llp-coimbatore-4-to-6-years-061026024930",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026003808",
+      "source": "naukri",
+      "company": "Qualitest",
+      "title": "Automation Engineer",
+      "location": "Pune, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-qualitest-pune-chennai-bengaluru-5-to-12-years-061026003808",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-061026505231",
+      "source": "naukri",
+      "company": "Algoshack Technologies",
+      "title": "Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-automation-engineer-algoshack-technologies-bengaluru-4-to-9-years-061026505231",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
       ]
     },
     {
@@ -1237,17 +1593,310 @@
       ]
     },
     {
-      "id": "gh-8162046",
-      "source": "greenhouse",
-      "company": "pinterest",
-      "title": "Machine Learning Engineer II, Responsible AI",
-      "location": "San Francisco, CA, US; Remote, US",
-      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8162046",
-      "posted": "2026-10-05T20:21:49-04:00",
-      "score": 46,
+      "id": "nk-nk-061026002836",
+      "source": "naukri",
+      "company": "Qualcomm",
+      "title": "Software Engineer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-software-engineer-qualcomm-hyderabad-0-to-1-years-061026002836",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
       "reasons": [
-        "engineer",
-        "ai"
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925820",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925820",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925777",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925777",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925768",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925768",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925752",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-12-to-17-years-061026925752",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925748",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925748",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925744",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-5-to-10-years-061026925744",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925721",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-6-to-11-years-061026925721",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925708",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Mumbai, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-mumbai-3-to-8-years-061026925708",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925679",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-2-to-7-years-061026925679",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925643",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-3-to-8-years-061026925643",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925580",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-bengaluru-7-to-12-years-061026925580",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026925546",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "Custom Software Engineer",
+      "location": "Mumbai, India",
+      "url": "https://www.naukri.com/job-listings-custom-software-engineer-accenture-solutions-pvt-ltd-mumbai-3-to-8-years-061026925546",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-061026505011",
+      "source": "naukri",
+      "company": "Aon",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-aon-bengaluru-5-to-9-years-061026505011",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026502413",
+      "source": "naukri",
+      "company": "Deutsche Bank",
+      "title": "Full Stack Developer, AS",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-as-deutsche-bank-bengaluru-4-to-8-years-061026502413",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503769",
+      "source": "naukri",
+      "company": "Envision Technology Solutions",
+      "title": "Full Stack Developer",
+      "location": "Warangal, Hyderabad, Nizamabad, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-envision-technology-solutions-tech-think-infotech-warangal-hyderabad-nizamabad-10-to-15-years-061026503769",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026917108",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "SFCC Full stack Developer",
+      "location": "Pune, India",
+      "url": "https://www.naukri.com/job-listings-sfcc-full-stack-developer-infosys-limited-pune-3-to-5-years-061026917108",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503604",
+      "source": "naukri",
+      "company": "Envision Technology Solutions",
+      "title": "Full Stack Developer",
+      "location": "Panipat, Yamunanagar, Faridabad, Sonipat, Gurugram, Hisar, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-envision-technology-solutions-tech-think-infotech-panipat-yamunanagar-faridabad-sonipat-gurugram-hisar-2-to-4-years-061026503604",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026004680",
+      "source": "naukri",
+      "company": "Hexaware Technologies",
+      "title": "Microsoft Full Stack Developer",
+      "location": "Pune, Chennai, Mumbai (All Areas), India",
+      "url": "https://www.naukri.com/job-listings-microsoft-full-stack-developer-hexaware-technologies-pune-chennai-mumbai-all-areas-9-to-14-years-061026004680",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026503539",
+      "source": "naukri",
+      "company": "Starkenn Technologies",
+      "title": "Full Stack Developer (AWS)",
+      "location": "Pune, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-aws-starkenn-technologies-pune-0-to-2-years-061026503539",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026004393",
+      "source": "naukri",
+      "company": "Sma Solar",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-sma-solar-bengaluru-5-to-12-years-061026004393",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-061026917830",
+      "source": "naukri",
+      "company": "Fujitsu",
+      "title": "Full-Stack Developer",
+      "location": "Noida, Pune, Chennai, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-fujitsu-consulting-india-pvt-ltd-noida-pune-chennai-8-to-13-years-061026917830",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 23,
+      "reasons": [
+        "developer"
       ]
     },
     {
@@ -1295,12 +1944,12 @@
       ]
     },
     {
-      "id": "gh-7993984",
+      "id": "gh-8239047",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=7993984",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1323,12 +1972,12 @@
       ]
     },
     {
-      "id": "gh-8208074",
+      "id": "gh-7993984",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8208074",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7993984",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1351,12 +2000,12 @@
       ]
     },
     {
-      "id": "gh-8239047",
+      "id": "gh-8208074",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8208074",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1469,34 +2118,6 @@
       ]
     },
     {
-      "id": "gh-8227344",
-      "source": "greenhouse",
-      "company": "pinterest",
-      "title": "Software Engineer II, Monetization Engineering ",
-      "location": "San Francisco, CA; Palo Alto, CA; Seattle, WA; New York, NY; Remote, US",
-      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8227344",
-      "posted": "2026-10-05T16:42:04-04:00",
-      "score": 41,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8015547",
-      "source": "greenhouse",
-      "company": "pinterest",
-      "title": "Security Software Engineer II, Detection and Response",
-      "location": "San Francisco, CA, US; Remote, US",
-      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8015547",
-      "posted": "2026-10-05T16:37:04-04:00",
-      "score": 41,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
       "id": "gh-6137958004",
       "source": "greenhouse",
       "company": "vercel",
@@ -1510,32 +2131,6 @@
         "engineer",
         "next",
         "next.js"
-      ]
-    },
-    {
-      "id": "gh-8859063002",
-      "source": "greenhouse",
-      "company": "gitlab",
-      "title": "Support Engineer, U.S. Government Support ",
-      "location": "Remote, United States",
-      "url": "https://job-boards.greenhouse.io/gitlab/jobs/8859063002",
-      "posted": "2026-10-05T15:24:21-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8207137",
-      "source": "greenhouse",
-      "company": "mixpanel",
-      "title": "Delivery Engineer",
-      "location": "Singapore (Hybrid)",
-      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8207137",
-      "posted": "2026-10-05T15:20:13-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
       ]
     },
     {
@@ -1579,45 +2174,6 @@
       ]
     },
     {
-      "id": "gh-8142661",
-      "source": "greenhouse",
-      "company": "mixpanel",
-      "title": "Customer Engineer ",
-      "location": "Remote, US (Remote) ",
-      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142661",
-      "posted": "2026-10-05T15:20:10-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8142657",
-      "source": "greenhouse",
-      "company": "mixpanel",
-      "title": "Customer Engineer ",
-      "location": "New York City, US (Remote) ",
-      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142657",
-      "posted": "2026-10-05T15:20:10-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8124207",
-      "source": "greenhouse",
-      "company": "mixpanel",
-      "title": "Delivery Engineer, EMEA ",
-      "location": "London, UK (Hybrid)",
-      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8124207",
-      "posted": "2026-10-05T15:20:10-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
       "id": "gh-8164649",
       "source": "greenhouse",
       "company": "cloudflare",
@@ -1644,163 +2200,6 @@
       ]
     },
     {
-      "id": "ro-1137465",
-      "source": "remoteok",
-      "company": "RedMimicry",
-      "title": "Platform and Integration Engineer Security Telemetry",
-      "location": "Remote ",
-      "url": "https://remoteOK.com/remote-jobs/remote-platform-and-integration-engineer-security-telemetry-redmimicry-1137465",
-      "posted": "2026-10-05T13:00:02+00:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8250423",
-      "source": "greenhouse",
-      "company": "samsara",
-      "title": "Data Engineer",
-      "location": "Remote - Canada",
-      "url": "https://www.samsara.com/company/careers/roles/8250423?gh_jid=8250423",
-      "posted": "2026-10-05T12:47:28-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8141959",
-      "source": "greenhouse",
-      "company": "samsara",
-      "title": "Data Engineer",
-      "location": "Remote - US",
-      "url": "https://www.samsara.com/company/careers/roles/8141959?gh_jid=8141959",
-      "posted": "2026-10-05T12:47:26-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-7996774",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Machine Learning Engineer",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/7996774",
-      "posted": "2026-10-05T10:32:44-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8007455",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Machine Learning Engineer",
-      "location": "Remote - Spain",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8007455",
-      "posted": "2026-10-05T10:32:25-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8102950",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Software Development Engineer (L3)",
-      "location": "Remote - Colombia",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8102950",
-      "posted": "2026-10-05T10:30:51-04:00",
-      "score": 41,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8108771",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "DevOps Engineer (Observability)",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8108771",
-      "posted": "2026-10-05T10:30:22-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8140436",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Technical Support Engineer 2",
-      "location": "Remote - Colombia",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8140436",
-      "posted": "2026-10-05T10:29:11-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8244723",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Technical Support Engineer 2",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8244723",
-      "posted": "2026-10-05T10:28:46-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8204407",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Technical Support Engineer",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8204407",
-      "posted": "2026-10-05T10:27:28-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8208126",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Technical Support Engineer",
-      "location": "Remote - Ireland",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8208126",
-      "posted": "2026-10-05T10:27:25-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8207696",
-      "source": "greenhouse",
-      "company": "twilio",
-      "title": "Technical Support Engineer",
-      "location": "Remote - Estonia",
-      "url": "https://job-boards.greenhouse.io/twilio/jobs/8207696",
-      "posted": "2026-10-05T10:27:03-04:00",
-      "score": 33,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
       "id": "sr-744000153459179",
       "source": "smartrecruiters",
       "company": "BoschGroup",
@@ -1814,14 +2213,28 @@
       ]
     },
     {
-      "id": "gh-7487353",
-      "source": "greenhouse",
-      "company": "datadog",
-      "title": "Enterprise Sales Engineer - UK/Ireland",
-      "location": "Dublin, Ireland; United Kingdom, Remote",
-      "url": "https://careers.datadoghq.com/detail/7487353/?gh_jid=7487353",
-      "posted": "2026-10-05T09:49:08-04:00",
-      "score": 33,
+      "id": "wd-intel-/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
+      "source": "workday",
+      "company": "intel",
+      "title": "Software Application Development Engineer",
+      "location": "India, Bangalore",
+      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
+      "posted": "2026-10-05T09:48:05.584738+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "wd-intel-/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
+      "source": "workday",
+      "company": "intel",
+      "title": "Memory Electrical Validation Engineer",
+      "location": "India, Bangalore",
+      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
+      "posted": "2026-10-05T09:48:05.584738+00:00",
+      "score": 23,
       "reasons": [
         "engineer"
       ]
@@ -1847,33 +2260,6 @@
       "location": "Hybrid",
       "url": "https://boards.greenhouse.io/cloudflare/jobs/8238758?gh_jid=8238758",
       "posted": "2026-10-05T08:52:44-04:00",
-      "score": 23,
-      "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "wd-intel-/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "source": "workday",
-      "company": "intel",
-      "title": "Software Application Development Engineer",
-      "location": "India, Bangalore",
-      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "posted": "2026-10-05T08:18:55.007885+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "wd-intel-/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "source": "workday",
-      "company": "intel",
-      "title": "Memory Electrical Validation Engineer",
-      "location": "India, Bangalore",
-      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "posted": "2026-10-05T08:18:55.007885+00:00",
       "score": 23,
       "reasons": [
         "engineer"
@@ -1964,6 +2350,391 @@
       "score": 23,
       "reasons": [
         "engineer"
+      ]
+    },
+    {
+      "id": "nk-nk-051026005140",
+      "source": "naukri",
+      "company": "Hexaware Technologies",
+      "title": "Dotnet Developer with React Gen AI",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-dotnet-developer-with-react-gen-ai-hexaware-technologies-bengaluru-6-to-9-years-051026005140",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "developer",
+        "react",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-051026015143",
+      "source": "naukri",
+      "company": "Infobeans",
+      "title": "React with Python Developer",
+      "location": "Indore, Pune, India",
+      "url": "https://www.naukri.com/job-listings-react-with-python-developer-infobeans-indore-pune-8-to-12-years-051026015143",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "developer",
+        "python",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-051026930660",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "React JS / React Native Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-react-js-react-native-developer-infosys-limited-bengaluru-9-to-11-years-051026930660",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "developer",
+        "react",
+        "react native"
+      ]
+    },
+    {
+      "id": "nk-nk-051026937544",
+      "source": "naukri",
+      "company": "Accenture",
+      "title": "AI & Automation Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-ai-automation-engineer-accenture-solutions-pvt-ltd-bengaluru-10-to-12-years-051026937544",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "engineer",
+        "automation",
+        "ai"
+      ]
+    },
+    {
+      "id": "nk-nk-290626928405",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java full stack, React Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-full-stack-react-developer-infosys-limited-bengaluru-3-to-5-years-290626928405",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 44,
+      "reasons": [
+        "developer",
+        "full stack",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-051026024196",
+      "source": "naukri",
+      "company": "PwC India",
+      "title": "Python Software Developer",
+      "location": "Kolkata, Bengaluru, Delhi / NCR, India",
+      "url": "https://www.naukri.com/job-listings-python-software-developer-pwc-india-kolkata-bengaluru-delhi-ncr-5-to-10-years-051026024196",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 44,
+      "reasons": [
+        "software",
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-051026503110",
+      "source": "naukri",
+      "company": "Pratham Software",
+      "title": "Node Full Stack Developer",
+      "location": "Jaipur, India",
+      "url": "https://www.naukri.com/job-listings-node-full-stack-developer-pratham-software-psi-jaipur-3-to-5-years-051026503110",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 39,
+      "reasons": [
+        "developer",
+        "full stack",
+        "node"
+      ]
+    },
+    {
+      "id": "nk-nk-051026040266",
+      "source": "naukri",
+      "company": "Altimetrik",
+      "title": "Urgent Opening For React Developer@Bangalore who Can join immediately",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-urgent-opening-for-react-developer-bangalore-who-can-join-immediately-altimetrik-bengaluru-5-to-10-years-051026040266",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-051026503931",
+      "source": "naukri",
+      "company": "Stallioni Agency",
+      "title": "React Developer",
+      "location": "Coimbatore, India",
+      "url": "https://www.naukri.com/job-listings-react-developer-stallioni-coimbatore-2-to-7-years-051026503931",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-051026501551",
+      "source": "naukri",
+      "company": "Stackerbee Technologies",
+      "title": "React Developer",
+      "location": "Jamnagar, India",
+      "url": "https://www.naukri.com/job-listings-react-developer-stackerbee-technologies-jamnagar-1-to-5-years-051026501551",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-030726032204",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java React Developer(3-5 yrs)-Pan India",
+      "location": "Hyderabad, Pune, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-react-developer-3-5-yrs-pan-india-infosys-hyderabad-pune-bengaluru-3-to-5-years-030726032204",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-100726919371",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Java React Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-java-react-developer-infosys-limited-bengaluru-3-to-5-years-100726919371",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "nk-nk-160926008093",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer (5 To 8 Years)",
+      "location": "Noida, Hyderabad, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-hyderabad-bengaluru-5-to-8-years-160926008093",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-051026039668",
+      "source": "naukri",
+      "company": "Virtusa",
+      "title": "python developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-virtusa-bengaluru-5-to-8-years-051026039668",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-051026503155",
+      "source": "naukri",
+      "company": "Zensar",
+      "title": "Python Developer",
+      "location": "Hyderabad, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-zensar-technologies-hyderabad-6-to-11-years-051026503155",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-051026025292",
+      "source": "naukri",
+      "company": "RiDiK",
+      "title": "Python Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-ridik-bengaluru-5-to-8-years-051026025292",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-051026015170",
+      "source": "naukri",
+      "company": "eGlobal HR",
+      "title": "python developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-eglobal-hr-bengaluru-5-to-7-years-051026015170",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-240926040124",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Python Developer (5 To 8 Years)",
+      "location": "Noida, Hyderabad, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-hyderabad-bengaluru-5-to-8-years-240926040124",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "python"
+      ]
+    },
+    {
+      "id": "nk-nk-070926031280",
+      "source": "naukri",
+      "company": "Nilkamal",
+      "title": "Auto Packing / Automation Engineer",
+      "location": "Hosur, Shoolagiri, India",
+      "url": "https://www.naukri.com/job-listings-auto-packing-automation-engineer-nilkamal-hosur-shoolagiri-1-to-5-years-070926031280",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "nk-nk-051026001444",
+      "source": "naukri",
+      "company": "Globallogic",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-globallogic-bengaluru-3-to-5-years-051026001444",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026931627",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-infosys-limited-bengaluru-5-to-9-years-051026931627",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026016449",
+      "source": "naukri",
+      "company": "Thales",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-thales-bengaluru-5-to-10-years-051026016449",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026932057",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "Full Stack Developer",
+      "location": "Pune, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-infosys-limited-pune-5-to-9-years-051026932057",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026009506",
+      "source": "naukri",
+      "company": "Tata Consultancy Services",
+      "title": "Walk-in || Tcs Opportunity For Full Stack Developer",
+      "location": "New Delhi, Gurugram, Delhi / NCR, India",
+      "url": "https://www.naukri.com/job-listings-tcs-opportunity-for-full-stack-developer-tata-consultancy-services-new-delhi-gurugram-delhi-ncr-6-to-11-years-051026009506",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026504223",
+      "source": "naukri",
+      "company": "Trigyn Technologies",
+      "title": "Full stack Developer",
+      "location": "Vijayawada, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-trigyn-technologies-vijayawada-5-to-10-years-051026504223",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026504675",
+      "source": "naukri",
+      "company": "Premium Aerotec",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-aerotec-bengaluru-4-to-6-years-051026504675",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "nk-nk-051026502503",
+      "source": "naukri",
+      "company": "Nextwebi IT solutions Pvt ltd",
+      "title": "Full Stack Developer",
+      "location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-nextwebi-it-solutions-bengaluru-1-to-3-years-051026502503",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
       ]
     },
     {
