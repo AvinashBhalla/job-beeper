@@ -249,7 +249,9 @@ def main():
     exists, seen, known_sources = load_state()
     s, f = CFG["sources"], CFG["filters"]
     apify_cfg = CFG.get("apify", {})
-    use_apify = bool(os.environ.get("APIFY_API_TOKEN")) and apify_cfg.get("enabled", True)
+    use_apify = (bool(os.environ.get("APIFY_API_TOKEN")) and
+                 apify_cfg.get("enabled", True) and
+                 apify_cfg.get("provider", "direct") == "apify")
 
     tasks = [(n, fn, a) for n, fn in LIST_SOURCES.items() for a in s.get(n, [])]
     tasks += [(n, fn, None) for n, fn in FLAG_SOURCES.items() if s.get(n)]
