@@ -3,7 +3,11 @@ function setupNavigation(){
   const sections=[...document.querySelectorAll(".page-section")];
   function show(id){
     const target=document.getElementById(id)||document.getElementById("jobsSection");
-    sections.forEach(s=>s.classList.toggle("hidden-section",s!==target));
+    sections.forEach(s=>{
+      const isTarget=s===target;
+      s.classList.toggle("hidden-section",!isTarget);
+      s.classList.toggle("active-section",isTarget);
+    });
     links.forEach(a=>a.classList.toggle("active",a.dataset.section===target.id));
     if(target.id!=="jobsSection" && location.hash!=="#"+target.id.replace("Section","")){
       history.replaceState(null,"","#"+target.id.replace("Section",""));
@@ -84,6 +88,7 @@ function loadForm(){
   $("cfgKeywords").value=(f.keywords||[]).join(", ");
   $("cfgLocations").value=(f.locations||[]).join(", ");
   $("cfgExclude").value=(f.title_exclude||[]).join(", ");
+  $("cfgCandidateExperience").value=f.candidate_experience_years ?? "";
   $("cfgExperience").value=String(f.max_experience_years ?? 3);
   $("cfgAge").value=String(f.max_age_hours ?? 72);
   $("cfgRemoteOnly").checked=!!f.remote_only;
@@ -98,6 +103,8 @@ function collectConfig(){
   f.locations=csv($("cfgLocations").value);
   f.title_exclude=csv($("cfgExclude").value);
   f.fields=[...document.querySelectorAll("[data-field]:checked")].map(x=>x.dataset.field);
+  const candidateExperience=$("cfgCandidateExperience").value.trim();
+  f.candidate_experience_years=candidateExperience==="" ? null : Number(candidateExperience);
   f.max_experience_years=Number($("cfgExperience").value);
   f.max_age_hours=Number($("cfgAge").value);
   f.remote_only=$("cfgRemoteOnly").checked;
