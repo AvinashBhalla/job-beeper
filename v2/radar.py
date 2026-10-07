@@ -17,7 +17,6 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from fastapi import FastAPI, HTTPException
-from jobspy import scrape_jobs
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("JOB_RADAR_DB", ROOT / "jobs.db"))
@@ -385,134 +384,68 @@ def linkedin_collect() -> list[dict[str, Any]]:
     return jobs
 
 
-def _naukri_search_urls(query: str, location: str) -> list[str]:
-    query_slug = re.sub(r"[^a-z0-9]+", "-", query.lower()).strip("-")
-    location_slug = re.sub(r"[^a-z0-9]+", "-", location.lower()).strip("-")
-    if not location_slug:
-        return [f"https://www.naukri.com/{query_slug}-jobs"]
-    return [f"https://www.naukri.com/{query_slug}-jobs-in-{location_slug}"]
-
-
-def naukri_browser_collect() -> list[dict[str, Any]]:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise RuntimeError("Playwright is not installed for the Naukri browser collector") from exc
-
-    jobs: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path="/usr/bin/chromium",
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-background-networking",
-                "--disable-extensions",
-                "--disable-sync",
-            ],
-        )
-        context = browser.new_context(
-            user_agent=UA["User-Agent"],
-            locale="en-IN",
-            viewport={"width": 1280, "height": 900},
-        )
-        page = context.new_page()
-        page.route("**/*", lambda route: route.abort() if route.request.resource_type in {"image", "font", "media"} else route.continue_())
-
-        try:
-            for query in CONFIG["naukri_queries"]:
-                for location in CONFIG["naukri_locations"]:
-                    url = _naukri_search_urls(query, location)[0]
-                    try:
-                        page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                        try:
-                            page.wait_for_selector("div.srp-jobtuple-wrapper", timeout=12000)
-                        except Exception:
-                            pass
-
-                        cards = page.locator("div.srp-jobtuple-wrapper")
-                        count = min(cards.count(), 25)
-                        for index in range(count):
-                            card = cards.nth(index)
-                            title_el = card.locator("a.title").first
-                            if not title_el.count():
-                                continue
-                            title = (title_el.inner_text() or "").strip()
-                            href = title_el.get_attribute("href") or ""
-                            if href.startswith("/"):
-                                href = "https://www.naukri.com" + href
-                            if not href or not title:
-                                continue
-
-                            job_id_attr = card.get_attribute("data-job-id") or ""
-                            id_match = re.search(r"(\d{8,})", job_id_attr) or re.search(r"(\d{8,})", href)
-                            source_id = id_match.group(1) if id_match else hashlib.sha1(href.encode()).hexdigest()[:20]
-                            if source_id in seen_ids:
-                                continue
-                            seen_ids.add(source_id)
-
-                            card_text = " ".join((card.inner_text() or "").split())
-                            lowered = card_text.lower()
-
-                            location_text = ""
-                            for candidate in [
-                                "Bengaluru", "Bangalore", "Gurugram", "Gurgaon",
-                                "Delhi", "New Delhi", "Remote"
-                            ]:
-                                if candidate.lower() in lowered:
-                                    location_text = candidate
-                                    break
-
-                            company = ""
-                            for selector in [
-                                "a.sub-title",
-                                "a.comp-name",
-                                "[class*='comp-name'] a",
-                                "[class*='company'] a",
-                            ]:
-                                locator = card.locator(selector).first
-                                if locator.count():
-                                    value = (locator.inner_text() or "").strip()
-                                    if value and value.lower() != title.lower():
-                                        company = value
-                                        break
-
-                            posted_at = None
-                            posted_precision = "unknown"
-                            age_match = re.search(
-                                r"\b(?:just now|\d+\s*(?:minute|min|hour|hr|day|week)s?\s*ago)\b",
-                                lowered,
-                            )
-                            if age_match:
-                                posted_at = parse_relative(age_match.group(0))
-                                posted_precision = "minute"
-
-                            jobs.append(normalize_job(
-                                "naukri",
-                                source_id,
-                                company,
-                                title,
-                                location_text,
-                                href,
-                                posted_at,
-                                posted_precision,
-                                card_text,
-                            ))
-                    except Exception as exc:
-                        log.warning("naukri browser search failed for %s / %s: %s", query, location, exc)
-        finally:
-            context.close()
-            browser.close()
-
-    return jobs
+NAUKRI_RELAY_URL = (
+    "https://raw.githubusercontent.com/AvinashBhalla/job-beeper/main/"
+    "dashboard/data/naukri_relay.json"
+)
 
 
 def naukri_collect() -> list[dict[str, Any]]:
-    return naukri_browser_collect()
+    response = requests.get(
+        NAUKRI_RELAY_URL,
+        params={"t": int(time.time())},
+        headers=UA,
+        timeout=20,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    relay_jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
+    relay_collected_at = payload.get("updated_at") if isinstance(payload, dict) else None
+    collected_at = parse_relative(relay_collected_at) if relay_collected_at else now()
+
+    jobs: list[dict[str, Any]] = []
+    for item in relay_jobs:
+        if not isinstance(item, dict):
+            continue
+        source_id = str(item.get("id") or item.get("url") or "")
+        url = str(item.get("url") or "")
+        if not source_id or not url:
+            continue
+
+        posted_raw = item.get("posted")
+        posted_at = parse_relative(str(posted_raw)) if posted_raw else None
+
+        experience = item.get("experience") or {}
+        skills = item.get("skills_detected") or []
+        description = str(item.get("description") or "")
+        if experience:
+            description = f"{description} {experience.get('label', '')}".strip()
+        if skills:
+            description = f"{description} {' '.join(map(str, skills))}".strip()
+
+        job = normalize_job(
+            "naukri",
+            source_id,
+            str(item.get("company") or ""),
+            str(item.get("title") or ""),
+            str(item.get("jd_location") or item.get("location") or ""),
+            url,
+            posted_at,
+            "date" if posted_at else "unknown",
+            description,
+        )
+
+        # The actual Naukri acquisition happened on the external GitHub runner.
+        # Preserve that timestamp rather than pretending the Oracle VM fetched
+        # the job at the same moment.
+        job["discovered_at"] = iso(collected_at) or job["discovered_at"]
+        if posted_at and posted_at.tzinfo:
+            job["discovery_latency_seconds"] = max(
+                0, int((collected_at - posted_at).total_seconds())
+            )
+        jobs.append(job)
+
+    return jobs
 
 
 def instahyre_collect() -> list[dict[str, Any]]:
