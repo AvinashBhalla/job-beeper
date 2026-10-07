@@ -17,6 +17,7 @@ except ImportError:
 
 _pw = None
 _browser = None
+_browser_fallbacks = 0
 
 UA = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36",
