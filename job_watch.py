@@ -247,7 +247,8 @@ def board_queries(name, source_cfg, f):
 
 def passes(j, f):
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
-    title_terms = configured_title_terms(f)\n    if title_terms and not any(text_matches(t, k) for k in title_terms):
+    title_terms = configured_title_terms(f)
+    if title_terms and not any(text_matches(t, k) for k in title_terms):
         return False
     if any(text_matches(t, x) for x in f["title_exclude"]):
         return False
