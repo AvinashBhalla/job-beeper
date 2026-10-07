@@ -68,7 +68,28 @@
       "gemini",
       "workflow",
       "orchestration"
-    ]
+    ],
+    "keywords": [
+      "software engineer",
+      "software developer",
+      "full stack developer",
+      "frontend developer",
+      "backend developer",
+      "react developer",
+      "python developer",
+      "automation engineer"
+    ],
+    "fields": [
+      "frontend",
+      "backend",
+      "full_stack",
+      "automation",
+      "ai_ml",
+      "python",
+      "javascript_typescript"
+    ],
+    "search_from_filters": true,
+    "notifications_enabled": true
   },
   "apify": {
     "enabled": true,
