@@ -3,6 +3,7 @@ Uses public unauthenticated pages/endpoints only. These adapters are optional be
 public HTML/API shapes can change or be rate-limited.
 """
 import re
+import time
 import requests
 from bs4 import BeautifulSoup
 
@@ -25,9 +26,27 @@ def _job(id_, company, title, location, url, posted=None, desc=""):
             "desc": (desc or "").lower()}
 
 def linkedin_guest(keyword):
+    """Fetch a small, fresh LinkedIn window instead of broad pagination."""
     base = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+    params = {
+        "keywords": keyword,
+        "location": "India",
+        "f_TPR": "r86400",
+        "f_E": "2,3",
+    }
     for start in (0, 25):
-        soup = _soup(base, {"keywords": keyword, "location": "India", "start": start})
+        params["start"] = start
+        try:
+            soup = _soup(base, params)
+        except requests.HTTPError as exc:
+            response = getattr(exc, "response", None)
+            if response is not None and response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                wait = min(60, max(2, int(retry_after))) if retry_after and retry_after.isdigit() else 10
+                time.sleep(wait)
+                soup = _soup(base, params)
+            else:
+                raise
         cards = soup.select("li")
         if not cards:
             break
