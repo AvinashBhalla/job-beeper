@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from job_sources_extra import linkedin_guest, naukri_public, instahyre_public
 from apify_sources import linkedin as apify_linkedin, naukri as apify_naukri, instahyre as apify_instahyre
 from jd_extract import enrich_job
+from web_job_discovery import discover as discover_web
 
 ROOT = pathlib.Path(__file__).parent
 CFG = json.loads((ROOT / "config.json").read_text())
@@ -469,6 +470,13 @@ def main():
             results += list(pool.map(run_board_source, board_tasks))
         else:
             results += [run_source((x[0], x[1], x[2])) for x in board_tasks]
+
+    # Broad discovery layer for ATS/job platforms that do not expose a single
+    # global public feed. Direct company APIs above remain preferred.
+    if f.get("web_discovery_enabled", True):
+        web_results = discover_web(f, max_results=int(f.get("web_discovery_results", 8)))
+        results.extend(("web:" + platform, None, jobs, err)
+                       for platform, jobs, err in web_results)
 
     alerts = []
     dashboard_jobs = []
