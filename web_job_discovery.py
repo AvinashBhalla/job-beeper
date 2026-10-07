@@ -9,6 +9,7 @@ No login or credential is required.
 """
 from __future__ import annotations
 import re
+import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
@@ -70,6 +71,17 @@ def _platform_url(url, domains):
     path=urlparse(url).path.lower()
     return any(d in host or d in (host+path) for d in domains)
 
+def _posted(value):
+    text=(value or '').lower()
+    if 'today' in text or 'just now' in text:
+        return dt.datetime.now(dt.timezone.utc)
+    m=re.search(r'(\\d+)\\s*(minute|min|hour|hr|day|week)s?\\s*ago', text)
+    if not m:
+        return None
+    n=int(m.group(1)); unit=m.group(2)
+    sec={'minute':60,'min':60,'hour':3600,'hr':3600,'day':86400,'week':604800}[unit]
+    return dt.datetime.now(dt.timezone.utc)-dt.timedelta(seconds=n*sec)
+
 def _company(url):
     p=urlparse(url)
     host=p.netloc.lower().replace("www.","")
@@ -112,7 +124,7 @@ def discover_platform(item):
             if not path or len(path)<4:
                 continue
             ident=f"web-{platform.lower().replace(' ','-')}-{abs(hash(url))}"
-            jobs.append({"id":ident,"company":_company(url),"title":title,"location":"","url":url,"posted":None,"desc":body.lower()})
+            jobs.append({"id":ident,"company":_company(url),"title":title,"location":"","url":url,"posted":_posted(title+" "+body),"desc":body.lower()})
         return platform,jobs,None
     except Exception as exc:
         return platform,[],str(exc)
