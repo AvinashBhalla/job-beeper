@@ -72,9 +72,19 @@ def linkedin_guest(keyword):
                 continue
             url = link.get("href", "").split("?")[0]
             jid = re.search(r"jobs/view/(\d+)", url)
+
+            # LinkedIn's guest HTML often puts only the calendar date in the
+            # <time datetime> attribute (e.g. 2026-10-07), while the visible
+            # text contains the useful relative age ("5 minutes ago").
+            # Prefer that relative value so the dashboard can correctly place
+            # genuinely fresh jobs in its "Last hour" filter.
+            posted_value = _text(posted) if posted else ""
+            if not re.search(r"(?:just now|today|yesterday|\d+\s*(?:minute|min|hour|hr|day|week)s?\s*ago)", posted_value.lower()):
+                posted_value = posted.get("datetime") if posted else None
+
             yield _job(
                 f"li-{jid.group(1) if jid else url}", _text(company), _text(title),
-                _text(loc), url, posted.get("datetime") if posted else None, _text(card)
+                _text(loc), url, posted_value, _text(card)
             )
 
 def _naukri_posted_from_url(url):
