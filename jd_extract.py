@@ -8,6 +8,33 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
+UA = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36",
+    "Accept-Language": "en-IN,en;q=0.9",
+}
+
+SKILL_TERMS = [
+    "python", "javascript", "typescript", "react", "react native", "next.js", "next",
+    "node.js", "node", "express", "fastapi", "django", "flask", "java", "c++", "c#",
+    "go", "golang", "rust", "sql", "postgresql", "mysql", "mongodb", "redis",
+    "aws", "gcp", "azure", "docker", "kubernetes", "jenkins", "ci/cd",
+    "git", "graphql", "rest api", "api", "n8n", "automation", "workflow",
+    "orchestration", "llm", "openai", "gemini", "generative ai", "machine learning",
+    "pytorch", "tensorflow", "pandas", "numpy", "snowflake", "spark", "kafka",
+    "terraform", "linux", "figma", "flutter", "android", "ios",
+]
+
+def clean_text(value):
+    value = re.sub(r"\s+", " ", value or "")
+    return value.strip()
+
+def _candidate_urls(url):
+    urls = [url]
+    m = re.search(r"linkedin\.com/jobs/view/(\d+)", url or "")
+    if m:
+        urls.insert(0, f"https://www.linkedin.com/jobs-guest/jobs/view/{m.group(1)}")
+    return list(dict.fromkeys(x for x in urls if x))
+
 def fetch_description(url):
     for target in _candidate_urls(url):
         try:
@@ -23,7 +50,9 @@ def fetch_description(url):
                     items = data if isinstance(data, list) else [data]
                     for item in items:
                         if isinstance(item, dict) and item.get("@type") == "JobPosting":
-                            desc = BeautifulSoup(str(item.get("description") or ""), "html.parser").get_text(" ", strip=True)
+                            desc = BeautifulSoup(
+                                str(item.get("description") or ""), "html.parser"
+                            ).get_text(" ", strip=True)
                             if len(desc) >= 300:
                                 return clean_text(desc)
                 except Exception:
@@ -33,8 +62,8 @@ def fetch_description(url):
                 '[class*="description"]',
                 '[id*="description"]',
                 '[class*="job-description"]',
-                'article',
-                'main',
+                "article",
+                "main",
             ]
             candidates = []
             for selector in selectors:
@@ -104,8 +133,8 @@ def extract_location(text, fallback):
     # Source-level location is usually more reliable than free-form JD prose.
     # Only replace it when the JD contains an explicit, compact location field.
     patterns = [
-        r"\\b(?:location|locations?)\\s*[:\\-]\\s*([^.;|]{3,100})",
-        r"\\b(?:based in|office in)\\s+([A-Z][^.;|]{2,80})",
+        r"\b(?:location|locations?)\s*[:\-]\s*([^.;|]{3,100})",
+        r"\b(?:based in|office in)\s+([A-Z][^.;|]{2,80})",
     ]
     for pattern in patterns:
         m = re.search(pattern, t, re.I)
@@ -116,7 +145,7 @@ def extract_location(text, fallback):
 
     if fallback:
         return fallback
-    if re.search(r"\\bfully remote\\b|\\bremote role\\b|\\bremote position\\b", t, re.I):
+    if re.search(r"\bfully remote\b|\bremote role\b|\bremote position\b", t, re.I):
         return "Remote"
     return "Not specified"
 
