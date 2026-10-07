@@ -53,12 +53,14 @@
 
   <section id="filtersSection" class="page-section hidden-section">
     <div class="settings-panel">
-      <div class="section-title"><h2>Filters</h2><p>Control which jobs are fetched and which jobs trigger Telegram alerts.</p></div>
+      <div class="section-title"><h2>Filters</h2><p>Control which jobs are fetched, ranked, and sent to Telegram.</p></div>
+      <div class="match-explainer"><b>Match score:</b> role/field relevance + skills + location + freshness + experience fit. The score is capped at 100. The reasons shown on each job card are the terms that contributed to its match.</div>
       <div class="settings-grid">
         <label class="field"><span>Keywords</span><textarea id="cfgKeywords" placeholder="software engineer, react developer, automation engineer"></textarea></label>
         <label class="field"><span>Locations</span><textarea id="cfgLocations" placeholder="Bengaluru, Gurugram, Delhi, Remote India"></textarea></label>
         <label class="field"><span>Exclude titles</span><textarea id="cfgExclude" placeholder="senior, staff, principal, manager, lead"></textarea></label>
-        <label class="field"><span>Maximum experience</span><select id="cfgExperience"><option value="1">1 year</option><option value="2">2 years</option><option value="3">3 years</option><option value="4">4 years</option><option value="5">5 years</option></select></label>
+        <label class="field"><span>Your experience</span><input id="cfgCandidateExperience" type="number" min="0" max="30" step="0.5" placeholder="e.g. 2"></label>
+        <label class="field"><span>Maximum experience required</span><select id="cfgExperience"><option value="1">1 year</option><option value="2">2 years</option><option value="3">3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option><option value="10">10 years</option></select></label>
         <label class="field"><span>Maximum job age</span><select id="cfgAge"><option value="6">6 hours</option><option value="24">24 hours</option><option value="48">48 hours</option><option value="72">72 hours</option><option value="168">7 days</option></select></label>
         <div class="field"><span>Job fields</span><div id="fieldChoices" class="choices"></div></div>
       </div>
