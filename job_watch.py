@@ -489,7 +489,8 @@ def main():
             if j["id"] in seen:
                 continue
             seen.add(j["id"])
-            if (not silent and passes(j, f) and f.get("notifications_enabled", True) and\n                    os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
+            if (not silent and passes(j, f) and f.get("notifications_enabled", True) and
+                    os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
                 notify(j, score, reasons)
                 alerts.append(j["id"])
 
