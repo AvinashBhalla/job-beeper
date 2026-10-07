@@ -16,10 +16,10 @@ No synthetic timestamps are used to make a job look newer.
 ## First sources
 
 1. LinkedIn public guest jobs endpoint — 2 minute polling target
-2. Naukri structured search through JobSpy — 10 minute polling target
+2. Naukri via the existing GitHub-hosted relay — 2 minute relay polling target
 3. Instahyre — 10 minute polling target, initially treated as experimental until freshness is verified
 
-The collector is deliberately small and low-volume. LinkedIn's guest endpoint currently exposes logged-out job cards and supports recency filtering; Naukri's current JobSpy adapter uses Naukri's `/jobapi/v3/search` endpoint and generates the current `nkparam` token. These are implementation facts, not guarantees of long-term stability.
+The collector is deliberately small and low-volume. LinkedIn's guest endpoint currently exposes logged-out job cards and supports recency filtering. Naukri is acquired by the existing GitHub-hosted watcher and published as a relay feed because direct Naukri access from the Oracle VM is timing out. The relay preserves source posting data and its collection timestamp.
 
 ## Storage
 
@@ -41,4 +41,4 @@ pip install -r v2/requirements.txt
 uvicorn v2.radar:app --host 0.0.0.0 --port 8000
 ```
 
-For production, run the same process under Docker/systemd on a persistent VM. GitHub Actions is not the monitoring engine.
+For production, run the same process under Docker/systemd on a persistent VM. GitHub Actions is not the persistent monitoring engine; it is used only as the Naukri acquisition relay.
