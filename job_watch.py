@@ -270,6 +270,15 @@ def passes(j, f):
     yrs = max_years_required(d, j.get("url"))
     if f["max_experience_years"] is not None and yrs is not None and yrs > f["max_experience_years"]:
         return False
+    min_required = f.get("min_experience_years")
+    if min_required is not None and yrs is not None and yrs < float(min_required):
+        return False
+    # Skills are a true filter, matching JobBeeper behavior, but only after
+    # the JD enrichment pass so a missing source description does not cause a
+    # good job to be discarded before we fetch its actual JD.
+    if f.get("skills") and j.get("_enrichment_complete"):
+        if not any(text_matches(d, k) or text_matches(t, k) for k in f["skills"]):
+            return False
     candidate = f.get("candidate_experience_years")
     if candidate is not None and yrs is not None and yrs > float(candidate):
         return False
@@ -542,6 +551,7 @@ def main():
                 "work_mode": enriched.get("work_mode", "Not specified"),
                 "jd_location": enriched.get("jd_location") or j.get("location", ""),
                 "jd_enriched": enriched.get("jd_enriched", False),
+                "_enrichment_complete": True,
             })
 
             if not passes(j, f):
