@@ -1,0 +1,15 @@
+services:
+  radar:
+    build:
+      context: ..
+      dockerfile: v2/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - radar-data:/data
+    environment:
+      JOB_RADAR_DB: /data/jobs.db
+
+volumes:
+  radar-data:
