@@ -193,18 +193,27 @@ def extract_skills(text):
     return found[:20]
 
 def extract_location(text, fallback):
+    fallback = clean_text(fallback)
     t = clean_text(text)
+
+    # Source-level location is usually more reliable than free-form JD prose.
+    # Only replace it when the JD contains an explicit, compact location field.
     patterns = [
-        r"(?:location|locations?|based in|office in)\s*[:\-]?\s*([^.;]{3,100})",
-        r"(?:remote)\s*[:\-]?\s*([^.;]{2,80})",
+        r"\\b(?:location|locations?)\\s*[:\\-]\\s*([^.;|]{3,100})",
+        r"\\b(?:based in|office in)\\s+([A-Z][^.;|]{2,80})",
     ]
     for pattern in patterns:
         m = re.search(pattern, t, re.I)
         if m:
             value = clean_text(m.group(1))
-            if value and len(value) <= 100:
+            if value and len(value) <= 100 and not value.lower().startswith(("employment type", "experience level")):
                 return value
-    return fallback or "Not specified"
+
+    if fallback:
+        return fallback
+    if re.search(r"\\bfully remote\\b|\\bremote role\\b|\\bremote position\\b", t, re.I):
+        return "Remote"
+    return "Not specified"
 
 def enrich_job(job):
     existing = job.get("desc") or ""
