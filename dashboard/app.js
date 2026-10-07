@@ -167,7 +167,7 @@ function apiHeaders(t){
   return {"Accept":"application/vnd.github+json","Authorization":"Bearer "+t,"X-GitHub-Api-Version":"2026-03-10","Content-Type":"application/json"};
 }
 
-async function waitForWorkflow(t, startedAt, statusTarget){
+async function waitForWorkflow(t, startedAt){
   if(scanPollTimer) clearTimeout(scanPollTimer);
   const deadline=Date.now()+10*60*1000;
   scanning=true;
@@ -203,7 +203,7 @@ async function waitForWorkflow(t, startedAt, statusTarget){
         scanning=false;
         if(button) button.disabled=false;
         scanPollTimer=null;
-        return;
+        return run.conclusion==="success";
       }
 
       if(Date.now()>=deadline){
@@ -211,7 +211,7 @@ async function waitForWorkflow(t, startedAt, statusTarget){
         scanning=false;
         if(button) button.disabled=false;
         scanPollTimer=null;
-        return;
+        return false;
       }
       scanPollTimer=setTimeout(poll,5000);
     }catch(e){
@@ -219,9 +219,10 @@ async function waitForWorkflow(t, startedAt, statusTarget){
       scanning=false;
       if(button) button.disabled=false;
       scanPollTimer=null;
+      return false;
     }
   }
-  await poll();
+  return await poll();
 }
 
 async function dispatchScan(){
@@ -238,7 +239,7 @@ async function dispatchScan(){
     });
     if(!r.ok) throw new Error(await githubError(r,"Could not start the workflow. Enable Actions: Read and write."));
     $("statusText").textContent="Scan queued · waiting for GitHub results…";
-    await waitForWorkflow(t,startedAt,"scan");
+    await waitForWorkflow(t,startedAt);
   }catch(e){
     scanning=false;
     const button=$("scanNow");
@@ -294,8 +295,8 @@ async function saveAndRun(){
     sessionStorage.setItem("jobbeeper_github_token",t);
     if ($("githubToken")) $("githubToken").value="";
     $("saveStatus").textContent="Filters saved · waiting for GitHub scan results…";
-    await waitForWorkflow(t,startedAt,"filters");
-    if(!scanning) $("saveStatus").textContent="Filters saved · GitHub scan finished. Latest results are loaded.";
+    const completed=await waitForWorkflow(t,startedAt);
+    if(completed) $("saveStatus").textContent="Filters saved · GitHub scan finished. Latest results are loaded.";
   }catch(e){ $("saveStatus").textContent=e.message; }
 }
 
