@@ -33,14 +33,26 @@
     "software engineer",
     "software developer",
     "full stack developer",
+    "full stack engineer",
     "frontend developer",
+    "frontend engineer",
     "backend developer",
+    "backend engineer",
     "react developer",
+    "react engineer",
+    "react native developer",
     "python developer",
+    "node developer",
+    "node.js developer",
+    "next.js developer",
     "automation engineer",
     "ai engineer",
     "ai developer",
-    "llm engineer"
+    "ai/ml engineer",
+    "llm engineer",
+    "llm developer",
+    "forward deployed engineer",
+    "forward-deployed engineer"
   ],
   "skills": [
     "react",
@@ -76,7 +88,9 @@
     "lead",
     "head",
     "architect",
-    "intern"
+    "intern",
+    "vp",
+    "vice president"
   ],
   "max_experience_years": 3
 }
