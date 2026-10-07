@@ -8,6 +8,7 @@ Board strategy:
 """
 import re
 import time
+import datetime as dt
 import requests
 from bs4 import BeautifulSoup
 
@@ -75,6 +76,24 @@ def linkedin_guest(keyword):
                 _text(loc), url, posted.get("datetime") if posted else None, _text(card)
             )
 
+def _naukri_posted_from_url(url):
+    """Recover the posting date from Naukri's numeric job id when JobSpy only
+    returns a date-only value. Naukri job ids commonly begin with DDMMYY.
+    """
+    match = re.search(r"-(\d{11,})(?:[/?#-]|$)", str(url))
+    if not match:
+        return None
+    raw = match.group(1)
+    try:
+        day, month, year = int(raw[:2]), int(raw[2:4]), int(raw[4:6])
+        year += 2000
+        candidate = dt.datetime(year, month, day, tzinfo=dt.timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    if candidate > dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=1):
+        return None
+    return candidate.isoformat()
+
 def naukri_public(keyword):
     """Use JobSpy's Naukri-only adapter; it targets the structured search API."""
     if scrape_jobs is None:
@@ -101,6 +120,9 @@ def naukri_public(keyword):
         posted = row.get("date_posted")
         if hasattr(posted, "isoformat"):
             posted = posted.isoformat()
+        url_posted = _naukri_posted_from_url(url)
+        if url_posted:
+            posted = url_posted
         yield _job(
             f"nk-{job_id}",
             str(company),
