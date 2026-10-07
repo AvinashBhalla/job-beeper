@@ -15,6 +15,7 @@ SEEN_FILE = ROOT / "seen.json"
 SOURCE_STATE_FILE = ROOT / "source_state.json"
 JD_CACHE_FILE = ROOT / "jd_cache.json"
 DASH_FILE = ROOT / "dashboard" / "data" / "jobs.json"
+NAUKRI_RELAY_FILE = ROOT / "dashboard" / "data" / "naukri_relay.json"
 UA = {"User-Agent": "Mozilla/5.0 (personal-job-watcher)"}
 NOW = dt.datetime.now(dt.timezone.utc)
 SOURCE_GENERATION = 3
@@ -408,6 +409,18 @@ def serial_job(j, source, score=None, reasons=None):
         "jd_enriched": bool(j.get("jd_enriched")),
     }
 
+def write_naukri_relay(jobs):
+    unique = {}
+    for j in jobs:
+        unique[j["id"]] = j
+    payload = {
+        "updated_at": NOW.isoformat(),
+        "jobs": list(unique.values())[:500],
+    }
+    NAUKRI_RELAY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    NAUKRI_RELAY_FILE.write_text(json.dumps(payload, indent=2))
+
+
 def write_dashboard(jobs, source_status, sent):
     DASH_FILE.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -495,6 +508,7 @@ def main():
 
     alerts = []
     dashboard_jobs = []
+    naukri_relay_jobs = []
     # Fetch job descriptions concurrently. The old implementation fetched each
     # uncached JD serially, which made one slow source page block the whole run.
     candidates = []
@@ -531,6 +545,29 @@ def main():
 
         for j in jobs:
             j["source"] = name
+
+            # Preserve the complete direct Naukri result set before the main
+            # profile filter is applied. V2 consumes this file as an external
+            # relay because Naukri is not reachable from its Oracle VM.
+            if name == "naukri":
+                relay_posted = j.get("posted")
+                if isinstance(relay_posted, dt.datetime):
+                    relay_posted = relay_posted.isoformat()
+                naukri_relay_jobs.append({
+                    "id": j.get("id"),
+                    "source": "naukri",
+                    "company": j.get("company", ""),
+                    "title": j.get("title", ""),
+                    "location": j.get("location", ""),
+                    "jd_location": j.get("jd_location") or j.get("location", ""),
+                    "url": j.get("url", ""),
+                    "posted": relay_posted,
+                    "description": j.get("description") or j.get("desc") or "",
+                    "experience": j.get("experience"),
+                    "skills_detected": j.get("skills_detected", []),
+                    "work_mode": j.get("work_mode", "Not specified"),
+                })
+
             if not passes(j, f):
                 if j["id"] in seen:
                     continue
@@ -593,6 +630,8 @@ def main():
                 os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
             notify(j, score, reasons)
             alerts.append(j["id"])
+
+    write_naukri_relay(naukri_relay_jobs)
 
     dashboard_jobs.sort(key=lambda x: (x["score"] or 0, x["posted"] or ""), reverse=True)
     unique = {}
