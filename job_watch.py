@@ -12,6 +12,7 @@ ROOT = pathlib.Path(__file__).parent
 CFG = json.loads((ROOT / "config.json").read_text())
 SEEN_FILE = ROOT / "seen.json"
 SOURCE_STATE_FILE = ROOT / "source_state.json"
+JD_CACHE_FILE = ROOT / "jd_cache.json"
 DASH_FILE = ROOT / "dashboard" / "data" / "jobs.json"
 UA = {"User-Agent": "Mozilla/5.0 (personal-job-watcher)"}
 NOW = dt.datetime.now(dt.timezone.utc)
@@ -335,6 +336,18 @@ def load_source_state():
 def save_source_state(state):
     SOURCE_STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True))
 
+def load_jd_cache():
+    if not JD_CACHE_FILE.exists():
+        return {}
+    try:
+        raw = json.loads(JD_CACHE_FILE.read_text())
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+def save_jd_cache(cache):
+    JD_CACHE_FILE.write_text(json.dumps(cache, indent=2, sort_keys=True))
+
 def source_key(name, arg):
     return f"{name}:{json.dumps(arg, sort_keys=True) if arg else ''}"
 
@@ -407,6 +420,7 @@ def notify(j, score, reasons):
 def main():
     exists, seen, known_sources = load_state()
     source_state = load_source_state()
+    jd_cache = load_jd_cache()
     s, f = CFG["sources"], CFG["filters"]
     force_refresh = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
     apify_cfg = CFG.get("apify", {})
@@ -494,7 +508,24 @@ def main():
                 seen.add(j["id"])
                 continue
 
-            enriched = enrich_job(j)
+            cached = jd_cache.get(j["id"])
+            retry_cached_at = parse_time(cached.get("attempted_at")) if cached else None
+            cache_fresh = bool(cached) and retry_cached_at and (NOW - retry_cached_at).total_seconds() < 24 * 3600
+
+            if cached and (cached.get("jd_enriched") or cache_fresh):
+                enriched = cached
+            else:
+                enriched = enrich_job(j)
+                jd_cache[j["id"]] = {
+                    "description": enriched.get("description", ""),
+                    "experience": enriched.get("experience"),
+                    "skills_detected": enriched.get("skills_detected", []),
+                    "work_mode": enriched.get("work_mode", "Not specified"),
+                    "jd_location": enriched.get("jd_location") or j.get("location", ""),
+                    "jd_enriched": enriched.get("jd_enriched", False),
+                    "attempted_at": NOW.isoformat(),
+                }
+
             j.update({
                 "desc": enriched.get("description") or j.get("desc", ""),
                 "description": enriched.get("description", ""),
@@ -529,6 +560,7 @@ def main():
     dashboard_jobs = sorted(unique.values(), key=lambda x: (x["posted"] or ""), reverse=True)
     write_dashboard(dashboard_jobs, source_status, len(alerts))
     save_source_state(source_state)
+    save_jd_cache(jd_cache)
     SEEN_FILE.write_text(json.dumps({"jobs": sorted(seen), "sources": sorted(known_sources)}))
     print(f"done: {len(alerts)} alerts from {len(tasks) + len(board_tasks)} sources; dashboard={len(dashboard_jobs)}")
 
