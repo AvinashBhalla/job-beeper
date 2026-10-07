@@ -27,6 +27,8 @@ const RAW = "https://raw.githubusercontent.com/" + REPO + "/main/";
 const API = "https://api.github.com";
 let state = {jobs: []};
 let config = null;
+let scanning = false;
+let scanPollTimer = null;
 const $ = id => document.getElementById(id);
 const ageHours = iso => iso ? (Date.now() - new Date(iso).getTime()) / 3600000 : 9999;
 const fmtAge = iso => {
@@ -94,7 +96,11 @@ function render(){
     return (!q || hay.includes(q)) && (!src || j.source===src) &&
       (j.score ?? 0) >= minScore && ageHours(j.posted) <= maxAge;
   });
-  jobs.sort((a,b)=>(b.score||0)-(a.score||0) || String(b.posted||"").localeCompare(String(a.posted||"")));
+  if ($("sort").value === "match") {
+    jobs.sort((a,b)=>(b.score||0)-(a.score||0) || String(b.posted||"").localeCompare(String(a.posted||"")));
+  } else {
+    jobs.sort((a,b)=>String(b.posted||"").localeCompare(String(a.posted||"")) || (b.score||0)-(a.score||0));
+  }
   $("count").textContent = jobs.length + " jobs";
   $("jobs").innerHTML = jobs.map(j=>`
     <article class="card">
@@ -161,6 +167,63 @@ function apiHeaders(t){
   return {"Accept":"application/vnd.github+json","Authorization":"Bearer "+t,"X-GitHub-Api-Version":"2026-03-10","Content-Type":"application/json"};
 }
 
+async function waitForWorkflow(t, startedAt, statusTarget){
+  if(scanPollTimer) clearTimeout(scanPollTimer);
+  const deadline=Date.now()+10*60*1000;
+  scanning=true;
+  const button=$("scanNow");
+  if(button) button.disabled=true;
+
+  async function poll(){
+    try{
+      const url=API+"/repos/"+REPO+"/actions/runs?branch=main&event=workflow_dispatch&per_page=10";
+      const r=await fetch(url,{headers:apiHeaders(t),cache:"no-store"});
+      if(!r.ok) throw new Error(await githubError(r,"Could not read GitHub workflow status."));
+      const data=await r.json();
+      const cutoff=startedAt-15000;
+      const runs=(data.workflow_runs||[]).filter(run=>{
+        return run.path===".github/workflows/job-watch.yml" &&
+          new Date(run.created_at).getTime()>=cutoff;
+      });
+      const run=runs[0];
+
+      if(!run){
+        $("statusText").textContent="GitHub accepted the scan · waiting for workflow to start…";
+      }else if(run.status==="queued" || run.status==="requested" || run.status==="waiting"){
+        $("statusText").textContent="GitHub scan queued · waiting for results…";
+      }else if(run.status==="in_progress"){
+        $("statusText").textContent="GitHub is scanning sources · waiting for results…";
+      }else{
+        if(run.conclusion==="success"){
+          $("statusText").textContent="Scan complete · loading latest GitHub results…";
+          await load();
+        }else{
+          $("statusText").textContent="Scan "+(run.conclusion||"finished")+". Check GitHub Actions for details.";
+        }
+        scanning=false;
+        if(button) button.disabled=false;
+        scanPollTimer=null;
+        return;
+      }
+
+      if(Date.now()>=deadline){
+        $("statusText").textContent="Scan is still running on GitHub. The feed will refresh when it finishes.";
+        scanning=false;
+        if(button) button.disabled=false;
+        scanPollTimer=null;
+        return;
+      }
+      scanPollTimer=setTimeout(poll,5000);
+    }catch(e){
+      $("statusText").textContent=e.message;
+      scanning=false;
+      if(button) button.disabled=false;
+      scanPollTimer=null;
+    }
+  }
+  await poll();
+}
+
 async function dispatchScan(){
   const t=token();
   if(!t){
@@ -169,13 +232,17 @@ async function dispatchScan(){
   }
   $("statusText").textContent="Starting source scan…";
   try{
+    const startedAt=Date.now();
     const r=await fetch(API+"/repos/"+REPO+"/actions/workflows/job-watch.yml/dispatches",{
       method:"POST",headers:apiHeaders(t),body:JSON.stringify({ref:"main"})
     });
     if(!r.ok) throw new Error(await githubError(r,"Could not start the workflow. Enable Actions: Read and write."));
-    $("statusText").textContent="Scan queued · feed will update when GitHub finishes.";
-    setTimeout(load,5000);
+    $("statusText").textContent="Scan queued · waiting for GitHub results…";
+    await waitForWorkflow(t,startedAt,"scan");
   }catch(e){
+    scanning=false;
+    const button=$("scanNow");
+    if(button) button.disabled=false;
     $("statusText").textContent=e.message;
   }
 }
@@ -216,6 +283,7 @@ async function saveAndRun(){
       throw new Error(await githubError(putr,"GitHub can read the repository but cannot write config.json. Enable Contents: Read and write for this repository."));
     }
     $("saveStatus").textContent="Filters saved. Starting scan…";
+    const startedAt=Date.now();
     const runr=await fetch(API+"/repos/"+REPO+"/actions/workflows/job-watch.yml/dispatches",{
       method:"POST",headers:apiHeaders(t),body:JSON.stringify({ref:"main"})
     });
@@ -225,7 +293,9 @@ async function saveAndRun(){
     config=next;
     sessionStorage.setItem("jobbeeper_github_token",t);
     if ($("githubToken")) $("githubToken").value="";
-    $("saveStatus").textContent="Saved. Scan started — Telegram will receive only jobs matching these filters.";
+    $("saveStatus").textContent="Filters saved · waiting for GitHub scan results…";
+    await waitForWorkflow(t,startedAt,"filters");
+    if(!scanning) $("saveStatus").textContent="Filters saved · GitHub scan finished. Latest results are loaded.";
   }catch(e){ $("saveStatus").textContent=e.message; }
 }
 
@@ -246,7 +316,9 @@ async function load(){
     $("today").textContent = data.jobs?.filter(j=>ageHours(j.posted)<24).length ?? 0;
     $("notified").textContent = data.new_alerts ?? 0;
     $("lastRun").textContent = data.last_run ? "· " + new Date(data.last_run).toLocaleTimeString() : "";
-    $("statusText").textContent = "Live · checked " + (data.last_run ? new Date(data.last_run).toLocaleTimeString() : "now");
+    if(!scanning){
+      $("statusText").textContent = "Live · checked " + (data.last_run ? new Date(data.last_run).toLocaleTimeString() : "now");
+    }
     populateSources(data.jobs||[]);
     render();
   }catch(e){ $("statusText").textContent = "Feed unavailable"; }
@@ -255,7 +327,7 @@ async function load(){
 $("githubToken").value="";
 $("clearToken").onclick=()=>{sessionStorage.removeItem("jobbeeper_github_token");$("githubToken").value="";$("saveStatus").textContent="Token cleared.";};
 $("saveConfig").onclick=saveAndRun;
-["search","source","score","age"].forEach(id=>$(id).addEventListener("input",render));
+["search","source","score","age","sort"].forEach(id=>$(id).addEventListener("input",render));
 $("refresh").onclick=load;
 $("scanNow").onclick=dispatchScan;
 $("backToJobs").onclick=closeJobDetail;
