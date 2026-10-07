@@ -163,24 +163,41 @@ function b64utf8(text){
   return btoa(binary);
 }
 
+async function githubError(response, fallback){
+  let detail="";
+  try{
+    const body=await response.json();
+    detail=body.message || "";
+  }catch(_){}
+  return fallback+" ("+response.status+")"+(detail ? ": "+detail : "");
+}
+
 async function saveAndRun(){
   const t=token();
   if(!t){ $("saveStatus").textContent="Add your GitHub token first."; return; }
   const next=collectConfig();
-  $("saveStatus").textContent="Saving filters…";
+  $("saveStatus").textContent="Checking GitHub access…";
   try{
     const getr=await fetch(API+"/repos/"+REPO+"/contents/config.json?ref=main",{headers:apiHeaders(t)});
-    if(!getr.ok) throw new Error("GitHub read failed: "+getr.status);
+    if(!getr.ok){
+      throw new Error(await githubError(getr,"GitHub cannot read this repository with the supplied token. Check that the fine-grained token is authorized for AvinashBhalla/job-beeper and has Contents: Read."));
+    }
     const current=await getr.json();
+    $("saveStatus").textContent="Saving filters…";
     const putr=await fetch(API+"/repos/"+REPO+"/contents/config.json",{
       method:"PUT",headers:apiHeaders(t),
       body:JSON.stringify({message:"Update job filters from dashboard",content:b64utf8(JSON.stringify(next,null,2)+"\n"),sha:current.sha,branch:"main"})
     });
-    if(!putr.ok) throw new Error("GitHub save failed: "+putr.status);
+    if(!putr.ok){
+      throw new Error(await githubError(putr,"GitHub can read the repository but cannot write config.json. Enable Contents: Read and write for this repository."));
+    }
+    $("saveStatus").textContent="Filters saved. Starting scan…";
     const runr=await fetch(API+"/repos/"+REPO+"/actions/workflows/job-watch.yml/dispatches",{
       method:"POST",headers:apiHeaders(t),body:JSON.stringify({ref:"main"})
     });
-    if(!runr.ok) throw new Error("Workflow dispatch failed: "+runr.status);
+    if(!runr.ok){
+      throw new Error(await githubError(runr,"Filters were saved, but GitHub could not start the workflow. Enable Actions: Read and write."));
+    }
     config=next;
     sessionStorage.setItem("jobbeeper_github_token",t);
     if ($("githubToken")) $("githubToken").value="";
