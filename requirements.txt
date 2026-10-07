@@ -2,3 +2,4 @@ requests>=2.31,<3
 beautifulsoup4>=4.12,<5
 python-jobspy==1.2.0
 playwright>=1.55,<2
+ddgs>=9.16,<10
