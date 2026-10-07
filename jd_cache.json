@@ -386,6 +386,28 @@
     ],
     "work_mode": "Not specified"
   },
+  "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "The Associate Engineer is responsible for executing defined coding tasks and ensuring basic code quality.<br><br><strong>Code Implementation:</strong> Write and modify <strong>clean, testable, and efficient code</strong> for low-to-medium complexity features and bug fixes, primarily using the required programming language (e.g., Java, Python, JavaScript, C#).<br><br><strong>Debugging and Testing:</strong> Conduct thorough <strong>unit testing</strong> on assigned components and participate actively in debugging applications to identify and resolve defects reported by Quality Assurance (QA) or end-users.<br><br><strong>Documentation:</strong> Assist in creating and maintaining <strong>technical documentation</strong>, including code comments, design specifications for small features, and developer runbooks.<br><br><strong>Version Control:</strong> Utilize <strong>version control systems (e.g., Git/GitHub/GitLab)</strong> effectively for branching, merging, and managing code changes within the team codebase.<br><br><strong>Database Interaction:</strong> Write basic <strong>SQL queries</strong> or interact with NoSQL databases to support application functionality, data fetching, and simple data manipulation.<br><br><ul><li> Operational &amp; Collaborative Duties<br><br></li></ul>This role requires strong teamwork and adherence to established development processes.<br><br><strong>SDLC Participation:</strong> Actively participate in all phases of the <strong>Software Development Lifecycle (SDLC)</strong>, with a focus on implementation, testing, and deployment support.<br><br><strong>Agile/Scrum:</strong> Participate in <strong>Agile ceremonies</strong> (Daily Standups, Sprint Planning, Retrospectives) and accurately update task status and progress in project management tools (e.g., Jira, Azure DevOps).<br><br><strong>Code Review:</strong> Participate in and learn from the code review process by providing basic feedback and incorporating feedback from senior developers into their own code.<br><br><strong>Troubleshooting &amp; Support:</strong> Provide <strong>Level 1 (L1) technical support</strong> for applications, assisting in diagnosing and escalating production issues as needed.<br><br><strong>Requirements Interpretation:</strong> Work with senior developers and business analysts to understand technical requirements derived from user stories and functional specifications.",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Gurugram, Haryana, India",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "java",
+      "c#",
+      "sql",
+      "azure",
+      "git"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/c%23-net-%E2%80%93-software-engineer-at-build-hire-4476354263": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "We are currently hiring for an experienced <strong>C# / .NET Software Engineer</strong> with 1\u20138 years of software development experience to design, develop, maintain, and enhance enterprise applications using <strong>C#, .NET, .NET Core, MVC, Web API, Microservices, and Angular</strong> for one of our client in Pune.<br><br>The role focuses on building robust enterprise applications, developing scalable backend services and REST APIs, implementing microservice-based architectures, and developing modern web applications using Angular.<br><br>This role is suited to a hands-on <strong>software engineer</strong> who has strong experience in C# and .NET technologies and understands modern enterprise application development. The ideal candidate should have practical experience with Web API, .NET Core, Microservices, Angular, SQL, and ORM technologies, along with a strong focus on coding standards and software quality.<br><br>Key Responsibilities<br><br><ul><li>Design, develop, maintain, and enhance enterprise applications using C# and .NET.</li><li>Develop robust and maintainable applications using .NET Core.</li><li>Design and develop ASP.NET MVC applications.</li><li>Develop and maintain RESTful Web APIs.</li><li>Design and implement scalable Microservices.</li><li>Develop frontend applications and components using Angular.</li><li>Work with relational databases and develop efficient SQL queries.</li><li>Implement data access using ORM technologies, including Entity Framework.</li><li>Analyze functional and technical requirements and translate them into effective software solutions.</li><li>Develop, debug, test, and optimize enterprise applications.</li><li>Troubleshoot application issues and provide effective root-cause analysis and resolutions.</li><li>Follow established software development standards, coding guidelines, and engineering best practices.</li><li>Ensure developed solutions meet functional, performance, maintainability, and quality requirements.</li><li>Participate in code reviews and contribute to continuous improvement of development practices.</li><li>Work within Agile development methodologies, including sprint planning, development, testing, and retrospectives.</li><li>Work closely with architects, developers, QA engineers, business stakeholders, and other engineering teams.</li><li>Take ownership of assigned development activities and ensure timely and high-quality delivery.<br><br></li></ul><strong>Required Skills / Primary Skills<br><br></strong><ul><li>1\u20138 years of professional software development experience.</li><li>Strong hands-on knowledge of C# and .NET.</li><li>Minimum 3 years of hands-on experience with relevant .NET technologies for experienced candidates.</li><li>Strong experience with C#, .NET, MVC, .NET Core, Web API, Microservices, and Angular.</li><li>Strong understanding of SQL and relational databases.</li><li>Good understanding of ORM technologies; Entity Framework experience is an advantage.</li><li>Strong understanding of enterprise software development principles and best practices.</li><li>Good knowledge of coding standards and software development best practices.</li><li>Strong debugging and problem-solving skills.</li><li>Ability to understand technical requirements and translate them into working solutions.</li><li>Strong focus on code quality, reliability, and maintainability.</li><li>Ability to work effectively in a collaborative engineering environment.<br><br></li></ul><strong>Additional Skills<br><br></strong><ul><li>Experience working with Agile/Scrum methodologies.</li><li>Experience with Entity Framework or other ORM technologies.</li><li>Strong understanding of RESTful API development.</li><li>Experience working with enterprise application architectures.</li><li>Knowledge of design patterns and clean coding practices.</li><li>Experience with version control and software development tools.</li><li>Understanding of CI/CD practices is an added advantage.</li><li>Cloud knowledge and experience with cloud technologies is an added advantage.</li><li>Experience working in large-scale enterprise application environments.</li><li>Strong analytical and troubleshooting capabilities.</li><li>Ability to quickly learn new technologies and apply them to real-world development problems.</li><li>Good communication and team collaboration skills.</li><li>Experience collaborating with distributed engineering teams is an added advantage.<br><br></li></ul>Education<br><br><ul><li>B.E. in Computer Science or equivalent in Computer Science, Information Technology, Engineering, or a related discipline.<br><br></li></ul>Employment Details<br><br><ul><li>Role: C# / .NET Software Engineer</li><li>Experience: 1\u20138 years</li><li>Employment Type: Full Time</li><li>Location: Pune</li><li>Industry: Enterprise Technology / Software Engineering<br><br></li></ul><strong>Compensation<br><br></strong>Compensation will be based on experience, technical capability, and interview performance.<br><br>Candidates with approximately <strong>5 years of relevant experience can be considered up to \u20b925 Lakhs</strong> for exceptionally strong profiles.<br><br>Candidates with approximately <strong>8 years of experience can be considered in the range of \u20b935\u201340 Lakhs</strong> for exceptionally strong profiles.<br><br>For exceptional candidates, compensation can be decided based on <strong>technical expertise, relevant experience, interview performance, and overall fit</strong>.",
@@ -490,6 +512,29 @@
     ],
     "work_mode": "Not specified"
   },
+  "li-https://in.linkedin.com/jobs/view/java-software-engineer-at-solarsys-innovations-private-ltd-4475171487": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "<strong>Company Description</strong> SolarSys Innovations Private Ltd is a software company focused on helping organizations transform into agile, digital enterprises. The company enables clients to stand out from competitors through modern technology solutions and enhanced engagement with customers, partners, and employees. SolarSys Innovations recognizes that every client environment is unique and designs tailored solutions to fit specific business needs. Team members work on diverse projects and technologies, offering opportunities to grow skills in digital transformation and enterprise software delivery.<br><strong>Role Description</strong> As a Java Software Engineer at SolarSys Innovations Private Ltd, you will design, develop, and maintain Java-based applications that support digital transformation initiatives for clients. You will work with cross-functional teams to understand requirements, implement features using the Spring Framework and related technologies, and build scalable microservices and APIs. Daily responsibilities include writing clean, efficient code, performing code reviews, debugging and resolving issues, and participating in testing and deployment activities. You will also collaborate on architecture discussions, contribute to technical documentation, and continuously improve application performance and reliability. This is a full-time, on-site role based in Trivandrum.<br><strong>Qualifications<br></strong> <ul><li>Strong foundation in Programming and Software Development, with experience in building and maintaining enterprise applications.</li><li>Proficiency in Java and Spring Framework, including core Spring modules and common libraries used in modern Java applications.</li><li>Experience designing and implementing Microservices and RESTful APIs, with an understanding of scalability, security, and performance considerations.</li><li>Knowledge of software engineering best practices, including version control (e.g., Git), unit testing, and continuous integration/continuous delivery (CI/CD).</li><li>Bachelor\u2019s degree in Computer Science, Engineering, or a related field, or equivalent practical experience.</li><li>Ability to work collaboratively in on-site teams, communicate clearly, and participate in agile development processes.</li><li>Exposure to cloud platforms (such as AWS, Azure, or GCP), containerization (Docker, Kubernetes), or related tools is an advantage.</li><li>Willingness to learn new technologies and contribute to innovative digital solutions for diverse client environments.</li></ul>",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Trivandrum",
+    "skills_detected": [
+      "java",
+      "aws",
+      "gcp",
+      "azure",
+      "docker",
+      "kubernetes",
+      "ci/cd",
+      "git"
+    ],
+    "work_mode": "On-site"
+  },
   "li-https://in.linkedin.com/jobs/view/junior-full-stack-developer-at-ata-4474081020": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "<br><p><strong>Role Title:</strong> Junior Full Stack Developer</p><p><br></p><p>\ud83d\udccd <strong>Location:</strong> Pune, India (Global Role)</p><p>\ud83d\udc68 \ud83d\udcbc <strong>Reporting To:</strong> Product Delivery Lead \u2013 Automation</p><p>\ud83d\udcbc <strong>Experience:</strong> 2\u20134 Years</p><p><br></p><p><strong>About ATA</strong></p><p><br></p><p>ATA is a leading global logistics and freight forwarding company, delivering innovative shipping management and integrated supply chain solutions across multiple countries. As part of our digital transformation journey, we are building a modern, cloud-native technology ecosystem to support our global operations and customer experience.</p><p><br></p><p><strong>Job Summary</strong></p><p><br></p><p>We are looking for a passionate and hands-on <strong>Junior Full Stack Developer</strong> with 2\u20134 years of experience to join our technology team. The ideal candidate should have strong experience in the <strong>MERN stack (React.js, Node.js, Express.js)</strong> along with <strong>SQL database development and integration</strong>.</p><p>This role will work closely with Product, Architecture, QA, DevOps, and business stakeholders to develop and support scalable enterprise applications. The position also requires experience using <strong>AI-powered development tools</strong> such as ChatGPT, Claude, GitHub Copilot, or similar platforms to enhance development productivity and code quality.</p><p><br></p><p><strong>Key Responsibilities:</strong></p><p><br></p><p>Full Stack Development</p><ul><li>Develop and maintain web applications using React.js, JavaScript/TypeScript, HTML, and CSS.</li><li>Build backend services and REST APIs using Node.js and Express.js.</li><li>Develop and manage applications using MongoDB and SQL databases.</li><li>Write and optimize SQL queries, stored procedures, and database integrations.</li><li>Convert business requirements and user stories into functional application features.</li><li>Integrate applications with internal and third-party systems through APIs.</li></ul><p>AI-Assisted Development</p><ul><li>Utilize AI tools such as ChatGPT, Claude, GitHub Copilot, or similar for coding, debugging, testing, and documentation.</li><li>Review, validate, and optimize AI-generated code before implementation.</li><li>Identify opportunities to improve development efficiency through AI-assisted practices.</li><li>Follow company security and data protection standards while using AI tools.</li></ul><p>Quality &amp; Engineering Standards</p><ul><li>Write clean, maintainable, and well-documented code.</li><li>Participate in code reviews and implement best practices.</li><li>Follow secure coding standards and application architecture guidelines.</li><li>Ensure compliance with development and technology standards.</li></ul><p>Testing &amp; Support</p><ul><li>Perform unit and integration testing.</li><li>Troubleshoot and resolve application issues.</li><li>Support QA, UAT, deployment validation, and production support activities.</li></ul><p>DevOps &amp; Deployment</p><ul><li>Follow Agile, SDLC, and CI/CD practices.</li><li>Use Git for version control and source code management.</li><li>Collaborate with DevOps teams for application deployment and monitoring.</li></ul><p>Collaboration</p><ul><li>Work with Product Owners, Business Analysts, Architects, QA, UI/UX, and DevOps teams.</li><li>Participate in sprint planning, stand-ups, and technical discussions.</li><li>Maintain technical documentation, APIs, and implementation notes.</li><li>Take ownership of assigned tasks and proactively communicate progress.</li></ul><p>Continuous Learning</p><ul><li>Stay updated on modern technologies, frameworks, and AI-assisted development practices.</li><li>Continuously improve technical and professional skills.</li><li>Contribute ideas for innovation, automation, and productivity enhancement.</li></ul><p><br></p><p><strong>Required Skills &amp; Qualifications</strong></p><ul><li>2\u20134 years of hands-on experience in <strong>Full Stack Development</strong>.</li><li>Strong experience with:</li><li>React.js</li><li>Node.js</li><li>Express.js</li><li>JavaScript / TypeScript</li><li>HTML5 &amp; CSS3</li><li>Experience with SQL databases:</li><li>Microsoft SQL Server</li><li>PostgreSQL</li><li>MySQL</li><li>Experience developing RESTful APIs and backend services.</li><li>Practical knowledge of AI development tools such as ChatGPT, Claude, GitHub Copilot, or similar.</li><li>Understanding of JSON, asynchronous programming, and client-server architecture.</li><li>Hands-on experience with Git and version control practices.</li><li>Basic knowledge of authentication, authorization, and secure coding practices.</li><li>Familiarity with software testing, debugging, and performance optimization.</li><li>Understanding of Agile methodology, SDLC, and CI/CD processes.</li><li>Strong analytical, problem-solving, and communication skills.</li></ul><p><br></p><p><strong>Preferred Qualifications</strong></p><ul><li>Exposure to AWS or Microsoft Azure.</li><li>Familiarity with Docker and CI/CD pipelines.</li><li>Experience with modern UI frameworks and component libraries.</li><li>Exposure to logistics, freight forwarding, or supply chain applications.</li><li>Portfolio, GitHub repositories, or project demonstrations preferred.</li></ul><p><br></p>",
@@ -572,6 +617,33 @@
     ],
     "work_mode": "Hybrid"
   },
+  "li-https://in.linkedin.com/jobs/view/python-developer-at-zemoso-technologies-4476599633": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "<p><strong>Role:</strong> Python Full Stack Developer (Django/FastAPI + React)</p><p><strong>Experience:</strong> 5 to 8 years</p><p><strong>Location:</strong> Bangalore (or willing to relocate to Bangalore)</p><p><strong>About Us:</strong></p><p>Zemoso Technologies is a Software Product Market Fit Studio that brings Silicon Valley-style rapid prototyping and rapid application builds to Entrepreneurs and Corporate innovation. We offer Innovation as a service and work on ideas from scratch and take them to the Product Market Fit stage using Design Thinking -&gt; Lean Execution -&gt; Agile Methodology.</p><p>We were featured as one of Deloitte's Fastest 50 growing tech companies from India thrice (2016, 2018, and <strong>2019</strong>). We were also featured in Deloitte Technology Fast 500 Asia Pacific both in 2016 and 2018.</p><p>We are located in Hyderabad, India, Dallas, US &amp; have recently incorporated another office in Waterloo, Canada.</p><p><strong>What You Will Do:</strong></p><ul><li>Design and develop full stack web applications using Python (Django/FastAPI) on the backend and React on the frontend.</li><li>Develop innovative software solutions using design thinking, lean, and agile methodologies.</li><li>Build and maintain scalable, high-quality software products using the latest technologies and platforms.</li><li>Collaborate with fast-paced, dynamic teams to deliver value-driven client experiences.</li><li>Own end-to-end feature development, from API design to UI implementation.</li><li>Mentor and contribute to the growth of the next generation of developers.</li></ul><p><strong>Must-Have Skills:</strong></p><ul><li><strong>Experience:</strong> 5 to 8 years.</li><li><strong>Core Stack:</strong> <strong>Python/Django, with React or Svelte on the front end.</strong></li><li><strong>Cloud Platform:</strong> <strong>Google Cloud Platform (GCP) is required as the primary cloud platform.</strong></li><li>Strong proficiency in Python with hands-on experience in <strong>Django and/or FastAPI.</strong></li><li>Solid hands-on experience with React.js for building modern, responsive UIs.</li><li>Experience building and consuming RESTful APIs.</li><li>Strong understanding of full stack architecture and integration between frontend and backend systems.</li><li>Bachelor's or Master's degree in Computer Science, Data Science, or a related field.</li></ul><p><strong>Nice to Have Qualifications:</strong></p><ul><li><strong>Experience with Microsoft Azure depending on project requirements (good to have).</strong></li><li>Experience with Pandas and PySpark.</li><li>Familiarity with state management libraries (Redux, Context API) and modern JS/TS tooling.</li><li>Experience with cloud platforms (AWS/Azure/GCP) and containerization (Docker/Kubernetes).</li><li>Product and customer-centric mindset.</li><li>Great Object-Oriented skills, including design patterns.</li><li>Good to great problem-solving and communication skills.</li><li>Experience working with cross-border, distributed teams.</li></ul><p><strong>Get to know us better:</strong></p><p>https://www.zemosolabs.com</p><p><br></p><p><br></p>",
+    "experience": {
+      "label": "5-8 years",
+      "max": 8,
+      "min": 5,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "</strong> Bangalore (or willing to relocate to Bangalore)</p><p><strong>About Us:</strong></p><p>Zem",
+    "skills_detected": [
+      "python",
+      "react",
+      "next",
+      "fastapi",
+      "django",
+      "aws",
+      "gcp",
+      "azure",
+      "docker",
+      "kubernetes",
+      "api",
+      "pandas"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-at-zemoso-technologies-4474095163": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "<br><p><strong>Role : </strong>Python Full Stack Developer</p><p><strong>Experience: </strong>5 to 8 years</p><p><strong>Location: </strong>Bangalore (or willing to relocate to Bangalore)</p><p><br></p><p><strong>About Us: </strong></p><p>Zemoso Technologies is a Software Product Market Fit Studio that brings Silicon Valley-style</p><p>rapid prototyping and rapid application builds to Entrepreneurs and Corporate innovation. We</p><p>offer Innovation as a service and work on ideas from scratch and take them to the Product</p><p>Market Fit stage using Design Thinking -&gt; Lean Execution -&gt; Agile Methodology.</p><p>We were featured as one of Deloitte's Fastest 50 growing tech companies from India thrice</p><p>(2016, 2018, and 2019). We were also featured in Deloitte Technology Fast 500 Asia Pacific</p><p>both in 2016 and 2018.</p><p>We are located in Hyderabad, India, Dallas, US &amp; have recently incorporated another office in</p><p>Waterloo, Canada.</p><p><br></p><p><strong>What You Will Do: </strong></p><p>\u25cf Design and develop full stack web applications using Python (Django/FastAPI) on the</p><p>backend and React on the frontend.</p><p>\u25cf Develop innovative software solutions using design thinking, lean, and agile methodologies.</p><p>\u25cf Build and maintain scalable, high-quality software products using the latest technologies</p><p>and platforms.</p><p>\u25cf Collaborate with fast-paced, dynamic teams to deliver value-driven client experiences.</p><p>\u25cf Own end-to-end feature development, from API design to UI implementation.</p><p>\u25cf Mentor and contribute to the growth of the next generation of developers.</p><p><br></p><p><strong>Must-Have Skills: </strong></p><p>\u25cf Experience: 5 to 8 years.</p><p>\u25cf Strong proficiency in Python with hands-on experience in Django and/or FastAPI.</p><p>\u25cf Solid hands-on experience with React.js for building modern, responsive UIs.</p><p>\u25cf Experience building and consuming RESTful APIs.</p><p>\u25cf Strong understanding of full stack architecture and integration between frontend and</p><p>backend systems.</p><p>\u25cf Bachelor's or Master's degree in Computer Science, Data Science, or a related field.</p><p><br></p><p><strong>Nice to Have Qualifications: </strong></p><p>\u25cf Experience with Pandas and PySpark.</p><p>\u25cf Familiarity with state management libraries (Redux, Context API) and modern JS/TS</p><p>tooling.\u25cf Experience with cloud platforms (AWS/Azure/GCP) and containerization (Docker/Kubernetes).</p><p>\u25cf Product and customer-centric mindset.</p><p>\u25cf Great Object-Oriented skills, including design patterns.</p><p>\u25cf Good to great problem-solving and communication skills.</p><p>\u25cf Experience working with cross-border, distributed teams.</p><p><br></p><p><strong>Get to know us better: </strong></p><p>https://www.zemosolabs.com</p>",
@@ -596,6 +668,52 @@
       "kubernetes",
       "api",
       "pandas"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "<p><strong>Essential Qualifications &amp; Experience: </strong></p><p>BE /BTech or equivalent degree with minimum 1 year of relevant experience </p><p>OR </p><p>B.Sc./BCS or equivalent degree with CS/ IT specialization with minimum 2 years of relevant experience. </p><p><br></p><p><strong>Required Technical Skills</strong>: Languages: Proficiency in Java (J2EE or Spring) for legacy application support, with the technical agility to transition into Python for upcoming product modernization. Frameworks: Basic understanding of Spring Boot or similar Java frameworks. Databases: Strong foundation in SQL and relational database concepts. Tools: Familiarity with Git for version control. Web Basics: Understanding of RESTful APIs and basic front-end technologies (HTML/CSS/JavaScript). </p><p><br></p><p><strong>Desirable criteria</strong>: Degree in Computer Science, Information Technology, or a related field. Strong analytical and logic-building skills. Ability to communicate technical concepts clearly to both technical and non-technical team members. A proactive learner who is comfortable working in a collaborative, fast-paced environment. Job Profile: We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply.</p><p><br></p><p><strong>Job Profile:</strong> We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply. \u2022 Feature Development: Write clean, scalable code in Java (J2EE or Spring Boot) and Python to support student and administrative modules. \u2022 System Maintenance: Assist in maintaining legacy systems while contributing to modern microservices migration. \u2022 Database Management: Write and optimize SQL queries (PostgreSQL/Oracle) and assist with data integrity tasks. \u2022 Testing &amp; Debugging: Perform unit testing and troubleshoot application bottlenecks to ensure high system availability. \u2022 Documentation: Maintain clear functional and technical documentation for all developed modules.</p><p><br></p><p><strong>PLEASE NOTE THAT IT IS MANDATORY TO APPLY FOR THIS POSITION ON IIT BOMBAY JOB PORTAL TO CONSIDER YOUR APPLICATION, PLEASE USE BELOW LINK. </strong></p><p><strong>Kindly use the APPLY button on the top left of the page.</strong></p><p>https://ep.iitb.ac.in/sap/bc/webdynpro/sap/hrrcf_a_posting_apply?PARAM=cG9zdF9pbnN0X2d1aWQ9Q0Q4QTdDRUFERjI0MUZEMUFFRTM5RDI2NDZFMTQzMTAmY2FuZF90eXBlPUVYVA%3d%3d&amp;sap-theme=sap_corbu&amp;sap-client=300&amp;sap-language=EN#</p><p><br></p><p><strong>Regards,</strong></p><p><strong>ASC IIT Bombay</strong></p>",
+    "experience": {
+      "label": "1+ years",
+      "max": null,
+      "min": 1,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Mumbai, Maharashtra, India",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "java",
+      "sql",
+      "postgresql",
+      "git",
+      "automation"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "<strong>About The Team<br><br></strong>The Rubrik Cloud Native Protection team helps customers secure their data on the cloud. Cloud data is growing at an ever growing pace and so are the risks with cyber attacks targeted towards cloud data. We make it easy for businesses to protect, search, analyze all of their cloud data simply and scalably.<br><br>Cloud Native Protection is one of the fastest growing businesses and teams within Rubrik. We consider ourselves a startup inside a startup! Join us in this journey where there are ever widening avenues to explore, opportunities to innovate, deep engineering problems to tackle. We believe in fostering a culture with strong engineering values and teamwork as the key to building a great company and product.<br><br><strong>About Role<br><br></strong>Rubrik Software Engineers are self-starters, driven, and can manage themselves. We believe in giving engineers responsibility, not tasks. Our goal is to motivate and challenge people to do their best work. Bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history!<br><br><strong>What You\u2019ll Do<br><br></strong><ul><li>Build software using your strong background in distributed systems and cloud.</li><li>Design, develop, test, deploy, maintain and improve the software.</li><li>Manage individual projects priorities, deadlines and deliverables with your technical expertise.<br><br></li></ul><strong>Experience You\u2019ll Need<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree or equivalent in computer science or related field</li><li>0-2 years of relevant work experience, </li><li>Proficiency in one or more general purpose programming languages like Go, Java, C/C++, Scala, Python</li><li>Experience with AWS/Azure/GCP or other public cloud technologies is a plus.</li><li>Knowledge of Docker, Containers, Kubernetes, microservice architectures is a plus.</li><li>Excellent problem-solving skills and attention to detail. </li><li>Strong understanding of System Development Life Cycle (SDLC) methodology, design patterns, and software engineering principles</li><li>Strong collaboration and communication skills. Ability to work independently or as part of a team on complex, time-sensitive projects.<br><br></li></ul>Join Us in Securing and Accelerating the World's AI Transformation<br><br>Rubrik (RBRK), the Security and AI Operations Company, leads at the intersection of data protection, cyber resilience, and enterprise AI acceleration. Rubrik Security Cloud delivers complete cyber resilience by securing, monitoring, and recovering data, identities, and workloads across clouds. Rubrik Agent Cloud accelerates trusted AI agent deployments at scale by monitoring and auditing agentic actions, enforcing real-time guardrails, fine-tuning for accuracy and undoing agentic mistakes.<br><br>Linkedin | X (formerly Twitter) | Instagram | Rubrik.com<br><br>Inclusion @ Rubrik<br><br>At Rubrik, we are dedicated to fostering a culture where people from all backgrounds are valued, feel they belong, and believe they can succeed. Our commitment to inclusion is at the heart of our mission to secure the world\u2019s data.<br><br>Our goal is to hire and promote the best talent, regardless of background. We continually review our hiring practices to ensure fairness and strive to create an environment where every employee has equal access to opportunities for growth and excellence. We believe in empowering everyone to bring their authentic selves to work and achieve their fullest potential.<br><br>Our inclusion strategy focuses on three core areas of our business and culture:<br><br><ul><li>Our Company: We are committed to building a merit-based organization that offers equal access to growth and success for all employees globally. Your potential is limitless here. </li><li>Our Culture: We strive to create an inclusive atmosphere where individuals from all backgrounds feel a strong sense of belonging, can thrive, and do their best work. Your contributions help us innovate and break boundaries. </li><li>Our Communities: We are dedicated to expanding our engagement with the communities we operate in, creating opportunities for underrepresented talent and driving greater innovation for our clients. Your impact extends beyond Rubrik, contributing to safer and stronger communities. <br><br></li></ul>Equal Opportunity Employer/Veterans/Disabled<br><br>Rubrik is an Equal Opportunity Employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, protected veteran status, or any other status protected by applicable law. Rubrik provides equal employment opportunities to employees and applicants in all terms and conditions of employment, including recruiting, hiring, promotion, compensation, training, leave, and termination.<br><br>Rubrik provides reasonable accommodations to qualified applicants and employees with disabilities in accordance with applicable law. If you need an accommodation to participate in the application process or to perform your job, please contact hr@rubrik.com. Accommodations may include changes to the application process, documents in an alternate format, a sign language interpreter, or specialized equipment.<br><br>EEO IS THE LAW<br><br>NOTIFICATION OF EMPLOYEE RIGHTS UNDER FEDERAL LABOR LAWS<br><br>",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, Karnataka, India",
+    "skills_detected": [
+      "python",
+      "java",
+      "c++",
+      "go",
+      "aws",
+      "gcp",
+      "azure",
+      "docker",
+      "kubernetes"
     ],
     "work_mode": "Not specified"
   },
@@ -652,6 +770,34 @@
     "jd_enriched": true,
     "jd_location": "Bengaluru, Karnataka, India",
     "skills_detected": [],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/software-engineering-specialist-python-fullstack-at-ge-vernova-4475425340": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "<strong>Job Description Summary<br><br></strong>We are seeking a highly capable Full Stack Software Engineer to design, build, and maintain scalable features across the frontend UI and Python backend of our enterprise SaaS platform. This role requires a hands on engineer who is comfortable owning end to end delivery from user facing functionality and API design to backend logic, data access, testing, and deployment support.<br><br>The ideal candidate brings strong engineering fundamentals, solid full stack development experience, and the ability to work e\ufb00ectively in a modern cloud based product environment. This role is intended for someone who can contribute independently, write production quality code, and operate with a strong sense of ownership, quality, and accountability.<br><br>including activities such as requirement analysis, documentation/procedures and implementation.<br><br><strong>Job Description<br><br></strong>Key Responsibilities<br><br>Build, maintain, and enhance end to end product features across frontend, backend, and data layers<br><br>Develop robust, reusable, and maintainable UI components using modern frontend technologies, preferably Angular<br><br>Develop backend services and APIs in Python, ensuring scalability, reliability, security, and maintainability<br><br>Design, build, and optimize REST APIs for internal and external product integrations<br><br>Translate product and technical requirements into high quality, production ready software solutions<br><br>Write clean, testable, and well documented code that adheres to engineering standards and best practices<br><br>Create and maintain unit and integration tests to improve reliability and reduce regression risk<br><br>Troubleshoot application issues across the full stack and support root cause analysis for defects and production issues<br><br>Contribute to CI/CD work\ufb02ows, build pipelines, and deployment readiness activities<br><br>Work closely with senior engineers, product managers, QA, and cross functional partners to deliver roadmap commitments<br><br>Participate actively in code reviews, sprint planning, estimation, retrospectives, and Agile delivery processes using Azure DevOps<br><br>Use AI assisted development tools such as <strong>GitHub Copilot </strong>and <strong>Claude Code </strong>responsibly to improve productivity in coding, refactoring, documentation, and testing work\ufb02ows<br><br><strong>Required Technical Skills<br><br></strong>Strong pro\ufb01ciency in modern frontend and UI development, preferably Angular, including component based architecture, TypeScript, and responsive web development<br><br>Strong pro\ufb01ciency in <strong>Python </strong>backend development, with hands on experience building and maintaining production grade services or APIs<br><br>Demonstrated experience designing, developing, and consuming <strong>REST APIs<br><br></strong>Strong working knowledge of <strong>SQL </strong>and relational databases, including schema design, query optimization, and data access patterns<br><br>Hands on experience writing <strong>unit and integration tests </strong>as part of standard development practice<br><br>Familiarity with software design principles, code modularity, and maintainable application architecture<br><br>Experience working with <strong>Git </strong>based version control in collaborative development environments Experience working in <strong>Agile and Scrum </strong>delivery teams using tools such as <strong>Azure DevOps<br><br></strong>Familiarity with AI assisted development tools such as <strong>GitHub Copilot </strong>and <strong>Claude Code</strong>, and the ability to use them e\ufb00ectively in development work\ufb02ows<br><br><strong>Preferred Skills And Experience<br><br></strong>Experience with <strong>Angular </strong>in enterprise scale applications strongly preferred Exposure to <strong>Java </strong>backend development is a plus<br><br>Working knowledge of <strong>AWS </strong>services such as EC2, Lambda, S3, or API Gateway Familiarity with <strong>Docker </strong>and containerized application development<br><br>Experience with <strong>CI/CD pipelines </strong>and automated build and deployment work\ufb02ows Exposure to automated UI testing tools such as <strong>Selenium<br><br></strong>Experience developing software in enterprise SaaS, B2B, or cloud native product environments<br><br>Understanding of secure coding practices, performance optimization, and production support expectations<br><br>Interest in growing into a senior full stack, technical lead, or architecture focused role<br><br>Qualification &amp; Years of Experience<br><br><strong>1 to 2 years </strong>of professional software engineering experience in full stack product development environments. For roles outside USA: Bachelor's Degree in Computer Science or \u201cSTEM\u201d Majors (Science, Technology, Engineering and Math) with basic experience.<br><br>Technology Stack Expertise<br><br>Frontend and UI<br><br>Angular preferred, React or Vue also considered, TypeScript, HTML, CSS<br><br>Backend<br><br>Python (primary), Java (good to have)<br><br>API Development<br><br>REST APIs<br><br>Database<br><br>SQL and relational databases (must have), NoSQL databases such as MongoDB or DynamoDB (working knowledge)<br><br>Cloud and DevOps<br><br>AWS fundamentals, Docker, CI/CD<br><br>Engineering Tools<br><br>Git, Azure DevOps<br><br>Testing<br><br>Unit testing, integration testing, exposure to Selenium or similar UI automation tools<br><br>Modern Development Tooling<br><br>AI assisted development tools such as GitHub Copilot and Claude Code<br><br>Candidate Expectations<br><br>Demonstrates strong ownership and the ability to deliver features with limited supervision<br><br>Writes high quality, maintainable code and takes testing seriously as part of engineering discipline<br><br>Comfortable working across multiple layers of the application stack rather than specializing narrowly in only frontend or backend<br><br>Able to communicate clearly with technical and non technical stakeholders Shows sound judgment, attention to detail, and a problem solving mindset<br><br>Open to feedback, continuous learning, and adoption of modern development practices<br><br><strong><strong><strong>Additional Information<br><br></strong></strong></strong><strong>Relocation Assistance Provided: </strong>Yes",
+    "experience": {
+      "label": "1-2 years",
+      "max": 2,
+      "min": 1,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, Karnataka, India",
+    "skills_detected": [
+      "python",
+      "typescript",
+      "react",
+      "java",
+      "sql",
+      "mongodb",
+      "aws",
+      "azure",
+      "docker",
+      "ci/cd",
+      "git",
+      "api",
+      "automation"
+    ],
     "work_mode": "Not specified"
   },
   "li-https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428": {
@@ -1317,6 +1463,23 @@
     ],
     "work_mode": "Not specified"
   },
+  "nk-nk-071026044924": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "develop and maintain applications using c#, .net / asp.net core build and consume rest apis work with sql server and database queries strong knowledge of c# and .net / .net core 0 yrs c#, asp.net, sql server, sql, backend, serv, backend development, .net",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, India",
+    "skills_detected": [
+      "c#",
+      "sql"
+    ],
+    "work_mode": "Not specified"
+  },
   "nk-nk-071026500861": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "design, develop, and test responsive web applications using react. collaborate with cross-functional teams to identify and prioritize project requirements. develop high-quality, reusable, and maintainable code. troubleshoot and resolve technical issues efficiently. participate in code reviews and contribute to improving overall code quality. stay updated with the latest trends and technologies in frontend development. disclaimer: this job posting and location has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 2-6 yrs frontend development, redux, css, version control, react, mobx, state management, web applications",
@@ -1400,6 +1563,32 @@
       "node",
       "mysql",
       "mongodb"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-071026502903": {
+    "attempted_at": "2026-10-07T12:20:17.370953+00:00",
+    "description": "job summary we build custom software for growing businesses, including crms, erps, project and operations systems, customer portals and workflow automations, often with ai features inside. we are looking for a software developer who is genuinely good with modern ai coding tools and uses them to design, build, test and document faster. just as important, you understand the code you ship, review ai output carefully, and care about security, performance and clean structure, so that our software scales as our clients grow. location: ahmedabad responsibilities build and maintain web applications, apis and integrations for client projects. use ai coding tools such as github copilot, cursor, claude or chatgpt to speed up development, testing and documentation. add ai features to products using llm apis, for example document reading, chat assistants and summaries. design databases and connect software with payment gateways, whatsapp, sms, email and other systems. review code, including ai-generated code, for security, performance and readability. write tests, fix bugs and support deployments. work with clients and the team to turn business requirements into working features. requirements 1+ year of professional development experience (strong freshers with real projects can apply). good knowledge of php / laravel or node.js, plus javascript and a frontend framework such as react or vue. solid sql and database design basics; experience with rest apis. daily, effective use of ai coding assistants, and the judgement to know when their output is wrong. experience with, or strong interest in, llm apis such as openai, claude or gemini and automation tools. git, clean code habits and basic security awareness. clear communication and ownership of your work. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 1-6 yrs cursor, digital marketing, copilot, github, business requirements, ai, js, javascript",
+    "experience": {
+      "label": "1-6 years",
+      "max": 6,
+      "min": 1,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "ahmedabad responsibilities build and maintain web applications, apis and integrations for client pro",
+    "skills_detected": [
+      "javascript",
+      "react",
+      "node.js",
+      "node",
+      "sql",
+      "git",
+      "automation",
+      "workflow",
+      "llm",
+      "openai",
+      "gemini"
     ],
     "work_mode": "Not specified"
   },
