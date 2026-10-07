@@ -4,7 +4,7 @@
     "title_exclude": [
       "senior",
       "sr.",
-      "sr ",
+      "sr",
       "sr-",
       "staff",
       "principal",
@@ -22,7 +22,8 @@
       "gurgaon",
       "delhi",
       "remote india",
-      "remote, india"
+      "remote",
+      "india"
     ],
     "remote_only": false,
     "max_age_hours": 72,
