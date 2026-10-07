@@ -44,6 +44,7 @@ def linkedin_guest(keyword):
         "location": "India",
         "f_TPR": "r86400",
         "f_E": "2,3",
+        "sortBy": "DD",
     }
     for start in (0, 25):
         params["start"] = start
@@ -102,8 +103,10 @@ def naukri_public(keyword):
         site_name=["naukri"],
         search_term=keyword,
         location="India",
-        results_wanted=20,
+        results_wanted=30,
         hours_old=72,
+        fetch_description=True,
+        description_format="plain",
         verbose=0,
     )
     if frame is None or frame.empty:
@@ -117,6 +120,9 @@ def naukri_public(keyword):
         company = row.get("company") or row.get("company_name") or ""
         title = row.get("title") or ""
         desc = row.get("description") or ""
+        experience = row.get("experience_range") or ""
+        skills = row.get("skills") or ""
+        desc = " ".join(str(x) for x in (desc, experience, skills) if x)
         posted = row.get("date_posted")
         if hasattr(posted, "isoformat"):
             posted = posted.isoformat()
