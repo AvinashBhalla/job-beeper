@@ -1,352 +1,352 @@
 {
   "arbeitnow:": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 325,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"cohere\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 126,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"deel\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"hightouch\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 1,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"linear\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 31,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"mercury\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"notion\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 133,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"openai\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 823,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"posthog\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 10,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"ramp\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 160,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"replit\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 71,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"sardine\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 38,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "ashby:\"supabase\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 52,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"airbnb\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 160,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"asana\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 97,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 98,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"brex\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 284,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"carta\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 72,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"cloudflare\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 420,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"coinbase\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 225,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"databricks\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 889,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 888,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"datadog\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 432,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 433,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"discord\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 48,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"dropbox\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 35,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"druva\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 37,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"duolingo\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 60,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"elastic\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 420,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"figma\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 155,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"fivetran\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 196,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 197,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"gitlab\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 210,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 209,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"grafanalabs\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 129,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"groww\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 7,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"instacart\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 122,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"lyft\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 195,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"mixpanel\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 53,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"mongodb\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 394,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 393,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"newrelic\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 48,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"observeai\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 12,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"okta\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 373,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"pinterest\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 178,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"reddit\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 149,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"robinhood\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 162,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 163,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"rubrik\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 132,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"samsara\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 241,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"stripe\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 732,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 727,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"sumologic\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 9,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"toast\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 323,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 320,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"twilio\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 130,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"vercel\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 84,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"webflow\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 24,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "greenhouse:\"zscaler\"": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 366,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 365,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "instahyre:\"automation engineer\"": {
@@ -375,8 +375,9 @@
   },
   "instahyre:\"software engineer\"": {
     "failures": 0,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T08:18:55.007885+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "instahyre:\"software\"": {
@@ -388,44 +389,44 @@
   },
   "lever:\"cred\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 8,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "lever:\"mindtickle\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 20,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "lever:\"palantir\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 314,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "lever:\"paytm\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 174,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "lever:\"spotify\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 76,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "lever:\"zeta\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 25,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "linkedin:\"(software engineer OR full stack developer OR react developer OR automation engineer OR python developer OR ai engineer)\"": {
@@ -435,165 +436,193 @@
     "last_success": "2026-10-07T09:59:05.536509+00:00",
     "skip_until": null
   },
+  "linkedin:\"(software engineer OR software developer OR full stack developer OR frontend developer OR backend developer OR react developer OR python developer OR automation engineer OR frontend OR front end)\"": {
+    "failures": 0,
+    "generation": 3,
+    "last_count": 20,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": null
+  },
   "naukri:\"automation engineer\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 20,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": null
+  },
+  "naukri:\"backend developer\"": {
+    "failures": 0,
+    "generation": 3,
+    "last_count": 20,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": null
+  },
+  "naukri:\"frontend developer\"": {
+    "failures": 0,
+    "generation": 3,
+    "last_count": 20,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "naukri:\"full stack developer\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 20,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "naukri:\"python developer\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 20,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "naukri:\"react developer\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 20,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": null
+  },
+  "naukri:\"software developer\"": {
+    "failures": 0,
+    "generation": 3,
+    "last_count": 20,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "naukri:\"software engineer\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 20,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "remoteok:": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 99,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "remotive:": {
     "failures": 0,
-    "generation": 2,
-    "last_count": 18,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "generation": 3,
+    "last_count": 17,
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "smartrecruiters:\"BoschGroup\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 100,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "smartrecruiters:\"Freshworks\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 32,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "smartrecruiters:\"McDonaldsCorporation\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "smartrecruiters:\"ServiceNow\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 74,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "smartrecruiters:\"Ubisoft2\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 6,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "smartrecruiters:\"Visa\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workable:\"sharechat\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workable:\"simpl\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workable:\"toddle\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workable:\"zoomcar\"": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://adobe.wd5.myworkdayjobs.com/external_experienced\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 12,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://dell.wd1.myworkdayjobs.com/External\"}": {
-    "failures": 5,
-    "generation": 2,
+    "failures": 6,
+    "generation": 3,
     "last_error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
-    "last_failure": "2026-10-07T09:59:05.536509+00:00",
-    "skip_until": "2026-10-07T15:19:05.536509+00:00"
+    "last_failure": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": "2026-10-07T17:18:21.187710+00:00"
   },
   "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 30,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://qualcomm.wd5.myworkdayjobs.com/External\"}": {
-    "failures": 5,
-    "generation": 2,
+    "failures": 6,
+    "generation": 3,
     "last_error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
-    "last_failure": "2026-10-07T09:59:05.536509+00:00",
-    "skip_until": "2026-10-07T15:19:05.536509+00:00"
+    "last_failure": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": "2026-10-07T17:18:21.187710+00:00"
   },
   "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://salesforce.wd12.myworkdayjobs.com/External_Career_Site\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 21,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://walmart.wd5.myworkdayjobs.com/WalmartExternal\"}": {
@@ -604,31 +633,31 @@
     "skip_until": "2026-10-07T11:13:10.601209+00:00"
   },
   "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://walmart.wd5.myworkdayjobs.com/walmartexternal\"}": {
-    "failures": 2,
-    "generation": 2,
+    "failures": 3,
+    "generation": 3,
     "last_error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/walmartexternal/jobs",
-    "last_failure": "2026-10-07T09:59:05.536509+00:00",
-    "skip_until": "2026-10-07T10:39:05.536509+00:00"
+    "last_failure": "2026-10-07T11:18:21.187710+00:00",
+    "skip_until": "2026-10-07T12:38:21.187710+00:00"
   },
   "workday:{\"search\": \"software engineer india\", \"url\": \"https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 60,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer pune bangalore\", \"url\": \"https://mastercard.wd1.myworkdayjobs.com/CorporateCareers\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 0,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   },
   "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
     "failures": 0,
-    "generation": 2,
+    "generation": 3,
     "last_count": 60,
-    "last_success": "2026-10-07T09:59:05.536509+00:00",
+    "last_success": "2026-10-07T11:18:21.187710+00:00",
     "skip_until": null
   }
 }
