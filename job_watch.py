@@ -153,7 +153,7 @@ def passes(j, f):
         return False
     if any(x.lower() in t for x in f["title_exclude"]):
         return False
-    if f["locations"] and loc and not any(l.lower() in loc for l in f["locations"]):
+    if f["locations"] and not any(l.lower() in loc for l in f["locations"]):
         return False
     if f["remote_only"] and "remote" not in loc:
         return False
