@@ -175,12 +175,12 @@ def location_matches(loc, allowed):
     return False
 
 def text_matches(value, phrase):
-    value = re.sub(r"\\s+", " ", (value or "").lower()).strip()
+    value = re.sub(r"\s+", " ", (value or "").lower()).strip()
     phrase = re.sub(r"\\s+", " ", (phrase or "").lower()).strip()
     if not phrase:
         return False
     if re.fullmatch(r"[a-z0-9]+", phrase) and len(phrase) <= 4:
-        return bool(re.search(rf"\\b{re.escape(phrase)}\\b", value))
+        return bool(re.search(rf"\b{re.escape(phrase)}\b", value))
     return phrase in value
 
 def passes(j, f):
