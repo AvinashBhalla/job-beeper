@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-10-07T07:40:35.831321+00:00",
-  "last_run": "2026-10-07T07:40:35.831321+00:00",
+  "updated_at": "2026-10-07T07:54:20.673836+00:00",
+  "last_run": "2026-10-07T07:54:20.673836+00:00",
   "new_alerts": 0,
   "source_status": {
     "greenhouse:\"groww\"": {
@@ -107,7 +107,7 @@
     },
     "greenhouse:\"zscaler\"": {
       "ok": true,
-      "count": 363,
+      "count": 364,
       "error": null,
       "provider": "direct"
     },
@@ -245,7 +245,7 @@
     },
     "lever:\"spotify\"": {
       "ok": true,
-      "count": 75,
+      "count": 74,
       "error": null,
       "provider": "direct"
     },
@@ -400,9 +400,9 @@
       "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://adobe.wd5.myworkdayjobs.com/external_experienced\"}": {
-      "ok": false,
-      "count": 0,
-      "error": "'externalPath'",
+      "ok": true,
+      "count": 12,
+      "error": null,
       "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://salesforce.wd12.myworkdayjobs.com/External_Career_Site\"}": {
@@ -472,100 +472,100 @@
       "provider": "direct"
     },
     "linkedin:\"software engineer\"": {
-      "ok": false,
-      "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "ok": true,
+      "count": 40,
+      "error": null,
+      "provider": "direct"
     },
     "linkedin:\"full stack developer\"": {
-      "ok": false,
-      "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "ok": true,
+      "count": 40,
+      "error": null,
+      "provider": "direct"
     },
     "linkedin:\"react developer\"": {
-      "ok": false,
-      "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "ok": true,
+      "count": 40,
+      "error": null,
+      "provider": "direct"
     },
     "linkedin:\"python developer\"": {
-      "ok": false,
-      "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "ok": true,
+      "count": 40,
+      "error": null,
+      "provider": "direct"
     },
     "linkedin:\"automation engineer\"": {
       "ok": false,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=automation+engineer&location=India&start=25",
+      "provider": "direct"
     },
     "linkedin:\"ai engineer\"": {
       "ok": false,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=ai+engineer&location=India&start=0",
+      "provider": "direct"
     },
     "naukri:\"software engineer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "naukri:\"full stack developer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "naukri:\"react developer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "naukri:\"python developer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "naukri:\"automation engineer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "instahyre:\"software engineer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "instahyre:\"full stack developer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "instahyre:\"react developer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "instahyre:\"python developer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     },
     "instahyre:\"automation engineer\"": {
-      "ok": false,
+      "ok": true,
       "count": 0,
-      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
-      "provider": "apify"
+      "error": null,
+      "provider": "direct"
     }
   },
   "jobs": [
@@ -576,7 +576,7 @@
       "title": "Sr Fullstack Engineer- Advanced AI",
       "location": "Tower 02, Manyata Embassy Business Park, Racenahali & Nagawara Villages. Outer Ring Rd, Bangalore 540065",
       "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/Tower-02-Manyata-Embassy-Business-Park-Racenahali--Nagawara-Villages-Outer-Ring-Rd-Bangalore-540065/Sr-Fullstack-Engineer--Advanced-AI_R0000452682",
-      "posted": "2026-10-07T07:40:35.831321+00:00",
+      "posted": "2026-10-07T07:54:20.673836+00:00",
       "score": 64,
       "reasons": [
         "engineer",
@@ -591,7 +591,7 @@
       "title": "AI/ML Technologist",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
-      "posted": "2026-10-07T07:40:35.831321+00:00",
+      "posted": "2026-10-07T07:54:20.673836+00:00",
       "score": 56,
       "reasons": [
         "ai",
@@ -605,24 +605,11 @@
       "title": "Sr Engineer - Managed Containers",
       "location": "Bangalore,India",
       "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Sr-Engineer---Target-India_R0000453851",
-      "posted": "2026-10-07T07:40:35.831321+00:00",
+      "posted": "2026-10-07T07:54:20.673836+00:00",
       "score": 56,
       "reasons": [
         "engineer",
         "ai"
-      ]
-    },
-    {
-      "id": "wd-target-/job/BangaloreIndia/Engineer---Dev-Ex_R0000450351",
-      "source": "workday",
-      "company": "target",
-      "title": "Engineer - Dev Ex",
-      "location": "Bangalore,India",
-      "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Engineer---Dev-Ex_R0000450351",
-      "posted": "2026-10-07T07:40:35.831321+00:00",
-      "score": 43,
-      "reasons": [
-        "engineer"
       ]
     },
     {
@@ -650,21 +637,6 @@
       "score": 56,
       "reasons": [
         "engineer",
-        "ai"
-      ]
-    },
-    {
-      "id": "an-devops-engineer-backend-entwicklerin-berlin-116212",
-      "source": "arbeitnow",
-      "company": "Nitrado (marbis GmbH)",
-      "title": "DevOps Engineer/ Backend Entwickler:in (m/w/d)",
-      "location": "Remote Berlin",
-      "url": "https://www.arbeitnow.com/jobs/companies/nitrado-marbis-gmbh/devops-engineer-backend-entwicklerin-berlin-116212",
-      "posted": "2026-10-07T05:30:57+00:00",
-      "score": 64,
-      "reasons": [
-        "engineer",
-        "backend",
         "ai"
       ]
     },
@@ -704,7 +676,7 @@
       "location": "Bangalore, India",
       "url": "https://jobs.elastic.co/jobs?gh_jid=8237463&gh_jid=8237463",
       "posted": "2026-10-07T02:13:51-04:00",
-      "score": 42,
+      "score": 41,
       "reasons": [
         "engineer"
       ]
@@ -738,6 +710,19 @@
       ]
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
+      "source": "linkedin",
+      "company": "foundit",
+      "title": ".NET Full stack",
+      "location": "Bangalore Urban, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 35,
+      "reasons": [
+        "full stack"
+      ]
+    },
+    {
       "id": "gh-8139781",
       "source": "greenhouse",
       "company": "reddit",
@@ -745,7 +730,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/8139781",
       "posted": "2026-10-06T19:12:22-04:00",
-      "score": 53,
+      "score": 52,
       "reasons": [
         "software",
         "engineer"
@@ -759,7 +744,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/8147559",
       "posted": "2026-10-06T16:14:08-04:00",
-      "score": 50,
+      "score": 49,
       "reasons": [
         "software",
         "engineer"
@@ -800,7 +785,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/8198102",
       "posted": "2026-10-06T13:20:28-04:00",
-      "score": 47,
+      "score": 46,
       "reasons": [
         "software",
         "engineer"
@@ -814,7 +799,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/8250125",
       "posted": "2026-10-06T13:20:28-04:00",
-      "score": 47,
+      "score": 46,
       "reasons": [
         "software",
         "engineer"
@@ -828,7 +813,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/6469397",
       "posted": "2026-10-06T13:20:28-04:00",
-      "score": 47,
+      "score": 46,
       "reasons": [
         "software",
         "engineer"
@@ -842,7 +827,7 @@
       "location": "Remote - Ontario, Canada",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/6512458",
       "posted": "2026-10-06T13:20:28-04:00",
-      "score": 47,
+      "score": 46,
       "reasons": [
         "software",
         "engineer"
@@ -856,7 +841,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/8172457",
       "posted": "2026-10-06T13:20:28-04:00",
-      "score": 47,
+      "score": 46,
       "reasons": [
         "software",
         "engineer"
@@ -1071,6 +1056,92 @@
       "score": 36,
       "reasons": [
         "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/associate-python-developer-in-pune-at-markytics-ai-4476109192",
+      "source": "linkedin",
+      "company": "Markytics.AI",
+      "title": "Associate Python Developer in Pune",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/associate-python-developer-in-pune-at-markytics-ai-4476109192",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 41,
+      "reasons": [
+        "developer",
+        "python",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-ii-java-spring-aws-terraform-at-jpmorganchase-4476155668",
+      "source": "linkedin",
+      "company": "JPMorganChase",
+      "title": "Software Engineer II - Java, Spring, AWS, Terraform",
+      "location": "Mumbai, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-java-spring-aws-terraform-at-jpmorganchase-4476155668",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "software",
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
+      "source": "linkedin",
+      "company": "Infosys",
+      "title": "REACTJS DEVELOPER",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-development-engineer-at-accenture-in-india-4476318237",
+      "source": "linkedin",
+      "company": "Accenture in India",
+      "title": "Software Development Engineer",
+      "location": "Hyderabad, Telangana, India",
+      "url": "https://in.linkedin.com/jobs/view/software-development-engineer-at-accenture-in-india-4476318237",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-ii-at-6sense-4476178947",
+      "source": "linkedin",
+      "company": "6sense",
+      "title": "Software Engineer II",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-at-6sense-4476178947",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/java-developer-at-dhl-4470297138",
+      "source": "linkedin",
+      "company": "DHL",
+      "title": "Java Developer",
+      "location": "Chennai, Tamil Nadu, India",
+      "url": "https://in.linkedin.com/jobs/view/java-developer-at-dhl-4470297138",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 28,
+      "reasons": [
+        "developer",
         "ai"
       ]
     },
@@ -1711,7 +1782,7 @@
       "title": "Software Application Development Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "posted": "2026-10-05T07:40:35.831321+00:00",
+      "posted": "2026-10-05T07:54:20.673836+00:00",
       "score": 31,
       "reasons": [
         "software",
@@ -1725,7 +1796,7 @@
       "title": "Memory Electrical Validation Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "posted": "2026-10-05T07:40:35.831321+00:00",
+      "posted": "2026-10-05T07:54:20.673836+00:00",
       "score": 23,
       "reasons": [
         "engineer"
@@ -1816,6 +1887,81 @@
       "score": 23,
       "reasons": [
         "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-python-at-morningstar-4475553293",
+      "source": "linkedin",
+      "company": "Morningstar",
+      "title": "Software Engineer (Python)",
+      "location": "Navi Mumbai, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-python-at-morningstar-4475553293",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "software",
+        "engineer",
+        "python",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-%E2%80%93-python-django-at-country-delight-4473622866",
+      "source": "linkedin",
+      "company": "Country Delight",
+      "title": "Software Engineer \u2013 Python / Django",
+      "location": "Gurugram, Haryana, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-%E2%80%93-python-django-at-country-delight-4473622866",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "software",
+        "engineer",
+        "python",
+        "django"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/wow-software-engineer-avp-at-natwest-group-4475805746",
+      "source": "linkedin",
+      "company": "NatWest Group",
+      "title": "WoW Software Engineer, AVP",
+      "location": "Chennai, Tamil Nadu, India",
+      "url": "https://in.linkedin.com/jobs/view/wow-software-engineer-avp-at-natwest-group-4475805746",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "software",
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-ii-at-microsoft-4475585085",
+      "source": "linkedin",
+      "company": "Microsoft",
+      "title": "Software Engineer-II",
+      "location": "Hyderabad, Telangana, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-at-microsoft-4475585085",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
+      "source": "linkedin",
+      "company": "Citi",
+      "title": "Java Full Stack Developer",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
       ]
     },
     {
