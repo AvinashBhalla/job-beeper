@@ -1,71 +1,234 @@
 {
   "filters": {
     "title_include": [
-      "software", "developer", "engineer", "full stack", "fullstack",
-      "backend", "frontend", "automation", "python", "react", "react native",
-      "node", "next", "ai", "ml", "llm", "forward deployed"
+      "software",
+      "developer",
+      "engineer",
+      "full stack",
+      "fullstack",
+      "backend",
+      "frontend",
+      "automation",
+      "python",
+      "react",
+      "react native",
+      "node",
+      "next",
+      "ai",
+      "ml",
+      "llm",
+      "forward deployed"
     ],
     "title_exclude": [
-      "senior", "sr.", "staff", "principal", "director", "manager",
-      "lead", "head", "architect", "intern"
+      "senior",
+      "sr.",
+      "staff",
+      "principal",
+      "director",
+      "manager",
+      "lead",
+      "head",
+      "architect",
+      "intern"
     ],
-    "locations": ["bengaluru", "bangalore", "gurugram", "gurgaon", "delhi",
-                   "remote", "india", "hybrid"],
+    "locations": [
+      "bengaluru",
+      "bangalore",
+      "gurugram",
+      "gurgaon",
+      "delhi",
+      "remote",
+      "india",
+      "hybrid"
+    ],
     "remote_only": false,
     "max_age_hours": 72,
     "max_experience_years": 3,
     "description_include_any": [],
-    "description_exclude_any": ["security clearance"],
+    "description_exclude_any": [
+      "security clearance"
+    ],
     "company_exclude": [],
     "skills": [
-      "react", "react native", "next.js", "node.js", "python", "fastapi",
-      "django", "javascript", "typescript", "automation", "n8n", "api",
-      "llm", "ai", "openai", "gemini", "workflow", "orchestration"
+      "react",
+      "react native",
+      "next.js",
+      "node.js",
+      "python",
+      "fastapi",
+      "django",
+      "javascript",
+      "typescript",
+      "automation",
+      "n8n",
+      "api",
+      "llm",
+      "ai",
+      "openai",
+      "gemini",
+      "workflow",
+      "orchestration"
     ]
   },
   "apify": {
     "enabled": true,
     "location": "India",
     "naukri_location": "Bangalore",
-    "locations": ["Bangalore", "Gurgaon", "Delhi", "India"],
-    "max_jobs_per_query": 50,
-    "date_posted": "past24h",
+    "locations": [
+      "Bangalore",
+      "Gurgaon",
+      "Delhi",
+      "India"
+    ],
+    "max_jobs_per_query": 25,
+    "date_posted": "24h",
     "actors": {
       "linkedin": "axiomworks/linkedin-jobs-scraper",
       "naukri": "epicscrapers/naukri-scraper",
       "instahyre": "s_actors/instahyre-jobs-scraper"
-    }
+    },
+    "provider": "direct"
   },
   "sources": {
-    "greenhouse": ["groww", "databricks", "stripe", "airbnb", "cloudflare", "coinbase",
-      "datadog", "elastic", "figma", "gitlab", "mongodb", "okta", "pinterest",
-      "reddit", "robinhood", "samsara", "twilio", "zscaler", "vercel", "webflow",
-      "discord", "dropbox", "lyft", "instacart", "asana", "brex", "carta",
-      "duolingo", "mixpanel", "fivetran", "grafanalabs", "observeai", "sumologic",
-      "rubrik", "druva", "newrelic", "toast"],
-    "lever": ["cred", "paytm", "palantir", "spotify", "zeta", "mindtickle"],
-    "ashby": ["openai", "ramp", "notion", "linear", "deel", "supabase", "posthog",
-      "mercury", "cohere", "replit", "hightouch", "sardine"],
-    "smartrecruiters": ["Freshworks", "ServiceNow", "BoschGroup", "Visa", "Ubisoft2", "McDonaldsCorporation"],
-    "workable": ["zoomcar", "sharechat", "toddle", "simpl"],
-    "workday": [
-      {"url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "search": "software engineer india"},
-      {"url": "https://adobe.wd5.myworkdayjobs.com/external_experienced", "search": "software engineer bangalore"},
-      {"url": "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site", "search": "software engineer bengaluru"},
-      {"url": "https://walmart.wd5.myworkdayjobs.com/WalmartExternal", "search": "software engineer bengaluru"},
-      {"url": "https://intel.wd1.myworkdayjobs.com/External", "search": "software engineer bangalore"},
-      {"url": "https://dell.wd1.myworkdayjobs.com/External", "search": "software engineer bangalore"},
-      {"url": "https://workday.wd5.myworkdayjobs.com/Workday", "search": "software engineer"},
-      {"url": "https://mastercard.wd1.myworkdayjobs.com/CorporateCareers", "search": "software engineer pune bangalore"},
-      {"url": "https://qualcomm.wd5.myworkdayjobs.com/External", "search": "software engineer bangalore"},
-      {"url": "https://target.wd5.myworkdayjobs.com/targetcareers", "search": "software engineer bengaluru"}
+    "greenhouse": [
+      "groww",
+      "databricks",
+      "stripe",
+      "airbnb",
+      "cloudflare",
+      "coinbase",
+      "datadog",
+      "elastic",
+      "figma",
+      "gitlab",
+      "mongodb",
+      "okta",
+      "pinterest",
+      "reddit",
+      "robinhood",
+      "samsara",
+      "twilio",
+      "zscaler",
+      "vercel",
+      "webflow",
+      "discord",
+      "dropbox",
+      "lyft",
+      "instacart",
+      "asana",
+      "brex",
+      "carta",
+      "duolingo",
+      "mixpanel",
+      "fivetran",
+      "grafanalabs",
+      "observeai",
+      "sumologic",
+      "rubrik",
+      "druva",
+      "newrelic",
+      "toast"
     ],
-    "linkedin": ["software engineer", "full stack developer", "react developer",
-      "python developer", "automation engineer", "ai engineer"],
-    "naukri": ["software engineer", "full stack developer", "react developer",
-      "python developer", "automation engineer"],
-    "instahyre": ["software engineer", "full stack developer", "react developer",
-      "python developer", "automation engineer"],
+    "lever": [
+      "cred",
+      "paytm",
+      "palantir",
+      "spotify",
+      "zeta",
+      "mindtickle"
+    ],
+    "ashby": [
+      "openai",
+      "ramp",
+      "notion",
+      "linear",
+      "deel",
+      "supabase",
+      "posthog",
+      "mercury",
+      "cohere",
+      "replit",
+      "hightouch",
+      "sardine"
+    ],
+    "smartrecruiters": [
+      "Freshworks",
+      "ServiceNow",
+      "BoschGroup",
+      "Visa",
+      "Ubisoft2",
+      "McDonaldsCorporation"
+    ],
+    "workable": [
+      "zoomcar",
+      "sharechat",
+      "toddle",
+      "simpl"
+    ],
+    "workday": [
+      {
+        "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+        "search": "software engineer india"
+      },
+      {
+        "url": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
+        "search": "software engineer bangalore"
+      },
+      {
+        "url": "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site",
+        "search": "software engineer bengaluru"
+      },
+      {
+        "url": "https://walmart.wd5.myworkdayjobs.com/WalmartExternal",
+        "search": "software engineer bengaluru"
+      },
+      {
+        "url": "https://intel.wd1.myworkdayjobs.com/External",
+        "search": "software engineer bangalore"
+      },
+      {
+        "url": "https://dell.wd1.myworkdayjobs.com/External",
+        "search": "software engineer bangalore"
+      },
+      {
+        "url": "https://workday.wd5.myworkdayjobs.com/Workday",
+        "search": "software engineer"
+      },
+      {
+        "url": "https://mastercard.wd1.myworkdayjobs.com/CorporateCareers",
+        "search": "software engineer pune bangalore"
+      },
+      {
+        "url": "https://qualcomm.wd5.myworkdayjobs.com/External",
+        "search": "software engineer bangalore"
+      },
+      {
+        "url": "https://target.wd5.myworkdayjobs.com/targetcareers",
+        "search": "software engineer bengaluru"
+      }
+    ],
+    "linkedin": [
+      "software engineer",
+      "full stack developer",
+      "react developer",
+      "python developer",
+      "automation engineer",
+      "ai engineer"
+    ],
+    "naukri": [
+      "software engineer",
+      "full stack developer",
+      "react developer",
+      "python developer",
+      "automation engineer"
+    ],
+    "instahyre": [
+      "software engineer",
+      "full stack developer",
+      "react developer",
+      "python developer",
+      "automation engineer"
+    ],
     "remotive": true,
     "remoteok": true,
     "arbeitnow": true,
