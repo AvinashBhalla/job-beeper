@@ -631,7 +631,8 @@ def main():
             notify(j, score, reasons)
             alerts.append(j["id"])
 
-    write_naukri_relay(naukri_relay_jobs)
+    if naukri_relay_jobs:
+        write_naukri_relay(naukri_relay_jobs)
 
     dashboard_jobs.sort(key=lambda x: (x["score"] or 0, x["posted"] or ""), reverse=True)
     unique = {}
