@@ -1,477 +1,571 @@
 {
-  "updated_at": "2026-10-07T07:22:44.894234+00:00",
-  "last_run": "2026-10-07T07:22:44.894234+00:00",
+  "updated_at": "2026-10-07T07:40:35.831321+00:00",
+  "last_run": "2026-10-07T07:40:35.831321+00:00",
   "new_alerts": 0,
   "source_status": {
     "greenhouse:\"groww\"": {
       "ok": true,
       "count": 7,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"databricks\"": {
       "ok": true,
       "count": 888,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"stripe\"": {
       "ok": true,
       "count": 732,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"airbnb\"": {
       "ok": true,
       "count": 160,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"cloudflare\"": {
       "ok": true,
       "count": 419,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"coinbase\"": {
       "ok": true,
       "count": 225,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"datadog\"": {
       "ok": true,
       "count": 433,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"elastic\"": {
       "ok": true,
       "count": 417,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"figma\"": {
       "ok": true,
       "count": 155,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"gitlab\"": {
       "ok": true,
       "count": 210,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"mongodb\"": {
       "ok": true,
       "count": 394,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"okta\"": {
       "ok": true,
-      "count": 372,
-      "error": null
+      "count": 371,
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"pinterest\"": {
       "ok": true,
       "count": 178,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"reddit\"": {
       "ok": true,
       "count": 148,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"robinhood\"": {
       "ok": true,
       "count": 160,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"samsara\"": {
       "ok": true,
       "count": 240,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"twilio\"": {
       "ok": true,
       "count": 131,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"zscaler\"": {
       "ok": true,
       "count": 363,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"vercel\"": {
       "ok": true,
       "count": 84,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"webflow\"": {
       "ok": true,
       "count": 24,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"discord\"": {
       "ok": true,
       "count": 48,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"dropbox\"": {
       "ok": true,
       "count": 35,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"lyft\"": {
       "ok": true,
       "count": 195,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"instacart\"": {
       "ok": true,
       "count": 122,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"asana\"": {
       "ok": true,
       "count": 97,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"brex\"": {
       "ok": true,
       "count": 284,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"carta\"": {
       "ok": true,
       "count": 72,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"duolingo\"": {
       "ok": true,
       "count": 60,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"mixpanel\"": {
       "ok": true,
       "count": 53,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"fivetran\"": {
       "ok": true,
       "count": 195,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"grafanalabs\"": {
       "ok": true,
       "count": 134,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"observeai\"": {
       "ok": true,
       "count": 12,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"sumologic\"": {
       "ok": true,
       "count": 9,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"rubrik\"": {
       "ok": true,
       "count": 133,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"druva\"": {
       "ok": true,
       "count": 37,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"newrelic\"": {
       "ok": true,
       "count": 47,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "greenhouse:\"toast\"": {
       "ok": true,
       "count": 325,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "lever:\"cred\"": {
       "ok": true,
       "count": 8,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "lever:\"paytm\"": {
       "ok": true,
       "count": 174,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "lever:\"palantir\"": {
       "ok": true,
       "count": 314,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "lever:\"spotify\"": {
       "ok": true,
       "count": 75,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "lever:\"zeta\"": {
       "ok": true,
       "count": 25,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "lever:\"mindtickle\"": {
       "ok": true,
       "count": 19,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"openai\"": {
       "ok": true,
       "count": 823,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"ramp\"": {
       "ok": true,
       "count": 160,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"notion\"": {
       "ok": true,
       "count": 133,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"linear\"": {
       "ok": true,
       "count": 31,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"deel\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"supabase\"": {
       "ok": true,
       "count": 52,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"posthog\"": {
       "ok": true,
       "count": 9,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"mercury\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"cohere\"": {
       "ok": true,
       "count": 126,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"replit\"": {
       "ok": true,
       "count": 71,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"hightouch\"": {
       "ok": true,
       "count": 1,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "ashby:\"sardine\"": {
       "ok": true,
       "count": 38,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "smartrecruiters:\"Freshworks\"": {
       "ok": true,
       "count": 32,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "smartrecruiters:\"ServiceNow\"": {
       "ok": true,
-      "count": 75,
-      "error": null
+      "count": 74,
+      "error": null,
+      "provider": "direct"
     },
     "smartrecruiters:\"BoschGroup\"": {
       "ok": true,
       "count": 100,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "smartrecruiters:\"Visa\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "smartrecruiters:\"Ubisoft2\"": {
       "ok": true,
       "count": 6,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "smartrecruiters:\"McDonaldsCorporation\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workable:\"zoomcar\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workable:\"sharechat\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workable:\"toddle\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workable:\"simpl\"": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer india\", \"url\": \"https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite\"}": {
       "ok": true,
       "count": 60,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://adobe.wd5.myworkdayjobs.com/external_experienced\"}": {
       "ok": false,
       "count": 0,
-      "error": "'externalPath'"
+      "error": "'externalPath'",
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://salesforce.wd12.myworkdayjobs.com/External_Career_Site\"}": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://walmart.wd5.myworkdayjobs.com/WalmartExternal\"}": {
       "ok": false,
       "count": 0,
-      "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs"
+      "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs",
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
       "count": 29,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://dell.wd1.myworkdayjobs.com/External\"}": {
       "ok": false,
       "count": 0,
-      "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs"
+      "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
       "count": 60,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer pune bangalore\", \"url\": \"https://mastercard.wd1.myworkdayjobs.com/CorporateCareers\"}": {
       "ok": true,
       "count": 0,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://qualcomm.wd5.myworkdayjobs.com/External\"}": {
       "ok": false,
       "count": 0,
-      "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs"
+      "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
+      "provider": "direct"
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
       "ok": true,
       "count": 21,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "remotive:": {
       "ok": true,
       "count": 18,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "remoteok:": {
       "ok": true,
       "count": 99,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "arbeitnow:": {
       "ok": true,
       "count": 325,
-      "error": null
+      "error": null,
+      "provider": "direct"
     },
     "linkedin:\"software engineer\"": {
       "ok": false,
       "count": 0,
-      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=software+engineer&location=India&start=75"
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "linkedin:\"full stack developer\"": {
-      "ok": true,
-      "count": 40,
-      "error": null
+      "ok": false,
+      "count": 0,
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "linkedin:\"react developer\"": {
-      "ok": true,
-      "count": 40,
-      "error": null
+      "ok": false,
+      "count": 0,
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "linkedin:\"python developer\"": {
       "ok": false,
       "count": 0,
-      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=python+developer&location=India&start=25"
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "linkedin:\"automation engineer\"": {
       "ok": false,
       "count": 0,
-      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=automation+engineer&location=India&start=25"
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "linkedin:\"ai engineer\"": {
       "ok": false,
       "count": 0,
-      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=ai+engineer&location=India&start=75"
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/axiomworks/linkedin-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "naukri:\"software engineer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "naukri:\"full stack developer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "naukri:\"react developer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "naukri:\"python developer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "naukri:\"automation engineer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/epicscrapers/naukri-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "instahyre:\"software engineer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "instahyre:\"full stack developer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "instahyre:\"react developer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "instahyre:\"python developer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     },
     "instahyre:\"automation engineer\"": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null
+      "error": "404 Client Error: Not Found for url: https://api.apify.com/v2/acts/s_actors/instahyre-jobs-scraper/run-sync-get-dataset-items",
+      "provider": "apify"
     }
   },
   "jobs": [
@@ -482,7 +576,7 @@
       "title": "Sr Fullstack Engineer- Advanced AI",
       "location": "Tower 02, Manyata Embassy Business Park, Racenahali & Nagawara Villages. Outer Ring Rd, Bangalore 540065",
       "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/Tower-02-Manyata-Embassy-Business-Park-Racenahali--Nagawara-Villages-Outer-Ring-Rd-Bangalore-540065/Sr-Fullstack-Engineer--Advanced-AI_R0000452682",
-      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "posted": "2026-10-07T07:40:35.831321+00:00",
       "score": 64,
       "reasons": [
         "engineer",
@@ -497,7 +591,7 @@
       "title": "AI/ML Technologist",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
-      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "posted": "2026-10-07T07:40:35.831321+00:00",
       "score": 56,
       "reasons": [
         "ai",
@@ -511,7 +605,7 @@
       "title": "Sr Engineer - Managed Containers",
       "location": "Bangalore,India",
       "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Sr-Engineer---Target-India_R0000453851",
-      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "posted": "2026-10-07T07:40:35.831321+00:00",
       "score": 56,
       "reasons": [
         "engineer",
@@ -525,7 +619,7 @@
       "title": "Engineer - Dev Ex",
       "location": "Bangalore,India",
       "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Engineer---Dev-Ex_R0000450351",
-      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "posted": "2026-10-07T07:40:35.831321+00:00",
       "score": 43,
       "reasons": [
         "engineer"
@@ -641,19 +735,6 @@
       "reasons": [
         "software",
         "engineer"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
-      "source": "linkedin",
-      "company": "foundit",
-      "title": ".NET Full stack",
-      "location": "Bangalore Urban, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "full stack"
       ]
     },
     {
@@ -803,7 +884,7 @@
       "location": "Hybrid",
       "url": "https://boards.greenhouse.io/cloudflare/jobs/8214470?gh_jid=8214470",
       "posted": "2026-10-06T12:03:14-04:00",
-      "score": 28,
+      "score": 27,
       "reasons": [
         "engineer"
       ]
@@ -991,20 +1072,6 @@
       "reasons": [
         "engineer",
         "ai"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
-      "source": "linkedin",
-      "company": "Infosys",
-      "title": "REACTJS DEVELOPER",
-      "location": "Pune Division, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
       ]
     },
     {
@@ -1644,7 +1711,7 @@
       "title": "Software Application Development Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "posted": "2026-10-05T07:22:44.894234+00:00",
+      "posted": "2026-10-05T07:40:35.831321+00:00",
       "score": 31,
       "reasons": [
         "software",
@@ -1658,7 +1725,7 @@
       "title": "Memory Electrical Validation Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "posted": "2026-10-05T07:22:44.894234+00:00",
+      "posted": "2026-10-05T07:40:35.831321+00:00",
       "score": 23,
       "reasons": [
         "engineer"
@@ -1749,20 +1816,6 @@
       "score": 23,
       "reasons": [
         "engineer"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
-      "source": "linkedin",
-      "company": "Citi",
-      "title": "Java Full Stack Developer",
-      "location": "Pune Division, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "developer",
-        "full stack"
       ]
     },
     {
