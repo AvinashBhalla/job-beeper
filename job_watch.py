@@ -171,8 +171,12 @@ def score_job(j, f):
         score += 15
     if "remote" in loc:
         score += 10
-    if j["posted"]:
-        age = max(0, (NOW - j["posted"]).total_seconds() / 3600)
+    posted = j.get("posted")
+    if isinstance(posted, str):
+        posted = parse_time(posted)
+        j["posted"] = posted
+    if posted:
+        age = max(0, (NOW - posted).total_seconds() / 3600)
         score += max(0, 20 - min(20, age))
     if max_years_required(d) is not None and max_years_required(d) <= (f.get("max_experience_years") or 99):
         score += 10
