@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-10-07T07:54:20.673836+00:00",
-  "last_run": "2026-10-07T07:54:20.673836+00:00",
+  "updated_at": "2026-10-07T08:18:55.007885+00:00",
+  "last_run": "2026-10-07T08:18:55.007885+00:00",
   "new_alerts": 0,
   "source_status": {
     "greenhouse:\"groww\"": {
@@ -65,7 +65,7 @@
     },
     "greenhouse:\"mongodb\"": {
       "ok": true,
-      "count": 394,
+      "count": 395,
       "error": null,
       "provider": "direct"
     },
@@ -89,19 +89,19 @@
     },
     "greenhouse:\"robinhood\"": {
       "ok": true,
-      "count": 160,
+      "count": 161,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"samsara\"": {
       "ok": true,
-      "count": 240,
+      "count": 241,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"twilio\"": {
       "ok": true,
-      "count": 131,
+      "count": 130,
       "error": null,
       "provider": "direct"
     },
@@ -203,7 +203,7 @@
     },
     "greenhouse:\"rubrik\"": {
       "ok": true,
-      "count": 133,
+      "count": 132,
       "error": null,
       "provider": "direct"
     },
@@ -257,7 +257,7 @@
     },
     "lever:\"mindtickle\"": {
       "ok": true,
-      "count": 19,
+      "count": 20,
       "error": null,
       "provider": "direct"
     },
@@ -415,7 +415,9 @@
       "ok": false,
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs",
-      "provider": "direct"
+      "provider": "direct",
+      "retry_at": "2026-10-07T08:38:55.007885+00:00",
+      "failures": 1
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
@@ -427,7 +429,9 @@
       "ok": false,
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
-      "provider": "direct"
+      "provider": "direct",
+      "retry_at": "2026-10-07T08:38:55.007885+00:00",
+      "failures": 1
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -445,7 +449,9 @@
       "ok": false,
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
-      "provider": "direct"
+      "provider": "direct",
+      "retry_at": "2026-10-07T08:38:55.007885+00:00",
+      "failures": 1
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
       "ok": true,
@@ -471,40 +477,10 @@
       "error": null,
       "provider": "direct"
     },
-    "linkedin:\"software engineer\"": {
+    "linkedin:\"(software engineer OR full stack developer OR react developer OR automation engineer OR python developer OR ai engineer)\"": {
       "ok": true,
-      "count": 40,
+      "count": 20,
       "error": null,
-      "provider": "direct"
-    },
-    "linkedin:\"full stack developer\"": {
-      "ok": true,
-      "count": 40,
-      "error": null,
-      "provider": "direct"
-    },
-    "linkedin:\"react developer\"": {
-      "ok": true,
-      "count": 40,
-      "error": null,
-      "provider": "direct"
-    },
-    "linkedin:\"python developer\"": {
-      "ok": true,
-      "count": 40,
-      "error": null,
-      "provider": "direct"
-    },
-    "linkedin:\"automation engineer\"": {
-      "ok": false,
-      "count": 0,
-      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=automation+engineer&location=India&start=25",
-      "provider": "direct"
-    },
-    "linkedin:\"ai engineer\"": {
-      "ok": false,
-      "count": 0,
-      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=ai+engineer&location=India&start=0",
       "provider": "direct"
     },
     "naukri:\"software engineer\"": {
@@ -570,46 +546,17 @@
   },
   "jobs": [
     {
-      "id": "wd-target-/job/Tower-02-Manyata-Embassy-Business-Park-Racenahali--Nagawara-Villages-Outer-Ring-Rd-Bangalore-540065/Sr-Fullstack-Engineer--Advanced-AI_R0000452682",
-      "source": "workday",
-      "company": "target",
-      "title": "Sr Fullstack Engineer- Advanced AI",
-      "location": "Tower 02, Manyata Embassy Business Park, Racenahali & Nagawara Villages. Outer Ring Rd, Bangalore 540065",
-      "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/Tower-02-Manyata-Embassy-Business-Park-Racenahali--Nagawara-Villages-Outer-Ring-Rd-Bangalore-540065/Sr-Fullstack-Engineer--Advanced-AI_R0000452682",
-      "posted": "2026-10-07T07:54:20.673836+00:00",
-      "score": 64,
-      "reasons": [
-        "engineer",
-        "fullstack",
-        "ai"
-      ]
-    },
-    {
       "id": "wd-intel-/job/India-Bangalore/AI-ML-Technologist_JR0285263",
       "source": "workday",
       "company": "intel",
       "title": "AI/ML Technologist",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
-      "posted": "2026-10-07T07:54:20.673836+00:00",
+      "posted": "2026-10-07T08:18:55.007885+00:00",
       "score": 56,
       "reasons": [
         "ai",
         "ml"
-      ]
-    },
-    {
-      "id": "wd-target-/job/BangaloreIndia/Sr-Engineer---Target-India_R0000453851",
-      "source": "workday",
-      "company": "target",
-      "title": "Sr Engineer - Managed Containers",
-      "location": "Bangalore,India",
-      "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Sr-Engineer---Target-India_R0000453851",
-      "posted": "2026-10-07T07:54:20.673836+00:00",
-      "score": 56,
-      "reasons": [
-        "engineer",
-        "ai"
       ]
     },
     {
@@ -620,7 +567,7 @@
       "location": "Remote Hamburg",
       "url": "https://www.arbeitnow.com/jobs/companies/boardwise-gmbh/product-owner-digital-products-ai-hamburg-151254",
       "posted": "2026-10-07T05:31:03+00:00",
-      "score": 61,
+      "score": 60,
       "reasons": [
         "ai",
         "llm"
@@ -634,7 +581,7 @@
       "location": "Remote Berlin",
       "url": "https://www.arbeitnow.com/jobs/companies/interlead-gmbh/devops-engineer-berlin-317808",
       "posted": "2026-10-07T05:31:00+00:00",
-      "score": 56,
+      "score": 55,
       "reasons": [
         "engineer",
         "ai"
@@ -662,7 +609,7 @@
       "location": "Remote - United States",
       "url": "https://job-boards.greenhouse.io/reddit/jobs/8189317",
       "posted": "2026-10-07T02:40:51-04:00",
-      "score": 60,
+      "score": 59,
       "reasons": [
         "engineer",
         "backend"
@@ -703,22 +650,54 @@
       "location": "Bangalore ",
       "url": "https://www.rubrik.com/company/careers/departments/job.8258200?gh_jid=8258200",
       "posted": "2026-10-07T01:44:29-04:00",
-      "score": 49,
+      "score": 48,
       "reasons": [
         "software",
         "engineer"
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
+      "id": "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-requirement-mumbai-tier-1-institutes-preferred-at-willware-technologies-4476568052",
       "source": "linkedin",
-      "company": "foundit",
-      "title": ".NET Full stack",
-      "location": "Bangalore Urban, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
+      "company": "WillWare Technologies",
+      "title": "Python Full Stack Developer Requirement | Mumbai | Tier 1 Institutes Preferred",
+      "location": "Mumbai, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/python-full-stack-developer-requirement-mumbai-tier-1-institutes-preferred-at-willware-technologies-4476568052",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 35,
+      "score": 69,
       "reasons": [
+        "developer",
+        "full stack",
+        "python",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/python-developer-at-ari-4475169815",
+      "source": "linkedin",
+      "company": "ARi",
+      "title": "Python Developer",
+      "location": "Chennai, Tamil Nadu, India",
+      "url": "https://in.linkedin.com/jobs/view/python-developer-at-ari-4475169815",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 53,
+      "reasons": [
+        "developer",
+        "python",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-crimson-energy-experts-pvt-ltd-4475186371",
+      "source": "linkedin",
+      "company": "Crimson Energy Experts Pvt Ltd",
+      "title": "Full Stack Engineer",
+      "location": "New Delhi, Delhi, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-crimson-energy-experts-pvt-ltd-4475186371",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 43,
+      "reasons": [
+        "engineer",
         "full stack"
       ]
     },
@@ -771,7 +750,7 @@
       "location": "Bangalore ",
       "url": "https://www.rubrik.com/company/careers/departments/job.8256407?gh_jid=8256407",
       "posted": "2026-10-06T13:30:23-04:00",
-      "score": 37,
+      "score": 36,
       "reasons": [
         "software",
         "engineer"
@@ -855,7 +834,7 @@
       "location": "Remote - US",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8026211",
       "posted": "2026-10-06T12:34:32-04:00",
-      "score": 46,
+      "score": 45,
       "reasons": [
         "software",
         "engineer"
@@ -882,7 +861,7 @@
       "location": "Remote - India",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/7781659",
       "posted": "2026-10-06T10:28:05-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -895,7 +874,7 @@
       "location": "Remote - Singapore",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8114393",
       "posted": "2026-10-06T10:27:11-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -908,7 +887,7 @@
       "location": "Remote - United Kingdom",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8055481",
       "posted": "2026-10-06T10:27:03-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -921,7 +900,7 @@
       "location": "Remote - Ireland",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8023560",
       "posted": "2026-10-06T10:27:03-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -934,7 +913,7 @@
       "location": "Remote - United Kingdom",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8000178",
       "posted": "2026-10-06T10:26:55-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -947,7 +926,7 @@
       "location": "Remote - India",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8079801",
       "posted": "2026-10-06T10:26:06-04:00",
-      "score": 44,
+      "score": 43,
       "reasons": [
         "software",
         "engineer"
@@ -961,7 +940,7 @@
       "location": "Remote - Ireland",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8157509",
       "posted": "2026-10-06T10:25:54-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -974,7 +953,7 @@
       "location": "Remote - United Kingdom",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8243073",
       "posted": "2026-10-06T10:25:46-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -987,7 +966,7 @@
       "location": "Remote - India",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8239751",
       "posted": "2026-10-06T10:25:05-04:00",
-      "score": 36,
+      "score": 35,
       "reasons": [
         "engineer"
       ]
@@ -1060,61 +1039,145 @@
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/associate-python-developer-in-pune-at-markytics-ai-4476109192",
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-1-2-years-of-exp-as-agentic-ai-developer-python-at-visa-4476170799",
       "source": "linkedin",
-      "company": "Markytics.AI",
-      "title": "Associate Python Developer in Pune",
-      "location": "Pune Division, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/associate-python-developer-in-pune-at-markytics-ai-4476109192",
+      "company": "Visa",
+      "title": "Software Engineer (1-2 years of exp as Agentic AI Developer, Python)",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-1-2-years-of-exp-as-agentic-ai-developer-python-at-visa-4476170799",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 41,
+      "score": 75,
       "reasons": [
+        "software",
         "developer",
+        "engineer",
         "python",
         "ai"
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-ii-java-spring-aws-terraform-at-jpmorganchase-4476155668",
+      "id": "li-https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428",
       "source": "linkedin",
-      "company": "JPMorganChase",
-      "title": "Software Engineer II - Java, Spring, AWS, Terraform",
-      "location": "Mumbai, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-java-spring-aws-terraform-at-jpmorganchase-4476155668",
+      "company": "Visa",
+      "title": "SW Engineer (Java/Python Full stack, GenAI - 6 months to 2 years' experience only)",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/sw-engineer-java-python-full-stack-genai-6-months-to-2-years-experience-only-at-visa-4476178428",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 67,
+      "reasons": [
+        "engineer",
+        "full stack",
+        "python",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-developer-python%2Breact-at-mott-macdonald-4458586868",
+      "source": "linkedin",
+      "company": "Mott MacDonald",
+      "title": "Full Stack Developer-Python+React",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-developer-python%2Breact-at-mott-macdonald-4458586868",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 57,
+      "reasons": [
+        "developer",
+        "full stack",
+        "python",
+        "react"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-developer-python%2Breact-at-mott-macdonald-4458591760",
+      "source": "linkedin",
+      "company": "Mott MacDonald",
+      "title": "Full Stack Developer-Python+React",
+      "location": "Noida, Uttar Pradesh, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-developer-python%2Breact-at-mott-macdonald-4458591760",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 57,
+      "reasons": [
+        "developer",
+        "full stack",
+        "python",
+        "react"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-at-indium-4474903135",
+      "source": "linkedin",
+      "company": "Indium",
+      "title": "Python Full Stack Developer",
+      "location": "Chennai, Tamil Nadu, India",
+      "url": "https://in.linkedin.com/jobs/view/python-full-stack-developer-at-indium-4474903135",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 49,
+      "reasons": [
+        "developer",
+        "full stack",
+        "python",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-ii-backend-leaning-fullstack-at-rippling-4476170898",
+      "source": "linkedin",
+      "company": "Rippling",
+      "title": "Software Engineer II - Backend Leaning FullStack",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-backend-leaning-fullstack-at-rippling-4476170898",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 47,
+      "reasons": [
+        "software",
+        "engineer",
+        "fullstack",
+        "backend"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/ai-backend-engineer-l1-at-jagdushah-technologies-4474042709",
+      "source": "linkedin",
+      "company": "Jagdushah Technologies",
+      "title": "AI & Backend Engineer - L1",
+      "location": "Ahmedabad, Gujarat, India",
+      "url": "https://in.linkedin.com/jobs/view/ai-backend-engineer-l1-at-jagdushah-technologies-4474042709",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 44,
+      "reasons": [
+        "engineer",
+        "backend",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-at-zemoso-technologies-4474095163",
+      "source": "linkedin",
+      "company": "Zemoso Technologies",
+      "title": "Python Full Stack Developer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/python-full-stack-developer-at-zemoso-technologies-4474095163",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 44,
+      "reasons": [
+        "developer",
+        "full stack",
+        "python"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
+      "source": "linkedin",
+      "company": "Auric AI Labs",
+      "title": "Junior Software Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-auric-ai-labs-4474996021",
       "posted": "2026-10-06T00:00:00+00:00",
       "score": 36,
       "reasons": [
         "software",
         "engineer",
         "ai"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
-      "source": "linkedin",
-      "company": "Infosys",
-      "title": "REACTJS DEVELOPER",
-      "location": "Pune Division, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/software-development-engineer-at-accenture-in-india-4476318237",
-      "source": "linkedin",
-      "company": "Accenture in India",
-      "title": "Software Development Engineer",
-      "location": "Hyderabad, Telangana, India",
-      "url": "https://in.linkedin.com/jobs/view/software-development-engineer-at-accenture-in-india-4476318237",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
       ]
     },
     {
@@ -1132,17 +1195,45 @@
       ]
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/java-developer-at-dhl-4470297138",
+      "id": "li-https://in.linkedin.com/jobs/view/net-full-stack-developer-at-sonata-software-4476337121",
       "source": "linkedin",
-      "company": "DHL",
-      "title": "Java Developer",
-      "location": "Chennai, Tamil Nadu, India",
-      "url": "https://in.linkedin.com/jobs/view/java-developer-at-dhl-4470297138",
+      "company": "Sonata Software",
+      "title": ".NET Full Stack Developer",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/net-full-stack-developer-at-sonata-software-4476337121",
       "posted": "2026-10-06T00:00:00+00:00",
-      "score": 28,
+      "score": 31,
       "reasons": [
         "developer",
-        "ai"
+        "full stack"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-development-engineer-at-fiserv-4474969558",
+      "source": "linkedin",
+      "company": "Fiserv",
+      "title": "Software Development Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-development-engineer-at-fiserv-4474969558",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-saarthee-4476303066",
+      "source": "linkedin",
+      "company": "Saarthee",
+      "title": "Full Stack Engineer",
+      "location": "Gurugram, Haryana, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-saarthee-4476303066",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "engineer",
+        "full stack"
       ]
     },
     {
@@ -1204,20 +1295,6 @@
       ]
     },
     {
-      "id": "gh-8239047",
-      "source": "greenhouse",
-      "company": "mongodb",
-      "title": "Software Engineer 3",
-      "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
-      "posted": "2026-10-05T19:30:53-04:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
       "id": "gh-7993984",
       "source": "greenhouse",
       "company": "mongodb",
@@ -1266,6 +1343,20 @@
       "title": "Software Engineer 3",
       "location": "Gurugram",
       "url": "https://www.mongodb.com/careers/job/?gh_jid=7597723",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8239047",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1339,12 +1430,12 @@
       ]
     },
     {
-      "id": "gh-8170631",
+      "id": "gh-8170628",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Technical Services Engineer",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170631",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170628",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 23,
       "reasons": [
@@ -1352,12 +1443,12 @@
       ]
     },
     {
-      "id": "gh-8170628",
+      "id": "gh-8170631",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Technical Services Engineer",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170628",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170631",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 23,
       "reasons": [
@@ -1374,20 +1465,6 @@
       "posted": "2026-10-05T18:30:28.401000+00:00",
       "score": 23,
       "reasons": [
-        "engineer"
-      ]
-    },
-    {
-      "id": "gh-8231071",
-      "source": "greenhouse",
-      "company": "pinterest",
-      "title": "Sr Software Engineer, Monetization Engineering",
-      "location": "San Francisco, CA; Palo Alto, CA; Seattle, WA; New York, NY; Remote, US",
-      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8231071",
-      "posted": "2026-10-05T17:10:51-04:00",
-      "score": 41,
-      "reasons": [
-        "software",
         "engineer"
       ]
     },
@@ -1502,12 +1579,12 @@
       ]
     },
     {
-      "id": "gh-8142657",
+      "id": "gh-8142661",
       "source": "greenhouse",
       "company": "mixpanel",
       "title": "Customer Engineer ",
-      "location": "New York City, US (Remote) ",
-      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142657",
+      "location": "Remote, US (Remote) ",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142661",
       "posted": "2026-10-05T15:20:10-04:00",
       "score": 33,
       "reasons": [
@@ -1515,12 +1592,12 @@
       ]
     },
     {
-      "id": "gh-8142661",
+      "id": "gh-8142657",
       "source": "greenhouse",
       "company": "mixpanel",
       "title": "Customer Engineer ",
-      "location": "Remote, US (Remote) ",
-      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142661",
+      "location": "New York City, US (Remote) ",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142657",
       "posted": "2026-10-05T15:20:10-04:00",
       "score": 33,
       "reasons": [
@@ -1782,7 +1859,7 @@
       "title": "Software Application Development Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "posted": "2026-10-05T07:54:20.673836+00:00",
+      "posted": "2026-10-05T08:18:55.007885+00:00",
       "score": 31,
       "reasons": [
         "software",
@@ -1796,7 +1873,7 @@
       "title": "Memory Electrical Validation Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "posted": "2026-10-05T07:54:20.673836+00:00",
+      "posted": "2026-10-05T08:18:55.007885+00:00",
       "score": 23,
       "reasons": [
         "engineer"
@@ -1887,81 +1964,6 @@
       "score": 23,
       "reasons": [
         "engineer"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-python-at-morningstar-4475553293",
-      "source": "linkedin",
-      "company": "Morningstar",
-      "title": "Software Engineer (Python)",
-      "location": "Navi Mumbai, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/software-engineer-python-at-morningstar-4475553293",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 49,
-      "reasons": [
-        "software",
-        "engineer",
-        "python",
-        "ai"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-%E2%80%93-python-django-at-country-delight-4473622866",
-      "source": "linkedin",
-      "company": "Country Delight",
-      "title": "Software Engineer \u2013 Python / Django",
-      "location": "Gurugram, Haryana, India",
-      "url": "https://in.linkedin.com/jobs/view/software-engineer-%E2%80%93-python-django-at-country-delight-4473622866",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 49,
-      "reasons": [
-        "software",
-        "engineer",
-        "python",
-        "django"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/wow-software-engineer-avp-at-natwest-group-4475805746",
-      "source": "linkedin",
-      "company": "NatWest Group",
-      "title": "WoW Software Engineer, AVP",
-      "location": "Chennai, Tamil Nadu, India",
-      "url": "https://in.linkedin.com/jobs/view/wow-software-engineer-avp-at-natwest-group-4475805746",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "software",
-        "engineer",
-        "ai"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-ii-at-microsoft-4475585085",
-      "source": "linkedin",
-      "company": "Microsoft",
-      "title": "Software Engineer-II",
-      "location": "Hyderabad, Telangana, India",
-      "url": "https://in.linkedin.com/jobs/view/software-engineer-ii-at-microsoft-4475585085",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "software",
-        "engineer"
-      ]
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
-      "source": "linkedin",
-      "company": "Citi",
-      "title": "Java Full Stack Developer",
-      "location": "Pune Division, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 31,
-      "reasons": [
-        "developer",
-        "full stack"
       ]
     },
     {
