@@ -113,6 +113,7 @@ def linkedin(cfg, keyword):
         "location": cfg.get("location", "India"),
         "includeDetails": True,
         "maxResults": int(cfg.get("max_jobs_per_query", 50)),
+        "datePosted": cfg.get("date_posted", "24h"),
     }
     actor = cfg["actors"]["linkedin"]
     return [j for j in (_job("linkedin", x) for x in _run(actor, payload)) if j]
