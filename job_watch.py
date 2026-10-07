@@ -270,7 +270,9 @@ def main():
         if use_apify:
             results += list(pool.map(run_board_source, board_tasks))
         else:
-            results += list(pool.map(lambda x: run_source((x[0], x[1], x[2])), board_tasks))
+            # Keep public board scrapers sequential. LinkedIn rate-limits bursts,
+            # so parallel board requests are counterproductive for a free setup.
+            results += [run_source((x[0], x[1], x[2])) for x in board_tasks]
 
     alerts = []
     dashboard_jobs = []
