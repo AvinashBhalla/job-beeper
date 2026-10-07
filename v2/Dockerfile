@@ -1,6 +1,11 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends chromium \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY v2/requirements.txt /app/v2/requirements.txt
 RUN pip install --no-cache-dir -r /app/v2/requirements.txt
 
