@@ -46,7 +46,7 @@ function render(){
 
 async function load(){
   try{
-    const r = await fetch("data/jobs.json?t="+Date.now(), {cache:"no-store"});
+    const r = await fetch("https://raw.githubusercontent.com/AvinashBhalla/job-beeper/main/dashboard/data/jobs.json?t="+Date.now(), {cache:"no-store"});
     if(!r.ok) throw new Error(r.status);
     const data = await r.json();
     state = data;
