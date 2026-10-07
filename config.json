@@ -210,10 +210,7 @@
       }
     ],
     "linkedin": [
-      "software engineer",
-      "full stack developer",
-      "react developer",
-      "automation engineer"
+      "(software engineer OR full stack developer OR react developer OR automation engineer OR python developer OR ai engineer)"
     ],
     "naukri": [
       "software engineer",

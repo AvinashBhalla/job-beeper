@@ -40,7 +40,7 @@ jobs:
 
           # The source code/config may have changed while this run was polling.
           # Rebase our generated state onto the latest main before pushing.
-          git add seen.json dashboard/data/jobs.json
+          git add seen.json source_state.json dashboard/data/jobs.json
           git diff --staged --quiet && exit 0
 
           git commit -m "refresh job feed"

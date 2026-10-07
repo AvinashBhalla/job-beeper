@@ -10,6 +10,7 @@ from apify_sources import linkedin as apify_linkedin, naukri as apify_naukri, in
 ROOT = pathlib.Path(__file__).parent
 CFG = json.loads((ROOT / "config.json").read_text())
 SEEN_FILE = ROOT / "seen.json"
+SOURCE_STATE_FILE = ROOT / "source_state.json"
 DASH_FILE = ROOT / "dashboard" / "data" / "jobs.json"
 UA = {"User-Agent": "Mozilla/5.0 (personal-job-watcher)"}
 NOW = dt.datetime.now(dt.timezone.utc)
@@ -204,6 +205,37 @@ def load_state():
         return True, set(raw), set()
     return True, set(raw["jobs"]), set(raw["sources"])
 
+def load_source_state():
+    if not SOURCE_STATE_FILE.exists():
+        return {}
+    try:
+        raw = json.loads(SOURCE_STATE_FILE.read_text())
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+def save_source_state(state):
+    SOURCE_STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True))
+
+def source_key(name, arg):
+    return f"{name}:{json.dumps(arg, sort_keys=True) if arg else ''}"
+
+def cooldown_minutes(failures):
+    # Back off broken sources instead of hammering them every scheduled run.
+    # 20m, 40m, 80m ... capped at 6h.
+    return min(360, 20 * (2 ** max(0, failures - 1)))
+
+def should_poll(source_state, key, force=False):
+    if force:
+        return True
+    until = source_state.get(key, {}).get("skip_until")
+    if not until:
+        return True
+    try:
+        return NOW >= dt.datetime.fromisoformat(until)
+    except Exception:
+        return True
+
 def run_source(task):
     name, fn, arg = task
     try:
@@ -247,23 +279,57 @@ def notify(j, score, reasons):
 
 def main():
     exists, seen, known_sources = load_state()
+    source_state = load_source_state()
     s, f = CFG["sources"], CFG["filters"]
+    force_refresh = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
     apify_cfg = CFG.get("apify", {})
     use_apify = (bool(os.environ.get("APIFY_API_TOKEN")) and
                  apify_cfg.get("enabled", True) and
                  apify_cfg.get("provider", "direct") == "apify")
 
-    tasks = [(n, fn, a) for n, fn in LIST_SOURCES.items() for a in s.get(n, [])]
-    tasks += [(n, fn, None) for n, fn in FLAG_SOURCES.items() if s.get(n)]
-    board_tasks = []
+    all_tasks = [(n, fn, a) for n, fn in LIST_SOURCES.items() for a in s.get(n, [])]
+    all_tasks += [(n, fn, None) for n, fn in FLAG_SOURCES.items() if s.get(n)]
+    all_board_tasks = []
     for name in BOARD_SOURCES:
         for query in s.get(name, []):
             if use_apify:
-                board_tasks.append((name, APIFY_BOARD_SOURCES[name], query, apify_cfg))
+                all_board_tasks.append((name, APIFY_BOARD_SOURCES[name], query, apify_cfg))
             else:
-                board_tasks.append((name, BOARD_SOURCES[name], query, None))
+                all_board_tasks.append((name, BOARD_SOURCES[name], query, None))
     if s.get("adzuna", {}).get("enabled"):
-        tasks.append(("adzuna", adzuna, s["adzuna"]))
+        all_tasks.append(("adzuna", adzuna, s["adzuna"]))
+
+    # Failed sources get exponential backoff. Manual runs always bypass it so
+    # source debugging never gets stuck behind a previous failure.
+    tasks = []
+    board_tasks = []
+    source_status = {}
+    for task in all_tasks:
+        key = source_key(task[0], task[2])
+        if should_poll(source_state, key, force_refresh):
+            tasks.append(task)
+        else:
+            source_status[key] = {
+                "ok": False,
+                "skipped": True,
+                "count": 0,
+                "error": "cooldown",
+                "retry_at": source_state[key].get("skip_until"),
+                "provider": "direct",
+            }
+    for task in all_board_tasks:
+        key = source_key(task[0], task[2])
+        if should_poll(source_state, key, force_refresh):
+            board_tasks.append(task)
+        else:
+            source_status[key] = {
+                "ok": False,
+                "skipped": True,
+                "count": 0,
+                "error": "cooldown",
+                "retry_at": source_state[key].get("skip_until"),
+                "provider": "apify" if use_apify else "direct",
+            }
 
     with ThreadPoolExecutor(max_workers=min(16, max(1, len(tasks) + len(board_tasks)))) as pool:
         results = list(pool.map(run_source, tasks))
@@ -276,18 +342,42 @@ def main():
 
     alerts = []
     dashboard_jobs = []
-    source_status = {}
     for name, arg, jobs, err in results:
-        key = f"{name}:{json.dumps(arg, sort_keys=True) if arg else ''}"
-        source_status[key] = {
-            "ok": err is None,
-            "count": len(jobs),
-            "error": str(err) if err else None,
-            "provider": "apify" if use_apify and name in APIFY_BOARD_SOURCES else "direct"
-        }
+        key = source_key(name, arg)
+        provider = "apify" if use_apify and name in APIFY_BOARD_SOURCES else "direct"
         if err:
-            print(f"[warn] {key}: {err}")
+            previous = source_state.get(key, {})
+            failures = int(previous.get("failures", 0)) + 1
+            retry_at = NOW + dt.timedelta(minutes=cooldown_minutes(failures))
+            source_state[key] = {
+                "failures": failures,
+                "last_error": str(err),
+                "last_failure": NOW.isoformat(),
+                "skip_until": retry_at.isoformat(),
+            }
+            source_status[key] = {
+                "ok": False,
+                "count": 0,
+                "error": str(err),
+                "provider": provider,
+                "retry_at": retry_at.isoformat(),
+                "failures": failures,
+            }
+            print(f"[warn] {key}: {err} (retry after {retry_at.isoformat()})")
             continue
+
+        source_state[key] = {
+            "failures": 0,
+            "last_success": NOW.isoformat(),
+            "last_count": len(jobs),
+            "skip_until": None,
+        }
+        source_status[key] = {
+            "ok": True,
+            "count": len(jobs),
+            "error": None,
+            "provider": provider,
+        }
         silent = (not exists) or key not in known_sources
         known_sources.add(key)
         for j in jobs:
@@ -309,8 +399,9 @@ def main():
         unique[item["id"]] = item
     dashboard_jobs = sorted(unique.values(), key=lambda x: (x["posted"] or ""), reverse=True)
     write_dashboard(dashboard_jobs, source_status, len(alerts))
+    save_source_state(source_state)
     SEEN_FILE.write_text(json.dumps({"jobs": sorted(seen), "sources": sorted(known_sources)}))
-    print(f"done: {len(alerts)} alerts from {len(tasks)} sources; dashboard={len(dashboard_jobs)}")
+    print(f"done: {len(alerts)} alerts from {len(tasks) + len(board_tasks)} sources; dashboard={len(dashboard_jobs)}")
 
 if __name__ == "__main__":
     main()
