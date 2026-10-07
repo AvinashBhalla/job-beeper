@@ -385,7 +385,7 @@ def linkedin_collect() -> list[dict[str, Any]]:
 
 
 NAUKRI_RELAY_URL = (
-    "https://raw.githubusercontent.com/AvinashBhalla/job-beeper/main/"
+    "https://raw.githubusercontent.com/AvinashBhalla/job-beeper/naukri-relay/"
     "dashboard/data/naukri_relay.json"
 )
 
