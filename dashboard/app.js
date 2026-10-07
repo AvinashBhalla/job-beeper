@@ -122,8 +122,10 @@ function loadForm(){
   const f=config.filters;
   $("cfgKeywords").value=(f.keywords||[]).join(", ");
   $("cfgLocations").value=(f.locations||[]).join(", ");
+  $("cfgSkills").value=(f.skills||[]).join(", ");
   $("cfgExclude").value=(f.title_exclude||[]).join(", ");
   $("cfgCandidateExperience").value=f.candidate_experience_years ?? "";
+  $("cfgMinExperience").value=f.min_experience_years ?? "";
   $("cfgExperience").value=String(f.max_experience_years ?? 3);
   $("cfgAge").value=String(f.max_age_hours ?? 72);
   $("cfgRemoteOnly").checked=!!f.remote_only;
@@ -136,9 +138,12 @@ function collectConfig(){
   const f=next.filters;
   f.keywords=csv($("cfgKeywords").value);
   f.locations=csv($("cfgLocations").value);
+  f.skills=csv($("cfgSkills").value);
   f.title_exclude=csv($("cfgExclude").value);
   f.fields=[...document.querySelectorAll("[data-field]:checked")].map(x=>x.dataset.field);
   const candidateExperience=$("cfgCandidateExperience").value.trim();
+  const minExperience=$("cfgMinExperience").value.trim();
+  f.min_experience_years=minExperience==="" ? null : Number(minExperience);
   f.candidate_experience_years=candidateExperience==="" ? null : Number(candidateExperience);
   f.max_experience_years=Number($("cfgExperience").value);
   f.max_age_hours=Number($("cfgAge").value);
