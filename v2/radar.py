@@ -51,9 +51,7 @@ def parse_relative(value: str | None, base: dt.datetime | None = None) -> dt.dat
         return None
     base = base or now()
     text = str(value).strip().lower()
-    if text in {"just now", "now"}:
-        return base
-    if text == "today":
+    if text in {"just now", "now", "today"}:
         return base
     if text == "yesterday":
         return base - dt.timedelta(days=1)
@@ -169,12 +167,12 @@ def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
     return new_count
 
 
-def record_run(source: str, started: dt.datetime, finished: dt.datetime,
+def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
                jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            "INSERT INTO source_runs(source,started_at,finished_at,jobs_seen,new_jobs,error) VALUES(?,?,?,?,?,?,?)",
-            (source, iso(started), iso(finished), jobs_seen, new_jobs, error)
+            "INSERT INTO source_runs(source,started_at,finished_at,jobs_seen,new_jobs,error) VALUES(?,?,?,?,?,?)",
+            (source, iso(started_at), iso(finished), jobs_seen, new_jobs, error)
         )
         conn.commit()
 
@@ -197,53 +195,79 @@ def location_allowed(location: str) -> bool:
 
 
 def likely_match(job: dict[str, Any]) -> bool:
-    # Keep ingestion source-faithful; this is only a lightweight first-pass
-    # filter for the API/feed. The full matching engine comes after freshness.
     return title_allowed(job["title"]) and location_allowed(job["location"])
+
+
+def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
+    for attempt in range(3):
+        response = requests.get(endpoint, params=params, headers=UA, timeout=25)
+        if response.status_code not in {429, 500, 502, 503, 504}:
+            response.raise_for_status()
+            return response
+        wait = min(30, 2 ** attempt * 2)
+        retry_after = response.headers.get("Retry-After")
+        if retry_after and retry_after.isdigit():
+            wait = min(60, int(retry_after))
+        time.sleep(wait)
+    response.raise_for_status()
+    return response
 
 
 def linkedin_collect() -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     endpoint = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+
+    # Keep a six-hour safety window so a transient failure does not create a
+    # permanent hole in the feed. We still request newest-first and dedupe by
+    # LinkedIn job id.
     for query in CONFIG["linkedin_queries"]:
         for location in CONFIG["locations"]:
-            params = {
-                "keywords": query,
-                "location": location,
-                "f_TPR": "r3600",
-                "sortBy": "DD",
-                "start": 0,
-            }
-            response = requests.get(endpoint, params=params, headers=UA, timeout=25)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            cards = soup.select("li")
-            for card in cards:
-                link = card.select_one("a.base-card__full-link") or card.select_one("a[href*='/jobs/view/']")
-                title = card.select_one("h3.base-search-card__title")
-                company = card.select_one("h4.base-search-card__subtitle")
-                loc = card.select_one("span.job-search-card__location")
-                posted = card.select_one("time")
-                if not link or not title:
-                    continue
-                url = (link.get("href") or "").split("?")[0]
-                match = re.search(r"jobs/view/(\d+)", url)
-                source_id = match.group(1) if match else hashlib.sha1(url.encode()).hexdigest()[:20]
-                visible = posted.get_text(" ", strip=True) if posted else ""
-                posted_at = parse_relative(visible)
-                precision = "minute" if re.search(
-                    r"(just now|\d+\s*(?:minute|min|hour|hr)s?\s*ago)", visible.lower()
-                ) else "date"
-                if not posted_at and posted and posted.get("datetime"):
-                    posted_at = parse_relative(posted.get("datetime"))
-                jobs.append(normalize_job(
-                    "linkedin", source_id,
-                    company.get_text(" ", strip=True) if company else "",
-                    title.get_text(" ", strip=True),
-                    loc.get_text(" ", strip=True) if loc else "",
-                    url, posted_at, precision,
-                    card.get_text(" ", strip=True)
-                ))
+            for start in (0, 10):
+                params = {
+                    "keywords": query,
+                    "location": location,
+                    "f_TPR": "r21600",
+                    "sortBy": "DD",
+                    "start": start,
+                }
+                response = _linkedin_request(endpoint, params)
+                soup = BeautifulSoup(response.text, "html.parser")
+                cards = soup.select("li")
+                if not cards:
+                    break
+                for card in cards:
+                    link = card.select_one("a.base-card__full-link") or card.select_one(
+                        "a[href*='/jobs/view/']"
+                    )
+                    title = card.select_one("h3.base-search-card__title")
+                    company = card.select_one("h4.base-search-card__subtitle")
+                    loc = card.select_one("span.job-search-card__location")
+                    posted = card.select_one("time")
+                    if not link or not title:
+                        continue
+                    url = (link.get("href") or "").split("?")[0]
+                    match = re.search(r"jobs/view/(\d+)", url)
+                    source_id = match.group(1) if match else hashlib.sha1(
+                        url.encode()
+                    ).hexdigest()[:20]
+                    visible = posted.get_text(" ", strip=True) if posted else ""
+                    posted_at = parse_relative(visible)
+                    precision = "minute" if re.search(
+                        r"(just now|\d+\s*(?:minute|min|hour|hr)s?\s*ago)",
+                        visible.lower(),
+                    ) else "date"
+                    if not posted_at and posted and posted.get("datetime"):
+                        posted_at = parse_relative(posted.get("datetime"))
+                    jobs.append(normalize_job(
+                        "linkedin", source_id,
+                        company.get_text(" ", strip=True) if company else "",
+                        title.get_text(" ", strip=True),
+                        loc.get_text(" ", strip=True) if loc else "",
+                        url, posted_at, precision,
+                        card.get_text(" ", strip=True),
+                    ))
+                if len(cards) < 10:
+                    break
     return jobs
 
 
@@ -285,7 +309,7 @@ def naukri_collect() -> list[dict[str, Any]]:
                     str(row.get("title") or ""),
                     str(row.get("location") or ""),
                     url, posted_at, "date" if posted_at else "unknown",
-                    description
+                    description,
                 ))
     return jobs
 
@@ -316,8 +340,10 @@ def instahyre_collect() -> list[dict[str, Any]]:
         source_id = item.get("jobId") or item.get("id") or item.get("jobID")
         if not source_id:
             continue
-        url = str(item.get("url") or item.get("publicUrl") or item.get("jobUrl") or
-                  f"https://www.instahyre.com/job-{source_id}-")
+        url = str(
+            item.get("url") or item.get("publicUrl") or item.get("jobUrl")
+            or f"https://www.instahyre.com/job-{source_id}-"
+        )
         posted_raw = item.get("postedAt") or item.get("posted_at") or item.get("postedDate")
         posted_at = parse_relative(str(posted_raw)) if posted_raw else None
         jobs.append(normalize_job(
@@ -326,7 +352,7 @@ def instahyre_collect() -> list[dict[str, Any]]:
             str(item.get("title") or item.get("jobTitle") or ""),
             str(item.get("location") or item.get("locations") or ""),
             url, posted_at, "minute" if posted_at else "unknown",
-            str(item.get("description") or item.get("descriptionText") or "")
+            str(item.get("description") or item.get("descriptionText") or ""),
         ))
     return jobs
 
@@ -339,22 +365,28 @@ COLLECTORS = {
 
 
 def run_source(source: str) -> None:
-    started = now()
+    if source_state.get(source, {}).get("running"):
+        log.warning("%s: previous run still active; skipping this cycle", source)
+        return
+
+    started_at = now()
     source_state.setdefault(source, {})["running"] = True
     try:
         jobs = COLLECTORS[source]()
         new_jobs = upsert_jobs(jobs)
-        record_run(source, started, now(), len(jobs), new_jobs)
+        finished = now()
+        record_run(source, started_at, finished, len(jobs), new_jobs)
         source_state[source] = {
             "running": False,
-            "last_success": iso(now()),
+            "last_success": iso(finished),
             "jobs_seen": len(jobs),
             "new_jobs": new_jobs,
             "error": None,
         }
         log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
     except Exception as exc:
-        record_run(source, started, now(), 0, 0, str(exc))
+        finished = now()
+        record_run(source, started_at, finished, 0, 0, str(exc))
         source_state[source] = {
             "running": False,
             "last_success": source_state.get(source, {}).get("last_success"),
@@ -370,11 +402,8 @@ async def scheduler() -> None:
     intervals = CONFIG["poll_seconds"]
     while not stop_event.is_set():
         current = time.monotonic()
-        due = [name for name in COLLECTORS if current >= next_run[name]]
-        if due:
-            # LinkedIn is intentionally first because it is our primary
-            # freshness target. Other sources run independently.
-            for name in due:
+        for name in COLLECTORS:
+            if current >= next_run[name] and not source_state.get(name, {}).get("running"):
                 next_run[name] = current + intervals[name]
                 asyncio.create_task(asyncio.to_thread(run_source, name))
         try:
@@ -417,8 +446,13 @@ def source_status():
         """).fetchall()
     return {
         "sources": [
-            {"source": r[0], "last_run": r[1], "jobs_seen": r[2] or 0, "new_jobs": r[3] or 0,
-             "runtime": source_state.get(r[0], {})}
+            {
+                "source": r[0],
+                "last_run": r[1],
+                "jobs_seen": r[2] or 0,
+                "new_jobs": r[3] or 0,
+                "runtime": source_state.get(r[0], {}),
+            }
             for r in rows
         ]
     }
