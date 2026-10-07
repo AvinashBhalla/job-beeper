@@ -1,7 +1,1835 @@
 {
-  "updated_at": null,
-  "last_run": null,
+  "updated_at": "2026-10-07T07:22:44.894234+00:00",
+  "last_run": "2026-10-07T07:22:44.894234+00:00",
   "new_alerts": 0,
-  "source_status": {},
-  "jobs": []
+  "source_status": {
+    "greenhouse:\"groww\"": {
+      "ok": true,
+      "count": 7,
+      "error": null
+    },
+    "greenhouse:\"databricks\"": {
+      "ok": true,
+      "count": 888,
+      "error": null
+    },
+    "greenhouse:\"stripe\"": {
+      "ok": true,
+      "count": 732,
+      "error": null
+    },
+    "greenhouse:\"airbnb\"": {
+      "ok": true,
+      "count": 160,
+      "error": null
+    },
+    "greenhouse:\"cloudflare\"": {
+      "ok": true,
+      "count": 419,
+      "error": null
+    },
+    "greenhouse:\"coinbase\"": {
+      "ok": true,
+      "count": 225,
+      "error": null
+    },
+    "greenhouse:\"datadog\"": {
+      "ok": true,
+      "count": 433,
+      "error": null
+    },
+    "greenhouse:\"elastic\"": {
+      "ok": true,
+      "count": 417,
+      "error": null
+    },
+    "greenhouse:\"figma\"": {
+      "ok": true,
+      "count": 155,
+      "error": null
+    },
+    "greenhouse:\"gitlab\"": {
+      "ok": true,
+      "count": 210,
+      "error": null
+    },
+    "greenhouse:\"mongodb\"": {
+      "ok": true,
+      "count": 394,
+      "error": null
+    },
+    "greenhouse:\"okta\"": {
+      "ok": true,
+      "count": 372,
+      "error": null
+    },
+    "greenhouse:\"pinterest\"": {
+      "ok": true,
+      "count": 178,
+      "error": null
+    },
+    "greenhouse:\"reddit\"": {
+      "ok": true,
+      "count": 148,
+      "error": null
+    },
+    "greenhouse:\"robinhood\"": {
+      "ok": true,
+      "count": 160,
+      "error": null
+    },
+    "greenhouse:\"samsara\"": {
+      "ok": true,
+      "count": 240,
+      "error": null
+    },
+    "greenhouse:\"twilio\"": {
+      "ok": true,
+      "count": 131,
+      "error": null
+    },
+    "greenhouse:\"zscaler\"": {
+      "ok": true,
+      "count": 363,
+      "error": null
+    },
+    "greenhouse:\"vercel\"": {
+      "ok": true,
+      "count": 84,
+      "error": null
+    },
+    "greenhouse:\"webflow\"": {
+      "ok": true,
+      "count": 24,
+      "error": null
+    },
+    "greenhouse:\"discord\"": {
+      "ok": true,
+      "count": 48,
+      "error": null
+    },
+    "greenhouse:\"dropbox\"": {
+      "ok": true,
+      "count": 35,
+      "error": null
+    },
+    "greenhouse:\"lyft\"": {
+      "ok": true,
+      "count": 195,
+      "error": null
+    },
+    "greenhouse:\"instacart\"": {
+      "ok": true,
+      "count": 122,
+      "error": null
+    },
+    "greenhouse:\"asana\"": {
+      "ok": true,
+      "count": 97,
+      "error": null
+    },
+    "greenhouse:\"brex\"": {
+      "ok": true,
+      "count": 284,
+      "error": null
+    },
+    "greenhouse:\"carta\"": {
+      "ok": true,
+      "count": 72,
+      "error": null
+    },
+    "greenhouse:\"duolingo\"": {
+      "ok": true,
+      "count": 60,
+      "error": null
+    },
+    "greenhouse:\"mixpanel\"": {
+      "ok": true,
+      "count": 53,
+      "error": null
+    },
+    "greenhouse:\"fivetran\"": {
+      "ok": true,
+      "count": 195,
+      "error": null
+    },
+    "greenhouse:\"grafanalabs\"": {
+      "ok": true,
+      "count": 134,
+      "error": null
+    },
+    "greenhouse:\"observeai\"": {
+      "ok": true,
+      "count": 12,
+      "error": null
+    },
+    "greenhouse:\"sumologic\"": {
+      "ok": true,
+      "count": 9,
+      "error": null
+    },
+    "greenhouse:\"rubrik\"": {
+      "ok": true,
+      "count": 133,
+      "error": null
+    },
+    "greenhouse:\"druva\"": {
+      "ok": true,
+      "count": 37,
+      "error": null
+    },
+    "greenhouse:\"newrelic\"": {
+      "ok": true,
+      "count": 47,
+      "error": null
+    },
+    "greenhouse:\"toast\"": {
+      "ok": true,
+      "count": 325,
+      "error": null
+    },
+    "lever:\"cred\"": {
+      "ok": true,
+      "count": 8,
+      "error": null
+    },
+    "lever:\"paytm\"": {
+      "ok": true,
+      "count": 174,
+      "error": null
+    },
+    "lever:\"palantir\"": {
+      "ok": true,
+      "count": 314,
+      "error": null
+    },
+    "lever:\"spotify\"": {
+      "ok": true,
+      "count": 75,
+      "error": null
+    },
+    "lever:\"zeta\"": {
+      "ok": true,
+      "count": 25,
+      "error": null
+    },
+    "lever:\"mindtickle\"": {
+      "ok": true,
+      "count": 19,
+      "error": null
+    },
+    "ashby:\"openai\"": {
+      "ok": true,
+      "count": 823,
+      "error": null
+    },
+    "ashby:\"ramp\"": {
+      "ok": true,
+      "count": 160,
+      "error": null
+    },
+    "ashby:\"notion\"": {
+      "ok": true,
+      "count": 133,
+      "error": null
+    },
+    "ashby:\"linear\"": {
+      "ok": true,
+      "count": 31,
+      "error": null
+    },
+    "ashby:\"deel\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "ashby:\"supabase\"": {
+      "ok": true,
+      "count": 52,
+      "error": null
+    },
+    "ashby:\"posthog\"": {
+      "ok": true,
+      "count": 9,
+      "error": null
+    },
+    "ashby:\"mercury\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "ashby:\"cohere\"": {
+      "ok": true,
+      "count": 126,
+      "error": null
+    },
+    "ashby:\"replit\"": {
+      "ok": true,
+      "count": 71,
+      "error": null
+    },
+    "ashby:\"hightouch\"": {
+      "ok": true,
+      "count": 1,
+      "error": null
+    },
+    "ashby:\"sardine\"": {
+      "ok": true,
+      "count": 38,
+      "error": null
+    },
+    "smartrecruiters:\"Freshworks\"": {
+      "ok": true,
+      "count": 32,
+      "error": null
+    },
+    "smartrecruiters:\"ServiceNow\"": {
+      "ok": true,
+      "count": 75,
+      "error": null
+    },
+    "smartrecruiters:\"BoschGroup\"": {
+      "ok": true,
+      "count": 100,
+      "error": null
+    },
+    "smartrecruiters:\"Visa\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "smartrecruiters:\"Ubisoft2\"": {
+      "ok": true,
+      "count": 6,
+      "error": null
+    },
+    "smartrecruiters:\"McDonaldsCorporation\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workable:\"zoomcar\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workable:\"sharechat\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workable:\"toddle\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workable:\"simpl\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workday:{\"search\": \"software engineer india\", \"url\": \"https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite\"}": {
+      "ok": true,
+      "count": 60,
+      "error": null
+    },
+    "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://adobe.wd5.myworkdayjobs.com/external_experienced\"}": {
+      "ok": false,
+      "count": 0,
+      "error": "'externalPath'"
+    },
+    "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://salesforce.wd12.myworkdayjobs.com/External_Career_Site\"}": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://walmart.wd5.myworkdayjobs.com/WalmartExternal\"}": {
+      "ok": false,
+      "count": 0,
+      "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs"
+    },
+    "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
+      "ok": true,
+      "count": 29,
+      "error": null
+    },
+    "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://dell.wd1.myworkdayjobs.com/External\"}": {
+      "ok": false,
+      "count": 0,
+      "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs"
+    },
+    "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
+      "ok": true,
+      "count": 60,
+      "error": null
+    },
+    "workday:{\"search\": \"software engineer pune bangalore\", \"url\": \"https://mastercard.wd1.myworkdayjobs.com/CorporateCareers\"}": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://qualcomm.wd5.myworkdayjobs.com/External\"}": {
+      "ok": false,
+      "count": 0,
+      "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs"
+    },
+    "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
+      "ok": true,
+      "count": 21,
+      "error": null
+    },
+    "remotive:": {
+      "ok": true,
+      "count": 18,
+      "error": null
+    },
+    "remoteok:": {
+      "ok": true,
+      "count": 99,
+      "error": null
+    },
+    "arbeitnow:": {
+      "ok": true,
+      "count": 325,
+      "error": null
+    },
+    "linkedin:\"software engineer\"": {
+      "ok": false,
+      "count": 0,
+      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=software+engineer&location=India&start=75"
+    },
+    "linkedin:\"full stack developer\"": {
+      "ok": true,
+      "count": 40,
+      "error": null
+    },
+    "linkedin:\"react developer\"": {
+      "ok": true,
+      "count": 40,
+      "error": null
+    },
+    "linkedin:\"python developer\"": {
+      "ok": false,
+      "count": 0,
+      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=python+developer&location=India&start=25"
+    },
+    "linkedin:\"automation engineer\"": {
+      "ok": false,
+      "count": 0,
+      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=automation+engineer&location=India&start=25"
+    },
+    "linkedin:\"ai engineer\"": {
+      "ok": false,
+      "count": 0,
+      "error": "429 Client Error: Too Many Requests for url: https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=ai+engineer&location=India&start=75"
+    },
+    "naukri:\"software engineer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "naukri:\"full stack developer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "naukri:\"react developer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "naukri:\"python developer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "naukri:\"automation engineer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "instahyre:\"software engineer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "instahyre:\"full stack developer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "instahyre:\"react developer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "instahyre:\"python developer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    },
+    "instahyre:\"automation engineer\"": {
+      "ok": true,
+      "count": 0,
+      "error": null
+    }
+  },
+  "jobs": [
+    {
+      "id": "wd-target-/job/Tower-02-Manyata-Embassy-Business-Park-Racenahali--Nagawara-Villages-Outer-Ring-Rd-Bangalore-540065/Sr-Fullstack-Engineer--Advanced-AI_R0000452682",
+      "source": "workday",
+      "company": "target",
+      "title": "Sr Fullstack Engineer- Advanced AI",
+      "location": "Tower 02, Manyata Embassy Business Park, Racenahali & Nagawara Villages. Outer Ring Rd, Bangalore 540065",
+      "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/Tower-02-Manyata-Embassy-Business-Park-Racenahali--Nagawara-Villages-Outer-Ring-Rd-Bangalore-540065/Sr-Fullstack-Engineer--Advanced-AI_R0000452682",
+      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "score": 64,
+      "reasons": [
+        "engineer",
+        "fullstack",
+        "ai"
+      ]
+    },
+    {
+      "id": "wd-intel-/job/India-Bangalore/AI-ML-Technologist_JR0285263",
+      "source": "workday",
+      "company": "intel",
+      "title": "AI/ML Technologist",
+      "location": "India, Bangalore",
+      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
+      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "score": 56,
+      "reasons": [
+        "ai",
+        "ml"
+      ]
+    },
+    {
+      "id": "wd-target-/job/BangaloreIndia/Sr-Engineer---Target-India_R0000453851",
+      "source": "workday",
+      "company": "target",
+      "title": "Sr Engineer - Managed Containers",
+      "location": "Bangalore,India",
+      "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Sr-Engineer---Target-India_R0000453851",
+      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "score": 56,
+      "reasons": [
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "wd-target-/job/BangaloreIndia/Engineer---Dev-Ex_R0000450351",
+      "source": "workday",
+      "company": "target",
+      "title": "Engineer - Dev Ex",
+      "location": "Bangalore,India",
+      "url": "https://target.wd5.myworkdayjobs.com/en-US/targetcareers/job/BangaloreIndia/Engineer---Dev-Ex_R0000450351",
+      "posted": "2026-10-07T07:22:44.894234+00:00",
+      "score": 43,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "an-product-owner-digital-products-ai-hamburg-151254",
+      "source": "arbeitnow",
+      "company": "Boardwise GmbH",
+      "title": "Product Owner Digital Products & AI (m/w/d)",
+      "location": "Remote Hamburg",
+      "url": "https://www.arbeitnow.com/jobs/companies/boardwise-gmbh/product-owner-digital-products-ai-hamburg-151254",
+      "posted": "2026-10-07T05:31:03+00:00",
+      "score": 61,
+      "reasons": [
+        "ai",
+        "llm"
+      ]
+    },
+    {
+      "id": "an-devops-engineer-berlin-317808",
+      "source": "arbeitnow",
+      "company": "Interlead GmbH",
+      "title": "DevOps Engineer (m/w/d)",
+      "location": "Remote Berlin",
+      "url": "https://www.arbeitnow.com/jobs/companies/interlead-gmbh/devops-engineer-berlin-317808",
+      "posted": "2026-10-07T05:31:00+00:00",
+      "score": 56,
+      "reasons": [
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "an-devops-engineer-backend-entwicklerin-berlin-116212",
+      "source": "arbeitnow",
+      "company": "Nitrado (marbis GmbH)",
+      "title": "DevOps Engineer/ Backend Entwickler:in (m/w/d)",
+      "location": "Remote Berlin",
+      "url": "https://www.arbeitnow.com/jobs/companies/nitrado-marbis-gmbh/devops-engineer-backend-entwicklerin-berlin-116212",
+      "posted": "2026-10-07T05:30:57+00:00",
+      "score": 64,
+      "reasons": [
+        "engineer",
+        "backend",
+        "ai"
+      ]
+    },
+    {
+      "id": "gh-8214910",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Software Engineer, Ingestion Platform",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8214910",
+      "posted": "2026-10-07T02:51:00-04:00",
+      "score": 60,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8189317",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Backend Engineer, IAM",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8189317",
+      "posted": "2026-10-07T02:40:51-04:00",
+      "score": 60,
+      "reasons": [
+        "engineer",
+        "backend"
+      ]
+    },
+    {
+      "id": "gh-8237463",
+      "source": "greenhouse",
+      "company": "elastic",
+      "title": "UX Engineer",
+      "location": "Bangalore, India",
+      "url": "https://jobs.elastic.co/jobs?gh_jid=8237463&gh_jid=8237463",
+      "posted": "2026-10-07T02:13:51-04:00",
+      "score": 42,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8194576",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Frontend Engineer, Ads",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8194576",
+      "posted": "2026-10-07T01:51:28-04:00",
+      "score": 59,
+      "reasons": [
+        "engineer",
+        "frontend"
+      ]
+    },
+    {
+      "id": "gh-8258200",
+      "source": "greenhouse",
+      "company": "rubrik",
+      "title": "Software Engineer - Cloud: Azure",
+      "location": "Bangalore ",
+      "url": "https://www.rubrik.com/company/careers/departments/job.8258200?gh_jid=8258200",
+      "posted": "2026-10-07T01:44:29-04:00",
+      "score": 49,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
+      "source": "linkedin",
+      "company": "foundit",
+      "title": ".NET Full stack",
+      "location": "Bangalore Urban, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/net-full-stack-at-foundit-4476555280",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "full stack"
+      ]
+    },
+    {
+      "id": "gh-8139781",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Software Engineer, Content Platform",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8139781",
+      "posted": "2026-10-06T19:12:22-04:00",
+      "score": 53,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8147559",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Front End Software Engineer, Consumer Engineering",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8147559",
+      "posted": "2026-10-06T16:14:08-04:00",
+      "score": 50,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8649994002",
+      "source": "greenhouse",
+      "company": "gitlab",
+      "title": "Public Sector Strategic Account Executive, SLED - Mountain Plains",
+      "location": "Remote, United States",
+      "url": "https://job-boards.greenhouse.io/gitlab/jobs/8649994002",
+      "posted": "2026-10-06T14:49:11-04:00",
+      "score": 45,
+      "reasons": [
+        "ai"
+      ]
+    },
+    {
+      "id": "gh-8256407",
+      "source": "greenhouse",
+      "company": "rubrik",
+      "title": "Software Engineer- SaaS O365",
+      "location": "Bangalore ",
+      "url": "https://www.rubrik.com/company/careers/departments/job.8256407?gh_jid=8256407",
+      "posted": "2026-10-06T13:30:23-04:00",
+      "score": 37,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8198102",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Front End Software Engineer, Media Player",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8198102",
+      "posted": "2026-10-06T13:20:28-04:00",
+      "score": 47,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8250125",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "iOS Software Engineer, Consumer Engineering",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8250125",
+      "posted": "2026-10-06T13:20:28-04:00",
+      "score": 47,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-6469397",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Software Engineer, Ads",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/6469397",
+      "posted": "2026-10-06T13:20:28-04:00",
+      "score": 47,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-6512458",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Software Engineer, Ads",
+      "location": "Remote - Ontario, Canada",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/6512458",
+      "posted": "2026-10-06T13:20:28-04:00",
+      "score": 47,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8172457",
+      "source": "greenhouse",
+      "company": "reddit",
+      "title": "Software Engineer, Consumer Engineering",
+      "location": "Remote - United States",
+      "url": "https://job-boards.greenhouse.io/reddit/jobs/8172457",
+      "posted": "2026-10-06T13:20:28-04:00",
+      "score": 47,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8026211",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Software Engineer, Platform Access (L2)",
+      "location": "Remote - US",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8026211",
+      "posted": "2026-10-06T12:34:32-04:00",
+      "score": 46,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8214470",
+      "source": "greenhouse",
+      "company": "cloudflare",
+      "title": "Performance Engineer, Kernel and Memory",
+      "location": "Hybrid",
+      "url": "https://boards.greenhouse.io/cloudflare/jobs/8214470?gh_jid=8214470",
+      "posted": "2026-10-06T12:03:14-04:00",
+      "score": 28,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7781659",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Applications Engineer 2",
+      "location": "Remote - India",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/7781659",
+      "posted": "2026-10-06T10:28:05-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8114393",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Solution Engineer",
+      "location": "Remote - Singapore",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8114393",
+      "posted": "2026-10-06T10:27:11-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8055481",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Security Engineer, Incident Response",
+      "location": "Remote - United Kingdom",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8055481",
+      "posted": "2026-10-06T10:27:03-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8023560",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Security Engineer, Incident Response",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8023560",
+      "posted": "2026-10-06T10:27:03-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8000178",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Presales Engineer (German Speaking) ",
+      "location": "Remote - United Kingdom",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8000178",
+      "posted": "2026-10-06T10:26:55-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8079801",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Software Engineer L3",
+      "location": "Remote - India",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8079801",
+      "posted": "2026-10-06T10:26:06-04:00",
+      "score": 44,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8157509",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Presales Engineer ",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8157509",
+      "posted": "2026-10-06T10:25:54-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8243073",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Presales Engineer",
+      "location": "Remote - United Kingdom",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8243073",
+      "posted": "2026-10-06T10:25:46-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8239751",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Technical Support Engineer 2",
+      "location": "Remote - India",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8239751",
+      "posted": "2026-10-06T10:25:05-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153701418",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Autosar Communication engineer",
+      "location": "hosur road bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153701418",
+      "posted": "2026-10-06T09:03:42.212000+00:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8855804002",
+      "source": "greenhouse",
+      "company": "databricks",
+      "title": "Strategic Account Executive - Retail vertical ",
+      "location": "Remote - California",
+      "url": "https://databricks.com/company/careers/open-positions/job?gh_jid=8855804002",
+      "posted": "2026-10-06T07:42:56-04:00",
+      "score": 38,
+      "reasons": [
+        "ai"
+      ]
+    },
+    {
+      "id": "sr-744000153674539",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Infrastructure, Automation & Integration Engineer",
+      "location": "hosur road bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153674539",
+      "posted": "2026-10-06T07:05:29.306000+00:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "automation"
+      ]
+    },
+    {
+      "id": "gh-8243101",
+      "source": "greenhouse",
+      "company": "okta",
+      "title": "Site Reliability Engineer",
+      "location": "Bengaluru, India",
+      "url": "https://www.okta.com/company/careers/opportunity/8243101?gh_jid=8243101",
+      "posted": "2026-10-06T03:04:07-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8247206",
+      "source": "greenhouse",
+      "company": "elastic",
+      "title": "Agentic AI Engineer",
+      "location": "Bangalore, India",
+      "url": "https://jobs.elastic.co/jobs?gh_jid=8247206&gh_jid=8247206",
+      "posted": "2026-10-06T01:57:48-04:00",
+      "score": 36,
+      "reasons": [
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
+      "source": "linkedin",
+      "company": "Infosys",
+      "title": "REACTJS DEVELOPER",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/reactjs-developer-at-infosys-4474652620",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 36,
+      "reasons": [
+        "developer",
+        "react"
+      ]
+    },
+    {
+      "id": "gh-8162046",
+      "source": "greenhouse",
+      "company": "pinterest",
+      "title": "Machine Learning Engineer II, Responsible AI",
+      "location": "San Francisco, CA, US; Remote, US",
+      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8162046",
+      "posted": "2026-10-05T20:21:49-04:00",
+      "score": 46,
+      "reasons": [
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "gh-8111979",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3, AI Builder Experience ",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8111979",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 44,
+      "reasons": [
+        "software",
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "gh-8127772",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3, AI Framework Integrations",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8127772",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 44,
+      "reasons": [
+        "software",
+        "engineer",
+        "ai"
+      ]
+    },
+    {
+      "id": "gh-8153125",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Forward Deployed Engineer, Industry Solutions",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8153125",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "engineer",
+        "forward deployed"
+      ]
+    },
+    {
+      "id": "gh-8239047",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7993984",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7993984",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8083366",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8083366",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8208074",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8208074",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7597723",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Software Engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7597723",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8143980",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Application Engineer",
+      "location": "Bengaluru",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8143980",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8184637",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Cloud Operations Engineer",
+      "location": "Bengaluru",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8184637",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8122751",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Engineer 3 - Business Systems",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8122751",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7943868",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Engineer 3 - GTM Tech",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7943868",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7779016",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Salesforce CPQ engineer 3",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7779016",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8170631",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Technical Services Engineer",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170631",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8170628",
+      "source": "greenhouse",
+      "company": "mongodb",
+      "title": "Technical Services Engineer",
+      "location": "Gurugram",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8170628",
+      "posted": "2026-10-05T19:30:53-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153588459",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "HiL Test Engineer",
+      "location": "bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153588459",
+      "posted": "2026-10-05T18:30:28.401000+00:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8231071",
+      "source": "greenhouse",
+      "company": "pinterest",
+      "title": "Sr Software Engineer, Monetization Engineering",
+      "location": "San Francisco, CA; Palo Alto, CA; Seattle, WA; New York, NY; Remote, US",
+      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8231071",
+      "posted": "2026-10-05T17:10:51-04:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8227344",
+      "source": "greenhouse",
+      "company": "pinterest",
+      "title": "Software Engineer II, Monetization Engineering ",
+      "location": "San Francisco, CA; Palo Alto, CA; Seattle, WA; New York, NY; Remote, US",
+      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8227344",
+      "posted": "2026-10-05T16:42:04-04:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8015547",
+      "source": "greenhouse",
+      "company": "pinterest",
+      "title": "Security Software Engineer II, Detection and Response",
+      "location": "San Francisco, CA, US; Remote, US",
+      "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8015547",
+      "posted": "2026-10-05T16:37:04-04:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-6137958004",
+      "source": "greenhouse",
+      "company": "vercel",
+      "title": "Software Engineer - Next.js",
+      "location": "Hybrid - San Francisco, New York City",
+      "url": "https://job-boards.greenhouse.io/vercel/jobs/6137958004",
+      "posted": "2026-10-05T16:04:42-04:00",
+      "score": 44,
+      "reasons": [
+        "software",
+        "engineer",
+        "next",
+        "next.js"
+      ]
+    },
+    {
+      "id": "gh-8859063002",
+      "source": "greenhouse",
+      "company": "gitlab",
+      "title": "Support Engineer, U.S. Government Support ",
+      "location": "Remote, United States",
+      "url": "https://job-boards.greenhouse.io/gitlab/jobs/8859063002",
+      "posted": "2026-10-05T15:24:21-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8207137",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Delivery Engineer",
+      "location": "Singapore (Hybrid)",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8207137",
+      "posted": "2026-10-05T15:20:13-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8162414",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Software Engineer, Distributed Systems ",
+      "location": "San Francisco, US (Hybrid)",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8162414",
+      "posted": "2026-10-05T15:20:12-04:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8201470",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Marketing Systems Engineer",
+      "location": "New York City, US (Hybrid)",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8201470",
+      "posted": "2026-10-05T15:20:12-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8194551",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Marketing Systems Engineer",
+      "location": "San Francisco, US (Hybrid)",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8194551",
+      "posted": "2026-10-05T15:20:12-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8142657",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Customer Engineer ",
+      "location": "New York City, US (Remote) ",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142657",
+      "posted": "2026-10-05T15:20:10-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8142661",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Customer Engineer ",
+      "location": "Remote, US (Remote) ",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8142661",
+      "posted": "2026-10-05T15:20:10-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8124207",
+      "source": "greenhouse",
+      "company": "mixpanel",
+      "title": "Delivery Engineer, EMEA ",
+      "location": "London, UK (Hybrid)",
+      "url": "https://job-boards.greenhouse.io/mixpanel/jobs/8124207",
+      "posted": "2026-10-05T15:20:10-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8164649",
+      "source": "greenhouse",
+      "company": "cloudflare",
+      "title": "Technical Support Engineer, Application Performance",
+      "location": "Hybrid",
+      "url": "https://boards.greenhouse.io/cloudflare/jobs/8164649?gh_jid=8164649",
+      "posted": "2026-10-05T14:31:59-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153495804",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Oracle SQL developer",
+      "location": "bengaluru, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153495804",
+      "posted": "2026-10-05T13:12:40.415000+00:00",
+      "score": 23,
+      "reasons": [
+        "developer"
+      ]
+    },
+    {
+      "id": "ro-1137465",
+      "source": "remoteok",
+      "company": "RedMimicry",
+      "title": "Platform and Integration Engineer Security Telemetry",
+      "location": "Remote ",
+      "url": "https://remoteOK.com/remote-jobs/remote-platform-and-integration-engineer-security-telemetry-redmimicry-1137465",
+      "posted": "2026-10-05T13:00:02+00:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8250423",
+      "source": "greenhouse",
+      "company": "samsara",
+      "title": "Data Engineer",
+      "location": "Remote - Canada",
+      "url": "https://www.samsara.com/company/careers/roles/8250423?gh_jid=8250423",
+      "posted": "2026-10-05T12:47:28-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8141959",
+      "source": "greenhouse",
+      "company": "samsara",
+      "title": "Data Engineer",
+      "location": "Remote - US",
+      "url": "https://www.samsara.com/company/careers/roles/8141959?gh_jid=8141959",
+      "posted": "2026-10-05T12:47:26-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7996774",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Machine Learning Engineer",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/7996774",
+      "posted": "2026-10-05T10:32:44-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8007455",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Machine Learning Engineer",
+      "location": "Remote - Spain",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8007455",
+      "posted": "2026-10-05T10:32:25-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8102950",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Software Development Engineer (L3)",
+      "location": "Remote - Colombia",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8102950",
+      "posted": "2026-10-05T10:30:51-04:00",
+      "score": 41,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8108771",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "DevOps Engineer (Observability)",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8108771",
+      "posted": "2026-10-05T10:30:22-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8140436",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Technical Support Engineer 2",
+      "location": "Remote - Colombia",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8140436",
+      "posted": "2026-10-05T10:29:11-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8244723",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Technical Support Engineer 2",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8244723",
+      "posted": "2026-10-05T10:28:46-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8204407",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Technical Support Engineer",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8204407",
+      "posted": "2026-10-05T10:27:28-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8208126",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Technical Support Engineer",
+      "location": "Remote - Ireland",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8208126",
+      "posted": "2026-10-05T10:27:25-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-8207696",
+      "source": "greenhouse",
+      "company": "twilio",
+      "title": "Technical Support Engineer",
+      "location": "Remote - Estonia",
+      "url": "https://job-boards.greenhouse.io/twilio/jobs/8207696",
+      "posted": "2026-10-05T10:27:03-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153459179",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Purchase Specialist \u2013 MLFF (Multi-Lane Free Flow) Tolling Systems_MPIN",
+      "location": "Bengaluru, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153459179",
+      "posted": "2026-10-05T10:14:57.708000+00:00",
+      "score": 23,
+      "reasons": [
+        "ml"
+      ]
+    },
+    {
+      "id": "gh-7487353",
+      "source": "greenhouse",
+      "company": "datadog",
+      "title": "Enterprise Sales Engineer - UK/Ireland",
+      "location": "Dublin, Ireland; United Kingdom, Remote",
+      "url": "https://careers.datadoghq.com/detail/7487353/?gh_jid=7487353",
+      "posted": "2026-10-05T09:49:08-04:00",
+      "score": 33,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153452540",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "IN_RBAI_Process owner_Dispensing (Conformal coating ,TIM printing) and PCBA cleaning process",
+      "location": "bengaluru, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153452540",
+      "posted": "2026-10-05T09:47:58.713000+00:00",
+      "score": 28,
+      "reasons": [
+        "ai"
+      ]
+    },
+    {
+      "id": "gh-8238758",
+      "source": "greenhouse",
+      "company": "cloudflare",
+      "title": "Digital Presales Customer Engineer",
+      "location": "Hybrid",
+      "url": "https://boards.greenhouse.io/cloudflare/jobs/8238758?gh_jid=8238758",
+      "posted": "2026-10-05T08:52:44-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "wd-intel-/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
+      "source": "workday",
+      "company": "intel",
+      "title": "Software Application Development Engineer",
+      "location": "India, Bangalore",
+      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
+      "posted": "2026-10-05T07:22:44.894234+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "engineer"
+      ]
+    },
+    {
+      "id": "wd-intel-/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
+      "source": "workday",
+      "company": "intel",
+      "title": "Memory Electrical Validation Engineer",
+      "location": "India, Bangalore",
+      "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
+      "posted": "2026-10-05T07:22:44.894234+00:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153410028",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Design for Environment - Regulatory Product/ Material Compliance Engineer",
+      "location": "bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153410028",
+      "posted": "2026-10-05T06:26:05.400000+00:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153409949",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "SAP SD consultant for Application support and Maintenance",
+      "location": "bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153409949",
+      "posted": "2026-10-05T06:25:09.938000+00:00",
+      "score": 28,
+      "reasons": [
+        "ai"
+      ]
+    },
+    {
+      "id": "sr-744000153404468",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Cost Engineering & Benchmarking",
+      "location": "bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153404468",
+      "posted": "2026-10-05T05:25:14.335000+00:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "rm-2091149",
+      "source": "remotive",
+      "company": "CodeForAI",
+      "title": "Software Engineer / AI Code Trainer (Python, Web, Full Stack)",
+      "location": "Remote USA, UK, India, Australia, Ireland, New Zealand, Philippines, Pakistan, Singapore, Mexico",
+      "url": "https://remotive.com/remote-jobs/software-development/software-engineer-ai-code-trainer-python-web-full-stack-2091149",
+      "posted": "2026-10-05T05:15:43+00:00",
+      "score": 100,
+      "reasons": [
+        "software",
+        "engineer",
+        "full stack",
+        "python",
+        "ai",
+        "react",
+        "node.js",
+        "javascript",
+        "typescript",
+        "api"
+      ]
+    },
+    {
+      "id": "sr-744000153402679",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "IN_Bosch Rexroth India_Engineer / Executive_Logistics (Imports)",
+      "location": "Bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153402679",
+      "posted": "2026-10-05T04:34:55.979000+00:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "gh-7960365",
+      "source": "greenhouse",
+      "company": "samsara",
+      "title": "Product Support Engineer III-1",
+      "location": "Bengaluru - BLR1",
+      "url": "https://www.samsara.com/company/careers/roles/7960365?gh_jid=7960365",
+      "posted": "2026-10-05T03:48:35-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
+      "source": "linkedin",
+      "company": "Citi",
+      "title": "Java Full Stack Developer",
+      "location": "Pune Division, Maharashtra, India",
+      "url": "https://in.linkedin.com/jobs/view/java-full-stack-developer-at-citi-4474624828",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 31,
+      "reasons": [
+        "developer",
+        "full stack"
+      ]
+    },
+    {
+      "id": "gh-7579269",
+      "source": "greenhouse",
+      "company": "cloudflare",
+      "title": "Vulnerability Management Engineer",
+      "location": "Hybrid",
+      "url": "https://boards.greenhouse.io/cloudflare/jobs/7579269?gh_jid=7579269",
+      "posted": "2026-10-04T17:39:09-04:00",
+      "score": 23,
+      "reasons": [
+        "engineer"
+      ]
+    },
+    {
+      "id": "sr-744000153374499",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "IN_RBAI_Process owner_Milling and Plasma cleaning process",
+      "location": "Bengaluru, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153374499",
+      "posted": "2026-10-04T14:22:41.564000+00:00",
+      "score": 28,
+      "reasons": [
+        "ai"
+      ]
+    },
+    {
+      "id": "sr-744000153372859",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "Software Developer",
+      "location": "hosur road bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153372859",
+      "posted": "2026-10-04T13:16:38.537000+00:00",
+      "score": 31,
+      "reasons": [
+        "software",
+        "developer"
+      ]
+    },
+    {
+      "id": "sr-744000153373138",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "VM-OS_ALM_DNG_Developer",
+      "location": "bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153373138",
+      "posted": "2026-10-04T13:08:30.305000+00:00",
+      "score": 23,
+      "reasons": [
+        "developer"
+      ]
+    },
+    {
+      "id": "sr-744000153372868",
+      "source": "smartrecruiters",
+      "company": "BoschGroup",
+      "title": "MS_EMT2-VM_VSCODE_Developer",
+      "location": "bangalore, IN",
+      "url": "https://jobs.smartrecruiters.com/BoschGroup/744000153372868",
+      "posted": "2026-10-04T13:03:35.609000+00:00",
+      "score": 23,
+      "reasons": [
+        "developer"
+      ]
+    }
+  ]
 }
