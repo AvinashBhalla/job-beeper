@@ -74,7 +74,9 @@
       "javascript_typescript"
     ],
     "search_from_filters": true,
-    "notifications_enabled": true
+    "notifications_enabled": true,
+    "web_discovery_enabled": true,
+    "web_discovery_results": 8
   },
   "apify": {
     "enabled": true,
