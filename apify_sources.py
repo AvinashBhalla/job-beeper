@@ -103,15 +103,14 @@ def _run(actor, payload):
     return data
 
 def linkedin(cfg, keyword):
+    # axiomworks/linkedin-jobs-scraper accepts a keyword string, location,
+    # includeDetails and maxResults. Keep the payload to documented fields.
     payload = {
-        "searchQueries": [keyword],
+        "keywords": keyword,
         "location": cfg.get("location", "India"),
-        "maxJobsPerQuery": int(cfg.get("max_jobs_per_query", 50)),
+        "includeDetails": True,
+        "maxResults": int(cfg.get("max_jobs_per_query", 50)),
     }
-    if cfg.get("date_posted"):
-        payload["datePosted"] = cfg["date_posted"]
-    if cfg.get("work_type"):
-        payload["workType"] = cfg["work_type"]
     actor = cfg["actors"]["linkedin"]
     return [j for j in (_job("linkedin", x) for x in _run(actor, payload)) if j]
 
