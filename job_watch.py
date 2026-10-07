@@ -489,6 +489,11 @@ def main():
 
     alerts = []
     dashboard_jobs = []
+    # Fetch job descriptions concurrently. The old implementation fetched each
+    # uncached JD serially, which made one slow source page block the whole run.
+    candidates = []
+    pending_enrichment = []
+
     for name, arg, jobs, err in results:
         key = source_key(name, arg)
         provider = "apify" if use_apify and name in APIFY_BOARD_SOURCES else "direct"
@@ -517,6 +522,7 @@ def main():
         }
         silent = ((not exists) or key not in known_sources or previous_generation != SOURCE_GENERATION)
         known_sources.add(key)
+
         for j in jobs:
             j["source"] = name
             if not passes(j, f):
@@ -530,46 +536,57 @@ def main():
             cache_fresh = bool(cached) and retry_cached_at and (NOW - retry_cached_at).total_seconds() < 24 * 3600
 
             if cached and (cached.get("jd_enriched") or cache_fresh):
-                enriched = cached
+                candidates.append((name, j, silent, cached))
             else:
-                enriched = enrich_job(j)
-                jd_cache[j["id"]] = {
-                    "description": enriched.get("description", ""),
-                    "experience": enriched.get("experience"),
-                    "skills_detected": enriched.get("skills_detected", []),
-                    "work_mode": enriched.get("work_mode", "Not specified"),
-                    "jd_location": enriched.get("jd_location") or j.get("location", ""),
-                    "jd_enriched": enriched.get("jd_enriched", False),
-                    "attempted_at": NOW.isoformat(),
-                }
+                pending_enrichment.append((name, j, silent))
 
-            j.update({
-                "desc": enriched.get("description") or j.get("desc", ""),
+    def enrich_pending(item):
+        name, j, silent = item
+        return name, j, silent, enrich_job(j)
+
+    if pending_enrichment:
+        with ThreadPoolExecutor(max_workers=min(12, len(pending_enrichment))) as pool:
+            enriched_results = list(pool.map(enrich_pending, pending_enrichment))
+        for name, j, silent, enriched in enriched_results:
+            jd_cache[j["id"]] = {
                 "description": enriched.get("description", ""),
                 "experience": enriched.get("experience"),
                 "skills_detected": enriched.get("skills_detected", []),
                 "work_mode": enriched.get("work_mode", "Not specified"),
                 "jd_location": enriched.get("jd_location") or j.get("location", ""),
                 "jd_enriched": enriched.get("jd_enriched", False),
-                "_enrichment_complete": True,
-            })
+                "attempted_at": NOW.isoformat(),
+            }
+            candidates.append((name, j, silent, enriched))
 
-            if not passes(j, f):
-                if j["id"] in seen:
-                    continue
-                seen.add(j["id"])
-                continue
+    for name, j, silent, enriched in candidates:
+        j.update({
+            "desc": enriched.get("description") or j.get("desc", ""),
+            "description": enriched.get("description", ""),
+            "experience": enriched.get("experience"),
+            "skills_detected": enriched.get("skills_detected", []),
+            "work_mode": enriched.get("work_mode", "Not specified"),
+            "jd_location": enriched.get("jd_location") or j.get("location", ""),
+            "jd_enriched": enriched.get("jd_enriched", False),
+            "_enrichment_complete": True,
+        })
 
-            score, reasons = score_job(j, f)
-            dashboard_jobs.append(serial_job(j, name, score, reasons))
-
+        if not passes(j, f):
             if j["id"] in seen:
                 continue
             seen.add(j["id"])
-            if (not silent and f.get("notifications_enabled", True) and
-                    os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
-                notify(j, score, reasons)
-                alerts.append(j["id"])
+            continue
+
+        score, reasons = score_job(j, f)
+        dashboard_jobs.append(serial_job(j, name, score, reasons))
+
+        if j["id"] in seen:
+            continue
+        seen.add(j["id"])
+        if (not silent and f.get("notifications_enabled", True) and
+                os.environ.get("TG_TOKEN") and os.environ.get("TG_CHAT_ID")):
+            notify(j, score, reasons)
+            alerts.append(j["id"])
 
     dashboard_jobs.sort(key=lambda x: (x["score"] or 0, x["posted"] or ""), reverse=True)
     unique = {}
