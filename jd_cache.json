@@ -949,6 +949,25 @@
     ],
     "work_mode": "Not specified"
   },
+  "nk-nk-051026039873": {
+    "attempted_at": "2026-10-07T12:39:20.418443+00:00",
+    "description": "responsibilities develop high-quality javascript (es6) code for react applications. coordinate with backend engineers to establish and integrate json-based apis. optimize applications for maximum speed, performance, and browser compatibility. integrate third-party dependencies and troubleshoot dependency conflicts. multitask effectively while maintaining a positive attitude and a client-first mentality. incorporate engineering best practices, methodologies, and standards into all deliverables. pay close attention to detail and follow specifications and ui/ux mockups to deliver pixel-perfect interfaces. identify ui/ux issues and provide recommendations for improvement. requirements strong understanding of web application development. strong experience with react, javascript (es6), and css3. good experience with react or react native and redux. experience building complex features and interfaces for react applications. familiarity with restful apis. experience with version control tools such as git and package management tools such as npm. deep understanding of data structures, data flow, ajax, and crud operations. solid knowledge of modern web application development practices. excellent spoken and written english. 2-4 yrs frontend development, javascript, react.js, redux, react native, restful apis, front end, rest",
+    "experience": {
+      "label": "2-4 years",
+      "max": 4,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, India",
+    "skills_detected": [
+      "javascript",
+      "react",
+      "react native",
+      "git"
+    ],
+    "work_mode": "Not specified"
+  },
   "nk-nk-051026500234": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "your role as a software developer, you will be instrumental in designing, developing, and maintaining robust software solutions for a global client base, including tier 1 banks and fortune 100 companies. this role demands strong problem-solving abilities, excellent communication skills, and adaptability in a dynamic, fast-paced environment. you will work as part of an agile team responsible for the end-to-end product development lifecycle, including: - business analysis solutioning : interpreting business requirements and contributing to effective product solutions. - architecture design : applying modern software engineering principles and design patterns to create scalable and maintainable systems. - development integration : writing clean, efficient code and integrating solutions using current and emerging technologies, following best practices, focusing on scalability, performance, and security. your contribution design and deliver innovative solutions that: simplify complex business processes enhance organizational efficiency through intelligent automation eliminate repetitive manual tasks, empowering teams to focus on higher-value work provide ion s clients with a competitive edge through cutting-edge product innovation tackle complex challenges: analyze and resolve intricate technical and business problems, while effectively communicating solutions to internal teams and ion clients. drive automation: streamline and automate sophisticated business workflows, delivering measurable impact and value to client operations. bring ideas technical innovation: bring fresh ideas to the team on technologies, tools, or features that can enhance the product and/or process. stay updated with emerging trends in software engineering and evaluate their relevance to ongoing projects. share innovative solutions to technical challenges that can improve product quality, scalability, or usability. bring ideas technical innovation: bring fresh ideas to the team on technologies, tools, or features that can enhance the product and/or process. stay updated with emerging trends in software engineering and evaluate their relevance to ongoing projects. share innovative solutions to technical challenges that can improve product quality, scalability, or usability. your growth you will collaborate closely with ion product teams and clients, gaining expertise in the following areas: in-depth knowledge development: a broad spectrum of technologies, development methodologies, and processes essential for building complex, mission-critical systems using distributed architectures. the financial domain, enabling the creation of world-class products. the end-to-end software product development lifecycle. technical expertise: develop a strong foundation in core technologies and stay ahead of the curve in a rapidly evolving tech landscape by working alongside subject matter experts. cultural and personal growth: thrive in an imaginative and positive work culture that values: passion: a drive to innovate and excel. expressiveness: the ability to communicate ideas clearly and creatively. intelligence: a commitment to continuous learning and smart problem-solving. our company: we re a diverse group of visionary innovators who provide trading and workflow automation software, high-value analytics, and strategic consulting to corporations, central banks, financial institutions, and governments. founded in 1999, we ve achieved tremendous growth by bringing together some of the best and most successful financial technology companies in the world. learn more at iongroup.com . we may use artificial intelligence (ai) tools to support parts of the hiring process, such as reviewing applications, analyzing resumes, or assessing responses and identifying potential inconsistencies or verification signals in application materials based on available information. these tools assist our recruitment team but do not replace human judgment. final hiring decisions are ultimately made by humans. if you would like more information about how your data is processed, please contact us. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 1-5 yrs product quality, automation, leadership development, business analysis, product innovation, artificial intelligence, agile, workflow",
@@ -1563,6 +1582,30 @@
       "node",
       "mysql",
       "mongodb"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-071026502658": {
+    "attempted_at": "2026-10-07T12:39:20.418443+00:00",
+    "description": "job summary rubrik software engineers are self-starters, driven, and can manage themselves. we believe in giving engineers responsibility, not tasks. our goal is to motivate and challenge people to do their best work. bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history! responsibilities build software using your strong background in distributed systems and cloud. design, develop, test, deploy, maintain and improve the software. manage individual projects priorities, deadlines and deliverables with your technical expertise. requirements bachelor's or master's degree or equivalent in computer science or related field 0-2 years of relevant work experience proficiency in one or more general purpose programming languages like go, java, c/c++, scala, python experience with aws/azure/gcp or other public cloud technologies is a plus knowledge of docker, containers, kubernetes, microservice architectures is a plus excellent problem-solving skills and attention to detail strong understanding of system development life cycle (sdlc) methodology, design patterns, and software engineering principles strong collaboration and communication skills. ability to work independently or as part of a team on complex, time-sensitive projects disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 0-2 yrs kubernetes, python, ai, auditing, programming languages, cloud technologies, docker, labor laws",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, India",
+    "skills_detected": [
+      "python",
+      "java",
+      "c++",
+      "go",
+      "aws",
+      "gcp",
+      "azure",
+      "docker",
+      "kubernetes"
     ],
     "work_mode": "Not specified"
   },

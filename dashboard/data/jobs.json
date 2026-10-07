@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-10-07T12:20:17.370953+00:00",
-  "last_run": "2026-10-07T12:20:17.370953+00:00",
-  "new_alerts": 5,
+  "updated_at": "2026-10-07T12:39:20.418443+00:00",
+  "last_run": "2026-10-07T12:39:20.418443+00:00",
+  "new_alerts": 2,
   "source_status": {
     "greenhouse:\"groww\"": {
       "ok": true,
@@ -29,7 +29,7 @@
     },
     "greenhouse:\"cloudflare\"": {
       "ok": true,
-      "count": 420,
+      "count": 421,
       "error": null,
       "provider": "direct"
     },
@@ -71,7 +71,7 @@
     },
     "greenhouse:\"okta\"": {
       "ok": true,
-      "count": 372,
+      "count": 373,
       "error": null,
       "provider": "direct"
     },
@@ -101,13 +101,13 @@
     },
     "greenhouse:\"twilio\"": {
       "ok": true,
-      "count": 130,
+      "count": 131,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"zscaler\"": {
       "ok": true,
-      "count": 363,
+      "count": 365,
       "error": null,
       "provider": "direct"
     },
@@ -149,7 +149,7 @@
     },
     "greenhouse:\"asana\"": {
       "ok": true,
-      "count": 98,
+      "count": 99,
       "error": null,
       "provider": "direct"
     },
@@ -215,7 +215,7 @@
     },
     "greenhouse:\"newrelic\"": {
       "ok": true,
-      "count": 48,
+      "count": 47,
       "error": null,
       "provider": "direct"
     },
@@ -416,8 +416,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/walmartexternal/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T17:40:17.370953+00:00",
-      "failures": 5
+      "retry_at": "2026-10-07T18:39:20.418443+00:00",
+      "failures": 6
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
@@ -430,8 +430,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T18:20:17.370953+00:00",
-      "failures": 8
+      "retry_at": "2026-10-07T18:39:20.418443+00:00",
+      "failures": 9
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -450,8 +450,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T18:20:17.370953+00:00",
-      "failures": 8
+      "retry_at": "2026-10-07T18:39:20.418443+00:00",
+      "failures": 9
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
       "ok": true,
@@ -542,284 +542,280 @@
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Avature:": {
-      "ok": false,
-      "count": 0,
-      "error": "No results found.",
-      "provider": "direct",
-      "retry_at": "2026-10-07T12:40:17.370953+00:00",
-      "failures": 1
+      "ok": true,
+      "count": 2,
+      "error": null,
+      "provider": "direct"
     },
     "web:BambooHR:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T12:40:17.370953+00:00",
-      "failures": 1
+      "retry_at": "2026-10-07T13:19:20.418443+00:00",
+      "failures": 2
     },
     "web:Breezy:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Cutshort:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Darwinbox:": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null,
-      "provider": "direct"
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-07T12:59:20.418443+00:00",
+      "failures": 1
     },
     "web:Eightfold AI:": {
-      "ok": true,
+      "ok": false,
       "count": 0,
-      "error": null,
-      "provider": "direct"
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-07T12:59:20.418443+00:00",
+      "failures": 1
     },
     "web:Freshteam:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Greenhouse:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Hireology:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Hirist:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:HRsmart:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:iCIMS:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Instahyre:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Jibe (iCIMS):": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Jobvite:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Keka:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Lever:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:LinkedIn:": {
-      "ok": false,
-      "count": 0,
-      "error": "No results found.",
-      "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "ok": true,
+      "count": 2,
+      "error": null,
+      "provider": "direct"
     },
     "web:Naukri:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Oracle Cloud Recruiting:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Paycom:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:PeopleStrong:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Phenom People:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Recruitee:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Rippling ATS:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:SmartRecruiters:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:SAP SuccessFactors:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Oracle Taleo:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Teamtailor:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:UKG Pro / UltiPro:": {
-      "ok": false,
-      "count": 0,
-      "error": "No results found.",
-      "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "ok": true,
+      "count": 1,
+      "error": null,
+      "provider": "direct"
     },
     "web:Wellfound:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Workable:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Workday:": {
       "ok": false,
       "count": 0,
-      "error": "No results found.",
+      "error": "error sending request for url (https://www.google.com/wml/search?q=%28%22software+engineer%22+OR+%22software+developer%22+OR+%22full+stack+developer%22+OR+%22frontend+developer%22+OR+%22backend+developer%22+OR+%22react+developer%22+OR+%22python+developer%22+OR+%22automation+engineer%22%29+%28%22bengaluru%22+OR+%22bangalore%22+OR+%22gurugram%22+OR+%22gurgaon%22+OR+%22delhi%22+OR+%22remote+india%22+OR+%22remote%22+OR+%22india%22%29+%28site%3Amyworkdayjobs.com%29&sca_esv=1&filter=1&start=0&hl=en-IN&lr=lang_en&cr=countryIN&tbs=qdr%3Aw) > operation timed out",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Y Combinator:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "retry_at": "2026-10-07T13:59:20.418443+00:00",
+      "failures": 3
     },
     "web:Zoho Recruit:": {
-      "ok": false,
-      "count": 0,
-      "error": "No results found.",
-      "provider": "direct",
-      "retry_at": "2026-10-07T13:00:17.370953+00:00",
-      "failures": 2
+      "ok": true,
+      "count": 1,
+      "error": null,
+      "provider": "direct"
     }
   },
   "jobs": [
@@ -912,7 +908,7 @@
       "jd_location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/software-engineering-specialist-python-fullstack-at-ge-vernova-4475425340",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 82,
+      "score": 81,
       "reasons": [
         "software engineer",
         "fullstack",
@@ -926,9 +922,9 @@
       ],
       "description": "<strong>Job Description Summary<br><br></strong>We are seeking a highly capable Full Stack Software Engineer to design, build, and maintain scalable features across the frontend UI and Python backend of our enterprise SaaS platform. This role requires a hands on engineer who is comfortable owning end to end delivery from user facing functionality and API design to backend logic, data access, testing, and deployment support.<br><br>The ideal candidate brings strong engineering fundamentals, solid full stack development experience, and the ability to work e\ufb00ectively in a modern cloud based product environment. This role is intended for someone who can contribute independently, write production quality code, and operate with a strong sense of ownership, quality, and accountability.<br><br>including activities such as requirement analysis, documentation/procedures and implementation.<br><br><strong>Job Description<br><br></strong>Key Responsibilities<br><br>Build, maintain, and enhance end to end product features across frontend, backend, and data layers<br><br>Develop robust, reusable, and maintainable UI components using modern frontend technologies, preferably Angular<br><br>Develop backend services and APIs in Python, ensuring scalability, reliability, security, and maintainability<br><br>Design, build, and optimize REST APIs for internal and external product integrations<br><br>Translate product and technical requirements into high quality, production ready software solutions<br><br>Write clean, testable, and well documented code that adheres to engineering standards and best practices<br><br>Create and maintain unit and integration tests to improve reliability and reduce regression risk<br><br>Troubleshoot application issues across the full stack and support root cause analysis for defects and production issues<br><br>Contribute to CI/CD work\ufb02ows, build pipelines, and deployment readiness activities<br><br>Work closely with senior engineers, product managers, QA, and cross functional partners to deliver roadmap commitments<br><br>Participate actively in code reviews, sprint planning, estimation, retrospectives, and Agile delivery processes using Azure DevOps<br><br>Use AI assisted development tools such as <strong>GitHub Copilot </strong>and <strong>Claude Code </strong>responsibly to improve productivity in coding, refactoring, documentation, and testing work\ufb02ows<br><br><strong>Required Technical Skills<br><br></strong>Strong pro\ufb01ciency in modern frontend and UI development, preferably Angular, including component based architecture, TypeScript, and responsive web development<br><br>Strong pro\ufb01ciency in <strong>Python </strong>backend development, with hands on experience building and maintaining production grade services or APIs<br><br>Demonstrated experience designing, developing, and consuming <strong>REST APIs<br><br></strong>Strong working knowledge of <strong>SQL </strong>and relational databases, including schema design, query optimization, and data access patterns<br><br>Hands on experience writing <strong>unit and integration tests </strong>as part of standard development practice<br><br>Familiarity with software design principles, code modularity, and maintainable application architecture<br><br>Experience working with <strong>Git </strong>based version control in collaborative development environments Experience working in <strong>Agile and Scrum </strong>delivery teams using tools such as <strong>Azure DevOps<br><br></strong>Familiarity with AI assisted development tools such as <strong>GitHub Copilot </strong>and <strong>Claude Code</strong>, and the ability to use them e\ufb00ectively in development work\ufb02ows<br><br><strong>Preferred Skills And Experience<br><br></strong>Experience with <strong>Angular </strong>in enterprise scale applications strongly preferred Exposure to <strong>Java </strong>backend development is a plus<br><br>Working knowledge of <strong>AWS </strong>services such as EC2, Lambda, S3, or API Gateway Familiarity with <strong>Docker </strong>and containerized application development<br><br>Experience with <strong>CI/CD pipelines </strong>and automated build and deployment work\ufb02ows Exposure to automated UI testing tools such as <strong>Selenium<br><br></strong>Experience developing software in enterprise SaaS, B2B, or cloud native product environments<br><br>Understanding of secure coding practices, performance optimization, and production support expectations<br><br>Interest in growing into a senior full stack, technical lead, or architecture focused role<br><br>Qualification &amp; Years of Experience<br><br><strong>1 to 2 years </strong>of professional software engineering experience in full stack product development environments. For roles outside USA: Bachelor's Degree in Computer Science or \u201cSTEM\u201d Majors (Science, Technology, Engineering and Math) with basic experience.<br><br>Technology Stack Expertise<br><br>Frontend and UI<br><br>Angular preferred, React or Vue also considered, TypeScript, HTML, CSS<br><br>Backend<br><br>Python (primary), Java (good to have)<br><br>API Development<br><br>REST APIs<br><br>Database<br><br>SQL and relational databases (must have), NoSQL databases such as MongoDB or DynamoDB (working knowledge)<br><br>Cloud and DevOps<br><br>AWS fundamentals, Docker, CI/CD<br><br>Engineering Tools<br><br>Git, Azure DevOps<br><br>Testing<br><br>Unit testing, integration testing, exposure to Selenium or similar UI automation tools<br><br>Modern Development Tooling<br><br>AI assisted development tools such as GitHub Copilot and Claude Code<br><br>Candidate Expectations<br><br>Demonstrates strong ownership and the ability to deliver features with limited supervision<br><br>Writes high quality, maintainable code and takes testing seriously as part of engineering discipline<br><br>Comfortable working across multiple layers of the application stack rather than specializing narrowly in only frontend or backend<br><br>Able to communicate clearly with technical and non technical stakeholders Shows sound judgment, attention to detail, and a problem solving mindset<br><br>Open to feedback, continuous learning, and adoption of modern development practices<br><br><strong><strong><strong>Additional Information<br><br></strong></strong></strong><strong>Relocation Assistance Provided: </strong>Yes",
       "experience": {
-        "min": 1,
-        "max": 2,
         "label": "1-2 years",
+        "max": 2,
+        "min": 1,
         "source": "job_description"
       },
       "skills_detected": [
@@ -958,7 +954,7 @@
       "jd_location": "Chennai, India",
       "url": "https://www.naukri.com/job-listings-frontend-developer-react-js-node-js-cafs-infotech-chennai-1-to-5-years-071026501970",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 75,
+      "score": 74,
       "reasons": [
         "frontend developer",
         "frontend",
@@ -991,7 +987,7 @@
       "jd_location": "Hyderabad, Chennai, Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-automation-engineer-pwc-hyderabad-chennai-bengaluru-2-to-4-years-071026023451",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 74,
+      "score": 73,
       "reasons": [
         "automation engineer",
         "automation",
@@ -1037,7 +1033,7 @@
       "jd_location": "Chennai, India",
       "url": "https://www.naukri.com/job-listings-backend-developer-node-js-mongodb-mysql-cafs-infotech-chennai-0-to-1-years-071026502167",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 70,
+      "score": 69,
       "reasons": [
         "backend developer",
         "backend",
@@ -1071,7 +1067,7 @@
       "jd_location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 66,
+      "score": 65,
       "reasons": [
         "full stack",
         "react",
@@ -1113,7 +1109,7 @@
       "jd_location": "ahmedabad responsibilities build and maintain web applications, apis and integrations for client pro",
       "url": "https://www.naukri.com/job-listings-software-developer-expert-web-designing-ahmedabad-1-to-6-years-071026502903",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 66,
+      "score": 65,
       "reasons": [
         "software developer",
         "react",
@@ -1126,9 +1122,9 @@
       ],
       "description": "job summary we build custom software for growing businesses, including crms, erps, project and operations systems, customer portals and workflow automations, often with ai features inside. we are looking for a software developer who is genuinely good with modern ai coding tools and uses them to design, build, test and document faster. just as important, you understand the code you ship, review ai output carefully, and care about security, performance and clean structure, so that our software scales as our clients grow. location: ahmedabad responsibilities build and maintain web applications, apis and integrations for client projects. use ai coding tools such as github copilot, cursor, claude or chatgpt to speed up development, testing and documentation. add ai features to products using llm apis, for example document reading, chat assistants and summaries. design databases and connect software with payment gateways, whatsapp, sms, email and other systems. review code, including ai-generated code, for security, performance and readability. write tests, fix bugs and support deployments. work with clients and the team to turn business requirements into working features. requirements 1+ year of professional development experience (strong freshers with real projects can apply). good knowledge of php / laravel or node.js, plus javascript and a frontend framework such as react or vue. solid sql and database design basics; experience with rest apis. daily, effective use of ai coding assistants, and the judgement to know when their output is wrong. experience with, or strong interest in, llm apis such as openai, claude or gemini and automation tools. git, clean code habits and basic security awareness. clear communication and ownership of your work. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 1-6 yrs cursor, digital marketing, copilot, github, business requirements, ai, js, javascript",
       "experience": {
-        "min": 1,
-        "max": 6,
         "label": "1-6 years",
+        "max": 6,
+        "min": 1,
         "source": "job_description"
       },
       "skills_detected": [
@@ -1156,7 +1152,7 @@
       "jd_location": "Noida, India",
       "url": "https://www.naukri.com/job-listings-react-frontend-developer-zion-infosystem-noida-2-to-6-years-071026500861",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 62,
+      "score": 61,
       "reasons": [
         "frontend developer",
         "frontend",
@@ -1186,7 +1182,7 @@
       "jd_location": "Mumbai, Maharashtra, India",
       "url": "https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 56,
+      "score": 55,
       "reasons": [
         "software developer",
         "python",
@@ -1197,9 +1193,9 @@
       ],
       "description": "<p><strong>Essential Qualifications &amp; Experience: </strong></p><p>BE /BTech or equivalent degree with minimum 1 year of relevant experience </p><p>OR </p><p>B.Sc./BCS or equivalent degree with CS/ IT specialization with minimum 2 years of relevant experience. </p><p><br></p><p><strong>Required Technical Skills</strong>: Languages: Proficiency in Java (J2EE or Spring) for legacy application support, with the technical agility to transition into Python for upcoming product modernization. Frameworks: Basic understanding of Spring Boot or similar Java frameworks. Databases: Strong foundation in SQL and relational database concepts. Tools: Familiarity with Git for version control. Web Basics: Understanding of RESTful APIs and basic front-end technologies (HTML/CSS/JavaScript). </p><p><br></p><p><strong>Desirable criteria</strong>: Degree in Computer Science, Information Technology, or a related field. Strong analytical and logic-building skills. Ability to communicate technical concepts clearly to both technical and non-technical team members. A proactive learner who is comfortable working in a collaborative, fast-paced environment. Job Profile: We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply.</p><p><br></p><p><strong>Job Profile:</strong> We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply. \u2022 Feature Development: Write clean, scalable code in Java (J2EE or Spring Boot) and Python to support student and administrative modules. \u2022 System Maintenance: Assist in maintaining legacy systems while contributing to modern microservices migration. \u2022 Database Management: Write and optimize SQL queries (PostgreSQL/Oracle) and assist with data integrity tasks. \u2022 Testing &amp; Debugging: Perform unit testing and troubleshoot application bottlenecks to ensure high system availability. \u2022 Documentation: Maintain clear functional and technical documentation for all developed modules.</p><p><br></p><p><strong>PLEASE NOTE THAT IT IS MANDATORY TO APPLY FOR THIS POSITION ON IIT BOMBAY JOB PORTAL TO CONSIDER YOUR APPLICATION, PLEASE USE BELOW LINK. </strong></p><p><strong>Kindly use the APPLY button on the top left of the page.</strong></p><p>https://ep.iitb.ac.in/sap/bc/webdynpro/sap/hrrcf_a_posting_apply?PARAM=cG9zdF9pbnN0X2d1aWQ9Q0Q4QTdDRUFERjI0MUZEMUFFRTM5RDI2NDZFMTQzMTAmY2FuZF90eXBlPUVYVA%3d%3d&amp;sap-theme=sap_corbu&amp;sap-client=300&amp;sap-language=EN#</p><p><br></p><p><strong>Regards,</strong></p><p><strong>ASC IIT Bombay</strong></p>",
       "experience": {
-        "min": 1,
-        "max": null,
         "label": "1+ years",
+        "max": null,
+        "min": 1,
         "source": "job_description"
       },
       "skills_detected": [
@@ -1223,7 +1219,7 @@
       "jd_location": "Greater Bengaluru Area",
       "url": "https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 54,
+      "score": 53,
       "reasons": [
         "backend developer",
         "backend",
@@ -1260,7 +1256,7 @@
       "jd_location": "Mohali, India",
       "url": "https://www.naukri.com/job-listings-python-developer-exotica-it-solutions-mohali-0-to-1-years-071026500899",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 54,
+      "score": 53,
       "reasons": [
         "python developer",
         "python",
@@ -1281,6 +1277,44 @@
       "jd_enriched": true
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
+      "source": "linkedin",
+      "company": "Rubrik",
+      "title": "Software Engineer - Cloud: Azure",
+      "location": "Bengaluru, Karnataka, India",
+      "jd_location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
+      "posted": "2026-10-07T00:00:00+00:00",
+      "score": 50,
+      "reasons": [
+        "software engineer",
+        "python",
+        "ai",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "<strong>About The Team<br><br></strong>The Rubrik Cloud Native Protection team helps customers secure their data on the cloud. Cloud data is growing at an ever growing pace and so are the risks with cyber attacks targeted towards cloud data. We make it easy for businesses to protect, search, analyze all of their cloud data simply and scalably.<br><br>Cloud Native Protection is one of the fastest growing businesses and teams within Rubrik. We consider ourselves a startup inside a startup! Join us in this journey where there are ever widening avenues to explore, opportunities to innovate, deep engineering problems to tackle. We believe in fostering a culture with strong engineering values and teamwork as the key to building a great company and product.<br><br><strong>About Role<br><br></strong>Rubrik Software Engineers are self-starters, driven, and can manage themselves. We believe in giving engineers responsibility, not tasks. Our goal is to motivate and challenge people to do their best work. Bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history!<br><br><strong>What You\u2019ll Do<br><br></strong><ul><li>Build software using your strong background in distributed systems and cloud.</li><li>Design, develop, test, deploy, maintain and improve the software.</li><li>Manage individual projects priorities, deadlines and deliverables with your technical expertise.<br><br></li></ul><strong>Experience You\u2019ll Need<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree or equivalent in computer science or related field</li><li>0-2 years of relevant work experience, </li><li>Proficiency in one or more general purpose programming languages like Go, Java, C/C++, Scala, Python</li><li>Experience with AWS/Azure/GCP or other public cloud technologies is a plus.</li><li>Knowledge of Docker, Containers, Kubernetes, microservice architectures is a plus.</li><li>Excellent problem-solving skills and attention to detail. </li><li>Strong understanding of System Development Life Cycle (SDLC) methodology, design patterns, and software engineering principles</li><li>Strong collaboration and communication skills. Ability to work independently or as part of a team on complex, time-sensitive projects.<br><br></li></ul>Join Us in Securing and Accelerating the World's AI Transformation<br><br>Rubrik (RBRK), the Security and AI Operations Company, leads at the intersection of data protection, cyber resilience, and enterprise AI acceleration. Rubrik Security Cloud delivers complete cyber resilience by securing, monitoring, and recovering data, identities, and workloads across clouds. Rubrik Agent Cloud accelerates trusted AI agent deployments at scale by monitoring and auditing agentic actions, enforcing real-time guardrails, fine-tuning for accuracy and undoing agentic mistakes.<br><br>Linkedin | X (formerly Twitter) | Instagram | Rubrik.com<br><br>Inclusion @ Rubrik<br><br>At Rubrik, we are dedicated to fostering a culture where people from all backgrounds are valued, feel they belong, and believe they can succeed. Our commitment to inclusion is at the heart of our mission to secure the world\u2019s data.<br><br>Our goal is to hire and promote the best talent, regardless of background. We continually review our hiring practices to ensure fairness and strive to create an environment where every employee has equal access to opportunities for growth and excellence. We believe in empowering everyone to bring their authentic selves to work and achieve their fullest potential.<br><br>Our inclusion strategy focuses on three core areas of our business and culture:<br><br><ul><li>Our Company: We are committed to building a merit-based organization that offers equal access to growth and success for all employees globally. Your potential is limitless here. </li><li>Our Culture: We strive to create an inclusive atmosphere where individuals from all backgrounds feel a strong sense of belonging, can thrive, and do their best work. Your contributions help us innovate and break boundaries. </li><li>Our Communities: We are dedicated to expanding our engagement with the communities we operate in, creating opportunities for underrepresented talent and driving greater innovation for our clients. Your impact extends beyond Rubrik, contributing to safer and stronger communities. <br><br></li></ul>Equal Opportunity Employer/Veterans/Disabled<br><br>Rubrik is an Equal Opportunity Employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, protected veteran status, or any other status protected by applicable law. Rubrik provides equal employment opportunities to employees and applicants in all terms and conditions of employment, including recruiting, hiring, promotion, compensation, training, leave, and termination.<br><br>Rubrik provides reasonable accommodations to qualified applicants and employees with disabilities in accordance with applicable law. If you need an accommodation to participate in the application process or to perform your job, please contact hr@rubrik.com. Accommodations may include changes to the application process, documents in an alternate format, a sign language interpreter, or specialized equipment.<br><br>EEO IS THE LAW<br><br>NOTIFICATION OF EMPLOYEE RIGHTS UNDER FEDERAL LABOR LAWS<br><br>",
+      "experience": {
+        "label": "0-2 years",
+        "max": 2,
+        "min": 0,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "java",
+        "c++",
+        "go",
+        "aws",
+        "gcp",
+        "azure",
+        "docker",
+        "kubernetes"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
       "id": "nk-nk-071026500897",
       "source": "naukri",
       "company": "Susania",
@@ -1289,7 +1323,7 @@
       "jd_location": "Mumbai, Mumbai Suburban, India",
       "url": "https://www.naukri.com/job-listings-frontend-web-developer-susania-opc-private-lt-mumbai-mumbai-suburban-1-to-3-years-071026500897",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 51,
+      "score": 50,
       "reasons": [
         "frontend",
         "react",
@@ -1312,15 +1346,15 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
-      "source": "linkedin",
+      "id": "nk-nk-071026502658",
+      "source": "naukri",
       "company": "Rubrik",
-      "title": "Software Engineer - Cloud: Azure",
-      "location": "Bengaluru, Karnataka, India",
-      "jd_location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
+      "title": "Software Engineer- SaaS O365",
+      "location": "Bengaluru, India",
+      "jd_location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-software-engineer-saas-o365-rubrik-bengaluru-0-to-2-years-071026502658",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 51,
+      "score": 50,
       "reasons": [
         "software engineer",
         "python",
@@ -1328,7 +1362,7 @@
         "location fit",
         "experience fit"
       ],
-      "description": "<strong>About The Team<br><br></strong>The Rubrik Cloud Native Protection team helps customers secure their data on the cloud. Cloud data is growing at an ever growing pace and so are the risks with cyber attacks targeted towards cloud data. We make it easy for businesses to protect, search, analyze all of their cloud data simply and scalably.<br><br>Cloud Native Protection is one of the fastest growing businesses and teams within Rubrik. We consider ourselves a startup inside a startup! Join us in this journey where there are ever widening avenues to explore, opportunities to innovate, deep engineering problems to tackle. We believe in fostering a culture with strong engineering values and teamwork as the key to building a great company and product.<br><br><strong>About Role<br><br></strong>Rubrik Software Engineers are self-starters, driven, and can manage themselves. We believe in giving engineers responsibility, not tasks. Our goal is to motivate and challenge people to do their best work. Bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history!<br><br><strong>What You\u2019ll Do<br><br></strong><ul><li>Build software using your strong background in distributed systems and cloud.</li><li>Design, develop, test, deploy, maintain and improve the software.</li><li>Manage individual projects priorities, deadlines and deliverables with your technical expertise.<br><br></li></ul><strong>Experience You\u2019ll Need<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree or equivalent in computer science or related field</li><li>0-2 years of relevant work experience, </li><li>Proficiency in one or more general purpose programming languages like Go, Java, C/C++, Scala, Python</li><li>Experience with AWS/Azure/GCP or other public cloud technologies is a plus.</li><li>Knowledge of Docker, Containers, Kubernetes, microservice architectures is a plus.</li><li>Excellent problem-solving skills and attention to detail. </li><li>Strong understanding of System Development Life Cycle (SDLC) methodology, design patterns, and software engineering principles</li><li>Strong collaboration and communication skills. Ability to work independently or as part of a team on complex, time-sensitive projects.<br><br></li></ul>Join Us in Securing and Accelerating the World's AI Transformation<br><br>Rubrik (RBRK), the Security and AI Operations Company, leads at the intersection of data protection, cyber resilience, and enterprise AI acceleration. Rubrik Security Cloud delivers complete cyber resilience by securing, monitoring, and recovering data, identities, and workloads across clouds. Rubrik Agent Cloud accelerates trusted AI agent deployments at scale by monitoring and auditing agentic actions, enforcing real-time guardrails, fine-tuning for accuracy and undoing agentic mistakes.<br><br>Linkedin | X (formerly Twitter) | Instagram | Rubrik.com<br><br>Inclusion @ Rubrik<br><br>At Rubrik, we are dedicated to fostering a culture where people from all backgrounds are valued, feel they belong, and believe they can succeed. Our commitment to inclusion is at the heart of our mission to secure the world\u2019s data.<br><br>Our goal is to hire and promote the best talent, regardless of background. We continually review our hiring practices to ensure fairness and strive to create an environment where every employee has equal access to opportunities for growth and excellence. We believe in empowering everyone to bring their authentic selves to work and achieve their fullest potential.<br><br>Our inclusion strategy focuses on three core areas of our business and culture:<br><br><ul><li>Our Company: We are committed to building a merit-based organization that offers equal access to growth and success for all employees globally. Your potential is limitless here. </li><li>Our Culture: We strive to create an inclusive atmosphere where individuals from all backgrounds feel a strong sense of belonging, can thrive, and do their best work. Your contributions help us innovate and break boundaries. </li><li>Our Communities: We are dedicated to expanding our engagement with the communities we operate in, creating opportunities for underrepresented talent and driving greater innovation for our clients. Your impact extends beyond Rubrik, contributing to safer and stronger communities. <br><br></li></ul>Equal Opportunity Employer/Veterans/Disabled<br><br>Rubrik is an Equal Opportunity Employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, protected veteran status, or any other status protected by applicable law. Rubrik provides equal employment opportunities to employees and applicants in all terms and conditions of employment, including recruiting, hiring, promotion, compensation, training, leave, and termination.<br><br>Rubrik provides reasonable accommodations to qualified applicants and employees with disabilities in accordance with applicable law. If you need an accommodation to participate in the application process or to perform your job, please contact hr@rubrik.com. Accommodations may include changes to the application process, documents in an alternate format, a sign language interpreter, or specialized equipment.<br><br>EEO IS THE LAW<br><br>NOTIFICATION OF EMPLOYEE RIGHTS UNDER FEDERAL LABOR LAWS<br><br>",
+      "description": "job summary rubrik software engineers are self-starters, driven, and can manage themselves. we believe in giving engineers responsibility, not tasks. our goal is to motivate and challenge people to do their best work. bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history! responsibilities build software using your strong background in distributed systems and cloud. design, develop, test, deploy, maintain and improve the software. manage individual projects priorities, deadlines and deliverables with your technical expertise. requirements bachelor's or master's degree or equivalent in computer science or related field 0-2 years of relevant work experience proficiency in one or more general purpose programming languages like go, java, c/c++, scala, python experience with aws/azure/gcp or other public cloud technologies is a plus knowledge of docker, containers, kubernetes, microservice architectures is a plus excellent problem-solving skills and attention to detail strong understanding of system development life cycle (sdlc) methodology, design patterns, and software engineering principles strong collaboration and communication skills. ability to work independently or as part of a team on complex, time-sensitive projects disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 0-2 yrs kubernetes, python, ai, auditing, programming languages, cloud technologies, docker, labor laws",
       "experience": {
         "min": 0,
         "max": 2,
@@ -1358,7 +1392,7 @@
       "jd_location": "Gurugram, Haryana, India",
       "url": "https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
       "posted": "2026-10-07T00:00:00+00:00",
-      "score": 41,
+      "score": 40,
       "reasons": [
         "software engineer",
         "python",
@@ -1367,9 +1401,9 @@
       ],
       "description": "The Associate Engineer is responsible for executing defined coding tasks and ensuring basic code quality.<br><br><strong>Code Implementation:</strong> Write and modify <strong>clean, testable, and efficient code</strong> for low-to-medium complexity features and bug fixes, primarily using the required programming language (e.g., Java, Python, JavaScript, C#).<br><br><strong>Debugging and Testing:</strong> Conduct thorough <strong>unit testing</strong> on assigned components and participate actively in debugging applications to identify and resolve defects reported by Quality Assurance (QA) or end-users.<br><br><strong>Documentation:</strong> Assist in creating and maintaining <strong>technical documentation</strong>, including code comments, design specifications for small features, and developer runbooks.<br><br><strong>Version Control:</strong> Utilize <strong>version control systems (e.g., Git/GitHub/GitLab)</strong> effectively for branching, merging, and managing code changes within the team codebase.<br><br><strong>Database Interaction:</strong> Write basic <strong>SQL queries</strong> or interact with NoSQL databases to support application functionality, data fetching, and simple data manipulation.<br><br><ul><li> Operational &amp; Collaborative Duties<br><br></li></ul>This role requires strong teamwork and adherence to established development processes.<br><br><strong>SDLC Participation:</strong> Actively participate in all phases of the <strong>Software Development Lifecycle (SDLC)</strong>, with a focus on implementation, testing, and deployment support.<br><br><strong>Agile/Scrum:</strong> Participate in <strong>Agile ceremonies</strong> (Daily Standups, Sprint Planning, Retrospectives) and accurately update task status and progress in project management tools (e.g., Jira, Azure DevOps).<br><br><strong>Code Review:</strong> Participate in and learn from the code review process by providing basic feedback and incorporating feedback from senior developers into their own code.<br><br><strong>Troubleshooting &amp; Support:</strong> Provide <strong>Level 1 (L1) technical support</strong> for applications, assisting in diagnosing and escalating production issues as needed.<br><br><strong>Requirements Interpretation:</strong> Work with senior developers and business analysts to understand technical requirements derived from user stories and functional specifications.",
       "experience": {
-        "min": null,
-        "max": null,
         "label": "Not specified",
+        "max": null,
+        "min": null,
         "source": "not_found"
       },
       "skills_detected": [
@@ -1756,6 +1790,43 @@
         "react",
         "java",
         "aws"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "nk-nk-061026502977",
+      "source": "naukri",
+      "company": "Barclays",
+      "title": "Full Stack Developer",
+      "location": "Pune, India",
+      "jd_location": "Pune, India",
+      "url": "https://www.naukri.com/job-listings-full-stack-developer-barclays-shared-services-pune-1-to-5-years-061026502977",
+      "posted": "2026-10-06T00:00:00+00:00",
+      "score": 56,
+      "reasons": [
+        "full stack developer",
+        "full stack",
+        "react",
+        "python",
+        "javascript",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "join us as a full stack developer for an exciting journey as we modernize our core platforms to make them simpler, leaner and more efficient. you will utilize your strong industry and domain expertise to shape up our technology product offerings to meet the business requirements for the future. youll harness cutting-edge technology to revolutionize our digital offerings, ensuring unparalleled customer experiences to be successful as a full stack developer, you should have experience with: back-end technologies - java, python, springboot, jpa, hibernate, junit, rest, microservices tdd (test driven development) front-end technologies - react js, redux, javascript, and html. database technologies sql and nosql - oracle / mongo devsecops - paas openshift / k8s, gitlab, jira, sonarqube, prisma and wiz npm and maven or gradle working knowledge of message queue like apache kafka, ibm mq, etc. computer science degree or equivalent understanding of computer science, object oriented design and data structures. experience of working in an it project environment preferably in banking or financial sector within an agile model. some other highly valued skills may include: adherence to secure coding practices to mitigate vulnerabilities, protect sensitive data, and ensure secure software solutions. implementation of effective unit testing practices to ensure proper code design, readability, and reliability. collaboration with peers, participate in code reviews, and promote a culture of code quality and knowledge sharing. you may be assessed on key critical skills relevant for success in role, such as risk and controls, change and transformation, business acumen, strategic thinking and digital and technology, as well as job-specific technical skills. the role is based out of pune. purpose of the role to design, develop and improve software, utilising various engineering methodologies, that provides business, platform, and technology capabilities for our customers and colleagues. accountabilities development and delivery of high-quality software solutions by using industry aligned programming languages, frameworks, and tools. ensuring that code is scalable, maintainable, and optimized for performance. cross-functional collaboration with product managers, designers, and other engineers to define software requirements, devise solution strategies, and ensure seamless integration and alignment with business objectives. collaboration with peers, participate in code reviews, and promote a culture of code quality and knowledge sharing. stay informed of industry technology trends and innovations and actively contribute to the organization s technology communities to foster a culture of technical excellence and growth. adherence to secure coding practices to mitigate vulnerabilities, protect sensitive data, and ensure secure software solutions. implementation of effective unit testing practices to ensure proper code design, readability, and reliability. assistant vice president expectations to advise and influence decision making, contribute to policy development and take responsibility for operational effectiveness. collaborate closely with other functions/ business divisions. lead a team performing complex tasks, using well developed professional knowledge and skills to deliver on work that impacts the whole business function. set objectives and coach employees in pursuit of those objectives, appraisal of performance relative to objectives and determination of reward outcomes if the position has leadership responsibilities, people leaders are expected to demonstrate a clear set of leadership behaviours to create an environment for colleagues to thrive and deliver to a consistently excellent standard. the four lead behaviours are: l - listen and be authentic, e - energise and inspire, a - align across the enterprise, d - develop others. or for an individual contributor, they will lead collaborative assignments and guide team members through structured assignments, identify the need for the inclusion of other areas of specialisation to complete assignments. they will identify new directions for assignments and/ or projects, identifying a combination of cross functional methodologies or practices to meet required outcomes. consult on complex issues; providing advice to people leaders to support the resolution of escalated issues. identify ways to mitigate risk and developing new policies/procedures in support of the control and governance agenda. take ownership for managing risk and strengthening controls in relation to the work done. perform work that is closely related to that of other areas, which requires understanding of how areas coordinate and contribute to the achievement of the objectives of the organisation sub-function. collaborate with other areas of work, for business aligned support areas to keep up to speed with business activity and the business strategy. engage in complex analysis of data from multiple sources of information, internal and external sources such as procedures and practises (in other areas, teams, companies, etc). to solve problems creatively and effectively. communicate complex information. complex information could include sensitive information or information that is difficult to communicate because of its content or its audience. influence or convince stakeholders to achieve outcomes. disclaimer: this job posting has been aggregated from external source. role details, content, and availability are subject to change. applicants are advised to confirm the latest information directly on the company website before applying. 1-5 yrs junit, business requirements, business strategy, full stack developer, js, database technologies, hibernate, code quality",
+      "experience": {
+        "label": "1-5 years",
+        "max": 5,
+        "min": 1,
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "react",
+        "java",
+        "sql",
+        "kafka"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
@@ -2726,6 +2797,39 @@
       "skills_detected": [
         "automation",
         "workflow"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "nk-nk-051026039873",
+      "source": "naukri",
+      "company": "Nxtwave Disruptive Technologies(Hiring for a Client)",
+      "title": "React JS Developer",
+      "location": "Bengaluru, India",
+      "jd_location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-react-js-developer-nxtwave-disruptive-technologies-hiring-for-a-client-bengaluru-2-to-4-years-051026039873",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 48,
+      "reasons": [
+        "react",
+        "react native",
+        "javascript",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "responsibilities develop high-quality javascript (es6) code for react applications. coordinate with backend engineers to establish and integrate json-based apis. optimize applications for maximum speed, performance, and browser compatibility. integrate third-party dependencies and troubleshoot dependency conflicts. multitask effectively while maintaining a positive attitude and a client-first mentality. incorporate engineering best practices, methodologies, and standards into all deliverables. pay close attention to detail and follow specifications and ui/ux mockups to deliver pixel-perfect interfaces. identify ui/ux issues and provide recommendations for improvement. requirements strong understanding of web application development. strong experience with react, javascript (es6), and css3. good experience with react or react native and redux. experience building complex features and interfaces for react applications. familiarity with restful apis. experience with version control tools such as git and package management tools such as npm. deep understanding of data structures, data flow, ajax, and crud operations. solid knowledge of modern web application development practices. excellent spoken and written english. 2-4 yrs frontend development, javascript, react.js, redux, react native, restful apis, front end, rest",
+      "experience": {
+        "min": 2,
+        "max": 4,
+        "label": "2-4 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "javascript",
+        "react",
+        "react native",
+        "git"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
