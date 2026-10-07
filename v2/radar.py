@@ -10,17 +10,23 @@ import re
 import sqlite3
 import threading
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from fastapi import FastAPI, HTTPException
 from jobspy import scrape_jobs
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("JOB_RADAR_DB", ROOT / "jobs.db"))
 CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+
+TARGET_ROLES = [str(x).lower() for x in CONFIG.get("target_roles", [])]
+SKILLS = [str(x).lower() for x in CONFIG.get("skills", [])]
+MATCH_THRESHOLD = int(CONFIG.get("match_threshold", 55))
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 log = logging.getLogger("job-radar")
@@ -183,19 +189,118 @@ def title_allowed(title: str) -> bool:
 
 
 def location_allowed(location: str) -> bool:
-    value = location.lower()
+    value = re.sub(r"\\s+", " ", (location or "").lower()).strip()
     return (
-        "bengaluru" in value or "bangalore" in value or
-        "gurugram" in value or "gurgaon" in value or
-        re.search(r"\bdelhi\b", value) is not None or
-        ("remote" in value and ("india" in value or not any(
-            x in value for x in ["usa", "united states", "canada", "uk", "europe"]
-        )))
+        re.search(r"\\bbengaluru\\b", value) is not None
+        or re.search(r"\\bbangalore\\b", value) is not None
+        or re.search(r"\\bgurugram\\b", value) is not None
+        or re.search(r"\\bgurgaon\\b", value) is not None
+        or re.search(r"\\bdelhi\\b", value) is not None
+        or (
+            "remote" in value
+            and ("india" in value or not any(
+                x in value for x in ["usa", "united states", "canada", "uk", "europe", "australia"]
+            ))
+        )
     )
 
 
+def extract_experience(text: str) -> tuple[float | None, float | None]:
+    value = (text or "").lower()
+    ranges = re.findall(
+        r"(\\d+(?:\\.\\d+)?)\\s*(?:-|to)\\s*(\\d+(?:\\.\\d+)?)\\s*(?:years?|yrs?)",
+        value,
+    )
+    if ranges:
+        lows = [float(a) for a, _ in ranges]
+        highs = [float(b) for _, b in ranges]
+        return min(lows), max(highs)
+
+    plus = re.search(r"(\\d+(?:\\.\\d+)?)\\s*\\+\\s*(?:years?|yrs?)", value)
+    if plus:
+        years = float(plus.group(1))
+        return years, None
+
+    single = re.search(r"(\\d+(?:\\.\\d+)?)\\s*(?:years?|yrs?)", value)
+    if single:
+        years = float(single.group(1))
+        return years, years
+
+    return None, None
+
+
+def match_details(job: dict[str, Any]) -> dict[str, Any]:
+    title = (job.get("title") or "").lower()
+    description = (job.get("description") or "").lower()
+    combined = f"{title} {description}"
+
+    reasons: list[str] = []
+
+    if not title_allowed(title):
+        return {
+            "match": False,
+            "score": 0,
+            "reasons": ["excluded senior/leadership title"],
+            "experience_min_years": None,
+            "experience_max_years": None,
+        }
+
+    if not location_allowed(job.get("location") or ""):
+        return {
+            "match": False,
+            "score": 0,
+            "reasons": ["location outside configured cities/remote India"],
+            "experience_min_years": None,
+            "experience_max_years": None,
+        }
+
+    score = 25
+    reasons.append("target location")
+
+    role_hits = [role for role in TARGET_ROLES if role in title]
+    if not role_hits:
+        role_hits = [role for role in TARGET_ROLES if role in description]
+
+    if role_hits:
+        score += 35
+        reasons.append(f"role: {role_hits[0]}")
+    else:
+        reasons.append("no configured target-role match")
+
+    skill_hits = [skill for skill in SKILLS if skill in combined]
+    if skill_hits:
+        bonus = min(30, 6 * len(skill_hits))
+        score += bonus
+        reasons.append("skills: " + ", ".join(skill_hits[:5]))
+
+    exp_min, exp_max = extract_experience(combined)
+    max_years = float(CONFIG.get("max_experience_years", 3))
+    if exp_min is not None or exp_max is not None:
+        effective_max = exp_max if exp_max is not None else exp_min
+        if effective_max is not None and effective_max > max_years:
+            return {
+                "match": False,
+                "score": 0,
+                "reasons": [f"experience exceeds {max_years:g} years"],
+                "experience_min_years": exp_min,
+                "experience_max_years": exp_max,
+            }
+        score += 15
+        reasons.append(f"experience within {max_years:g}-year limit")
+    else:
+        reasons.append("experience not stated in captured source data")
+
+    return {
+        "match": score >= MATCH_THRESHOLD and bool(role_hits),
+        "score": min(score, 100),
+        "reasons": reasons,
+        "experience_min_years": exp_min,
+        "experience_max_years": exp_max,
+    }
+
+
 def likely_match(job: dict[str, Any]) -> bool:
-    return title_allowed(job["title"]) and location_allowed(job["location"])
+    return bool(match_details(job)["match"])
 
 
 def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
@@ -246,7 +351,7 @@ def linkedin_collect() -> list[dict[str, Any]]:
                     if not link or not title:
                         continue
                     url = (link.get("href") or "").split("?")[0]
-                    match = re.search(r"jobs/view/(\d+)", url)
+                    match = re.search(r"(?:-|/)(\d{8,})$", url)
                     source_id = match.group(1) if match else hashlib.sha1(
                         url.encode()
                     ).hexdigest()[:20]
@@ -474,7 +579,12 @@ def jobs(minutes: int = 60, limit: int = 100):
     result = []
     for row in rows:
         item = dict(row)
-        item["likely_match"] = likely_match(item)
+        details = match_details(item)
+        item["likely_match"] = details["match"]
+        item["match_score"] = details["score"]
+        item["match_reasons"] = details["reasons"]
+        item["experience_min_years"] = details["experience_min_years"]
+        item["experience_max_years"] = details["experience_max_years"]
         result.append(item)
     return {"jobs": result}
 
