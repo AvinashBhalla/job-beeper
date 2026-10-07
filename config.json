@@ -27,7 +27,7 @@
     "remote_only": false,
     "max_age_hours": 72,
     "max_experience_years": 3,
-    "candidate_experience_years": null,
+    "candidate_experience_years": 2,
     "description_include_any": [],
     "description_exclude_any": [
       "security clearance"
