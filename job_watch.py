@@ -474,18 +474,24 @@ def main():
             }
 
     with ThreadPoolExecutor(max_workers=min(16, max(1, len(tasks) + len(board_tasks)))) as pool:
+        # Overlap broad web discovery with direct source polling so DDGS latency
+        # does not sit entirely after the direct-source critical path.
+        web_future = None
+        if f.get("web_discovery_enabled", True):
+            web_future = pool.submit(
+                discover_web, f, max_results=int(f.get("web_discovery_results", 8))
+            )
+
         results = list(pool.map(run_source, tasks))
         if use_apify:
             results += list(pool.map(run_board_source, board_tasks))
         else:
             results += [run_source((x[0], x[1], x[2])) for x in board_tasks]
 
-    # Broad discovery layer for ATS/job platforms that do not expose a single
-    # global public feed. Direct company APIs above remain preferred.
-    if f.get("web_discovery_enabled", True):
-        web_results = discover_web(f, max_results=int(f.get("web_discovery_results", 8)))
-        results.extend(("web:" + platform, None, jobs, err)
-                       for platform, jobs, err in web_results)
+        if web_future is not None:
+            web_results = web_future.result()
+            results.extend(("web:" + platform, None, jobs, err)
+                           for platform, jobs, err in web_results)
 
     alerts = []
     dashboard_jobs = []
