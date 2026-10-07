@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-10-07T09:53:10.601209+00:00",
-  "last_run": "2026-10-07T09:53:10.601209+00:00",
+  "updated_at": "2026-10-07T09:56:23.258243+00:00",
+  "last_run": "2026-10-07T09:56:23.258243+00:00",
   "new_alerts": 0,
   "source_status": {
     "greenhouse:\"groww\"": {
@@ -299,7 +299,7 @@
     },
     "ashby:\"posthog\"": {
       "ok": true,
-      "count": 9,
+      "count": 10,
       "error": null,
       "provider": "direct"
     },
@@ -411,13 +411,13 @@
       "error": null,
       "provider": "direct"
     },
-    "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://walmart.wd5.myworkdayjobs.com/WalmartExternal\"}": {
+    "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://walmart.wd5.myworkdayjobs.com/walmartexternal\"}": {
       "ok": false,
       "count": 0,
-      "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/WalmartExternal/jobs",
+      "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/walmartexternal/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T11:13:10.601209+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T10:16:23.258243+00:00",
+      "failures": 1
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
@@ -430,8 +430,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T11:13:10.601209+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T12:36:23.258243+00:00",
+      "failures": 4
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -450,16 +450,14 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-07T11:13:10.601209+00:00",
-      "failures": 3
+      "retry_at": "2026-10-07T12:36:23.258243+00:00",
+      "failures": 4
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
-      "ok": false,
-      "count": 0,
-      "error": "'externalPath'",
-      "provider": "direct",
-      "retry_at": "2026-10-07T10:33:10.601209+00:00",
-      "failures": 2
+      "ok": true,
+      "count": 21,
+      "error": null,
+      "provider": "direct"
     },
     "remotive:": {
       "ok": true,
@@ -530,7 +528,7 @@
       "title": "AI/ML Technologist",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/AI-ML-Technologist_JR0285263",
-      "posted": "2026-10-07T09:53:10.601209+00:00",
+      "posted": "2026-10-07T09:56:23.258243+00:00",
       "score": 56,
       "reasons": [
         "ai",
@@ -591,36 +589,6 @@
       ]
     },
     {
-      "id": "nk-nk-051026040407",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "React + Node Developer",
-      "location": "Hyderabad, Chennai, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-react-node-developer-infosys-hyderabad-chennai-bengaluru-5-to-9-years-051026040407",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 54,
-      "reasons": [
-        "developer",
-        "react",
-        "node"
-      ]
-    },
-    {
-      "id": "nk-nk-051026040389",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "React + Node Developer",
-      "location": "Hyderabad, Chennai, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-react-node-developer-infosys-hyderabad-chennai-bengaluru-3-to-5-years-051026040389",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 54,
-      "reasons": [
-        "developer",
-        "react",
-        "node"
-      ]
-    },
-    {
       "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
       "source": "linkedin",
       "company": "Hunar.AI",
@@ -661,76 +629,6 @@
       "reasons": [
         "developer",
         "react"
-      ]
-    },
-    {
-      "id": "nk-nk-200926014684",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Java React Developer",
-      "location": "Pune, Chennai, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-react-developer-infosys-pune-chennai-bengaluru-2-to-6-years-200926014684",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "developer",
-        "react"
-      ]
-    },
-    {
-      "id": "nk-nk-160926046096",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Python Developer (5 To 8 Years)",
-      "location": "Noida, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-pune-bengaluru-5-to-8-years-160926046096",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "developer",
-        "python"
-      ]
-    },
-    {
-      "id": "nk-nk-110926010576",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Python Developer",
-      "location": "Hyderabad, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-python-developer-infosys-hyderabad-pune-bengaluru-5-to-8-years-110926010576",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "developer",
-        "python"
-      ]
-    },
-    {
-      "id": "nk-nk-250926035861",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Python Developer (5 To 8 Years)",
-      "location": "Noida, Hyderabad, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-hyderabad-bengaluru-5-to-8-years-250926035861",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "developer",
-        "python"
-      ]
-    },
-    {
-      "id": "nk-nk-111225012381",
-      "source": "naukri",
-      "company": "Hexaware Technologies",
-      "title": "Python Developer (Location - Bangalore)",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-python-developer-location-bangalore-hexaware-technologies-bengaluru-5-to-10-years-111225012381",
-      "posted": "2026-10-07T00:00:00+00:00",
-      "score": 46,
-      "reasons": [
-        "developer",
-        "python"
       ]
     },
     {
@@ -1078,48 +976,6 @@
         "software",
         "engineer",
         "ai"
-      ]
-    },
-    {
-      "id": "nk-nk-190926012151",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Java React Developer (5-12 yrs) @ Infosys",
-      "location": "Hyderabad, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-react-developer-5-12-yrs-infosys-infosys-hyderabad-pune-bengaluru-5-to-10-years-190926012151",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
-      ]
-    },
-    {
-      "id": "nk-nk-190926012138",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Java React Developer (3-5 yrs) @ Infosys",
-      "location": "Hyderabad, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-react-developer-3-5-yrs-infosys-infosys-hyderabad-pune-bengaluru-3-to-5-years-190926012138",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
-      ]
-    },
-    {
-      "id": "nk-nk-190926012110",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Java React Developer (2-3 yrs) @ Infosys",
-      "location": "Hyderabad, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-react-developer-2-3-yrs-infosys-infosys-hyderabad-pune-bengaluru-2-to-3-years-190926012110",
-      "posted": "2026-10-06T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
       ]
     },
     {
@@ -1517,12 +1373,12 @@
       ]
     },
     {
-      "id": "gh-7993984",
+      "id": "gh-8239047",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=7993984",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1545,12 +1401,12 @@
       ]
     },
     {
-      "id": "gh-8208074",
+      "id": "gh-7993984",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8208074",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=7993984",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1573,12 +1429,12 @@
       ]
     },
     {
-      "id": "gh-8239047",
+      "id": "gh-8208074",
       "source": "greenhouse",
       "company": "mongodb",
       "title": "Software Engineer 3",
       "location": "Gurugram",
-      "url": "https://www.mongodb.com/careers/job/?gh_jid=8239047",
+      "url": "https://www.mongodb.com/careers/job/?gh_jid=8208074",
       "posted": "2026-10-05T19:30:53-04:00",
       "score": 31,
       "reasons": [
@@ -1710,7 +1566,7 @@
       "title": "Software Application Development Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Software-Application-Development-Engineer_JR0287750",
-      "posted": "2026-10-05T09:53:10.601209+00:00",
+      "posted": "2026-10-05T09:56:23.258243+00:00",
       "score": 31,
       "reasons": [
         "software",
@@ -1724,7 +1580,7 @@
       "title": "Memory Electrical Validation Engineer",
       "location": "India, Bangalore",
       "url": "https://intel.wd1.myworkdayjobs.com/en-US/External/job/India-Bangalore/Memory-Electrical-Validation-Engineer_JR0287713",
-      "posted": "2026-10-05T09:53:10.601209+00:00",
+      "posted": "2026-10-05T09:56:23.258243+00:00",
       "score": 23,
       "reasons": [
         "engineer"
@@ -1850,18 +1706,33 @@
       ]
     },
     {
-      "id": "nk-nk-290626928405",
+      "id": "nk-nk-051026040407",
       "source": "naukri",
       "company": "Infosys",
-      "title": "Java full stack, React Developer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-full-stack-react-developer-infosys-limited-bengaluru-3-to-5-years-290626928405",
+      "title": "React + Node Developer",
+      "location": "Hyderabad, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-react-node-developer-infosys-hyderabad-chennai-bengaluru-5-to-9-years-051026040407",
       "posted": "2026-10-05T00:00:00+00:00",
       "score": 44,
       "reasons": [
         "developer",
-        "full stack",
-        "react"
+        "react",
+        "node"
+      ]
+    },
+    {
+      "id": "nk-nk-051026040389",
+      "source": "naukri",
+      "company": "Infosys",
+      "title": "React + Node Developer",
+      "location": "Hyderabad, Chennai, Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-react-node-developer-infosys-hyderabad-chennai-bengaluru-3-to-5-years-051026040389",
+      "posted": "2026-10-05T00:00:00+00:00",
+      "score": 44,
+      "reasons": [
+        "developer",
+        "react",
+        "node"
       ]
     },
     {
@@ -1891,48 +1762,6 @@
       "reasons": [
         "developer",
         "react"
-      ]
-    },
-    {
-      "id": "nk-nk-030726032204",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Java React Developer(3-5 yrs)-Pan India",
-      "location": "Hyderabad, Pune, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-react-developer-3-5-yrs-pan-india-infosys-hyderabad-pune-bengaluru-3-to-5-years-030726032204",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
-      ]
-    },
-    {
-      "id": "nk-nk-100726919371",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Java React Developer",
-      "location": "Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-java-react-developer-infosys-limited-bengaluru-3-to-5-years-100726919371",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "react"
-      ]
-    },
-    {
-      "id": "nk-nk-160926008093",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Python Developer (5 To 8 Years)",
-      "location": "Noida, Hyderabad, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-hyderabad-bengaluru-5-to-8-years-160926008093",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "python"
       ]
     },
     {
@@ -1970,20 +1799,6 @@
       "title": "python developer",
       "location": "Bengaluru, India",
       "url": "https://www.naukri.com/job-listings-python-developer-eglobal-hr-bengaluru-5-to-7-years-051026015170",
-      "posted": "2026-10-05T00:00:00+00:00",
-      "score": 36,
-      "reasons": [
-        "developer",
-        "python"
-      ]
-    },
-    {
-      "id": "nk-nk-240926040124",
-      "source": "naukri",
-      "company": "Infosys",
-      "title": "Python Developer (5 To 8 Years)",
-      "location": "Noida, Hyderabad, Bengaluru, India",
-      "url": "https://www.naukri.com/job-listings-python-developer-5-to-8-years-infosys-noida-hyderabad-bengaluru-5-to-8-years-240926040124",
       "posted": "2026-10-05T00:00:00+00:00",
       "score": 36,
       "reasons": [
