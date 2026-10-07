@@ -164,8 +164,11 @@ FLAG_SOURCES = {"remotive": remotive, "remoteok": remoteok, "arbeitnow": arbeitn
 BOARD_SOURCES = {"linkedin": linkedin_guest, "naukri": naukri_public, "instahyre": instahyre_public}
 APIFY_BOARD_SOURCES = {"linkedin": apify_linkedin, "naukri": apify_naukri, "instahyre": apify_instahyre}
 
-def max_years_required(desc):
-    nums = [int(n) for n in re.findall(r"(\d{1,2})\s*\+?\s*(?:-\s*\d+\s*)?(?:years|yrs)", desc)]
+def max_years_required(desc, url=""):
+    text = " ".join([str(desc or ""), str(url or "")]).lower()
+    nums = [int(n) for n in re.findall(r"(\d{1,2})\s*\+?\s*(?:-\s*\d+\s*)?(?:years|yrs)", text)]
+    ranges = re.findall(r"(\d{1,2})\s*(?:to|-)\s*(\d{1,2})\s*years", text)
+    nums.extend(int(high) for _, high in ranges)
     return max(nums) if nums else None
 
 def location_matches(loc, allowed):
@@ -220,7 +223,7 @@ def passes(j, f):
         return False
     if any(text_matches(d, k) for k in f["description_exclude_any"]):
         return False
-    yrs = max_years_required(d)
+    yrs = max_years_required(d, j.get("url"))
     return not (f["max_experience_years"] is not None and yrs is not None and yrs > f["max_experience_years"])
 
 def score_job(j, f):
@@ -246,7 +249,7 @@ def score_job(j, f):
     if posted:
         age = max(0, (NOW - posted).total_seconds() / 3600)
         score += max(0, 20 - min(20, age))
-    if max_years_required(d) is not None and max_years_required(d) <= (f.get("max_experience_years") or 99):
+    if max_years_required(d, j.get("url")) is not None and max_years_required(d, j.get("url")) <= (f.get("max_experience_years") or 99):
         score += 10
     score = min(100, round(score))
     return score, list(dict.fromkeys(reasons))[:12]
