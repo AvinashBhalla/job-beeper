@@ -88,7 +88,7 @@
     "actors": {
       "linkedin": "axiomworks/linkedin-jobs-scraper",
       "naukri": "epicscrapers/naukri-scraper",
-      "instahyre": "s_actors/instahyre-jobs-scraper"
+      "instahyre": "umararshad2/instahyre-jobs-scraper"
     },
     "provider": "direct"
   },
@@ -221,11 +221,7 @@
       "automation engineer"
     ],
     "instahyre": [
-      "software engineer",
-      "full stack developer",
-      "react developer",
-      "python developer",
-      "automation engineer"
+      "software"
     ],
     "remotive": true,
     "remoteok": true,
