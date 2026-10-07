@@ -265,24 +265,37 @@ def passes(j, f):
     if any(text_matches(d, k) for k in f["description_exclude_any"]):
         return False
     yrs = max_years_required(d, j.get("url"))
-    return not (f["max_experience_years"] is not None and yrs is not None and yrs > f["max_experience_years"])
+    if f["max_experience_years"] is not None and yrs is not None and yrs > f["max_experience_years"]:
+        return False
+    candidate = f.get("candidate_experience_years")
+    if candidate is not None and yrs is not None and yrs > float(candidate):
+        return False
+    return True
 
 def score_job(j, f):
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
     score = 0
     reasons = []
-    for k in configured_title_terms(f):
-        if text_matches(t, k):
-            score += 8
-            reasons.append(k)
-    for k in f.get("skills", []):
-        if text_matches(t, k) or text_matches(d, k):
-            score += 5
-            reasons.append(k)
+
+    # Role / field relevance: up to 32 points.
+    title_hits = list(dict.fromkeys(k for k in configured_title_terms(f) if text_matches(t, k)))
+    score += min(32, len(title_hits) * 8)
+    reasons.extend(title_hits[:4])
+
+    # Skills match: up to 25 points.
+    skill_hits = list(dict.fromkeys(k for k in f.get("skills", []) if text_matches(t, k) or text_matches(d, k)))
+    score += min(25, len(skill_hits) * 5)
+    reasons.extend(skill_hits[:5])
+
+    # Location fit: 15 points, plus 5 for a remote listing.
     if location_matches(loc, f.get("locations", [])):
         score += 15
+        reasons.append("location fit")
     if "remote" in loc:
-        score += 10
+        score += 5
+        reasons.append("remote")
+
+    # Freshness: up to 20 points.
     posted = j.get("posted")
     if isinstance(posted, str):
         posted = parse_time(posted)
@@ -290,8 +303,19 @@ def score_job(j, f):
     if posted:
         age = max(0, (NOW - posted).total_seconds() / 3600)
         score += max(0, 20 - min(20, age))
-    if max_years_required(d, j.get("url")) is not None and max_years_required(d, j.get("url")) <= (f.get("max_experience_years") or 99):
-        score += 10
+
+    # Experience fit: 10 points when the listing exposes a requirement.
+    required = max_years_required(d, j.get("url"))
+    candidate = f.get("candidate_experience_years")
+    if required is not None and candidate is not None:
+        if required <= float(candidate):
+            score += 10
+            reasons.append("experience fit")
+        else:
+            reasons.append("experience gap")
+    elif required is not None and f.get("max_experience_years") is not None and required <= f["max_experience_years"]:
+        score += 5
+
     score = min(100, round(score))
     return score, list(dict.fromkeys(reasons))[:12]
 
