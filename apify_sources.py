@@ -64,15 +64,18 @@ def _job(source, item):
     url = _first(item, "url", "jobUrl", "job_url", "applyUrl", "apply_url", "link")
     title = _first(item, "title", "jobTitle", "position", "name")
     company = _first(item, "company", "companyName", "company_name", "employer")
-    location = _first(item, "location", "locations", "locationName", "city")
+    location = _first(item, "location", "locations", "locationLabel", "locationName", "city")
     posted = _first(item, "postedAt", "posted_at", "postedDate", "posted_date",
                     "publicationDate", "publication_date", "createdAt", "created_at",
-                    "updatedAt", "updated_at", "datePosted", "date_posted", "jobPosted")
+                    "updatedAt", "updated_at", "datePosted", "date_posted", "postedDate",
+                    "posted_date", "jobPosted")
     desc = _first(item, "description", "descriptionText", "descriptionPlain",
                   "jobDescription", "job_description", "summary", "details")
     skills = _first(item, "skills", "tagsAndSkills", "tags", "skill")
     experience = _first(item, "experience", "experienceRange", "experience_range",
-                        "experienceRequired", "experience_required", "yearsOfExperience")
+                        "experienceRequired", "experience_required", "yearsOfExperience",
+                        "experienceLabel", "experienceMinYears", "experienceMaxYears",
+                        "minimumExperience", "maximumExperience")
     if not url and not job_id:
         return None
     stable = str(job_id or url)
