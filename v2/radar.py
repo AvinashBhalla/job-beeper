@@ -183,13 +183,22 @@ def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
         conn.commit()
 
 
+def normalize_phrase(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
 def title_allowed(title: str) -> bool:
-    t = f" {title.lower()} "
-    return not any(term.lower() in t for term in CONFIG["title_exclude"])
+    normalized = normalize_phrase(title)
+    tokens = set(normalized.split())
+    excluded = {
+        "senior", "sr", "staff", "principal", "director", "manager",
+        "lead", "head", "architect", "intern", "vp"
+    }
+    return not bool(tokens & excluded)
 
 
 def location_allowed(location: str) -> bool:
-    value = re.sub(r"\\s+", " ", (location or "").lower()).strip()
+    value = normalize_phrase(location)
     return (
         re.search(r"\\bbengaluru\\b", value) is not None
         or re.search(r"\\bbangalore\\b", value) is not None
@@ -206,9 +215,9 @@ def location_allowed(location: str) -> bool:
 
 
 def extract_experience(text: str) -> tuple[float | None, float | None]:
-    value = (text or "").lower()
+    value = normalize_phrase(text)
     ranges = re.findall(
-        r"(\\d+(?:\\.\\d+)?)\\s*(?:-|to)\\s*(\\d+(?:\\.\\d+)?)\\s*(?:years?|yrs?)",
+        r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)",
         value,
     )
     if ranges:
@@ -216,15 +225,15 @@ def extract_experience(text: str) -> tuple[float | None, float | None]:
         highs = [float(b) for _, b in ranges]
         return min(lows), max(highs)
 
-    plus = re.search(r"(\\d+(?:\\.\\d+)?)\\s*\\+\\s*(?:years?|yrs?)", value)
+    plus = re.search(r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)", value)
     if plus:
         years = float(plus.group(1))
         return years, None
 
-    single = re.search(r"(\\d+(?:\\.\\d+)?)\\s*(?:years?|yrs?)", value)
-    if single:
-        years = float(single.group(1))
-        return years, years
+    singles = re.findall(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", value)
+    if singles:
+        years = [float(x) for x in singles]
+        return min(years), max(years)
 
     return None, None
 
@@ -276,17 +285,17 @@ def match_details(job: dict[str, Any]) -> dict[str, Any]:
     exp_min, exp_max = extract_experience(combined)
     max_years = float(CONFIG.get("max_experience_years", 3))
     if exp_min is not None or exp_max is not None:
-        effective_max = exp_max if exp_max is not None else exp_min
-        if effective_max is not None and effective_max > max_years:
+        effective_min = exp_min if exp_min is not None else exp_max
+        if effective_min is not None and effective_min > max_years:
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [f"experience exceeds {max_years:g} years"],
+                "reasons": [f"experience minimum exceeds {max_years:g} years"],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
         score += 15
-        reasons.append(f"experience within {max_years:g}-year limit")
+        reasons.append(f"experience compatible with {max_years:g}-year limit")
     else:
         reasons.append("experience not stated in captured source data")
 
