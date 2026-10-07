@@ -106,8 +106,6 @@ def workday(entry):
         for j in posts:
             path = j.get("externalPath") or j.get("url") or j.get("jobUrl") or j.get("externalUrl")
             if not path:
-                # Some tenants return a malformed posting without a public path.
-                # Skip that posting instead of failing the entire tenant.
                 continue
             path = str(path)
             if path.startswith("http"):
@@ -173,11 +171,6 @@ def max_years_required(desc, url=""):
     return max(nums) if nums else None
 
 def location_matches(loc, allowed):
-    """Match geography deliberately; 'remote' alone must not mean worldwide remote.
-    For this India-focused profile, remote is accepted when the listing says India
-    (or gives no conflicting country). City/location tokens remain exact-ish
-    substring matches because source formatting varies.
-    """
     loc = (loc or "").strip().lower()
     allowed = {x.strip().lower() for x in allowed}
     if not loc:
@@ -205,7 +198,6 @@ def text_matches(value, phrase):
     if re.fullmatch(r"[a-z0-9]+", phrase) and len(phrase) <= 4:
         return bool(re.search(rf"\b{re.escape(phrase)}\b", value))
     return phrase in value
-
 
 FIELD_TERMS = {
     "frontend": ["frontend", "front end", "react", "react native", "next.js", "next"],
@@ -247,6 +239,14 @@ def board_queries(name, source_cfg, f):
     return source_cfg.get(name, [])
 
 def passes(j, f):
+    # Board adapters may return ISO/date strings while the built-in adapters
+    # already return datetime objects. Normalize here so all filters share one
+    # representation and datetime arithmetic cannot crash the whole run.
+    posted = j.get("posted")
+    if posted and not isinstance(posted, dt.datetime):
+        posted = parse_time(posted)
+        j["posted"] = posted
+
     t, loc, d = j["title"].lower(), j["location"].lower(), j["desc"]
     title_terms = configured_title_terms(f)
     if title_terms and not any(text_matches(t, k) for k in title_terms):
@@ -257,7 +257,7 @@ def passes(j, f):
         return False
     if f["remote_only"] and "remote" not in loc:
         return False
-    if f["max_age_hours"] and j["posted"] and (NOW - j["posted"]).total_seconds() > f["max_age_hours"] * 3600:
+    if f["max_age_hours"] and posted and (NOW - posted).total_seconds() > f["max_age_hours"] * 3600:
         return False
     if any(c.lower() in j["company"].lower() for c in f["company_exclude"]):
         return False
@@ -278,17 +278,14 @@ def score_job(j, f):
     score = 0
     reasons = []
 
-    # Role / field relevance: up to 32 points.
     title_hits = list(dict.fromkeys(k for k in configured_title_terms(f) if text_matches(t, k)))
     score += min(32, len(title_hits) * 8)
     reasons.extend(title_hits[:4])
 
-    # Skills match: up to 25 points.
     skill_hits = list(dict.fromkeys(k for k in f.get("skills", []) if text_matches(t, k) or text_matches(d, k)))
     score += min(25, len(skill_hits) * 5)
     reasons.extend(skill_hits[:5])
 
-    # Location fit: 15 points, plus 5 for a remote listing.
     if location_matches(loc, f.get("locations", [])):
         score += 15
         reasons.append("location fit")
@@ -296,7 +293,6 @@ def score_job(j, f):
         score += 5
         reasons.append("remote")
 
-    # Freshness: up to 20 points.
     posted = j.get("posted")
     if isinstance(posted, str):
         posted = parse_time(posted)
@@ -305,7 +301,6 @@ def score_job(j, f):
         age = max(0, (NOW - posted).total_seconds() / 3600)
         score += max(0, 20 - min(20, age))
 
-    # Experience fit: 10 points when the listing exposes a requirement.
     required = max_years_required(d, j.get("url"))
     candidate = f.get("candidate_experience_years")
     if required is not None and candidate is not None:
@@ -344,8 +339,6 @@ def source_key(name, arg):
     return f"{name}:{json.dumps(arg, sort_keys=True) if arg else ''}"
 
 def cooldown_minutes(failures):
-    # Back off broken sources instead of hammering them every scheduled run.
-    # 20m, 40m, 80m ... capped at 6h.
     return min(360, 20 * (2 ** max(0, failures - 1)))
 
 def should_poll(source_state, key, force=False):
@@ -375,11 +368,15 @@ def run_board_source(task):
 
 def serial_job(j, source, score=None, reasons=None):
     experience = j.get("experience") or {"min": None, "max": None, "label": "Not specified", "source": "not_found"}
+    posted = j.get("posted")
+    if posted and not isinstance(posted, dt.datetime):
+        posted = parse_time(posted)
+        j["posted"] = posted
     return {
         "id": j["id"], "source": source, "company": j["company"], "title": j["title"],
         "location": j["location"], "jd_location": j.get("jd_location") or j["location"],
         "url": j["url"],
-        "posted": j["posted"].isoformat() if j["posted"] else None,
+        "posted": posted.isoformat() if posted else None,
         "score": score, "reasons": reasons or [],
         "description": j.get("description") or j.get("desc") or "",
         "experience": experience,
@@ -429,8 +426,6 @@ def main():
     if s.get("adzuna", {}).get("enabled"):
         all_tasks.append(("adzuna", adzuna, s["adzuna"]))
 
-    # Failed sources get exponential backoff. Manual runs always bypass it so
-    # source debugging never gets stuck behind a previous failure.
     tasks = []
     board_tasks = []
     source_status = {}
@@ -440,12 +435,8 @@ def main():
             tasks.append(task)
         else:
             source_status[key] = {
-                "ok": False,
-                "skipped": True,
-                "count": 0,
-                "error": "cooldown",
-                "retry_at": source_state[key].get("skip_until"),
-                "provider": "direct",
+                "ok": False, "skipped": True, "count": 0, "error": "cooldown",
+                "retry_at": source_state[key].get("skip_until"), "provider": "direct",
             }
     for task in all_board_tasks:
         key = source_key(task[0], task[2])
@@ -453,10 +444,7 @@ def main():
             board_tasks.append(task)
         else:
             source_status[key] = {
-                "ok": False,
-                "skipped": True,
-                "count": 0,
-                "error": "cooldown",
+                "ok": False, "skipped": True, "count": 0, "error": "cooldown",
                 "retry_at": source_state[key].get("skip_until"),
                 "provider": "apify" if use_apify else "direct",
             }
@@ -466,8 +454,6 @@ def main():
         if use_apify:
             results += list(pool.map(run_board_source, board_tasks))
         else:
-            # Keep public board scrapers sequential. LinkedIn rate-limits bursts,
-            # so parallel board requests are counterproductive for a free setup.
             results += [run_source((x[0], x[1], x[2])) for x in board_tasks]
 
     alerts = []
@@ -480,52 +466,34 @@ def main():
             failures = int(previous.get("failures", 0)) + 1
             retry_at = NOW + dt.timedelta(minutes=cooldown_minutes(failures))
             source_state[key] = {
-                "failures": failures,
-                "last_error": str(err),
-                "last_failure": NOW.isoformat(),
-                "skip_until": retry_at.isoformat(),
-                "generation": SOURCE_GENERATION,
+                "failures": failures, "last_error": str(err), "last_failure": NOW.isoformat(),
+                "skip_until": retry_at.isoformat(), "generation": SOURCE_GENERATION,
             }
             source_status[key] = {
-                "ok": False,
-                "count": 0,
-                "error": str(err),
-                "provider": provider,
-                "retry_at": retry_at.isoformat(),
-                "failures": failures,
+                "ok": False, "count": 0, "error": str(err), "provider": provider,
+                "retry_at": retry_at.isoformat(), "failures": failures,
             }
             print(f"[warn] {key}: {err} (retry after {retry_at.isoformat()})")
             continue
 
         previous_generation = source_state.get(key, {}).get("generation")
         source_state[key] = {
-            "failures": 0,
-            "last_success": NOW.isoformat(),
-            "last_count": len(jobs),
-            "skip_until": None,
-            "generation": SOURCE_GENERATION,
+            "failures": 0, "last_success": NOW.isoformat(), "last_count": len(jobs),
+            "skip_until": None, "generation": SOURCE_GENERATION,
         }
         source_status[key] = {
-            "ok": True,
-            "count": len(jobs),
-            "error": None,
-            "provider": provider,
+            "ok": True, "count": len(jobs), "error": None, "provider": provider,
         }
         silent = ((not exists) or key not in known_sources or previous_generation != SOURCE_GENERATION)
         known_sources.add(key)
         for j in jobs:
             j["source"] = name
-
-            # First apply cheap source-level filters. Only likely matches get
-            # JD enrichment so a free run does not fetch every job page.
             if not passes(j, f):
                 if j["id"] in seen:
                     continue
                 seen.add(j["id"])
                 continue
 
-            # Enrich the likely match from its public job page. This supplies
-            # structured experience, skills, work mode, location and the full JD.
             enriched = enrich_job(j)
             j.update({
                 "desc": enriched.get("description") or j.get("desc", ""),
@@ -537,8 +505,6 @@ def main():
                 "jd_enriched": enriched.get("jd_enriched", False),
             })
 
-            # Re-check after enrichment because the JD may reveal an experience
-            # requirement that was not present in the source listing card.
             if not passes(j, f):
                 if j["id"] in seen:
                     continue
@@ -557,7 +523,6 @@ def main():
                 alerts.append(j["id"])
 
     dashboard_jobs.sort(key=lambda x: (x["score"] or 0, x["posted"] or ""), reverse=True)
-    # Keep a compact, fresh feed. Deduplicate by job id across overlapping sources.
     unique = {}
     for item in dashboard_jobs:
         unique[item["id"]] = item
