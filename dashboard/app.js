@@ -156,6 +156,25 @@ function apiHeaders(t){
   return {"Accept":"application/vnd.github+json","Authorization":"Bearer "+t,"X-GitHub-Api-Version":"2026-03-10","Content-Type":"application/json"};
 }
 
+async function dispatchScan(){
+  const t=token();
+  if(!t){
+    $("statusText").textContent="Add your GitHub token in Settings to start a scan.";
+    return;
+  }
+  $("statusText").textContent="Starting source scan…";
+  try{
+    const r=await fetch(API+"/repos/"+REPO+"/actions/workflows/job-watch.yml/dispatches",{
+      method:"POST",headers:apiHeaders(t),body:JSON.stringify({ref:"main"})
+    });
+    if(!r.ok) throw new Error(await githubError(r,"Could not start the workflow. Enable Actions: Read and write."));
+    $("statusText").textContent="Scan queued · feed will update when GitHub finishes.";
+    setTimeout(load,5000);
+  }catch(e){
+    $("statusText").textContent=e.message;
+  }
+}
+
 function b64utf8(text){
   const bytes=new TextEncoder().encode(text);
   let binary="";
@@ -233,6 +252,7 @@ $("clearToken").onclick=()=>{sessionStorage.removeItem("jobbeeper_github_token")
 $("saveConfig").onclick=saveAndRun;
 ["search","source","score","age"].forEach(id=>$(id).addEventListener("input",render));
 $("refresh").onclick=load;
+$("scanNow").onclick=dispatchScan;
 $("backToJobs").onclick=closeJobDetail;
 document.addEventListener("click",e=>{const b=e.target.closest(".job-title-link");if(b)showJobDetail(b.dataset.jobId);});
 setupNavigation();
