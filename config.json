@@ -23,6 +23,19 @@
       "llm", "ai", "openai", "gemini", "workflow", "orchestration"
     ]
   },
+  "apify": {
+    "enabled": true,
+    "location": "India",
+    "naukri_location": "Bangalore",
+    "locations": ["Bangalore", "Gurgaon", "Delhi", "India"],
+    "max_jobs_per_query": 50,
+    "date_posted": "past24h",
+    "actors": {
+      "linkedin": "axiomworks/linkedin-jobs-scraper",
+      "naukri": "epicscrapers/naukri-scraper",
+      "instahyre": "s_actors/instahyre-jobs-scraper"
+    }
+  },
   "sources": {
     "greenhouse": ["groww", "databricks", "stripe", "airbnb", "cloudflare", "coinbase",
       "datadog", "elastic", "figma", "gitlab", "mongodb", "okta", "pinterest",
