@@ -103,10 +103,29 @@ def workday(entry):
         r.raise_for_status()
         posts = r.json().get("jobPostings", [])
         for j in posts:
-            yield job(f"wd-{tenant}-{j['externalPath']}", tenant, j.get("title"),
-                      j.get("locationsText"),
-                      f"https://{host}/en-US/{site}{j['externalPath']}",
-                      workday_age(j.get("postedOn")))
+            path = j.get("externalPath") or j.get("url") or j.get("jobUrl") or j.get("externalUrl")
+            if not path:
+                # Some tenants return a malformed posting without a public path.
+                # Skip that posting instead of failing the entire tenant.
+                continue
+            path = str(path)
+            if path.startswith("http"):
+                public_url = path
+            else:
+                if not path.startswith("/"):
+                    path = "/" + path
+                public_url = f"https://{host}/en-US/{site}{path}"
+            job_id = j.get("id") or j.get("jobId") or j.get("requisitionId") or path
+            locations = j.get("locationsText") or j.get("location") or j.get("locations")
+            if isinstance(locations, list):
+                locations = ", ".join(
+                    str(x.get("descriptor") or x.get("name") or x)
+                    if isinstance(x, dict) else str(x)
+                    for x in locations
+                )
+            yield job(f"wd-{tenant}-{job_id}", tenant, j.get("title"),
+                      locations, public_url, workday_age(j.get("postedOn")),
+                      strip(j.get("description") or j.get("jobDescription") or ""))
         if len(posts) < 20:
             break
 
@@ -176,7 +195,7 @@ def location_matches(loc, allowed):
 
 def text_matches(value, phrase):
     value = re.sub(r"\s+", " ", (value or "").lower()).strip()
-    phrase = re.sub(r"\\s+", " ", (phrase or "").lower()).strip()
+    phrase = re.sub(r"\s+", " ", (phrase or "").lower()).strip()
     if not phrase:
         return False
     if re.fullmatch(r"[a-z0-9]+", phrase) and len(phrase) <= 4:
