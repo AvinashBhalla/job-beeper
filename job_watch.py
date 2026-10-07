@@ -423,7 +423,7 @@ def notify(j, score, reasons):
     posted = j["posted"].strftime("%d %b %H:%M UTC") if j["posted"] else "unknown"
     why = ", ".join(reasons[:8]) or "profile filters"
     text = (f"🚨 {score}% MATCH\n{j['title']}\n🏢 {j['company']}\n"
-            f"📍 {j['location']}\n🕒 {posted}\n✓ {why}\n🔗 {j['url']}")
+            f"📍 {j['location']}\n🌐 {j.get('source', 'job source')}\n🕒 {posted}\n✓ {why}\n🔗 {j['url']}")
     requests.post(f"https://api.telegram.org/bot{os.environ['TG_TOKEN']}/sendMessage",
                   data={"chat_id": os.environ["TG_CHAT_ID"], "text": text}, timeout=20)
 
