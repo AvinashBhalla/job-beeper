@@ -3,29 +3,54 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "job_watch.py"
+      - "job_sources_extra.py"
+      - "config.json"
+      - "requirements.txt"
+      - ".github/workflows/job-watch.yml"
+
 permissions:
   contents: write
+
+# Never allow an old polling run to overwrite a newer run/code change.
 concurrency:
-  group: job-watch
-  cancel-in-progress: false
+  group: job-watch-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - run: pip install -r requirements.txt
+
       - run: python job_watch.py
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+
       - name: Save state and dashboard feed
         run: |
           git config user.name "job-watch-bot"
           git config user.email "bot@users.noreply.github.com"
+
+          # The source code/config may have changed while this run was polling.
+          # Rebase our generated state onto the latest main before pushing.
           git add seen.json dashboard/data/jobs.json
-          git diff --staged --quiet || (git commit -m "refresh job feed" && git push)
+          git diff --staged --quiet && exit 0
+
+          git commit -m "refresh job feed"
+          git pull --rebase origin main
+          git push
