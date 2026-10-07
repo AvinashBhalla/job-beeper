@@ -26,7 +26,7 @@ def _job(id_, company, title, location, url, posted=None, desc=""):
 
 def linkedin_guest(keyword):
     base = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-    for start in (0, 25, 50, 75):
+    for start in (0, 25):
         soup = _soup(base, {"keywords": keyword, "location": "India", "start": start})
         cards = soup.select("li")
         if not cards:
