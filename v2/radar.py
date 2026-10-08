@@ -687,6 +687,26 @@ def backfill_job_evaluations(config: dict[str, Any] | None = None) -> int:
     return count
 
 
+def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
+    config = config or get_config()
+    fingerprint = _config_fingerprint(config)
+    count = 0
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT j.id
+            FROM jobs j
+            LEFT JOIN job_evaluations e ON e.job_id = j.id
+            WHERE e.job_id IS NULL OR e.config_fingerprint != ?
+            ORDER BY j.first_seen_at ASC, j.id ASC
+        """, (fingerprint,)).fetchall()
+        for row in rows:
+            _persist_job_evaluation(conn, int(row["id"]), config)
+            count += 1
+        conn.commit()
+    return count
+
+
 def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
     for field in ("source_posted_at", "discovered_at"):
         value = job.get(field)
@@ -1222,6 +1242,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
     try:
         jobs = COLLECTORS[source](config)
         new_jobs = upsert_jobs(jobs, config)
+        refresh_job_evaluations(config)
         refresh_notification_decisions(config)
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
@@ -1275,7 +1296,7 @@ async def startup() -> None:
     init_db()
     ensure_runtime_config()
     config = get_config()
-    backfill_job_evaluations(config)
+    refresh_job_evaluations(config)
     refresh_notification_decisions(config)
     ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
@@ -1314,6 +1335,8 @@ def read_config():
 def update_config(payload: dict[str, Any], x_config_token: str | None = Header(default=None, alias="X-Config-Token")):
     authorize_config_update(x_config_token)
     saved = save_config(payload)
+    refresh_job_evaluations(saved)
+    refresh_notification_decisions(saved)
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
