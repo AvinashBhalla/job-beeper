@@ -1384,3 +1384,15 @@ The repository and this file should be kept in sync deliberately.
 - The Naukri relay workflow is present on main and continues to publish the relay to the dedicated `naukri-relay` branch.
 - The premium dashboard, live-feed mismatch fix, three-source UI restriction, Source Health correction, LinkedIn fast-lane freshness fix, and related regression coverage are included in main.
 - Next operational step: update the Oracle Docker deployment from the old runtime to this main revision, then measure LinkedIn discovery latency on real fresh postings. Development after this point should branch from/main-track `main`.
+
+## Post-Main Runtime Findings & LinkedIn Burst Reduction — 2026-10-08
+
+- After rebuilding `main` on Oracle, the V2 container is healthy and the live API responds correctly.
+- Runtime inspection exposed configuration drift: Instahyre was disabled in repository defaults but the persistent `/data/config.json` still allowed it, so the scheduler attempted Instahyre and received HTTP 400. This was not a new production source decision; it was stale runtime configuration.
+- V2 config migration was advanced to version 4. Runtimes upgraded from pre-v4 configuration now force Instahyre back to the intended disabled-by-default state while preserving other settings. Added regression coverage for this migration.
+- LinkedIn still shows 429 pressure. The previous fast lane removed the Easy Apply restriction, but it was still issuing 4 query families × 4 locations every minute (16 search requests/minute), plus retries and periodic deep scans.
+- Corrective change: the fast lane now rotates through two of the configured four locations per 60-second cycle, so every target location is covered across two cycles while reducing the fast search burst from 16 requests to 8 per cycle. Search/detail worker concurrency was also reduced from 6 to 4 to reduce burst pressure on LinkedIn.
+- The 5-minute deep scan still covers the complete configured location set.
+- This is a measured compromise between freshness and rate-limit pressure: target location coverage remains within roughly two fast cycles under normal runtime conditions, while request bursts are materially smaller.
+- New commits on `main`: `520da25` (scan-burst reduction + config migration), `6bf496c` (config version), `8b6f558` (migration regression test).
+- Next Oracle action after CI passes: rebuild the container again so the v4 migration and reduced-burst LinkedIn collector become active. Then inspect `/api/config` to confirm Instahyre is false and inspect LinkedIn source runs/latency over several fresh postings.
