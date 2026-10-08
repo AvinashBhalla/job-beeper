@@ -163,8 +163,12 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
         FROM notification_ledger nl
         JOIN jobs j ON j.id = nl.candidate_job_id
         JOIN job_evaluations e ON e.job_id = nl.candidate_job_id
-        WHERE nl.status IN ('queued', 'failed')
-          AND (nl.next_attempt_at IS NULL OR nl.next_attempt_at <= ?)
+        WHERE nl.status='queued'
+           OR (
+                nl.status='failed'
+                AND nl.next_attempt_at IS NOT NULL
+                AND nl.next_attempt_at <= ?
+           )
         ORDER BY nl.created_at ASC
         LIMIT 1
     """, (timestamp,)).fetchone()
@@ -194,6 +198,24 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
         return None
 
     return item
+
+
+def recover_stale_claims(max_age_minutes: int = 10) -> int:
+    cutoff = iso(now() - dt.timedelta(minutes=max_age_minutes))
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("""
+            UPDATE notification_ledger
+            SET status='queued',
+                updated_at=?,
+                claimed_at=NULL,
+                next_attempt_at=NULL,
+                last_error=COALESCE(last_error, 'Recovered interrupted delivery')
+            WHERE status='sending'
+              AND claimed_at IS NOT NULL
+              AND claimed_at < ?
+        """, (iso(now()), cutoff))
+        conn.commit()
+        return cursor.rowcount
 
 
 def deliver_queued_notifications(limit: int = 10) -> int:
