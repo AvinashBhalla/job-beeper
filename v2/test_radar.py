@@ -956,7 +956,7 @@ class MatcherTests(unittest.TestCase):
             fast = next(p for p in params_seen if p["start"] == 0)
             deep = next(p for p in params_seen if p["start"] == 10)
             self.assertEqual(fast["f_TPR"], radar.LINKEDIN_FAST_TPR)
-            self.assertEqual(fast["f_EA"], "true")
+            self.assertNotIn("f_EA", fast)
             self.assertEqual(deep["f_TPR"], radar.LINKEDIN_DEEP_TPR)
             self.assertNotIn("f_EA", deep)
             self.assertEqual(len(second), 1)
