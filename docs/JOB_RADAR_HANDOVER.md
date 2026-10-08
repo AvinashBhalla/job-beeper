@@ -609,9 +609,10 @@ The system is therefore **ingesting real jobs continuously**.
 ### Currently in progress
 
 ```
+⏳ Pull the latest GitHub commits onto Oracle and deploy the hardened LinkedIn JD extraction/retrieval change
+⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Verify notification dedupe at the canonical-opportunity level using fresh production samples (the 20-row diagnostic can contain multiple observations of the same canonical opportunity, so distinct canonical counts must be measured before MVP sign-off)
-⏳ Commit/reconcile the latest matcher changes on the active branch after the Docker-green production validation, keeping GitHub and Oracle working-tree state aligned
+⏳ Verify canonical-level alert deduplication using distinct canonical opportunities rather than raw job rows
 ⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
 ⏳ Validate restart/recovery behavior with persisted config, evaluations and notification ledger
 ⏳ Finish browser verification of the live dashboard against real V2 API data
@@ -619,26 +620,37 @@ The system is therefore **ingesting real jobs continuously**.
 ⏳ Validate source-health UI and remaining convenience features
 ⏳ Final V2 MVP sign-off after latency, dedupe, config persistence/recovery and frontend verification
 ```
-
 ### V1 status
 
 The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
 
-### Step A — Verify canonical-level alert deduplication
+### Step A — Deploy and verify hardened LinkedIn JD extraction
 
-Run a production diagnostic on the latest 10-minute sample and count:
+Pull the latest v2-live-radar commits onto Oracle, rebuild/recreate the V2 container and verify a real LinkedIn posting whose browser JD explicitly states:
 
-- fresh matching rows
-- distinct canonical opportunities
-- distinct canonical opportunities with `sent`
-- duplicate source observations per canonical opportunity
+```
+5 to 7 years of overall software engineering experience
+```
 
-Do not treat a row count as an alert count.
+The system must capture:
 
-### Step B — Measure end-to-end alert latency
+```
+experience_min_years = 5
+experience_max_years = 7
+```
 
-Measure a controlled set of fresh jobs through:
+and reject the posting for the current 3-year maximum before Telegram delivery.
+
+### Step B — Verify canonical-level alert deduplication
+
+On a fresh production window, count fresh matching rows, distinct canonical opportunities, distinct sent canonical opportunities and duplicate observations per canonical opportunity.
+
+Do not interpret source-row count as alert count.
+
+### Step C — Measure end-to-end alert latency
+
+Measure:
 
 ```
 source posting
@@ -652,55 +664,26 @@ source posting
 
 Record median and p95 latency.
 
-### Step C — Reconcile GitHub and Oracle working-tree state
-
-The matcher improvement has been Docker-tested and is active in the current Oracle runtime validation. Commit and push the validated matcher/test/.gitignore changes so the active branch and deployed runtime are aligned.
-
-Then update this handover in the same milestone.
-
 ### Step D — Validate runtime configuration + recovery
 
-Verify that frontend/API changes:
-
-- persist in `/data/config.json`
-- re-evaluate existing jobs
-- reconsider pending notification state correctly
-- survive container restart/recovery
+Verify frontend/API changes persist in /data/config.json, trigger evaluation/notification reconsideration correctly and survive container restart.
 
 ### Step E — Finish frontend verification
 
-Validate:
-
-- live refresh
-- current-day feed
-- daily counters
-- filters/settings
-- job details
-- source health
-- direct apply links
+Validate live refresh, current-day feed, daily counters, filters/settings, job details, source health and direct apply links.
 
 ### Step F — Changed-opportunity detection
 
-Define what constitutes a materially changed opportunity, for example:
+Define material changes including experience requirements, description/requirements, location/work mode and application URL changes, then reconsider without duplicate alerts.
 
-- changed experience requirement
-- materially changed description/requirements
-- changed location/work mode
-- changed application URL
+### Step G — Source-access optimisation evaluation
 
-Reconsider the opportunity without producing duplicate alerts.
+Only after the core V2 path is stable, benchmark Agent-Reach against the current LinkedIn collector for freshness, detail quality, latency, 429/failure rate and Oracle resource usage.
 
-### Step G — MVP sign-off
+### Step H — MVP sign-off
 
 Only after the above checks pass should the current architecture be treated as the stable V2 MVP baseline.
 
-### Step H — Source expansion
-
-After MVP sign-off:
-
-- benchmark Agent-Reach against the existing LinkedIn collector
-- add high-value structured ATS sources progressively
-- keep each source isolated behind an adapter
 ## 13. ENGINEERING RULES FOR FUTURE AGENTS
 
 ### Before changing a source
@@ -891,6 +874,44 @@ docker compose ... run --rm --no-deps radar python3 -m unittest discover -s v2 -
 
 Do not install ad-hoc host Python dependencies just to run the suite.
 
+### Observation 20 — LinkedIn JD experience can be present in the browser while missing from Telegram
+
+A real BlueOptima LinkedIn posting exposed a correctness gap:
+
+```
+Browser JD:
+5 to 7 years of overall software engineering experience.
+
+Telegram:
+Experience: Not stated
+```
+
+The important distinction is that the source posting can contain an explicit experience requirement even when the search-card payload does not. The V2 detail acquisition or parsing layer can therefore be the failure point.
+
+Corrective rule:
+
+```
+LinkedIn card has no experience
+        ↓
+preliminary profile match
+        ↓
+fetch public job detail
+        ↓
+prefer explicit overall/total experience statements
+        ↓
+persist min/max experience
+        ↓
+re-evaluate before notification
+```
+
+Supported JD wording must include phrases such as `5 to 7 years of overall software engineering experience`, common Unicode dash variants, HTML entities/non-breaking spaces and common minimum/at-least experience wording.
+
+A known experience requirement must not be hidden merely because the search card omitted it.
+
+### Observation 21 — The latest production alert diagnostic showed canonical duplication is controlled but not yet fully audited
+
+The latest 10-minute diagnostic showed 29 fresh matching rows, 25 distinct canonical opportunities and 13 distinct canonical opportunities with sent notification state. One canonical opportunity contained five fresh LinkedIn observations of the same Accenture AI/ML Engineer listing. This confirms why canonical-level counts must be used for alert analysis.
+
 ### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
 
 Agent-Reach may reduce the amount of bespoke web-access code for some future sources, particularly LinkedIn or generic web/ATS discovery.
@@ -973,8 +994,9 @@ Oracle Always Free VM + Docker + SQLite.
 
 LINKEDIN:
 Direct ingestion from Oracle. Proven.
-Current polling is approximately every 60 seconds with a bounded fast/deep scan strategy.
+Polling is approximately every 60 seconds with bounded fast/deep scanning.
 Historical 429/rate-limit pressure exists and must be measured, not solved by blindly increasing request volume.
+JD enrichment is required for cards missing experience; detail retrieval/parsing has a known BlueOptima-style incident under hardening.
 
 NAUKRI:
 Do NOT scrape from Oracle.
@@ -983,7 +1005,6 @@ Proven and running every 5 minutes.
 
 INSTAHYRE:
 Experimental and disabled by default.
-Do not depend on it.
 
 V2:
 Running on port 8000.
@@ -995,17 +1016,13 @@ Supports Software Engineer / Software Development Engineer / SDE variants.
 Supports skill + generic developer/engineer title matching such as Javascript Developer.
 Unknown experience is neutral for matching.
 Configured maximum experience remains strict.
-39 regression tests are green in Docker.
-
-CONFIG:
-Defaults in v2/config.json.
-Runtime preferences persist under /data/config.json through the protected V2 configuration API.
+39 regression tests were green before the latest JD-hardening change; the updated suite must pass after the latest changes.
 
 TELEGRAM:
 Working.
-Alerts require match + alertable state and recent discovery for queued items.
-The real-time queued-alert window is 10 minutes.
-Fresh production validation showed 20 matching rows, 20 alertable rows and 17 rows linked to sent canonical notification state; distinct canonical alert count still needs verification.
+Queued alerts require match + alertability + recent discovery.
+The recent-discovery queue window is 10 minutes; failed delivery retries are still allowed after that window.
+Fresh alert diagnostics must be counted by canonical opportunity, not source rows.
 
 DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
@@ -1020,12 +1037,13 @@ V1:
 Legacy job-watch Telegram workflow is inactive/disabled.
 
 AGENT-REACH:
-Parked as a future optimisation.
-Do not make it a runtime dependency yet.
+Parked as a future source-access optimisation.
+Do not make it a runtime dependency until the core V2 MVP is stable and benchmarked.
 
 NEXT:
-Verify canonical-level dedupe → measure end-to-end alert latency → commit/reconcile latest matcher changes → validate config persistence/recovery → finish frontend verification → implement changed-opportunity detection → MVP sign-off → expand sources.
+Deploy JD hardening → verify 5–7-year extraction end-to-end → verify canonical alert counts → measure end-to-end latency → validate config persistence/recovery → finish frontend verification → changed-opportunity detection → MVP sign-off → benchmark Agent-Reach and expand sources.
 ```
+
 ## 18. SOURCE OF TRUTH HIERARCHY
 
 When information conflicts, use this order:
