@@ -3,9 +3,11 @@ name: V2 CI
 on:
   push:
     branches:
+      - main
       - v2-live-radar
   pull_request:
     branches:
+      - main
       - v2-live-radar
 
 jobs:
