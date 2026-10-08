@@ -66,6 +66,51 @@ class MatcherTests(unittest.TestCase):
                     """).fetchall()
                 self.assertEqual(len(rows), 2)
                 self.assertEqual(rows[0][1], rows[1][1])
+                ledger = conn.execute(
+                    "SELECT count(*), min(status) FROM notification_ledger"
+                ).fetchone()
+                self.assertEqual(ledger[0], 1)
+                self.assertEqual(ledger[1], "pending")
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_new_opportunity_gets_pending_notification_state(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-1", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/1", None,
+                    "unknown", "same listing metadata",
+                )
+                self.assertEqual(upsert_jobs([job]), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("SELECT status FROM notification_ledger").fetchone()
+                self.assertEqual(row[0], "pending")
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_existing_opportunity_can_be_backfilled_as_suppressed(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-1", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/1", None,
+                    "unknown", "same listing metadata",
+                )
+                self.assertEqual(upsert_jobs([job]), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("DELETE FROM notification_ledger")
+                    conn.commit()
+                radar.backfill_notification_ledger()
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("SELECT status FROM notification_ledger").fetchone()
+                self.assertEqual(row[0], "suppressed")
             finally:
                 radar.DB_PATH = original_db
 
