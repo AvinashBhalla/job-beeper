@@ -497,15 +497,7 @@ V2 container is running:
 - port: `8000`
 - database: `/data/jobs.db`
 
-Health endpoint currently returns:
-
-```json
-{
-  "status": "ok",
-  "version": "2.0.0",
-  "db": "/data/jobs.db"
-}
-```
+The deployed service is verified through its root redirect and V2 APIs. There is no `/api/health` endpoint in the current implementation; `/` redirects to `/dashboard/`.
 
 ### Naukri systemd scheduler
 
@@ -619,7 +611,7 @@ The system is therefore **ingesting real jobs continuously**.
 ```
 ✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
-⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
+✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
 ⏳ Verify canonical-level alert deduplication using distinct canonical opportunities rather than raw job rows
 ⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
@@ -634,7 +626,7 @@ The system is therefore **ingesting real jobs continuously**.
 The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
 
-### Step A — Verify hardened LinkedIn JD extraction end-to-end
+### Step A — Hardened LinkedIn JD extraction end-to-end — VERIFIED
 
 With the latest container running, verify a real LinkedIn posting whose browser JD explicitly states:
 
