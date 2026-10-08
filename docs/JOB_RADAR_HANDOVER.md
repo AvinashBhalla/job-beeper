@@ -471,6 +471,28 @@ Oracle deployment is now complete; browser/product verification remains pending.
 
 ---
 
+### Observation 27 — Repository cleanup after UI PR
+
+The merged UI PR accidentally committed runtime/generated artifacts:
+
+- `v2/jobs.db`
+- `v2/config_token`
+- ten tracked `__pycache__/*.pyc` files, including UI skill cache files
+
+These artifacts have now been removed from the current `v2-live-radar` branch tip, and `.gitignore` now covers:
+
+```
+__pycache__/
+*.pyc
+*.pyo
+v2/jobs.db
+v2/config_token
+```
+
+A branch-tree verification confirms none of those artifact paths remain in the current branch.
+
+Security rule: removing a credential from the current branch does not erase it from Git history. Because `v2/config_token` was committed, the live Oracle configuration token should be rotated immediately. Full history scrubbing is a separate optional cleanup and should be coordinated with the production branch before force-pushing.
+
 ## 9. CURRENT INFRASTRUCTURE STATE — VERIFIED
 
 ### Oracle VM
