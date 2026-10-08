@@ -103,5 +103,6 @@
     "linkedin": true,
     "naukri": true,
     "instahyre": false
-  }
+  },
+  "config_version": 2
 }
