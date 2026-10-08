@@ -1,23 +1,23 @@
 {
-  "updated_at": "2026-10-08T02:52:07.817538+00:00",
-  "last_run": "2026-10-08T02:52:07.817538+00:00",
-  "new_alerts": 0,
+  "updated_at": "2026-10-08T09:33:38.846023+00:00",
+  "last_run": "2026-10-08T09:33:38.846023+00:00",
+  "new_alerts": 13,
   "source_status": {
     "greenhouse:\"groww\"": {
       "ok": true,
-      "count": 7,
+      "count": 8,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"databricks\"": {
       "ok": true,
-      "count": 894,
+      "count": 895,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"stripe\"": {
       "ok": true,
-      "count": 722,
+      "count": 725,
       "error": null,
       "provider": "direct"
     },
@@ -29,7 +29,7 @@
     },
     "greenhouse:\"cloudflare\"": {
       "ok": true,
-      "count": 426,
+      "count": 425,
       "error": null,
       "provider": "direct"
     },
@@ -41,19 +41,19 @@
     },
     "greenhouse:\"datadog\"": {
       "ok": true,
-      "count": 438,
+      "count": 439,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"elastic\"": {
       "ok": true,
-      "count": 417,
+      "count": 418,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"figma\"": {
       "ok": true,
-      "count": 153,
+      "count": 150,
       "error": null,
       "provider": "direct"
     },
@@ -65,19 +65,19 @@
     },
     "greenhouse:\"mongodb\"": {
       "ok": true,
-      "count": 393,
+      "count": 392,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"okta\"": {
       "ok": true,
-      "count": 372,
+      "count": 364,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"pinterest\"": {
       "ok": true,
-      "count": 179,
+      "count": 180,
       "error": null,
       "provider": "direct"
     },
@@ -101,19 +101,19 @@
     },
     "greenhouse:\"twilio\"": {
       "ok": true,
-      "count": 130,
+      "count": 131,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"zscaler\"": {
       "ok": true,
-      "count": 366,
+      "count": 368,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"vercel\"": {
       "ok": true,
-      "count": 85,
+      "count": 86,
       "error": null,
       "provider": "direct"
     },
@@ -149,7 +149,7 @@
     },
     "greenhouse:\"asana\"": {
       "ok": true,
-      "count": 102,
+      "count": 104,
       "error": null,
       "provider": "direct"
     },
@@ -167,7 +167,7 @@
     },
     "greenhouse:\"duolingo\"": {
       "ok": true,
-      "count": 59,
+      "count": 58,
       "error": null,
       "provider": "direct"
     },
@@ -179,13 +179,13 @@
     },
     "greenhouse:\"fivetran\"": {
       "ok": true,
-      "count": 197,
+      "count": 196,
       "error": null,
       "provider": "direct"
     },
     "greenhouse:\"grafanalabs\"": {
       "ok": true,
-      "count": 122,
+      "count": 113,
       "error": null,
       "provider": "direct"
     },
@@ -203,7 +203,7 @@
     },
     "greenhouse:\"rubrik\"": {
       "ok": true,
-      "count": 132,
+      "count": 133,
       "error": null,
       "provider": "direct"
     },
@@ -221,7 +221,7 @@
     },
     "greenhouse:\"toast\"": {
       "ok": true,
-      "count": 305,
+      "count": 306,
       "error": null,
       "provider": "direct"
     },
@@ -233,7 +233,7 @@
     },
     "lever:\"paytm\"": {
       "ok": true,
-      "count": 175,
+      "count": 177,
       "error": null,
       "provider": "direct"
     },
@@ -263,7 +263,7 @@
     },
     "ashby:\"openai\"": {
       "ok": true,
-      "count": 815,
+      "count": 816,
       "error": null,
       "provider": "direct"
     },
@@ -275,7 +275,7 @@
     },
     "ashby:\"notion\"": {
       "ok": true,
-      "count": 134,
+      "count": 135,
       "error": null,
       "provider": "direct"
     },
@@ -311,7 +311,7 @@
     },
     "ashby:\"cohere\"": {
       "ok": true,
-      "count": 126,
+      "count": 124,
       "error": null,
       "provider": "direct"
     },
@@ -335,7 +335,7 @@
     },
     "smartrecruiters:\"Freshworks\"": {
       "ok": true,
-      "count": 32,
+      "count": 33,
       "error": null,
       "provider": "direct"
     },
@@ -416,12 +416,12 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://walmart.wd5.myworkdayjobs.com/wday/cxs/walmart/walmartexternal/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 8
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 9
     },
     "workday:{\"search\": \"software engineer bangalore\", \"url\": \"https://intel.wd1.myworkdayjobs.com/External\"}": {
       "ok": true,
-      "count": 30,
+      "count": 32,
       "error": null,
       "provider": "direct"
     },
@@ -430,8 +430,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 11
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 12
     },
     "workday:{\"search\": \"software engineer\", \"url\": \"https://workday.wd5.myworkdayjobs.com/Workday\"}": {
       "ok": true,
@@ -450,8 +450,8 @@
       "count": 0,
       "error": "422 Client Error: Unprocessable Entity for url: https://qualcomm.wd5.myworkdayjobs.com/wday/cxs/qualcomm/External/jobs",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 11
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 12
     },
     "workday:{\"search\": \"software engineer bengaluru\", \"url\": \"https://target.wd5.myworkdayjobs.com/targetcareers\"}": {
       "ok": true,
@@ -538,290 +538,411 @@
       "provider": "direct"
     },
     "web:Ashby:": {
-      "ok": true,
-      "count": 0,
-      "error": null,
-      "provider": "direct"
-    },
-    "web:Avature:": {
-      "ok": true,
-      "count": 2,
-      "error": null,
-      "provider": "direct"
-    },
-    "web:BambooHR:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:12:07.817538+00:00",
-      "failures": 5
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
+      "failures": 1
     },
-    "web:Breezy:": {
+    "web:Avature:": {
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
+      "failures": 1
+    },
+    "web:BambooHR:": {
       "ok": true,
       "count": 0,
       "error": null,
       "provider": "direct"
+    },
+    "web:Breezy:": {
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
+      "failures": 1
     },
     "web:Cutshort:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Darwinbox:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T05:32:07.817538+00:00",
-      "failures": 4
+      "retry_at": "2026-10-08T14:53:38.846023+00:00",
+      "failures": 5
     },
     "web:Eightfold AI:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T05:32:07.817538+00:00",
-      "failures": 4
+      "retry_at": "2026-10-08T14:53:38.846023+00:00",
+      "failures": 5
     },
     "web:Freshteam:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T03:32:07.817538+00:00",
-      "failures": 2
+      "retry_at": "2026-10-08T10:53:38.846023+00:00",
+      "failures": 3
     },
     "web:Greenhouse:": {
       "ok": false,
       "count": 0,
-      "error": "No results found.",
+      "error": "error decoding response body > request or response body error > operation timed out",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Hireology:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Hirist:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:HRsmart:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:iCIMS:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Instahyre:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Jibe (iCIMS):": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Jobvite:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Keka:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Lever:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:LinkedIn:": {
+      "ok": true,
+      "count": 2,
+      "error": null,
+      "provider": "direct"
+    },
+    "web:Naukri:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T03:12:07.817538+00:00",
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
       "failures": 1
     },
-    "web:Naukri:": {
-      "ok": true,
-      "count": 1,
-      "error": null,
-      "provider": "direct"
-    },
     "web:Oracle Cloud Recruiting:": {
-      "ok": true,
-      "count": 3,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
+      "failures": 1
     },
     "web:Paycom:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:PeopleStrong:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Phenom People:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Recruitee:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Rippling ATS:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:SmartRecruiters:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:SAP SuccessFactors:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Oracle Taleo:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T03:12:07.817538+00:00",
-      "failures": 1
+      "retry_at": "2026-10-08T10:13:38.846023+00:00",
+      "failures": 2
     },
     "web:Teamtailor:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:UKG Pro / UltiPro:": {
-      "ok": true,
-      "count": 1,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
+      "failures": 1
     },
     "web:Wellfound:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Workable:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Workday:": {
-      "ok": false,
-      "count": 0,
-      "error": "No results found.",
-      "provider": "direct",
-      "retry_at": "2026-10-08T03:12:07.817538+00:00",
-      "failures": 1
+      "ok": true,
+      "count": 3,
+      "error": null,
+      "provider": "direct"
     },
     "web:Y Combinator:": {
       "ok": false,
       "count": 0,
       "error": "No results found.",
       "provider": "direct",
-      "retry_at": "2026-10-08T08:52:07.817538+00:00",
-      "failures": 6
+      "retry_at": "2026-10-08T15:33:38.846023+00:00",
+      "failures": 7
     },
     "web:Zoho Recruit:": {
-      "ok": true,
-      "count": 2,
-      "error": null,
-      "provider": "direct"
+      "ok": false,
+      "count": 0,
+      "error": "No results found.",
+      "provider": "direct",
+      "retry_at": "2026-10-08T09:53:38.846023+00:00",
+      "failures": 1
     }
   },
   "jobs": [
     {
-      "id": "an-remote-applied-ai-engineer-3132",
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-developer-at-nippon-data-systems-4475771484",
+      "source": "linkedin",
+      "company": "Nippon Data Systems",
+      "title": "Full Stack Developer",
+      "location": "Sahibzada Ajit Singh Nagar, Punjab, India",
+      "jd_location": "Sahibzada Ajit Singh Nagar, Punjab, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-developer-at-nippon-data-systems-4475771484",
+      "posted": "2026-10-08T08:33:38.846023+00:00",
+      "score": 55,
+      "reasons": [
+        "full stack developer",
+        "full stack",
+        "python",
+        "location fit"
+      ],
+      "description": "We are seeking a skilled Full Stack Developer to join our dynamic team in the Chandigarh Region. The ideal candidate will have a strong background in both front-end and back-end development, with expertise in Angular, .NET Core, PostgreSQL, and Python. As a Full Stack Developer, you will be responsible for designing, developing, and maintaining web applications that provide a seamless user experience. Key Responsibilities: - Collaborate with cross-functional teams to define, design, and ship new features. - Develop and maintain high-quality web applications using Angular for the front end and .NET Core for the back end. - Write clean, maintainable, and efficient code while adhering to best practices. - Troubleshoot and debug applications to optimize performance. - Participate in code reviews and contribute to team knowledge sharing. - Stay updated with emerging technologies and industry trends to enhance development processes. Required Skills: - Proficiency in Angular and .NET Core. - Strong knowledge of PostgreSQL and Python. - Experience with full stack development practices. - Ability to work collaboratively in a team environment. - Excellent problem-solving skills and attention to detail. If you are passionate about technology and eager to work in a fast-paced environment, we encourage you to apply for this exciting opportunity. Join us in building innovative solutions that make a difference.<br><br>This job is provided by Shine.com",
+      "experience": {
+        "min": null,
+        "max": null,
+        "label": "Not specified",
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "python",
+        "postgresql"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-developer-at-nippon-data-systems-4475783186",
+      "source": "linkedin",
+      "company": "Nippon Data Systems",
+      "title": "Full Stack Developer",
+      "location": "Balachaur, Punjab, India",
+      "jd_location": "Balachaur, Punjab, India",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-developer-at-nippon-data-systems-4475783186",
+      "posted": "2026-10-08T08:33:38.846023+00:00",
+      "score": 55,
+      "reasons": [
+        "full stack developer",
+        "full stack",
+        "python",
+        "location fit"
+      ],
+      "description": "We are seeking a skilled Full Stack Developer to join our dynamic team in the Chandigarh Region. The ideal candidate will have a strong background in both front-end and back-end development, with expertise in Angular, .NET Core, PostgreSQL, and Python. As a Full Stack Developer, you will be responsible for designing, developing, and maintaining web applications that provide a seamless user experience. Key Responsibilities: - Collaborate with cross-functional teams to define, design, and ship new features. - Develop and maintain high-quality web applications using Angular for the front end and .NET Core for the back end. - Write clean, maintainable, and efficient code while adhering to best practices. - Troubleshoot and debug applications to optimize performance. - Participate in code reviews and contribute to team knowledge sharing. - Stay updated with emerging technologies and industry trends to enhance development processes. Required Skills: - Proficiency in Angular and .NET Core. - Strong knowledge of PostgreSQL and Python. - Experience with full stack development practices. - Ability to work collaboratively in a team environment. - Excellent problem-solving skills and attention to detail. If you are passionate about technology and eager to work in a fast-paced environment, we encourage you to apply for this exciting opportunity. Join us in building innovative solutions that make a difference.<br><br>This job is provided by Shine.com",
+      "experience": {
+        "min": null,
+        "max": null,
+        "label": "Not specified",
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "python",
+        "postgresql"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/full-stack-software-developer-4475751261",
+      "source": "linkedin",
+      "company": "CrimsonEdge Systems Pvt Ltd",
+      "title": "Full Stack Software Developer",
+      "location": "Chennai, Tamil Nadu, India",
+      "jd_location": "Chennai Show more Show less Seniority level Entry level Employment type Full-time Get notified about",
+      "url": "https://in.linkedin.com/jobs/view/full-stack-software-developer-4475751261",
+      "posted": "2026-10-08T05:33:38.846023+00:00",
+      "score": 82,
+      "reasons": [
+        "software developer",
+        "full stack",
+        "react",
+        "node.js",
+        "python",
+        "django",
+        "javascript",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "Full Stack Software Developer Chennai, Tamil Nadu, India Apply Full Stack Software Developer CrimsonEdge Systems Pvt Ltd Chennai, Tamil Nadu, India 4 hours ago Over 200 applicants Apply Save Report this job Company Description CrimsonEdge Systems Pvt Ltd is a technology company focused on developing innovative robotics, embedded systems, IoT, and software products. Based in Chennai, the company brings together hardware, firmware, and software engineering to build reliable, practical, and scalable solutions. Team members collaborate across disciplines to transform ideas and business requirements into working products. CrimsonEdge Systems values continuous learning, ownership, innovation, and hands-on problem-solving, offering team members opportunities to strengthen their technical skills while contributing to real-world product development. Role Description The Full Stack Software Developer will design, develop, test, and maintain web applications and backend services for robotics and IoT products. Day-to-day responsibilities include building backend applications using Java and Spring Boot, developing Python-based services and automation tools, creating responsive dashboards, and implementing REST APIs that connect hardware devices, applications, and cloud platforms. The developer will manage database integration, authentication, user management, and role-based access control while ensuring application performance, security, and scalability. The role also involves integrating IoT and embedded devices with backend systems, developing user interfaces using React or a similar JavaScript framework, deploying applications on Linux or cloud environments, maintaining code through Git, and troubleshooting application issues. The developer will work closely with hardware, firmware, robotics, and product teams throughout the development process. This is a full-time, junior-level role based in Chennai. Qualifications Proficiency in Python and Java for application and backend development. Working knowledge of Java Spring Boot and REST API development. Experience with HTML, CSS, and JavaScript. Familiarity with React or another modern front-end framework. Understanding of SQL and database fundamentals. Experience integrating front-end applications with backend services and APIs. Familiarity with authentication, user management, and role-based access control. Basic knowledge of Linux environments and application deployment. Experience using Git and standard version-control workflows. Ability to write clean, maintainable, and properly documented code. Strong debugging, troubleshooting, and problem-solving skills. Ability to collaborate with hardware, firmware, robotics, and software teams. Bachelor\u2019s degree in Computer Science, Information Technology, Engineering, or a related field, or equivalent practical experience. Fresh graduates and candidates with up to two years of experience are encouraged to apply, especially those with strong academic, internship, open-source, or personal projects. Preferred Qualifications Experience with Docker and containerized applications. Familiarity with PostgreSQL or MySQL. Understanding of MQTT and WebSockets. Exposure to Redis and Node.js. Familiarity with AWS, Azure, or Google Cloud Platform. Experience developing IoT dashboards or device-management applications. Knowledge of CI/CD pipelines. Previous experience integrating software with embedded systems, robotics platforms, or IoT devices. Employment Details Position: Full Stack Software Developer Number of Openings: 1 Employment Type: Full-time Experience: 0\u20132 years Location: Chennai Show more Show less Seniority level Entry level Employment type Full-time Get notified about new Full Stack Engineer jobs in Chennai, Tamil Nadu, India . Sign in to create job alert Jobs Javascript Developer jobs Full Stack Software Developer Similar jobs Full Stack Engineer Full Stack Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Full Stack Developer Full Stack Developer TestUnity Chennai, Tamil Nadu, India \u20b9500,000.00 - \u20b9600,000.00 1 week ago Fullstack Developer Fullstack Developer Niyati Technologies Pvt. Ltd. Chennai, Tamil Nadu, India \u20b9700,000.00 - \u20b91,000,000.00 1 year ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Full Stack Developer Full Stack Developer Jitil - Website For Everyone Chennai, Tamil Nadu, India 2 months ago Full Stack Engineer Full Stack Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Show more jobs like this Show fewer jobs like this People also viewed Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Similar Searches Javascript Developer jobs 14,295 open jobs Java Software Engineer jobs 11,988 open jobs Developer jobs 73,513 open jobs Coldfusion Developer jobs 6,494 open jobs Senior Software Engineer jobs 18,207 open jobs PHP Developer jobs 6,106 open jobs Java Application Developer jobs 7,582 open jobs Senior Web Developer jobs 9,040 open jobs Django Developer jobs 9,350 open jobs Associate Software Engineer jobs 52,154 open jobs Ruby on Rails Developer jobs 10,683 open jobs Web Developer jobs 14,028 open jobs Web Application Developer jobs 10,986 open jobs Software Engineer jobs 59,663 open jobs Dotnet Developer jobs 8,372 open jobs Python Developer jobs 12,759 open jobs Java Web Developer jobs 7,207 open jobs Engineer jobs 71,158 open jobs Web Development Intern jobs 1,491 open jobs Junior Software Engineer jobs 52,787 open jobs Java Developer Contract jobs 306 open jobs Frontend Developer jobs 10,770 open jobs Junior Web Developer jobs 5,053 open jobs Lead Web Developer jobs 8,945 open jobs Java Consultant jobs 2,640 open jobs Show more Show less",
+      "experience": {
+        "min": 0,
+        "max": 2,
+        "label": "0-2 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "react",
+        "node.js",
+        "node",
+        "django",
+        "java",
+        "sql",
+        "postgresql",
+        "mysql",
+        "redis",
+        "aws",
+        "azure",
+        "docker",
+        "ci/cd",
+        "git",
+        "rest api",
+        "api",
+        "automation",
+        "linux"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "an-remote-applied-ai-engineer-467829",
       "source": "arbeitnow",
-      "company": "ElevenLabs",
+      "company": "Elevenlabs",
       "title": "Applied AI Engineer",
-      "location": "Remote Remote",
+      "location": "Remote",
       "jd_location": "past offsites have included croatia and italy",
-      "url": "https://www.arbeitnow.com/jobs/companies/elevenlabs/remote-applied-ai-engineer-3132",
-      "posted": "2026-10-07T20:40:03+00:00",
+      "url": "https://www.arbeitnow.co.uk/jobs/companies/elevenlabs/remote-applied-ai-engineer-467829",
+      "posted": "2026-10-08T03:40:14+00:00",
       "score": 62,
       "reasons": [
         "ai",
@@ -831,11 +952,11 @@
         "location fit",
         "remote"
       ],
-      "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role    we're building agents that run real parts of our business, take on real work, and get better based on the results they produce. you'll build them with whatever is most capable right now: our own agents platform, the latest orchestration tools, and frontier models. the hard part is making them reliable, measurable, and safe enough for the business to depend on.  you'll sit in marketing engineering and be forward-deployed to our growth pods, where you'll find the problems worth solving and own the solutions end to end. you might be a forward-deployed builder, an applied ai engineer who has taken agents beyond the demo stage, or a full-stack engineer who is curious about growth.    requirements    python, sql, llm apis and agent orchestration    you've shipped production systems that other people relied on, starting from a vague problem    you've built with llms beyond a demo and know how to evaluate them and where they fail    you measure whether what you built worked     bonus:  experience with gtm data or marketing systems.    we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find  jobs in germany  on arbeitnow ",
+      "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role    we're building agents that run real parts of our business, take on real work, and get better based on the results they produce. you'll build them with whatever is most capable right now: our own agents platform, the latest orchestration tools, and frontier models. the hard part is making them reliable, measurable, and safe enough for the business to depend on.  you'll sit in marketing engineering and be forward-deployed to our growth pods, where you'll find the problems worth solving and own the solutions end to end. you might be a forward-deployed builder, an applied ai engineer who has taken agents beyond the demo stage, or a full-stack engineer who is curious about growth.    requirements    python, sql, llm apis and agent orchestration    you've shipped production systems that other people relied on, starting from a vague problem    you've built with llms beyond a demo and know how to evaluate them and where they fail    you measure whether what you built worked     bonus:  experience with gtm data or marketing systems.    we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find  jobs in united kingdom  on arbeitnow ",
       "experience": {
-        "label": "Not specified",
-        "max": null,
         "min": null,
+        "max": null,
+        "label": "Not specified",
         "source": "not_found"
       },
       "skills_detected": [
@@ -848,14 +969,14 @@
       "jd_enriched": true
     },
     {
-      "id": "an-remote-full-stack-engineer-backend-leaning-creative-agents-312986",
+      "id": "an-remote-full-stack-engineer-backend-leaning-creative-agents-167706",
       "source": "arbeitnow",
-      "company": "ElevenLabs",
+      "company": "Elevenlabs",
       "title": "Full-Stack Engineer (Backend Leaning) - Creative Agents",
-      "location": "Remote Remote",
+      "location": "Remote",
       "jd_location": "past offsites have included croatia and italy",
-      "url": "https://www.arbeitnow.com/jobs/companies/elevenlabs/remote-full-stack-engineer-backend-leaning-creative-agents-312986",
-      "posted": "2026-10-07T20:40:03+00:00",
+      "url": "https://www.arbeitnow.co.uk/jobs/companies/elevenlabs/remote-full-stack-engineer-backend-leaning-creative-agents-167706",
+      "posted": "2026-10-08T03:40:14+00:00",
       "score": 52,
       "reasons": [
         "backend",
@@ -864,11 +985,11 @@
         "location fit",
         "remote"
       ],
-      "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role  we are looking for a backend-leaning full-stack engineer to help build the next generation of creative agents at elevenlabs.  our ambition is to make agents a primary way people create across elevencreative. we are building systems that turn ideas into high-quality audio, image and video, bringing models and creative tools together without requiring users to become prompting experts.  the creative agent is already live. you will join a small team shaping its capabilities and architecture, with ownership from backend systems and agent infrastructure through to the customer-facing experience. you will help discover what works, turn experiments into reliable features, and use real customer feedback to guide what we build next.   your responsibilities will include:     building production agents and expanding their capabilities through prompts, tool use, orchestration, new models and mcp integrations.    designing and operating reliable backend systems for asynchronous creative generation and long-running tasks, with strong performance, observability, scalability and security.    developing shared evaluations and live quality monitoring, including model-based assessment of image and video outputs.    owning features end to end, from identifying user needs and prototyping to shipping across the stack and supporting them in production, alongside product, design and engineering.    you will help shape both what the agent can do and how people use it across elevencreative. the work combines substantial greenfield development with improving and operating a live product.    requirements  we care about evidence of exceptional engineering: products you have shipped, difficult problems you have solved, and systems you have owned.  we are looking for:    strong backend engineering skills, experience operating production systems, and sound fundamentals in apis, cloud infrastructure, storage and asynchronous processing.    hands-on experience developing agents, with an understanding of prompts, tools, execution logic, evaluations and the challenges of reliable, secure operation.    evidence of independent, end-to-end ownership and confidence working across the stack, including frontend delivery when needed.    good product judgement, clear communication and enthusiasm for creative agents.    we may also consider exceptional engineers with closely relevant experience. familiarity with http, websockets and asynchronous workers will help you build reliable communication between services and recover from failures.  experience with multimodal generation, creative editors, mcp, or building products in a small, fast-moving team would be particularly valuable.  we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find more  english speaking jobs in germany  on arbeitnow ",
+      "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role  we are looking for a backend-leaning full-stack engineer to help build the next generation of creative agents at elevenlabs.  our ambition is to make agents a primary way people create across elevencreative. we are building systems that turn ideas into high-quality audio, image and video, bringing models and creative tools together without requiring users to become prompting experts.  the creative agent is already live. you will join a small team shaping its capabilities and architecture, with ownership from backend systems and agent infrastructure through to the customer-facing experience. you will help discover what works, turn experiments into reliable features, and use real customer feedback to guide what we build next.   your responsibilities will include:     building production agents and expanding their capabilities through prompts, tool use, orchestration, new models and mcp integrations.    designing and operating reliable backend systems for asynchronous creative generation and long-running tasks, with strong performance, observability, scalability and security.    developing shared evaluations and live quality monitoring, including model-based assessment of image and video outputs.    owning features end to end, from identifying user needs and prototyping to shipping across the stack and supporting them in production, alongside product, design and engineering.    you will help shape both what the agent can do and how people use it across elevencreative. the work combines substantial greenfield development with improving and operating a live product.    requirements  we care about evidence of exceptional engineering: products you have shipped, difficult problems you have solved, and systems you have owned.  we are looking for:    strong backend engineering skills, experience operating production systems, and sound fundamentals in apis, cloud infrastructure, storage and asynchronous processing.    hands-on experience developing agents, with an understanding of prompts, tools, execution logic, evaluations and the challenges of reliable, secure operation.    evidence of independent, end-to-end ownership and confidence working across the stack, including frontend delivery when needed.    good product judgement, clear communication and enthusiasm for creative agents.    we may also consider exceptional engineers with closely relevant experience. familiarity with http, websockets and asynchronous workers will help you build reliable communication between services and recover from failures.  experience with multimodal generation, creative editors, mcp, or building products in a small, fast-moving team would be particularly valuable.  we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find more  english speaking jobs in united kingdom  on arbeitnow ",
       "experience": {
-        "label": "Not specified",
-        "max": null,
         "min": null,
+        "max": null,
+        "label": "Not specified",
         "source": "not_found"
       },
       "skills_detected": [
@@ -879,67 +1000,219 @@
       "jd_enriched": true
     },
     {
-      "id": "an-forward-deployed-ai-engineer-energy-lennestadt-469857",
-      "source": "arbeitnow",
-      "company": "KnowWay GmbH",
-      "title": "Forward Deployed AI Engineer Energy (m/w/d)",
-      "location": "Remote Lennestadt",
-      "jd_location": "Remote Lennestadt",
-      "url": "https://www.arbeitnow.com/jobs/companies/knowway-gmbh/forward-deployed-ai-engineer-energy-lennestadt-469857",
-      "posted": "2026-10-07T20:00:42+00:00",
-      "score": 56,
+      "id": "nk-nk-081026923592",
+      "source": "naukri",
+      "company": "Senpiper Technologies India",
+      "title": "React Developer",
+      "location": "Gurugram, India",
+      "jd_location": "Gurugram, India",
+      "url": "https://www.naukri.com/job-listings-react-developer-senpiper-technologies-india-gurugram-2-to-4-years-081026923592",
+      "posted": "2026-10-08T00:00:00+00:00",
+      "score": 66,
       "reasons": [
-        "ai",
-        "python",
-        "llm",
+        "react developer",
+        "react",
+        "node.js",
+        "javascript",
         "location fit",
-        "remote"
+        "experience fit"
       ],
-      "description": " wir bei knowway entwickeln ki-agenten f\u00fcr kritische infrastruktur \u2013 energie, telekommunikation und \u00f6ffentlicher sektor. \u00fcberall dort, wo compliance, nachvollziehbarkeit und datensouver\u00e4nit\u00e4t keine kompromisse zulassen, automatisieren wir gesch\u00e4ftsprozesse mit ki. \n die rolle \n wir bauen eine ki-plattform f\u00fcr die energiewirtschaft. unsere agenten unterst\u00fctzen prozesse wie  lieferantenwechsel, netzanschluss, abrechnung und messstellenbetrieb . \n als forward deployed ai engineer \u00fcbernimmst du einen use case  von discovery bis go-live . du arbeitest direkt mit fachbereichen bei stadtwerken und energieversorgern, verstehst ihre prozesse und \u00fcbersetzt dieses wissen in produktive ki-agenten. \n dabei verbindest du  genai engineering mit kundenarbeit : du f\u00fchrst fachinterviews und workshops, entwickelst mit python, llms, rag und tools funktionierende l\u00f6sungen und stellst durch systematische evaluation sicher, dass sie im alltag zuverl\u00e4ssig funktionieren. \n aufgaben \n \n workshops und fachinterviews durchf\u00fchren und komplexe prozesse sowie implizites wissen verstehen \n anforderungen in agent blueprints und technische l\u00f6sungen \u00fcbersetzen \n ki-agenten mit  llms, rag, tool use / function calling und agenten-orchestrierung  entwickeln \n dokumente, daten und wissen f\u00fcr retrieval und agenten aufbereiten \n innerhalb weniger tage funktionierende prototypen entwickeln und mit nutzern iterieren \n golden questions, testsets und regressionstests zur evaluation aufbauen \n feedback analysieren und agenten kontinuierlich verbessern \n technische m\u00f6glichkeiten und grenzen verst\u00e4ndlich gegen\u00fcber kunden kommunizieren \n wiederverwendbare komponenten gemeinsam mit unserem plattformteam weiterentwickeln \n \n  das team  \n du arbeitest eng mit unserem plattform- und delivery-team aus ai und software engineering sowie consulting zusammen. l\u00f6sungen entwickeln wir gemeinsam mit unseren kunden \u2013 wiederverwendbare komponenten und erkenntnisse flie\u00dfen zur\u00fcck in unsere plattform. \n qualifikation \n  must-haves  \n \n praktische erfahrung im  genai engineering , idealerweise mindestens 1\u20132 jahre \n erfahrung mit llm-anwendungen,  rag, prompt engineering, tool use und agenten-orchestrierung  \n sehr gute  python-kenntnisse auf produktionsniveau  \n erfahrung mit der evaluation von genai-anwendungen, z. b. testsets, golden questions oder regressionstests \n verst\u00e4ndnis von  chunking, retrieval, metadaten und wissensstrukturen  \n freude am direkten kundenkontakt und die f\u00e4higkeit, unklare anforderungen selbstst\u00e4ndig zu strukturieren \n hohe ownership und pragmatischer umgang mit wechselnden anforderungen \n deutsch verhandlungssicher \n \n f\u00fcr uns z\u00e4hlen  gebaute anwendungen mehr als zertifikate . eigene projekte, github-repositories oder andere arbeitsproben sehen wir uns deshalb besonders gerne an. \n  nice-to-have  \n \n energiewirtschaftliches know-how, z. b. marktkommunikation, gpke, edifact, sap is-u oder kvasy \n bpmn oder vergleichbare prozessmodellierung \n gcp, docker und ci/cd \n knowledge graphs oder strukturierte wissensrepr\u00e4sentation \n erfahrung aus consulting oder anderen kundenorientierten technischen rollen \n \n benefits \n \n 30 tage urlaub \n erfolgsbeteiligung und perspektive auf vsops \n flexible arbeitszeiten und remote-first-arbeitsmodell \n standorte bzw. smartoffice rund um  hamburg, ruhrgebiet/nrw und m\u00fcnchen  \n direkter kontakt zu fachbereichen und entscheider \n fr\u00fche verantwortung und hoher gestaltungsspielraum \n modernes genai-umfeld mit fokus auf produktive ai agents \n wertsch\u00e4tzendes team und kurze entscheidungswege \n \n wir suchen  mid-level- und senior-profile . \n auf mid-level \u00fcbernimmst du eigene use cases von discovery bis go-live. auf senior-level entwickelst du zus\u00e4tzlich standards und blueprints f\u00fcr unser agent building weiter, arbeitest auf kundenleitungsebene und hilfst uns, forward deployed engineering im team zu skalieren. \n klingt gut? dann bewirb dich jetzt und wir sprechen miteinander. \n find  jobs in germany  on arbeitnow ",
+      "description": "responsibilities: * collaborate with cross-functional teams on project requirements and deliverables * ensure code quality through testing and documentation * develop user interfaces using react.js, javascript, css, node.js 2-4 yrs react.js, css, javascript, node.js, cs, development",
       "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
+        "min": 2,
+        "max": 4,
+        "label": "2-4 years",
+        "source": "job_description"
       },
       "skills_detected": [
-        "python",
-        "go",
-        "gcp",
-        "docker",
-        "ci/cd",
-        "llm"
+        "javascript",
+        "react",
+        "node.js",
+        "node"
       ],
-      "work_mode": "Remote",
+      "work_mode": "Not specified",
       "jd_enriched": true
     },
     {
-      "id": "gh-8089353",
-      "source": "greenhouse",
-      "company": "stripe",
-      "title": "Software Engineer, Vulnerability Management",
-      "location": "US - Remote",
-      "jd_location": "US - Remote",
-      "url": "https://stripe.com/jobs/search?gh_jid=8089353",
-      "posted": "2026-10-07T19:02:27-04:00",
-      "score": 49,
+      "id": "nk-nk-081026019892",
+      "source": "naukri",
+      "company": "UNIQ Technologies - Bengaluru",
+      "title": "Walk-in || Python Software Developer",
+      "location": "Bengaluru, India",
+      "jd_location": "Bengaluru, India",
+      "url": "https://www.naukri.com/job-listings-python-software-developer-uniq-technologies-bengaluru-bengaluru-0-to-5-years-081026019892",
+      "posted": "2026-10-08T00:00:00+00:00",
+      "score": 66,
       "reasons": [
-        "software engineer",
-        "ai",
+        "software developer",
+        "python",
+        "fastapi",
+        "django",
         "location fit",
-        "remote"
+        "experience fit"
       ],
-      "description": "Help implement the conditions for prosperity. Work on problems that matter at scale. Assess your fit Search Filter by Company Teams Office location Role type 0 filters selected Clear all filters AEO and GEO Marketing Manager Marketing Remote in Canada AEO and GEO Marketing Manager Marketing Toronto AEO and GEO Marketing Manager Marketing Remote in United States AEO and GEO Marketing Manager Marketing Atlanta AEO and GEO Marketing Manager Marketing Chicago AI Engineer Solutions Architect Toronto AI Engineer Solutions Architect Atlanta AI Engineer Solutions Architect Chicago AI Solutions Program Manager, Finance Controllership Chicago AI Solutions Program Manager, Finance Controllership New York AI Solutions Program Manager, Finance Controllership Seattle AI Solutions Program Manager, Finance Controllership South San Francisco HQ ARG Engineering Manager Security Remote in United States ARG Engineering Manager Security South San Francisco HQ Abuse Investigator Security Remote in United States Abuse Investigator Security Atlanta Abuse Investigator Security Chicago Abuse Investigator Security New York Abuse Investigator Security Seattle Abuse Investigator Security South San Francisco HQ 1 2 3 4 5 \u2026 63 Prev 1 of 63 Next Help us improve the conditions for economic growth and prosperity We embrace diverse perspectives, ideas, and backgrounds at Stripe. We\u2019re committed to providing equal employment opportunities for all applicants and employees. Stripe doesn\u2019t discriminate on the basis of any protected characteristic, including race, color, ancestry, national origin, religion (including religious dress), creed, age, disability (mental and physical), sex, gender (including pregnancy, childbirth, breastfeeding, or related medical conditions), sexual orientation, gender identity, gender expression, medical condition, genetic information, family care or medical leave status, marital status, domestic partner status, military and veteran status (including military spouse status), or any other characteristic protected by US federal, state or local laws, or the laws of the country or jurisdiction where you work. This commitment is also reflected in our candidate experience. We will work with your needs and provide any assistance we can. If you are a nursing mother or have individual needs related to a disability, please reach out to accommodations@stripe.com . If you\u2019re having trouble submitting an application or experiencing other technical difficulties with this site, please reach out to candidatefeedback-applications@stripe.com .",
+      "description": "* develop, test, and maintain * python-based applications and backend services *. * write clean, reusable, efficient, and scalable code. * develop and integrate *rest apis* using django, flask, or fastapi. * work with *sql and nosql databases* and optimize database queries. * debug, troubleshoot, and resolve application issues. * perform unit testing and ensure application quality and reliability. * integrate third-party apis and external services. * participate in code reviews and follow coding standards. * use *git/github* for version control and collaborative development. * collaborate with *developers, qa, devops, and other teams*. * understand project requirements and convert them into technical solutions. * continuously improve application performance, security, and maintainability. this hiring is for one of our client companies, and the selected candidates will be on the client's direct payroll. as per our client's hiring requirements, candidates who graduated in 2025, or 2026 are not eligible to apply. 0-5 yrs django, python, sql, software development, development, software",
       "experience": {
-        "label": "Not specified",
-        "max": null,
+        "min": 0,
+        "max": 5,
+        "label": "0-5 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "fastapi",
+        "django",
+        "flask",
+        "sql",
+        "git"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "nk-nk-081026014355",
+      "source": "naukri",
+      "company": "Hindustan Latex Family Planning Promotion Trust (HLFPPT)",
+      "title": "Software Developer",
+      "location": "Noida, India",
+      "jd_location": "Noida, India",
+      "url": "https://www.naukri.com/job-listings-software-developer-hindustan-latex-family-planning-promotion-trust-hlfppt-noida-2-to-7-years-081026014355",
+      "posted": "2026-10-08T00:00:00+00:00",
+      "score": 63,
+      "reasons": [
+        "software developer",
+        "react",
+        "react native",
+        "node.js",
+        "python",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "role overview design, develop, deploy, and maintain web and mobile applications while collaborating with cross-functional teams to deliver scalable and secure solutions. key responsibilities develop and maintain backend and frontend applications. write clean, secure, and maintainable code. test, debug, and deploy applications. integrate third-party and internal apis. collaborate with business analysts, ui/ux designers, and devops teams. required qualifications & skills bachelors degree in computer science, it, or a related field. backend: php, python, or node.js . frontend: react, angular, or vue.js . databases: mysql, postgresql, or mongodb . good knowledge of git and ci/cd . preferred / additional skills docker and kubernetes. cloud platforms, preferably aws . mobile development using flutter or react native . knowledge of application security and secure coding practices. 2-7 yrs python, php, node.js, software, software development, development",
+      "experience": {
+        "min": 2,
+        "max": 7,
+        "label": "2-7 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "react",
+        "react native",
+        "node.js",
+        "node",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "aws",
+        "docker",
+        "kubernetes",
+        "ci/cd",
+        "git",
+        "flutter"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "nk-nk-081026923478",
+      "source": "naukri",
+      "company": "Arun Govindhasamy",
+      "title": "Front End Developer",
+      "location": "Coimbatore, India",
+      "jd_location": "Coimbatore, India",
+      "url": "https://www.naukri.com/job-listings-front-end-developer-arun-govindhasamy-coimbatore-0-to-2-years-081026923478",
+      "posted": "2026-10-08T00:00:00+00:00",
+      "score": 53,
+      "reasons": [
+        "front end",
+        "react",
+        "python",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "required skills experience with react, angular or similar front-end frameworks. understanding of responsive design principles . proficiency in python work requirements candidate may be required to work on-site based on business and project needs 0-2 yrs react.js, angular, front end, frontend development, end, front, development",
+      "experience": {
+        "min": 0,
+        "max": 2,
+        "label": "0-2 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "python",
+        "react"
+      ],
+      "work_mode": "On-site",
+      "jd_enriched": true
+    },
+    {
+      "id": "nk-nk-081026921000",
+      "source": "naukri",
+      "company": "Monarcnova Technologies",
+      "title": "Software Developer",
+      "location": "Hubballi, India",
+      "jd_location": "Hubballi, India",
+      "url": "https://www.naukri.com/job-listings-software-developer-monarcnova-technologies-pvt-ltd-hubballi-2-to-5-years-081026921000",
+      "posted": "2026-10-08T00:00:00+00:00",
+      "score": 48,
+      "reasons": [
+        "software developer",
+        "typescript",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "responsibilities: * design, develop, test & maintain software solutions using golang, typescript & docker. * collaborate with cross-functional teams on project delivery. * ensure code quality through testing & documentation. 2-5 yrs golang, typescript, typesense, docker, software, software development, development",
+      "experience": {
+        "min": 2,
+        "max": 5,
+        "label": "2-5 years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "typescript",
+        "golang",
+        "docker"
+      ],
+      "work_mode": "Not specified",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/z2-python-full-stack-developer-at-ntt-data-north-america-4476797986",
+      "source": "linkedin",
+      "company": "NTT DATA North America",
+      "title": "Z2_Python Full Stack Developer",
+      "location": "Bangalore Urban, Karnataka, India",
+      "jd_location": "Bangalore Urban, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/z2-python-full-stack-developer-at-ntt-data-north-america-4476797986",
+      "posted": "2026-10-07T19:33:38.846023+00:00",
+      "score": 70,
+      "reasons": [
+        "full stack developer",
+        "full stack",
+        "python",
+        "react",
+        "fastapi",
+        "django",
+        "javascript",
+        "location fit"
+      ],
+      "description": "<strong>Req ID:</strong> 391596<br><br>NTT DATA strives to hire exceptional, innovative and passionate individuals who want to grow with us. If you want to be part of an inclusive, adaptable, and forward-thinking organization, apply now.<br><br>We are currently seeking a Z2_Python Full Stack Developer to join our team in Bangalore, Karn\u0101taka (IN-KA), India (IN).<br><br><strong>Position Overview<br><br></strong>We are looking for a skilled Full Stack Developer with strong experience in Python, web application development, automation, REST APIs, React, databases, and enterprise application development.<br><br>The candidate will be responsible for designing, developing, testing, deploying, and maintaining scalable applications used for engineering and business workflows. The role requires strong ownership of applications from requirement gathering through production deployment and support.<br><br><strong>Key Responsibilities<br><br></strong>Design and develop end-to-end web applications using Python, Django, Flask, FastAPI, React.js, JavaScript, HTML and CSS.<br><br>Develop scalable and optimized REST APIs for enterprise applications and data-processing workflows.<br><br>Build Python-based automation and rule-validation solutions to reduce manual engineering and business processes.<br><br>Develop applications for Excel processing, data comparison, validation, reporting,<br><br><strong>About NTT DATA<br><br></strong>NTT DATA is a $30 billion business and technology services leader, serving 75% of the Fortune Global 100. We are committed to accelerating client success and positively impacting society through responsible innovation. We are one of the world's leading AI and digital infrastructure providers, with unmatched capabilities in enterprise-scale AI, cloud, security, connectivity, data centers and application services. our consulting and Industry solutions help organizations and society move confidently and sustainably into the digital future. As a Global Top Employer, we have experts in more than 50 countries. We also offer clients access to a robust ecosystem of innovation centers as well as established and start-up partners. NTT DATA is a part of NTT Group, which invests over $3 billion each year in R&amp;D.<br><br>Whenever possible, we hire locally to NTT DATA offices or client sites. This ensures we can provide timely and effective support tailored to each client\u2019s needs. While many positions offer remote or hybrid work options, these arrangements are subject to change based on client requirements. For employees near an NTT DATA office or client site, in-office attendance may be required for meetings or events, depending on business needs. At NTT DATA, we are committed to staying flexible and meeting the evolving needs of both our clients and employees. NTT DATA recruiters will never ask for payment or banking information and will only use @nttdata.com, @nttdatafed.com and @talent.nttdataservices.com email addresses. If you are requested to provide payment or disclose banking information, please submit a contact us form, https://us.nttdata.com/en/contact-us.<br><br><strong><em>NTT DATA endeavors to make https://us.nttdata.com accessible to any and all users. If you would like to contact us regarding the accessibility of our website or need assistance completing the application process, please contact us at https://us.nttdata.com/en/contact-us. </em></strong><strong><em>This contact information is for accommodation requests only and cannot be used to inquire about the status of applications. NTT DATA is an equal opportunity employer. Qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, disability or protected veteran status. For our EEO Policy Statement, please click here. If you'd like more information on your EEO rights under the law, please click here. For Pay Transparency information, please click here.</em></strong>",
+      "experience": {
         "min": null,
+        "max": null,
+        "label": "Not specified",
         "source": "not_found"
       },
       "skills_detected": [
-        "next"
+        "python",
+        "javascript",
+        "react",
+        "fastapi",
+        "django",
+        "flask",
+        "automation"
       ],
-      "work_mode": "Remote",
+      "work_mode": "Hybrid",
       "jd_enriched": true
     },
     {
@@ -950,8 +1223,8 @@
       "location": "Bengaluru, Karnataka, India",
       "jd_location": "Bangalore</span></p><p><span>Compensation: As per industry standards</span></p><p><br></p><p><br></p",
       "url": "https://in.linkedin.com/jobs/view/associate-software-engineer-at-cite-ai-4475485064",
-      "posted": "2026-10-07T18:52:07.817538+00:00",
-      "score": 65,
+      "posted": "2026-10-07T19:33:38.846023+00:00",
+      "score": 59,
       "reasons": [
         "software engineer",
         "python",
@@ -977,6 +1250,76 @@
       "jd_enriched": true
     },
     {
+      "id": "gh-8089353",
+      "source": "greenhouse",
+      "company": "stripe",
+      "title": "Software Engineer, Vulnerability Management",
+      "location": "US - Remote",
+      "jd_location": "US - Remote",
+      "url": "https://stripe.com/jobs/search?gh_jid=8089353",
+      "posted": "2026-10-07T19:02:27-04:00",
+      "score": 42,
+      "reasons": [
+        "software engineer",
+        "ai",
+        "location fit",
+        "remote"
+      ],
+      "description": "Help implement the conditions for prosperity. Work on problems that matter at scale. Assess your fit Search Filter by Company Teams Office location Role type 0 filters selected Clear all filters AEO and GEO Marketing Manager Marketing Remote in Canada AEO and GEO Marketing Manager Marketing Toronto AEO and GEO Marketing Manager Marketing Remote in United States AEO and GEO Marketing Manager Marketing Atlanta AEO and GEO Marketing Manager Marketing Chicago AI Engineer Solutions Architect Toronto AI Engineer Solutions Architect Atlanta AI Engineer Solutions Architect Chicago AI Solutions Program Manager, Finance Controllership Chicago AI Solutions Program Manager, Finance Controllership New York AI Solutions Program Manager, Finance Controllership Seattle AI Solutions Program Manager, Finance Controllership South San Francisco HQ ARG Engineering Manager Security Remote in United States ARG Engineering Manager Security South San Francisco HQ Abuse Investigator Security Remote in United States Abuse Investigator Security Atlanta Abuse Investigator Security Chicago Abuse Investigator Security New York Abuse Investigator Security Seattle Abuse Investigator Security South San Francisco HQ 1 2 3 4 5 \u2026 63 Prev 1 of 63 Next Help us improve the conditions for economic growth and prosperity We embrace diverse perspectives, ideas, and backgrounds at Stripe. We\u2019re committed to providing equal employment opportunities for all applicants and employees. Stripe doesn\u2019t discriminate on the basis of any protected characteristic, including race, color, ancestry, national origin, religion (including religious dress), creed, age, disability (mental and physical), sex, gender (including pregnancy, childbirth, breastfeeding, or related medical conditions), sexual orientation, gender identity, gender expression, medical condition, genetic information, family care or medical leave status, marital status, domestic partner status, military and veteran status (including military spouse status), or any other characteristic protected by US federal, state or local laws, or the laws of the country or jurisdiction where you work. This commitment is also reflected in our candidate experience. We will work with your needs and provide any assistance we can. If you are a nursing mother or have individual needs related to a disability, please reach out to accommodations@stripe.com . If you\u2019re having trouble submitting an application or experiencing other technical difficulties with this site, please reach out to candidatefeedback-applications@stripe.com .",
+      "experience": {
+        "label": "Not specified",
+        "max": null,
+        "min": null,
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "next"
+      ],
+      "work_mode": "Remote",
+      "jd_enriched": true
+    },
+    {
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-c%23-net-and-asp-net-core-at-wells-fargo-4476780287",
+      "source": "linkedin",
+      "company": "Wells Fargo",
+      "title": "Software Engineer - C#, .NET, and ASP.NET Core",
+      "location": "Bengaluru, Karnataka, India",
+      "jd_location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-c%23-net-and-asp-net-core-at-wells-fargo-4476780287",
+      "posted": "2026-10-07T16:33:38.846023+00:00",
+      "score": 56,
+      "reasons": [
+        "software engineer",
+        "react",
+        "javascript",
+        "typescript",
+        "api",
+        "location fit",
+        "experience fit"
+      ],
+      "description": "<strong>About This Role<br><br></strong>Wells Fargo is seeking a Software Engineer - C#, .NET, and ASP.NET Core<br><br><strong>In This Role, You Will<br><br></strong><ul><li>Participate in low to moderately complex initiatives and projects associated with the technology domain, including installation, upgrades, and deployment efforts</li><li>Identify opportunities for service quality and availability improvements within the technology domain environment</li><li>Design, code, test, debug, and document for low to moderately complex projects and programs associated with technology domain, including upgrades and deployments</li><li>Review and analyze technical assignments or challenges that are related to low to medium risk deliverables and that require research, evaluation, and selection of alternative technology domains</li><li>Present recommendations for resolving issues or may escalate issues as needed to meet established service level agreements</li><li>Exercise some independent judgment while also developing understanding of given technology domain in reference to security and compliance requirements</li><li>Provide information to technology colleagues, internal partners, and stakeholders<br><br></li></ul><strong>Required Qualifications<br><br></strong><ul><li>2+ years of software engineering experience, or equivalent demonstrated through one or a combination of the following: work experience, training, military experience, education</li><li>Knowledge of C#, .NET, and ASP.NET Core.</li><li>Exposure to REST API and Web application development.</li><li>Familiarity with SQL-Server or other relational database technologies.<br><br></li></ul><strong>Desired Qualifications<br><br></strong><ul><li>Knowledge of Angular or React, JavaScript, TypeScript, HTML, and CSS.</li><li>Understanding of object-oriented programming, data structures, and software design principles.</li><li>Exposure to Git source control and CI/CD concepts.</li><li>Understanding of Agile development methodologies.</li><li>Exposure to Microsoft Azure or other cloud platforms.</li><li>Strong analytical, problem-solving, and debugging skills.</li><li>Effective verbal and written communication skills.</li><li>Internship, academic project, or hands-on experience developing full-stack applications<br><br></li></ul><strong>Job Expectations<br><br></strong><ul><li>Demonstrate a strong learning mindset and willingness to acquire new technical skills.</li><li>Effectively collaborate with geographically distributed teams.</li><li>Adhere to Wells Fargo risk management, compliance, and security standards.</li><li>Participate in hybrid work arrangements as required by the organization.</li><li>Support occasional production deployments or release activities when needed.<br><br></li></ul><strong>Posting End Date<br><br></strong>13 Oct 2026<br><br><ul><li>Job posting may come down early due to volume of applicants.<br><br></li></ul><strong>We Value Equal Opportunity<br><br></strong>Wells Fargo is an equal opportunity employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, disability, status as a protected veteran, or any other legally protected characteristic.<br><br>Employees support our focus on building strong customer relationships balanced with a strong risk mitigating and compliance-driven culture which firmly establishes those disciplines as critical to the success of our customers and company. They are accountable for execution of all applicable risk programs (Credit, Market, Financial Crimes, Operational, Regulatory Compliance), which includes effectively following and adhering to applicable Wells Fargo policies and procedures, appropriately fulfilling risk and compliance obligations, timely and effective escalation and remediation of issues, and making sound risk decisions. There is emphasis on proactive monitoring, governance, risk identification and escalation, as well as making sound risk decisions commensurate with the business unit\u2019s risk appetite and all risk and compliance program requirements.<br><br>Candidates applying to job openings posted in Canada: Applications for employment are encouraged from all qualified candidates, including women, persons with disabilities, aboriginal peoples and visible minorities. Accommodation for applicants with disabilities is available upon request in connection with the recruitment process.<br><br><strong>Applicants With Disabilities<br><br></strong>To request a medical accommodation during the application or interview process, visit Disability Inclusion at Wells Fargo.<br><br><strong>Drug and Alcohol Policy<br><br></strong>Wells Fargo maintains a drug free workplace. Please see our Drug and Alcohol Policy to learn more.<br><br><strong>Wells Fargo Recruitment And Hiring Requirements<br><br></strong><ul><li> Third-Party recordings are prohibited unless authorized by Wells Fargo.</li><li> Wells Fargo requires you to directly represent your own experiences during the recruiting and hiring process.<br><br></li></ul><strong>Reference Number<br><br></strong>R-579867",
+      "experience": {
+        "min": 2,
+        "max": null,
+        "label": "2+ years",
+        "source": "job_description"
+      },
+      "skills_detected": [
+        "javascript",
+        "typescript",
+        "react",
+        "c#",
+        "sql",
+        "azure",
+        "ci/cd",
+        "git",
+        "rest api",
+        "api"
+      ],
+      "work_mode": "Hybrid",
+      "jd_enriched": true
+    },
+    {
       "id": "gh-7985187",
       "source": "greenhouse",
       "company": "coinbase",
@@ -985,7 +1328,7 @@
       "jd_location": "Remote - India",
       "url": "https://www.coinbase.com/careers/positions/7985187?gh_jid=7985187",
       "posted": "2026-10-07T16:18:36-04:00",
-      "score": 76,
+      "score": 70,
       "reasons": [
         "machine learning",
         "python",
@@ -1016,31 +1359,40 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-ncr-atleos-4474456436",
+      "id": "li-https://in.linkedin.com/jobs/view/python-developer-irc301400-at-globallogic-4475450327",
       "source": "linkedin",
-      "company": "NCR Atleos",
-      "title": "Junior Software Engineer",
-      "location": "Hyderabad, Telangana, India",
-      "jd_location": "Hyderabad<br><br></strong><strong><strong>About NCR Atleos:<br><br></strong></strong>NCR Atleos (NYS",
-      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-ncr-atleos-4474456436",
-      "posted": "2026-10-07T15:52:07.817538+00:00",
-      "score": 37,
+      "company": "GlobalLogic",
+      "title": "Python developer IRC301400",
+      "location": "Noida, Uttar Pradesh, India",
+      "jd_location": "Noida, Uttar Pradesh, India",
+      "url": "https://in.linkedin.com/jobs/view/python-developer-irc301400-at-globallogic-4475450327",
+      "posted": "2026-10-07T15:33:38.846023+00:00",
+      "score": 53,
       "reasons": [
-        "software engineer",
-        "automation",
+        "python developer",
+        "python",
+        "fastapi",
+        "django",
+        "api",
         "location fit"
       ],
-      "description": "<strong><strong>About NCR Atleos<br><br></strong></strong>NCR Atleos, headquartered in Atlanta, is a leader in expanding financial access. Our dedicated 20,000 employees optimize the branch, improve operational efficiency and maximize self-service availability for financial institutions and retailers across the globe.<br><br><strong>Title: SW Engineer I<br><br></strong><strong>Grade: 9<br><br></strong><strong>Location: Hyderabad<br><br></strong><strong><strong>About NCR Atleos:<br><br></strong></strong>NCR Atleos (NYSE: NATL) is a global technology company creating exceptional self-service banking experiences. We offer all of the services, software and hardware solutions needed for a comprehensive self-service channel. NCR Atleos (www.ncratleos.com) is headquartered in Atlanta, Georgia.<br><br><strong><strong>JD:<br><br></strong></strong>As a developer we are seeking a dynamic, self-motivated individual to join our team of software engineers. You will be part of a team responsible for delivering high quality software for ATM Recycler/Deposit devices.<br><br>Due to the unique development environment and knowledge required for this role, full training will be given to the successful candidate to acquire the appropriate skill set.<br><br>NCR ATM Recycler/Deposit devices contain a Bill Validator module installed with Currency Template software. The Template software verifies the deposited media to determine several characteristics including if it is genuine or counterfeit currency. Key steps in the template software development involve analysis of note image attributes for image authentication, design &amp; implementation of functions to detect/validate image attributes, simulation testing and test on target hardware. The Template software is developed for several different devices using in-house tool sets with the addition of some C++.<br><br>The successful candidate will be part of an engineering group with development teams in global locations. As a junior software engineer in the team, you will be responsible for working development projects, investigating &amp; resolving complex problems, and supporting the team to ensure customer commitments and goals are met.<br><br><strong><strong>Key Areas Of Responsibility:<br><br></strong></strong><ul><li>Develop high quality software with the support of the senior developer/technical team lead to meet customer requirements, within agreed timescales</li><li>Analyse and process data then identify and develop solutions with assistance of senior developer/technical team lead</li><li>Prepare technical documentation</li><li>Participate in template update peer reviews</li><li>Estimate time for template development efforts with assistance of senior developer/technical team lead</li><li>Effective communication with developers, technical team lead &amp; QA</li><li>Work all developments diligently to ensure customer satisfaction targets are achieved<br><br></li></ul><strong><strong>Required Skills &amp; Experience:<br><br></strong></strong><ul><li>Minimum Bachelors Level Degree in Computer Science, Engineering, or related field</li><li>Experience in software development, preferably C# / C++. </li><li>Hands on experience in .NET development environment and automation solution development. </li><li>Good methodical problem-solving skills</li><li>Strong communication skills both written and verbal</li><li>Ability to work effectively in a team environment composed of peers and cross-functional members</li><li>Have ability to multi-task<br><br></li></ul><strong>The following would be considered an advantage though not essential<br><br></strong><ul><li>Use/awareness of bug tracking &amp; version control systems. </li><li>Visit our careers site for a list of the benefits offered in your region in addition to a competitive base salary and strong work/family programs. <br><br></li></ul><strong>Statement to Third Party Agencies<br><br></strong>To ALL recruitment agencies: NCR Atleos only accepts resumes from agencies on the NCR Atleos preferred supplier list. Please do not forward resumes to our applicant tracking system, NCR Atleos employees, or any NCR Atleos facility. NCR Atleos is not responsible for any <strong>fees or</strong> charges associated <strong>with</strong> unsolicited resumes.<br><br><strong>EEO Statement<br><br></strong>NCR Atleos is an equal opportunity employer. It is NCR Atleos' policy to hire, train, promote and pay associates based on their job-related qualifications, ability and performance, without regard to race, color, creed, religion, national origin, citizenship status, sex, marital status, age, physical or mental disability, sexual orientation or veteran status.<br><br>Offers of employment are conditional upon passage of screening criteria applicable to the job.<br><br><strong>EEO Statement<br><br></strong>NCR Atleos is an equal-opportunity employer. It is NCR Atleos policy to hire, train, promote, and pay associates based on their job-related qualifications, ability, and performance, without regard to race, color, creed, religion, national origin, citizenship status, sex, sexual orientation, gender identity/expression, pregnancy, marital status, age, mental or physical disability, genetic information, medical condition, military or veteran status, or any other factor protected by law.<br><br><strong>Statement to Third Party Agencies<br><br></strong>To ALL recruitment agencies: NCR Atleos only accepts resumes from agencies on the NCR Atleos preferred supplier list. Please do not forward resumes to our applicant tracking system, NCR Atleos employees, or any NCR Atleos facility. NCR Atleos is not responsible for any fees or charges associated with unsolicited resumes.<br><br>",
+      "description": "<strong>Description<br><br></strong>Python FS<br><br><strong>Requirements<br><br></strong>Required Skills:<br><br><br><ul><li> Python, FastAPI/Flask/Django, REST API development,</li><li> SQL knowledge</li><li> Basic CICD pipeline working, knowledge of any version control \u2013 GIT, GitHub actions.</li><li> Knowledge of AWS<br><br><br></li></ul>Good to have:<br><br><br><ul><li> Databricks</li><li> Power BI</li><li> ETL pipelines<br><br><br></li></ul>Job responsibilities<br><br>Required Skills:<br><br><br><ul><li> Python, FastAPI/Flask/Django, REST API development,</li><li> SQL knowledge</li><li> Basic CICD pipeline working, knowledge of any version control \u2013 GIT, GitHub actions.</li><li> Knowledge of AWS<br><br><br></li></ul>Good to have:<br><br><br><ul><li> Databricks</li><li> Power BI</li><li> ETL pipelines<br><br><br></li></ul>What we offer<br><br><strong>Exciting Projects:</strong> We focus on industries like High-Tech, communication, media, healthcare, retail and telecom. Our customer list is full of fantastic global brands and leaders who love what we build for them.<br><br><strong>Collaborative Environment:</strong> You Can expand your skills by collaborating with a diverse team of highly talented people in an open, laidback environment \u2014 or even abroad in one of our global centers or client facilities!<br><br><strong>Work-Life Balance:</strong> GlobalLogic prioritizes work-life balance, which is why we offer flexible work schedules, opportunities to work from home, and paid time off and holidays.<br><br><strong>Professional Development:</strong> Our dedicated Learning &amp; Development team regularly organizes Communication skills training(GL Vantage, Toast Master),Stress Management program, professional certifications, and technical and soft skill trainings.<br><br><strong>Excellent Benefits:</strong> We provide our employees with competitive salaries, family medical insurance, Group Term Life Insurance, Group Personal Accident Insurance , NPS(National Pension Scheme ), Periodic health awareness program, extended maternity leave, annual performance bonuses, and referral bonuses.<br><br><strong>Fun Perks:</strong> We want you to love where you work, which is why we host sports events, cultural activities, offer food on subsidies rates, Corporate parties. Our vibrant offices also include dedicated GL Zones, rooftop decks and GL Club where you can drink coffee or tea with your colleagues over a game of table and offer discounts for popular stores and restaurants!<br><br><strong>About GlobalLogic<br><br></strong>GlobalLogic, a Hitachi Group Company, is a trusted digital engineering partner to the world\u2019s largest and most forward-thinking companies. Since 2000, we\u2019ve been at the forefront of the digital revolution \u2013 helping create some of the most innovative and widely used digital products and experiences. Today we continue to collaborate with clients in transforming businesses and redefining industries through intelligent products, platforms, and services.",
       "experience": {
-        "label": "Not specified",
-        "max": null,
         "min": null,
+        "max": null,
+        "label": "Not specified",
         "source": "not_found"
       },
       "skills_detected": [
-        "c++",
-        "c#",
-        "automation"
+        "python",
+        "fastapi",
+        "django",
+        "flask",
+        "sql",
+        "aws",
+        "git",
+        "rest api",
+        "api"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
@@ -1054,7 +1406,7 @@
       "jd_location": "San Francisco, CA; Palo Alto, CA; Seattle, WA; New York, NY; Remote, US",
       "url": "https://www.pinterestcareers.com/jobs/?gh_jid=8227344",
       "posted": "2026-10-07T15:08:14-04:00",
-      "score": 70,
+      "score": 64,
       "reasons": [
         "software engineer",
         "react",
@@ -1088,8 +1440,8 @@
       "location": "Vellore, Tamil Nadu, India",
       "jd_location": "Vellore, Tamil Nadu, India",
       "url": "https://in.linkedin.com/jobs/view/l1-%E2%80%93-junior-software-developer-the-builder-at-wonder-worth-solutions-4476769047",
-      "posted": "2026-10-07T14:52:07.817538+00:00",
-      "score": 56,
+      "posted": "2026-10-07T14:33:38.846023+00:00",
+      "score": 49,
       "reasons": [
         "software developer",
         "react",
@@ -1116,6 +1468,38 @@
       "jd_enriched": true
     },
     {
+      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336",
+      "source": "linkedin",
+      "company": "Transportation Outlook",
+      "title": "Junior Software Engineer",
+      "location": "Bengaluru, Karnataka, India",
+      "jd_location": "Bengaluru",
+      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336",
+      "posted": "2026-10-07T14:33:38.846023+00:00",
+      "score": 34,
+      "reasons": [
+        "software engineer",
+        "python",
+        "javascript",
+        "location fit"
+      ],
+      "description": "<p><strong>Company Description</strong> Pharma Business Outlook is a specialized publication that connects pharmaceutical companies, healthcare providers, and key decision-makers across the industry. It focuses on critical topics such as regulatory compliance, emerging market opportunities, and digital transformation in the pharma sector. By fostering informed discussions, it helps stakeholders navigate complex challenges and identify strategic growth areas. The magazine plays an active role in shaping the future of the pharmaceutical ecosystem, making it an engaging environment for professionals interested in healthcare, technology, and innovation.</p><p><strong>Role Description</strong> The Junior Software Engineer will support the development and maintenance of software solutions that power Pharma Business Outlook\u2019s digital platforms and internal tools. Day-to-day responsibilities include writing clean, efficient code, participating in back-end web development tasks, debugging and resolving technical issues, and assisting in the implementation of new features under the guidance of senior engineers. The role involves collaborating with cross-functional teams to understand requirements, contributing to code reviews, and helping improve system performance and reliability. This is a full-time, on-site role based in Bengaluru.</p><p><strong>Qualifications</strong></p><ul><li>Strong foundational knowledge in Computer Science, including data structures, algorithms, and software engineering principles.</li><li>Practical experience or coursework in Software Development and Programming using modern languages (e.g., Java, Python, JavaScript, or similar).</li><li>Understanding of Back-End Web Development concepts such as APIs, databases, and server-side frameworks.</li><li>Familiarity with Object-Oriented Programming (OOP) and ability to apply OOP principles to real-world problems.</li><li>Bachelor\u2019s degree in Computer Science, Information Technology, or a closely related field (or equivalent practical experience).</li><li>Ability to work collaboratively in a team, follow coding standards, and learn from feedback.</li><li>Strong problem-solving skills, attention to detail, and willingness to learn new technologies.</li><li>Exposure to version control systems (e.g., Git) and basic software development lifecycle concepts is beneficial.</li></ul><p><br></p><p>Onsite Only</p>",
+      "experience": {
+        "label": "Not specified",
+        "max": null,
+        "min": null,
+        "source": "not_found"
+      },
+      "skills_detected": [
+        "python",
+        "javascript",
+        "java",
+        "git"
+      ],
+      "work_mode": "On-site",
+      "jd_enriched": true
+    },
+    {
       "id": "li-https://in.linkedin.com/jobs/view/software-engineering-specialist-python-fullstack-at-ge-vernova-4475425340",
       "source": "linkedin",
       "company": "GE Vernova",
@@ -1123,8 +1507,8 @@
       "location": "Bengaluru, Karnataka, India",
       "jd_location": "Bengaluru, Karnataka, India",
       "url": "https://in.linkedin.com/jobs/view/software-engineering-specialist-python-fullstack-at-ge-vernova-4475425340",
-      "posted": "2026-10-07T13:52:07.817538+00:00",
-      "score": 81,
+      "posted": "2026-10-07T13:33:38.846023+00:00",
+      "score": 74,
       "reasons": [
         "software engineer",
         "fullstack",
@@ -1162,68 +1546,39 @@
       "jd_enriched": true
     },
     {
-      "id": "li-https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336",
+      "id": "li-https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
       "source": "linkedin",
-      "company": "Transportation Outlook",
-      "title": "Junior Software Engineer",
+      "company": "Rubrik",
+      "title": "Software Engineer - Cloud: Azure",
       "location": "Bengaluru, Karnataka, India",
-      "jd_location": "Bengaluru",
-      "url": "https://in.linkedin.com/jobs/view/junior-software-engineer-at-transportation-outlook-4475442336",
-      "posted": "2026-10-07T13:52:07.817538+00:00",
-      "score": 40,
+      "jd_location": "Bengaluru, Karnataka, India",
+      "url": "https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994",
+      "posted": "2026-10-07T12:33:38.846023+00:00",
+      "score": 43,
       "reasons": [
         "software engineer",
         "python",
-        "javascript",
-        "location fit"
+        "ai",
+        "location fit",
+        "experience fit"
       ],
-      "description": "<p><strong>Company Description</strong> Pharma Business Outlook is a specialized publication that connects pharmaceutical companies, healthcare providers, and key decision-makers across the industry. It focuses on critical topics such as regulatory compliance, emerging market opportunities, and digital transformation in the pharma sector. By fostering informed discussions, it helps stakeholders navigate complex challenges and identify strategic growth areas. The magazine plays an active role in shaping the future of the pharmaceutical ecosystem, making it an engaging environment for professionals interested in healthcare, technology, and innovation.</p><p><strong>Role Description</strong> The Junior Software Engineer will support the development and maintenance of software solutions that power Pharma Business Outlook\u2019s digital platforms and internal tools. Day-to-day responsibilities include writing clean, efficient code, participating in back-end web development tasks, debugging and resolving technical issues, and assisting in the implementation of new features under the guidance of senior engineers. The role involves collaborating with cross-functional teams to understand requirements, contributing to code reviews, and helping improve system performance and reliability. This is a full-time, on-site role based in Bengaluru.</p><p><strong>Qualifications</strong></p><ul><li>Strong foundational knowledge in Computer Science, including data structures, algorithms, and software engineering principles.</li><li>Practical experience or coursework in Software Development and Programming using modern languages (e.g., Java, Python, JavaScript, or similar).</li><li>Understanding of Back-End Web Development concepts such as APIs, databases, and server-side frameworks.</li><li>Familiarity with Object-Oriented Programming (OOP) and ability to apply OOP principles to real-world problems.</li><li>Bachelor\u2019s degree in Computer Science, Information Technology, or a closely related field (or equivalent practical experience).</li><li>Ability to work collaboratively in a team, follow coding standards, and learn from feedback.</li><li>Strong problem-solving skills, attention to detail, and willingness to learn new technologies.</li><li>Exposure to version control systems (e.g., Git) and basic software development lifecycle concepts is beneficial.</li></ul><p><br></p><p>Onsite Only</p>",
+      "description": "<strong>About The Team<br><br></strong>The Rubrik Cloud Native Protection team helps customers secure their data on the cloud. Cloud data is growing at an ever growing pace and so are the risks with cyber attacks targeted towards cloud data. We make it easy for businesses to protect, search, analyze all of their cloud data simply and scalably.<br><br>Cloud Native Protection is one of the fastest growing businesses and teams within Rubrik. We consider ourselves a startup inside a startup! Join us in this journey where there are ever widening avenues to explore, opportunities to innovate, deep engineering problems to tackle. We believe in fostering a culture with strong engineering values and teamwork as the key to building a great company and product.<br><br><strong>About Role<br><br></strong>Rubrik Software Engineers are self-starters, driven, and can manage themselves. We believe in giving engineers responsibility, not tasks. Our goal is to motivate and challenge people to do their best work. Bottom line, if you have a limitless drive and like to win, we want to talk to you - come make history!<br><br><strong>What You\u2019ll Do<br><br></strong><ul><li>Build software using your strong background in distributed systems and cloud.</li><li>Design, develop, test, deploy, maintain and improve the software.</li><li>Manage individual projects priorities, deadlines and deliverables with your technical expertise.<br><br></li></ul><strong>Experience You\u2019ll Need<br><br></strong><ul><li>Bachelor\u2019s or Master\u2019s degree or equivalent in computer science or related field</li><li>0-2 years of relevant work experience, </li><li>Proficiency in one or more general purpose programming languages like Go, Java, C/C++, Scala, Python</li><li>Experience with AWS/Azure/GCP or other public cloud technologies is a plus.</li><li>Knowledge of Docker, Containers, Kubernetes, microservice architectures is a plus.</li><li>Excellent problem-solving skills and attention to detail. </li><li>Strong understanding of System Development Life Cycle (SDLC) methodology, design patterns, and software engineering principles</li><li>Strong collaboration and communication skills. Ability to work independently or as part of a team on complex, time-sensitive projects.<br><br></li></ul>Join Us in Securing and Accelerating the World's AI Transformation<br><br>Rubrik (RBRK), the Security and AI Operations Company, leads at the intersection of data protection, cyber resilience, and enterprise AI acceleration. Rubrik Security Cloud delivers complete cyber resilience by securing, monitoring, and recovering data, identities, and workloads across clouds. Rubrik Agent Cloud accelerates trusted AI agent deployments at scale by monitoring and auditing agentic actions, enforcing real-time guardrails, fine-tuning for accuracy and undoing agentic mistakes.<br><br>Linkedin | X (formerly Twitter) | Instagram | Rubrik.com<br><br>Inclusion @ Rubrik<br><br>At Rubrik, we are dedicated to fostering a culture where people from all backgrounds are valued, feel they belong, and believe they can succeed. Our commitment to inclusion is at the heart of our mission to secure the world\u2019s data.<br><br>Our goal is to hire and promote the best talent, regardless of background. We continually review our hiring practices to ensure fairness and strive to create an environment where every employee has equal access to opportunities for growth and excellence. We believe in empowering everyone to bring their authentic selves to work and achieve their fullest potential.<br><br>Our inclusion strategy focuses on three core areas of our business and culture:<br><br><ul><li>Our Company: We are committed to building a merit-based organization that offers equal access to growth and success for all employees globally. Your potential is limitless here. </li><li>Our Culture: We strive to create an inclusive atmosphere where individuals from all backgrounds feel a strong sense of belonging, can thrive, and do their best work. Your contributions help us innovate and break boundaries. </li><li>Our Communities: We are dedicated to expanding our engagement with the communities we operate in, creating opportunities for underrepresented talent and driving greater innovation for our clients. Your impact extends beyond Rubrik, contributing to safer and stronger communities. <br><br></li></ul>Equal Opportunity Employer/Veterans/Disabled<br><br>Rubrik is an Equal Opportunity Employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, protected veteran status, or any other status protected by applicable law. Rubrik provides equal employment opportunities to employees and applicants in all terms and conditions of employment, including recruiting, hiring, promotion, compensation, training, leave, and termination.<br><br>Rubrik provides reasonable accommodations to qualified applicants and employees with disabilities in accordance with applicable law. If you need an accommodation to participate in the application process or to perform your job, please contact hr@rubrik.com. Accommodations may include changes to the application process, documents in an alternate format, a sign language interpreter, or specialized equipment.<br><br>EEO IS THE LAW<br><br>NOTIFICATION OF EMPLOYEE RIGHTS UNDER FEDERAL LABOR LAWS<br><br>",
       "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
+        "label": "0-2 years",
+        "max": 2,
+        "min": 0,
+        "source": "job_description"
       },
       "skills_detected": [
         "python",
-        "javascript",
         "java",
-        "git"
-      ],
-      "work_mode": "On-site",
-      "jd_enriched": true
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
-      "source": "linkedin",
-      "company": "Minfy",
-      "title": "Associate Software Engineer",
-      "location": "Gurugram, Haryana, India",
-      "jd_location": "Gurugram, Haryana, India",
-      "url": "https://in.linkedin.com/jobs/view/associate-software-engineer-at-minfy-4475425405",
-      "posted": "2026-10-07T11:52:07.817538+00:00",
-      "score": 38,
-      "reasons": [
-        "software engineer",
-        "python",
-        "javascript",
-        "location fit"
-      ],
-      "description": "The Associate Engineer is responsible for executing defined coding tasks and ensuring basic code quality.<br><br><strong>Code Implementation:</strong> Write and modify <strong>clean, testable, and efficient code</strong> for low-to-medium complexity features and bug fixes, primarily using the required programming language (e.g., Java, Python, JavaScript, C#).<br><br><strong>Debugging and Testing:</strong> Conduct thorough <strong>unit testing</strong> on assigned components and participate actively in debugging applications to identify and resolve defects reported by Quality Assurance (QA) or end-users.<br><br><strong>Documentation:</strong> Assist in creating and maintaining <strong>technical documentation</strong>, including code comments, design specifications for small features, and developer runbooks.<br><br><strong>Version Control:</strong> Utilize <strong>version control systems (e.g., Git/GitHub/GitLab)</strong> effectively for branching, merging, and managing code changes within the team codebase.<br><br><strong>Database Interaction:</strong> Write basic <strong>SQL queries</strong> or interact with NoSQL databases to support application functionality, data fetching, and simple data manipulation.<br><br><ul><li> Operational &amp; Collaborative Duties<br><br></li></ul>This role requires strong teamwork and adherence to established development processes.<br><br><strong>SDLC Participation:</strong> Actively participate in all phases of the <strong>Software Development Lifecycle (SDLC)</strong>, with a focus on implementation, testing, and deployment support.<br><br><strong>Agile/Scrum:</strong> Participate in <strong>Agile ceremonies</strong> (Daily Standups, Sprint Planning, Retrospectives) and accurately update task status and progress in project management tools (e.g., Jira, Azure DevOps).<br><br><strong>Code Review:</strong> Participate in and learn from the code review process by providing basic feedback and incorporating feedback from senior developers into their own code.<br><br><strong>Troubleshooting &amp; Support:</strong> Provide <strong>Level 1 (L1) technical support</strong> for applications, assisting in diagnosing and escalating production issues as needed.<br><br><strong>Requirements Interpretation:</strong> Work with senior developers and business analysts to understand technical requirements derived from user stories and functional specifications.",
-      "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
-      },
-      "skills_detected": [
-        "python",
-        "javascript",
-        "java",
-        "c#",
-        "sql",
+        "c++",
+        "go",
+        "aws",
+        "gcp",
         "azure",
-        "git"
+        "docker",
+        "kubernetes"
       ],
       "work_mode": "Not specified",
       "jd_enriched": true
@@ -1237,7 +1592,7 @@
       "jd_location": "Remote - Ireland",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/7996774",
       "posted": "2026-10-07T10:32:47-04:00",
-      "score": 61,
+      "score": 54,
       "reasons": [
         "machine learning",
         "python",
@@ -1277,7 +1632,7 @@
       "jd_location": "Remote - Spain",
       "url": "https://job-boards.greenhouse.io/twilio/jobs/8007455",
       "posted": "2026-10-07T10:30:26-04:00",
-      "score": 61,
+      "score": 54,
       "reasons": [
         "machine learning",
         "python",
@@ -1306,122 +1661,6 @@
         "tensorflow"
       ],
       "work_mode": "Remote",
-      "jd_enriched": true
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
-      "source": "linkedin",
-      "company": "Hunar.AI",
-      "title": "Full Stack Engineer",
-      "location": "Bengaluru, Karnataka, India",
-      "jd_location": "Bengaluru, Karnataka, India",
-      "url": "https://in.linkedin.com/jobs/view/full-stack-engineer-at-hunar-ai-4475191701",
-      "posted": "2026-10-07T08:52:07.817538+00:00",
-      "score": 60,
-      "reasons": [
-        "full stack",
-        "react",
-        "node.js",
-        "python",
-        "javascript",
-        "typescript",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "<p><strong>Junior Full Stack Engineer</strong></p><p><strong>Location:</strong> Bengaluru</p><p><strong>Employment type:</strong> Full-time</p><p><strong>Experience level:</strong> 1-2 years</p><p><br></p>About the role<p><strong>You\u2019ll work across the stack TypeScript, React, and Python - shipping real features with</strong></p><p><strong>mentorship from experienced engineers.</strong></p><p><strong>This is an in-office role</strong>. You will need to come to our office in <strong>HSR Layout, Bengaluru</strong> on</p><p>working days.</p><p>This role is designed for someone early in their career who learns quickly, communicates</p><p>clearly, and wants ownership that grows with skill. You don\u2019t need to know everything on day</p><p>one. Curiosity, solid fundamentals, and a habit of asking good questions matter more than a</p><p>long tool checklist.</p><p><br></p>What you'll do<ul><li><span>Build and ship user-facing features in React and TypeScript, with guidance on design and code quality</span></li><li><span>Contribute to Python APIs and services that power Hunar Connect, including REST endpoints and basic data access with SQL</span></li><li><span>Work from well-scoped tickets: clarify requirements, propose a simple approach, implement, and open pull requests for review</span></li><li><span>Write clear, maintainable code and add basic tests where they protect important behavior</span></li><li><span>Debug issues across the frontend, API, and database with help from teammates when you\u2019re stuck</span></li><li><span>Participate in code review - both receiving feedback and, over time, giving thoughtful review to peers</span></li><li><span>Collaborate with product and design to understand the \u201cwhy\u201d behind features, not only the \u201cwhat\u201d</span></li><li><span>Improve docs, small tooling, or developer experience when you spot friction (with support)</span></li></ul><p><br></p>Requirements (must-haves)<ul><li>0\u20132 years of professional software experience, or equivalent through internships, bootcamps, coursework, open source, or substantial personal projects</li><li>Working knowledge of <strong>TypeScript</strong> and <strong>JavaScript</strong></li><li>Experience building UIs with <strong>React</strong> (or a similar modern UI framework)</li><li>Familiarity with <strong>Node.js</strong> and building or consuming <strong>REST APIs</strong></li><li>Basic <strong>SQL</strong> skills (reading queries, simple joins, understanding tables and relationships)</li><li>Comfort with <strong>Git</strong> (branching, commits, pull requests)</li><li>Ability to break a problem into steps, communicate progress, and ask for help early</li><li>Willingness to learn in public: take feedback, iterate, and document what you learn</li></ul><p><br></p>Nice-to-haves<ul><li>Exposure to testing (unit or integration) in a JS/TS codebase</li><li>Familiarity with cloud basics, CI/CD, or deploying a small app end-to-end</li><li>Experience with relational databases beyond simple queries (indexes, migrations)</li><li>Interest in accessibility, performance, or product analytics</li><li>Contributions to open source, hackathons, or teaching/mentoring others</li></ul><p>None of these are required. They\u2019re signals of curiosity, not filters.</p><p><br></p>How to apply<p>Apply via https://apply.hunar.ai/job/nRWg3SAV?utm=jq_ot</p>",
-      "experience": {
-        "label": "1-2 years",
-        "max": 2,
-        "min": 1,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "javascript",
-        "typescript",
-        "react",
-        "node.js",
-        "node",
-        "sql",
-        "ci/cd",
-        "git",
-        "api"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
-      "source": "linkedin",
-      "company": "Application Software Centre- IIT Bombay",
-      "title": "Software Developer",
-      "location": "Mumbai, Maharashtra, India",
-      "jd_location": "Mumbai, Maharashtra, India",
-      "url": "https://in.linkedin.com/jobs/view/software-developer-at-application-software-centre-iit-bombay-4476571134",
-      "posted": "2026-10-07T08:52:07.817538+00:00",
-      "score": 50,
-      "reasons": [
-        "software developer",
-        "python",
-        "javascript",
-        "automation",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "<p><strong>Essential Qualifications &amp; Experience: </strong></p><p>BE /BTech or equivalent degree with minimum 1 year of relevant experience </p><p>OR </p><p>B.Sc./BCS or equivalent degree with CS/ IT specialization with minimum 2 years of relevant experience. </p><p><br></p><p><strong>Required Technical Skills</strong>: Languages: Proficiency in Java (J2EE or Spring) for legacy application support, with the technical agility to transition into Python for upcoming product modernization. Frameworks: Basic understanding of Spring Boot or similar Java frameworks. Databases: Strong foundation in SQL and relational database concepts. Tools: Familiarity with Git for version control. Web Basics: Understanding of RESTful APIs and basic front-end technologies (HTML/CSS/JavaScript). </p><p><br></p><p><strong>Desirable criteria</strong>: Degree in Computer Science, Information Technology, or a related field. Strong analytical and logic-building skills. Ability to communicate technical concepts clearly to both technical and non-technical team members. A proactive learner who is comfortable working in a collaborative, fast-paced environment. Job Profile: We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply.</p><p><br></p><p><strong>Job Profile:</strong> We are seeking motivated Software Developers to join a dynamic technical team. This role involves contributing to the development, maintenance, and modernization of core applications across a diverse technology stack. The position primarily focuses on Java/Python for enterprise backend systems and automation/integration tasks. Candidates who enjoy problem-solving and are eager to work on high-impact projects within a collaborative environment are encouraged to apply. \u2022 Feature Development: Write clean, scalable code in Java (J2EE or Spring Boot) and Python to support student and administrative modules. \u2022 System Maintenance: Assist in maintaining legacy systems while contributing to modern microservices migration. \u2022 Database Management: Write and optimize SQL queries (PostgreSQL/Oracle) and assist with data integrity tasks. \u2022 Testing &amp; Debugging: Perform unit testing and troubleshoot application bottlenecks to ensure high system availability. \u2022 Documentation: Maintain clear functional and technical documentation for all developed modules.</p><p><br></p><p><strong>PLEASE NOTE THAT IT IS MANDATORY TO APPLY FOR THIS POSITION ON IIT BOMBAY JOB PORTAL TO CONSIDER YOUR APPLICATION, PLEASE USE BELOW LINK. </strong></p><p><strong>Kindly use the APPLY button on the top left of the page.</strong></p><p>https://ep.iitb.ac.in/sap/bc/webdynpro/sap/hrrcf_a_posting_apply?PARAM=cG9zdF9pbnN0X2d1aWQ9Q0Q4QTdDRUFERjI0MUZEMUFFRTM5RDI2NDZFMTQzMTAmY2FuZF90eXBlPUVYVA%3d%3d&amp;sap-theme=sap_corbu&amp;sap-client=300&amp;sap-language=EN#</p><p><br></p><p><strong>Regards,</strong></p><p><strong>ASC IIT Bombay</strong></p>",
-      "experience": {
-        "label": "1+ years",
-        "max": null,
-        "min": 1,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "javascript",
-        "java",
-        "sql",
-        "postgresql",
-        "git",
-        "automation"
-      ],
-      "work_mode": "Not specified",
-      "jd_enriched": true
-    },
-    {
-      "id": "li-https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
-      "source": "linkedin",
-      "company": "SkilloVilla",
-      "title": "Java Backend Developer",
-      "location": "Greater Bengaluru Area",
-      "jd_location": "Greater Bengaluru Area",
-      "url": "https://in.linkedin.com/jobs/view/java-backend-developer-at-skillovilla-4475192097",
-      "posted": "2026-10-07T07:52:07.817538+00:00",
-      "score": 47,
-      "reasons": [
-        "backend developer",
-        "backend",
-        "python",
-        "location fit",
-        "experience fit"
-      ],
-      "description": "<p>What you\u2019ll do</p><p><br></p><p>Technology is at the heart of our organization. We have a strong engineering team, and we're looking to expand our tech team. As part of the tech team, you\u2019ll be:</p><ol><li>Partnering with the product/business teams to understand the product features and specifications, translate them into high-level and low-level design</li><li>Participating in all stages of the Software Development Lifecycle - design, development, testing, deployment, and maintenance</li><li>Writing elegant, effective, and scalable code while maintaining the highest level of coding standards</li><li>Taking ownership of the work and ensuring timely deliveries</li><li>Driving innovation while relentlessly improving performance</li></ol><p><br></p><p>What you'll need</p><p><br></p><p>Must-haves</p><ul><li>1+ years of experience as a Java backend developer with strong knowledge of Java web frameworks like Spring Boot, and experience working in Microservices architecture</li><li>Hands-on experience working with Linux/Unix platform</li><li>Strong knowledge of SQL and RDBMS like PostgreSQL/MySQL, etc.</li><li>Experience in Python, Git</li><li>Strong technical aptitude and good knowledge of CS fundamentals</li><li>Strong design skills involving data modelling and low-level class design</li><li>Follow industry coding standards and be responsible for writing maintainable, scalable, and efficient code to solve business problems</li></ul><p><br></p><p>Good to have</p><ul><li>BTech. / MTech. in Computer Science or equivalent degree</li><li>Prior experience working in a start-up environment</li></ul><p><br></p><p>Why us?</p><p>We're hiring a set of highly skilled, enthusiastic, and passionate people who thrive in a high-growth environment.</p><p><br></p><ul><li>Skyrocket your career and salary: be part of our growth rocket ship</li><li>Explosive learning: learn multiple things in a very short duration and get to work directly with the CTO</li><li>Get to work things from an end-to-end perspective</li><li>Be a part-owner of the company: we\u2019ll also be offering a healthy amount of ESOPs over and above the salary !!</li></ul><p><br></p><p>About us</p><p>SkilloVilla is building the next-generation platform to prepare students, fresh graduates, and</p><p>working professionals for the rapidly changing employment landscape through a</p><p>technology-enabled advanced curriculum.</p><p><br></p><p>In a world where technology evolves by the day, and educational institutions\u2019 curriculums</p><p>find it difficult to upgrade to rapidly changing industry needs, upskilling becomes the need</p><p>of the hour for young graduates who are ready to enter the real world of opportunities. We</p><p>strive to bridge the skills gap and propel a person's career with an industry-aligned</p><p>curriculum that is not included in regular college syllabi. While we support novice</p><p>professionals to become job-ready, our team of hiring experts connects them to employers</p><p>from top-tier partner companies to help explore opportunities and secure the jobs of their</p><p>dreams.</p><p><br></p><p>Started by seasoned entrepreneurs from IIT Delhi and IIIT Hyderabad, we are passionate</p><p>about creating something unique, innovative, and big from India. We're backed by Titan</p><p>Capital, a prominent VC fund, along with 10+ marquee angel investors.</p><p><br></p><p>Know more about our founding team:</p><ul><li>Ronak Agrawal (CEO): IIT Delhi, Ex- Business Head, Cuemath</li><li>Rajat Agrawal (CTO): IIIT Hyderabad, Ex-Tech Lead, Swiggy</li><li>Deepak Kharol (COO): IIT Delhi, Ex-Sr. Growth Manager, Swiggy</li></ul>",
-      "experience": {
-        "label": "1+ years",
-        "max": null,
-        "min": 1,
-        "source": "job_description"
-      },
-      "skills_detected": [
-        "python",
-        "next",
-        "java",
-        "sql",
-        "postgresql",
-        "mysql",
-        "git",
-        "linux"
-      ],
-      "work_mode": "Not specified",
       "jd_enriched": true
     },
     {
@@ -2674,53 +2913,6 @@
         "automation",
         "workflow",
         "linux"
-      ],
-      "work_mode": "Remote",
-      "jd_enriched": true
-    },
-    {
-      "id": "rm-2091149",
-      "source": "remotive",
-      "company": "CodeForAI",
-      "title": "Software Engineer / AI Code Trainer (Python, Web, Full Stack)",
-      "location": "Remote USA, UK, India, Australia, Ireland, New Zealand, Philippines, Pakistan, Singapore, Mexico",
-      "jd_location": "Remote USA, UK, India, Australia, Ireland, New Zealand, Philippines, Pakistan, Singapore, Mexico",
-      "url": "https://remotive.com/remote-jobs/software-development/software-engineer-ai-code-trainer-python-web-full-stack-2091149",
-      "posted": "2026-10-05T05:15:43+00:00",
-      "score": 77,
-      "reasons": [
-        "software engineer",
-        "full stack",
-        "ai",
-        "python",
-        "react",
-        "node.js",
-        "javascript",
-        "typescript",
-        "location fit",
-        "remote"
-      ],
-      "description": "  who should apply  \n \u00a0 \n we are looking for developers from all technical backgrounds and language specializations. if you write clean code and understand software design, you are a fit: \n \n \n  software engineers &amp; computer scientists  specializing in algorithms, data structures, or system design. \n \n \n  full-stack &amp; web developers  working with modern front-end or back-end frameworks (javascript, typescript, react, node.js, python, php, ruby, etc.). \n \n \n  backend &amp; systems developers  experienced in languages such as c++, java, go, rust, or python. \n \n \n  devops &amp; database engineers  familiar with api design, sql/nosql databases, or scripting. \n \n \n \u00a0 \n  role &amp; responsibilities  \n as an  ai code trainer , you will evaluate model-generated code, author reference solutions, and stress-test ai reasoning across various engineering domains. \n \n \n  code auditing &amp; quality analysis:  critique ai-generated solutions for logic, performance, security vulnerabilities, syntax, and coding best practices. \n \n \n  gold-standard solutions:  write clean, production-grade reference code and clear technical explanations for complex programming prompts. \n \n \n  test design:  build unit tests and edge-case scenarios to evaluate model accuracy and expose edge-case failures. \n \n \n  technical feedback:  write structured explanations detailing why an ai solution succeeds, fails, or produces bugs. \n \n \n  \u00a0  \n  requirements  \n \n \n  software engineering proficiency:  strong core fundamentals in at least one major programming language or web stack (e.g., python, javascript/typescript, java, c++, go, c#, rust, php). \n \n \n  debugging &amp; code review:  ability to quickly analyze third-party code, catch subtle logical errors, and evaluate efficiency. \n \n \n  technical communication:  clear written english to explain technical concepts and code review rationales effectively. \n \n \n  eligible locations:  resident of  usa, uk, canada, australia, new zealand, india, pakistan, or philippines . \n \n \n  \u00a0  \n  why join us?  \n \n \n  $50\u2013$125/hr  commensurate with your technical domain expertise and task complexity. \n \n \n  weekly guaranteed payouts  directly to your choice of  paypal  or  payoneer . \n \n \n  100% remote &amp; asynchronous:  total schedule control\u2014work whenever and wherever you choose with no fixed minimum hours. \n \n \n how to apply \n apply directly on our website at  https://codeforai.tech/  \n ",
-      "experience": {
-        "label": "Not specified",
-        "max": null,
-        "min": null,
-        "source": "not_found"
-      },
-      "skills_detected": [
-        "python",
-        "javascript",
-        "typescript",
-        "react",
-        "node.js",
-        "node",
-        "java",
-        "c++",
-        "c#",
-        "go",
-        "rust",
-        "sql",
-        "api"
       ],
       "work_mode": "Remote",
       "jd_enriched": true

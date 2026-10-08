@@ -61,6 +61,42 @@
     ],
     "work_mode": "Remote"
   },
+  "an-remote-applied-ai-engineer-467829": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role    we're building agents that run real parts of our business, take on real work, and get better based on the results they produce. you'll build them with whatever is most capable right now: our own agents platform, the latest orchestration tools, and frontier models. the hard part is making them reliable, measurable, and safe enough for the business to depend on.  you'll sit in marketing engineering and be forward-deployed to our growth pods, where you'll find the problems worth solving and own the solutions end to end. you might be a forward-deployed builder, an applied ai engineer who has taken agents beyond the demo stage, or a full-stack engineer who is curious about growth.    requirements    python, sql, llm apis and agent orchestration    you've shipped production systems that other people relied on, starting from a vague problem    you've built with llms beyond a demo and know how to evaluate them and where they fail    you measure whether what you built worked     bonus:  experience with gtm data or marketing systems.    we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find  jobs in united kingdom  on arbeitnow ",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "past offsites have included croatia and italy",
+    "skills_detected": [
+      "python",
+      "sql",
+      "orchestration",
+      "llm"
+    ],
+    "work_mode": "Remote"
+  },
+  "an-remote-full-stack-engineer-backend-leaning-creative-agents-167706": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role  we are looking for a backend-leaning full-stack engineer to help build the next generation of creative agents at elevenlabs.  our ambition is to make agents a primary way people create across elevencreative. we are building systems that turn ideas into high-quality audio, image and video, bringing models and creative tools together without requiring users to become prompting experts.  the creative agent is already live. you will join a small team shaping its capabilities and architecture, with ownership from backend systems and agent infrastructure through to the customer-facing experience. you will help discover what works, turn experiments into reliable features, and use real customer feedback to guide what we build next.   your responsibilities will include:     building production agents and expanding their capabilities through prompts, tool use, orchestration, new models and mcp integrations.    designing and operating reliable backend systems for asynchronous creative generation and long-running tasks, with strong performance, observability, scalability and security.    developing shared evaluations and live quality monitoring, including model-based assessment of image and video outputs.    owning features end to end, from identifying user needs and prototyping to shipping across the stack and supporting them in production, alongside product, design and engineering.    you will help shape both what the agent can do and how people use it across elevencreative. the work combines substantial greenfield development with improving and operating a live product.    requirements  we care about evidence of exceptional engineering: products you have shipped, difficult problems you have solved, and systems you have owned.  we are looking for:    strong backend engineering skills, experience operating production systems, and sound fundamentals in apis, cloud infrastructure, storage and asynchronous processing.    hands-on experience developing agents, with an understanding of prompts, tools, execution logic, evaluations and the challenges of reliable, secure operation.    evidence of independent, end-to-end ownership and confidence working across the stack, including frontend delivery when needed.    good product judgement, clear communication and enthusiasm for creative agents.    we may also consider exceptional engineers with closely relevant experience. familiarity with http, websockets and asynchronous workers will help you build reliable communication between services and recover from failures.  experience with multimodal generation, creative editors, mcp, or building products in a small, fast-moving team would be particularly valuable.  we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find more  english speaking jobs in united kingdom  on arbeitnow ",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "past offsites have included croatia and italy",
+    "skills_detected": [
+      "next",
+      "orchestration"
+    ],
+    "work_mode": "Remote"
+  },
   "an-remote-full-stack-engineer-backend-leaning-creative-agents-312986": {
     "attempted_at": "2026-10-07T23:32:59.289043+00:00",
     "description": " about elevenlabs  elevenlabs is an ai research and product company transforming how we interact with technology.  we launched in january 2023 with the first human-like ai voice model. today, we serve millions of users and thousands of businesses - from fast-growing startups to large enterprises like deutsche telekom and meta. our investors are some of the world's most prominent, including andreessen horowitz, iconiq growth and sequoia. we've raised $781m in funding and our last valuation was $22b - multiples of 11, always.  we have expanded from voice into three main platforms:    elevenagents enables businesses to deliver seamless and intelligent customer experiences, with the integrations, testing, monitoring, and reliability necessary to deploy voice and chat agents at scale.    elevencreative empowers creators and marketers to generate and edit speech, music, image, and video across 70+ languages.    elevenapi gives developers access to our leading ai audio foundational models.    everything we do is the result of the creativity and commitment of our team - builders doing the best work of their lives. we are researchers, engineers, and operators. ioi medalists and ex-founders. if you want to work hard and create lasting positive impact, we want to hear from you.    how we work     high-velocity:  rapid experimentation, lean autonomous teams, and minimal bureaucracy.     impact not job titles:  we don\u2019t have job titles. instead, it\u2019s about the impact you have. no task is above or beneath you.     ai first:  we use ai to move faster with higher-quality results. we do this across the whole company\u2014from engineering to growth to operations.     excellence everywhere:  everything we do should match the quality of our ai models.     global team:  we prioritize your talent, not your location.      what we offer     innovative culture:  you\u2019ll be part of a generational opportunity to define the trajectory of ai, surrounded by a team pushing the boundaries of what\u2019s possible.     growth paths:  joining elevenlabs means joining a dynamic team with countless opportunities to drive impact - beyond your immediate role and responsibilities.     learning &amp; development : elevenlabs proactively supports professional development through an annual discretionary stipend.     social travel : we also provide an annual discretionary stipend to meet up with colleagues each year, however you choose.     annual company offsite:  each year, we bring the entire team together in a new location - past offsites have included croatia and italy.     co-working : if you\u2019re not located near one of our main hubs, we offer a monthly co-working stipend.    about the role  we are looking for a backend-leaning full-stack engineer to help build the next generation of creative agents at elevenlabs.  our ambition is to make agents a primary way people create across elevencreative. we are building systems that turn ideas into high-quality audio, image and video, bringing models and creative tools together without requiring users to become prompting experts.  the creative agent is already live. you will join a small team shaping its capabilities and architecture, with ownership from backend systems and agent infrastructure through to the customer-facing experience. you will help discover what works, turn experiments into reliable features, and use real customer feedback to guide what we build next.   your responsibilities will include:     building production agents and expanding their capabilities through prompts, tool use, orchestration, new models and mcp integrations.    designing and operating reliable backend systems for asynchronous creative generation and long-running tasks, with strong performance, observability, scalability and security.    developing shared evaluations and live quality monitoring, including model-based assessment of image and video outputs.    owning features end to end, from identifying user needs and prototyping to shipping across the stack and supporting them in production, alongside product, design and engineering.    you will help shape both what the agent can do and how people use it across elevencreative. the work combines substantial greenfield development with improving and operating a live product.    requirements  we care about evidence of exceptional engineering: products you have shipped, difficult problems you have solved, and systems you have owned.  we are looking for:    strong backend engineering skills, experience operating production systems, and sound fundamentals in apis, cloud infrastructure, storage and asynchronous processing.    hands-on experience developing agents, with an understanding of prompts, tools, execution logic, evaluations and the challenges of reliable, secure operation.    evidence of independent, end-to-end ownership and confidence working across the stack, including frontend delivery when needed.    good product judgement, clear communication and enthusiasm for creative agents.    we may also consider exceptional engineers with closely relevant experience. familiarity with http, websockets and asynchronous workers will help you build reliable communication between services and recover from failures.  experience with multimodal generation, creative editors, mcp, or building products in a small, fast-moving team would be particularly valuable.  we are an equal opportunity employer and do not discriminate on the basis of race, religion, national origin, gender, sexual orientation, age, veteran status, disability or other legally protected statuses.  find more  english speaking jobs in germany  on arbeitnow ",
@@ -653,6 +689,40 @@
     ],
     "work_mode": "Not specified"
   },
+  "li-https://in.linkedin.com/jobs/view/full-stack-developer-at-nippon-data-systems-4475771484": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "We are seeking a skilled Full Stack Developer to join our dynamic team in the Chandigarh Region. The ideal candidate will have a strong background in both front-end and back-end development, with expertise in Angular, .NET Core, PostgreSQL, and Python. As a Full Stack Developer, you will be responsible for designing, developing, and maintaining web applications that provide a seamless user experience. Key Responsibilities: - Collaborate with cross-functional teams to define, design, and ship new features. - Develop and maintain high-quality web applications using Angular for the front end and .NET Core for the back end. - Write clean, maintainable, and efficient code while adhering to best practices. - Troubleshoot and debug applications to optimize performance. - Participate in code reviews and contribute to team knowledge sharing. - Stay updated with emerging technologies and industry trends to enhance development processes. Required Skills: - Proficiency in Angular and .NET Core. - Strong knowledge of PostgreSQL and Python. - Experience with full stack development practices. - Ability to work collaboratively in a team environment. - Excellent problem-solving skills and attention to detail. If you are passionate about technology and eager to work in a fast-paced environment, we encourage you to apply for this exciting opportunity. Join us in building innovative solutions that make a difference.<br><br>This job is provided by Shine.com",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Sahibzada Ajit Singh Nagar, Punjab, India",
+    "skills_detected": [
+      "python",
+      "postgresql"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/full-stack-developer-at-nippon-data-systems-4475783186": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "We are seeking a skilled Full Stack Developer to join our dynamic team in the Chandigarh Region. The ideal candidate will have a strong background in both front-end and back-end development, with expertise in Angular, .NET Core, PostgreSQL, and Python. As a Full Stack Developer, you will be responsible for designing, developing, and maintaining web applications that provide a seamless user experience. Key Responsibilities: - Collaborate with cross-functional teams to define, design, and ship new features. - Develop and maintain high-quality web applications using Angular for the front end and .NET Core for the back end. - Write clean, maintainable, and efficient code while adhering to best practices. - Troubleshoot and debug applications to optimize performance. - Participate in code reviews and contribute to team knowledge sharing. - Stay updated with emerging technologies and industry trends to enhance development processes. Required Skills: - Proficiency in Angular and .NET Core. - Strong knowledge of PostgreSQL and Python. - Experience with full stack development practices. - Ability to work collaboratively in a team environment. - Excellent problem-solving skills and attention to detail. If you are passionate about technology and eager to work in a fast-paced environment, we encourage you to apply for this exciting opportunity. Join us in building innovative solutions that make a difference.<br><br>This job is provided by Shine.com",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Balachaur, Punjab, India",
+    "skills_detected": [
+      "python",
+      "postgresql"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/full-stack-developer-ii-java-react-at-guidewire-software-4475165251": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "<strong>Summary<br><br></strong>Guidewire is searching for a smart, proactive, and results-oriented Software Engineer to build sophisticated solutions for the property &amp; casualty insurance industry's complex business domain and make our industry-leading products even better. The product development team is looking for an enthusiastic engineer who is passionate about building high-quality software with a phenomenal team and improving the customer experience for millions of people who use our products every day.<br><br>You will have the opportunity to make an impact and contribute to a complex application suite of products that generate over 500 million dollars of revenue annually, mission-critical to 400+ enterprises serving more than a million users. Guidewire provides outstanding software for the second-largest financial services industry in the world: insurance. We deliver the core applications that Property and Casualty (P/C) insurers use to build their products, sell policies, settle claims, and bill their customers. The SaaS solutions delivered via Guidewire Cloud enable our customers to rapidly innovate and drive measurable value. Guidewire Cloud is powered by the highly resilient Amazon Web Services (AWS) cloud infrastructure, with SLAs backed by experienced Guidewire teams and SaaS-certified partners spanning application management, system administration, security and compliance, upgrades, QA testing, health checks, and other services.<br><br>The successful candidate will work on the entire technology stack, from the core persistence layer through to the Web Application front ends.Our teams are lean, empowered, and collaborative. You must be a self-starter and able to perform independently while working alongside intelligent colleagues who've checked their egos at the door in a team environment, communicating effectively with everyone. We've built a strong culture, and we're looking for engineers who can help us maintain it.<br><br><strong>Job Description<br><br></strong><strong>Successful software engineers at Guidewire typically have:<br><br></strong><ul><li>Enjoy working collaboratively in an empowered, small, cross-functional team</li><li>Experience working in an agile and fast paced development environment (e.g. TDD, BDD, Agile, pair programming, etc.)</li><li>A passion for code quality demonstrated by thorough testing</li><li>A desire to be hands-on in designing and writing code</li><li>Curiosity and internal motivation to constantly improve</li><li>Ability to learn quickly in a dynamic environment</li><li>Excellent communication skills, comfort level to speak their mind and defend ideas based on merit, yet humility and hunger to learn from others.<br><br></li></ul><strong>Key Qualifications Include Experience With<br><br></strong><ul><li>2-4 years of experience in enterprise software development</li><li>Proficiency in Core Java and solid understanding of JavaScript / HTML5 / CSS.</li><li>Experience with a market leading client-side framework (e.g. React, Angular) is plus.</li><li>Familiarity with Continuous Delivery, Continuous Integration, Unit/Integration Testing, etc</li><li>Object-Oriented Design using SOLID and Hexagonal design principles</li><li>Experience building secure software and knowledge of security practices</li><li>Experience working with Open-Source frameworks (e.g. Spring, Jersey, Drools, others)</li><li>Understanding of relational database persistence (e.g. MySQL, Oracle). Familiarity with NoSQL databases (e.g. MongoDB, CouchDB) is a plus</li><li>Agile development practices</li><li>Experience with REST or gRPC based APIs</li><li>Cloud Services (e.g. AWS/GCP/Azure)</li><li>A typical candidate has a Computer Science degree or equivalent<br><br></li></ul><strong>About Guidewire<br><br></strong>Guidewire is the platform P&amp;C insurers trust to engage, innovate, and grow efficiently. We combine digital, core, analytics, and AI to deliver our platform as a cloud service. More than 540+ insurers in 40 countries, from new ventures to the largest and most complex in the world, run on Guidewire.<br><br>As a partner to our customers, we continually evolve to enable their success. We are proud of our unparalleled implementation track record with 1600+ successful projects, supported by the largest R&amp;D team and partner ecosystem in the industry. Our Marketplace provides hundreds of applications that accelerate integration, localization, and innovation.<br><br>For more information, please visit www.guidewire.com and follow us on Twitter: @Guidewire_PandC.<br><br>Guidewire Software, Inc. is proud to be an equal opportunity and affirmative action employer. We are committed to an inclusive workplace, and believe that a diversity of perspectives, abilities, and cultures is a key to our success. Qualified applicants will receive consideration without regard to race, color, ancestry, religion, sex, national origin, citizenship, marital status, age, sexual orientation, gender identity, gender expression, veteran status, or disability. All offers are contingent upon passing a criminal history and other background checks where it's applicable to the position.",
@@ -743,6 +813,41 @@
       "ci/cd",
       "orchestration",
       "kafka"
+    ],
+    "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/full-stack-software-developer-4475751261": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "Full Stack Software Developer Chennai, Tamil Nadu, India Apply Full Stack Software Developer CrimsonEdge Systems Pvt Ltd Chennai, Tamil Nadu, India 4 hours ago Over 200 applicants Apply Save Report this job Company Description CrimsonEdge Systems Pvt Ltd is a technology company focused on developing innovative robotics, embedded systems, IoT, and software products. Based in Chennai, the company brings together hardware, firmware, and software engineering to build reliable, practical, and scalable solutions. Team members collaborate across disciplines to transform ideas and business requirements into working products. CrimsonEdge Systems values continuous learning, ownership, innovation, and hands-on problem-solving, offering team members opportunities to strengthen their technical skills while contributing to real-world product development. Role Description The Full Stack Software Developer will design, develop, test, and maintain web applications and backend services for robotics and IoT products. Day-to-day responsibilities include building backend applications using Java and Spring Boot, developing Python-based services and automation tools, creating responsive dashboards, and implementing REST APIs that connect hardware devices, applications, and cloud platforms. The developer will manage database integration, authentication, user management, and role-based access control while ensuring application performance, security, and scalability. The role also involves integrating IoT and embedded devices with backend systems, developing user interfaces using React or a similar JavaScript framework, deploying applications on Linux or cloud environments, maintaining code through Git, and troubleshooting application issues. The developer will work closely with hardware, firmware, robotics, and product teams throughout the development process. This is a full-time, junior-level role based in Chennai. Qualifications Proficiency in Python and Java for application and backend development. Working knowledge of Java Spring Boot and REST API development. Experience with HTML, CSS, and JavaScript. Familiarity with React or another modern front-end framework. Understanding of SQL and database fundamentals. Experience integrating front-end applications with backend services and APIs. Familiarity with authentication, user management, and role-based access control. Basic knowledge of Linux environments and application deployment. Experience using Git and standard version-control workflows. Ability to write clean, maintainable, and properly documented code. Strong debugging, troubleshooting, and problem-solving skills. Ability to collaborate with hardware, firmware, robotics, and software teams. Bachelor\u2019s degree in Computer Science, Information Technology, Engineering, or a related field, or equivalent practical experience. Fresh graduates and candidates with up to two years of experience are encouraged to apply, especially those with strong academic, internship, open-source, or personal projects. Preferred Qualifications Experience with Docker and containerized applications. Familiarity with PostgreSQL or MySQL. Understanding of MQTT and WebSockets. Exposure to Redis and Node.js. Familiarity with AWS, Azure, or Google Cloud Platform. Experience developing IoT dashboards or device-management applications. Knowledge of CI/CD pipelines. Previous experience integrating software with embedded systems, robotics platforms, or IoT devices. Employment Details Position: Full Stack Software Developer Number of Openings: 1 Employment Type: Full-time Experience: 0\u20132 years Location: Chennai Show more Show less Seniority level Entry level Employment type Full-time Get notified about new Full Stack Engineer jobs in Chennai, Tamil Nadu, India . Sign in to create job alert Jobs Javascript Developer jobs Full Stack Software Developer Similar jobs Full Stack Engineer Full Stack Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Full Stack Developer Full Stack Developer TestUnity Chennai, Tamil Nadu, India \u20b9500,000.00 - \u20b9600,000.00 1 week ago Fullstack Developer Fullstack Developer Niyati Technologies Pvt. Ltd. Chennai, Tamil Nadu, India \u20b9700,000.00 - \u20b91,000,000.00 1 year ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Full Stack Developer Full Stack Developer Jitil - Website For Everyone Chennai, Tamil Nadu, India 2 months ago Full Stack Engineer Full Stack Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Show more jobs like this Show fewer jobs like this People also viewed Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Custom Software Engineer Custom Software Engineer Accenture in India Chennai, Tamil Nadu, India 1 week ago Similar Searches Javascript Developer jobs 14,295 open jobs Java Software Engineer jobs 11,988 open jobs Developer jobs 73,513 open jobs Coldfusion Developer jobs 6,494 open jobs Senior Software Engineer jobs 18,207 open jobs PHP Developer jobs 6,106 open jobs Java Application Developer jobs 7,582 open jobs Senior Web Developer jobs 9,040 open jobs Django Developer jobs 9,350 open jobs Associate Software Engineer jobs 52,154 open jobs Ruby on Rails Developer jobs 10,683 open jobs Web Developer jobs 14,028 open jobs Web Application Developer jobs 10,986 open jobs Software Engineer jobs 59,663 open jobs Dotnet Developer jobs 8,372 open jobs Python Developer jobs 12,759 open jobs Java Web Developer jobs 7,207 open jobs Engineer jobs 71,158 open jobs Web Development Intern jobs 1,491 open jobs Junior Software Engineer jobs 52,787 open jobs Java Developer Contract jobs 306 open jobs Frontend Developer jobs 10,770 open jobs Junior Web Developer jobs 5,053 open jobs Lead Web Developer jobs 8,945 open jobs Java Consultant jobs 2,640 open jobs Show more Show less",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Chennai Show more Show less Seniority level Entry level Employment type Full-time Get notified about",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "react",
+      "node.js",
+      "node",
+      "django",
+      "java",
+      "sql",
+      "postgresql",
+      "mysql",
+      "redis",
+      "aws",
+      "azure",
+      "docker",
+      "ci/cd",
+      "git",
+      "rest api",
+      "api",
+      "automation",
+      "linux"
     ],
     "work_mode": "Not specified"
   },
@@ -927,6 +1032,32 @@
     ],
     "work_mode": "Not specified"
   },
+  "li-https://in.linkedin.com/jobs/view/mendix-python-ai-solutions-developer-at-siemens-4477110749": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "<strong>Dear Aspirant!<br><br></strong>We empower our people to stay resilient and relevant in a constantly changing world. We\u2019re looking for people who are always searching for creative ways to grow and learn. People who want to make a real impact, now and in the future. Does that sound like you? Then it seems like you\u2019d make a great addition to our vibrant international team.<br><br><strong>We are looking for: Mendix, Python &amp; AI Solutions Developer <br><br></strong><strong>You\u2019ll Make An Impact By<br><br></strong><ul><li>Design, develop, and maintain scalable, user-focused business applications using Mendix.</li><li>Build Python backend services, automation scripts, integrations, and REST APIs.</li><li>Integrate Generative AI and AI-powered capabilities into enterprise applications and workflows.</li><li>Translate business requirements into maintainable technical solutions with support from senior team members.</li><li>Develop Mendix domain models, microflows, nanoflows, workflows, and integrations.</li><li>Improve application quality, performance, and stability through testing, debugging, troubleshooting, and development standards.</li><li>Collaborate with business stakeholders, architects, infrastructure, operations, and cybersecurity teams to deliver effective solutions.</li><li>Support deployments, CI/CD, DevOps practices, and technical documentation for applications, APIs, and integrations.<br><br></li></ul><strong>You\u2019re excited to build on your existing expertise, including:<br><br></strong><ul><li>Bring 3\u20135 years of software engineering, application development, or automation experience.</li><li>Apply 1\u20133 years of hands-on Mendix experience across web or mobile applications, lifecycle management, and version control.</li><li>Develop Python services and REST APIs using integration services, with FastAPI or Flask preferred.</li><li>Work with PostgreSQL, Oracle, SQL, HTML, CSS, JavaScript, Git, and GitHub.</li><li>Apply API authentication, authorization, API management, CI/CD fundamentals, and Agile delivery practices.</li><li>Integrate Generative AI, LLMs, and AI services responsibly into business applications through APIs.</li><li>Demonstrate strong analytical, troubleshooting, problem-solving, collaboration, and English communication skills.<br><br></li></ul><strong>Create a better #TomorrowWithUs!<br><br></strong>This role is based in Pune where you\u2019ll get the chance to work with teams impacting entire cities, countries - and the shape of things to come.<br><br>We value your unique identity and perspective and are fully committed to providing equitable opportunities and building a workplace that reflects the diversity of society. Come bring your authentic self and create a better tomorrow with us.<br><br>We\u2019re Siemens. A collection of over 312,000 minds building the future, one day at a time in over 200 countries. We're dedicated to equality, and we encourage applications that reflect the diversity of the communities we work in. All employment decisions at Siemens are based on qualifications, merit and business need. Bring your curiosity and creativity and help us shape tomorrow.<br><br><strong>Find out more about Siemens careers at: www.siemens.com/careers </strong> #STS",
+    "experience": {
+      "label": "3-5 years",
+      "max": 5,
+      "min": 3,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Pune where you\u2019ll get the chance to work with teams impacting entire cities, coun",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "fastapi",
+      "flask",
+      "sql",
+      "postgresql",
+      "ci/cd",
+      "git",
+      "api",
+      "automation",
+      "generative ai"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/net-full-stack-developer-at-sonata-software-4476337121": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "<strong>Job Description<br><br></strong><strong>Job Title-</strong> .NET Full Stack Developer<br><br><strong>Location-</strong> Pune | Hybrid<br><br><strong>Experience-</strong> 3\u20136 Years<br><br><strong>Primary Skills-</strong> React.js, .NET / C#, SQL Server, REST APIs &amp; Full-Stack Development<br><br><strong>About The Role<br><br></strong>This is a hands-on <strong>Individual Contributor (IC)</strong> role for someone early in their career who is eager to learn a modern technology stack, develop strong engineering practices, and become comfortable using AI-assisted development tools as part of their daily delivery.<br><br><strong>Roles And Responsibilities<br><br></strong><ul><li>Build and maintain features across React.js front ends and .NET 10 (C#) back ends, under the guidance of senior engineers.</li><li>Write clean, tested, and well-documented code for well-scoped tickets and features.</li><li>Use AI-assisted development tools such as Cursor, GitHub Copilot, or similar tools as part of the day-to-day development workflow.</li><li>Participate in code reviews by both giving and receiving feedback to develop strong engineering practices.</li><li>Work with QA/SDET teams to fix defects and improve test coverage for developed features.</li><li>Learn the portfolio's applications and contribute to bug fixes and small enhancements across business units.</li><li>Maintain parity with legacy system behavior where required.</li><li>Develop and maintain automated tests and perform regression testing against existing systems.</li><li>Collaborate with senior engineers and architects to understand technical requirements and implementation approaches.<br><br></li></ul><strong>Qualifications &amp; Required Skills<br><br></strong><ul><li>Up to 6 years of professional software development experience.</li><li>Good understanding of React.js, including components, hooks, and basic state management.</li><li>Good understanding of .NET / C#, with exposure to .NET 10 or willingness to learn and ramp up quickly.</li><li>Good understanding of SQL Server and relational databases, including reading queries, understanding existing tables, and testing against development databases.</li><li>Good understanding of REST APIs, relational databases, and full-stack web application architecture.</li><li>Hands-on exposure to AI-assisted development tools such as Cursor, GitHub Copilot, Windsurf, or similar tools, or strong willingness to adopt them.</li><li>Good debugging and problem-solving skills with the ability to ask relevant questions when required.</li><li>Clear communication skills and a collaborative attitude.</li><li>Ability to work effectively with and learn from senior engineers.<br><br></li></ul><strong>Mandatory Skills<br><br></strong><ul><li>React.js</li><li>.NET / C#</li><li>SQL Server</li><li>REST APIs</li><li>Full-Stack Web Development</li><li>Relational Databases</li><li>Basic State Management</li><li>Debugging &amp; Troubleshooting</li><li>AI-Assisted Development Tools<br><br></li></ul><strong>Good To Have Skills<br><br></strong><ul><li>Exposure to legacy .NET Framework or Web Forms.</li><li>Academic or personal projects involving React.js and/or .NET.</li><li>Exposure to Git-based development workflows.</li><li>Basic understanding of CI/CD pipelines.</li><li>Interest in application modernization and migration projects.</li><li>Experience with automated testing and regression testing.<br><br></li></ul><strong>About Sonata Software<br><br></strong>Sonata Software is an <strong>AI-first modernization engineering company</strong> that helps enterprises transform legacy systems into intelligent, scalable business platforms. Powered by its <strong>Platformation\u2122 framework and Harmoni.AI platform</strong>, Sonata delivers AI-led modernization across cloud, data, AI, Dynamics, test automation, and managed services.<br><br>Headquartered in Bengaluru, India, Sonata has more than <strong>$1.2 billion in revenue and 6,400+ AI engineers</strong> supporting global delivery across regions including the US, UK, India, Malaysia, Mexico, Australia, DACH, and the Nordics.<br><br>With deep partnerships across <strong>Microsoft, AWS, Salesforce, and Snowflake</strong>, Sonata helps Fortune 500 enterprises accelerate innovation, improve efficiency, and drive sustainable growth.<br><br>For more information, please visit <strong>www.sonata-software.com</strong> .",
@@ -1005,6 +1136,30 @@
     ],
     "work_mode": "Not specified"
   },
+  "li-https://in.linkedin.com/jobs/view/python-developer-irc301400-at-globallogic-4475450327": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "<strong>Description<br><br></strong>Python FS<br><br><strong>Requirements<br><br></strong>Required Skills:<br><br><br><ul><li> Python, FastAPI/Flask/Django, REST API development,</li><li> SQL knowledge</li><li> Basic CICD pipeline working, knowledge of any version control \u2013 GIT, GitHub actions.</li><li> Knowledge of AWS<br><br><br></li></ul>Good to have:<br><br><br><ul><li> Databricks</li><li> Power BI</li><li> ETL pipelines<br><br><br></li></ul>Job responsibilities<br><br>Required Skills:<br><br><br><ul><li> Python, FastAPI/Flask/Django, REST API development,</li><li> SQL knowledge</li><li> Basic CICD pipeline working, knowledge of any version control \u2013 GIT, GitHub actions.</li><li> Knowledge of AWS<br><br><br></li></ul>Good to have:<br><br><br><ul><li> Databricks</li><li> Power BI</li><li> ETL pipelines<br><br><br></li></ul>What we offer<br><br><strong>Exciting Projects:</strong> We focus on industries like High-Tech, communication, media, healthcare, retail and telecom. Our customer list is full of fantastic global brands and leaders who love what we build for them.<br><br><strong>Collaborative Environment:</strong> You Can expand your skills by collaborating with a diverse team of highly talented people in an open, laidback environment \u2014 or even abroad in one of our global centers or client facilities!<br><br><strong>Work-Life Balance:</strong> GlobalLogic prioritizes work-life balance, which is why we offer flexible work schedules, opportunities to work from home, and paid time off and holidays.<br><br><strong>Professional Development:</strong> Our dedicated Learning &amp; Development team regularly organizes Communication skills training(GL Vantage, Toast Master),Stress Management program, professional certifications, and technical and soft skill trainings.<br><br><strong>Excellent Benefits:</strong> We provide our employees with competitive salaries, family medical insurance, Group Term Life Insurance, Group Personal Accident Insurance , NPS(National Pension Scheme ), Periodic health awareness program, extended maternity leave, annual performance bonuses, and referral bonuses.<br><br><strong>Fun Perks:</strong> We want you to love where you work, which is why we host sports events, cultural activities, offer food on subsidies rates, Corporate parties. Our vibrant offices also include dedicated GL Zones, rooftop decks and GL Club where you can drink coffee or tea with your colleagues over a game of table and offer discounts for popular stores and restaurants!<br><br><strong>About GlobalLogic<br><br></strong>GlobalLogic, a Hitachi Group Company, is a trusted digital engineering partner to the world\u2019s largest and most forward-thinking companies. Since 2000, we\u2019ve been at the forefront of the digital revolution \u2013 helping create some of the most innovative and widely used digital products and experiences. Today we continue to collaborate with clients in transforming businesses and redefining industries through intelligent products, platforms, and services.",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Noida, Uttar Pradesh, India",
+    "skills_detected": [
+      "python",
+      "fastapi",
+      "django",
+      "flask",
+      "sql",
+      "aws",
+      "git",
+      "rest api",
+      "api"
+    ],
+    "work_mode": "Not specified"
+  },
   "li-https://in.linkedin.com/jobs/view/python-full-stack-developer-at-zemoso-technologies-4474095163": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
     "description": "<br><p><strong>Role : </strong>Python Full Stack Developer</p><p><strong>Experience: </strong>5 to 8 years</p><p><strong>Location: </strong>Bangalore (or willing to relocate to Bangalore)</p><p><br></p><p><strong>About Us: </strong></p><p>Zemoso Technologies is a Software Product Market Fit Studio that brings Silicon Valley-style</p><p>rapid prototyping and rapid application builds to Entrepreneurs and Corporate innovation. We</p><p>offer Innovation as a service and work on ideas from scratch and take them to the Product</p><p>Market Fit stage using Design Thinking -&gt; Lean Execution -&gt; Agile Methodology.</p><p>We were featured as one of Deloitte's Fastest 50 growing tech companies from India thrice</p><p>(2016, 2018, and 2019). We were also featured in Deloitte Technology Fast 500 Asia Pacific</p><p>both in 2016 and 2018.</p><p>We are located in Hyderabad, India, Dallas, US &amp; have recently incorporated another office in</p><p>Waterloo, Canada.</p><p><br></p><p><strong>What You Will Do: </strong></p><p>\u25cf Design and develop full stack web applications using Python (Django/FastAPI) on the</p><p>backend and React on the frontend.</p><p>\u25cf Develop innovative software solutions using design thinking, lean, and agile methodologies.</p><p>\u25cf Build and maintain scalable, high-quality software products using the latest technologies</p><p>and platforms.</p><p>\u25cf Collaborate with fast-paced, dynamic teams to deliver value-driven client experiences.</p><p>\u25cf Own end-to-end feature development, from API design to UI implementation.</p><p>\u25cf Mentor and contribute to the growth of the next generation of developers.</p><p><br></p><p><strong>Must-Have Skills: </strong></p><p>\u25cf Experience: 5 to 8 years.</p><p>\u25cf Strong proficiency in Python with hands-on experience in Django and/or FastAPI.</p><p>\u25cf Solid hands-on experience with React.js for building modern, responsive UIs.</p><p>\u25cf Experience building and consuming RESTful APIs.</p><p>\u25cf Strong understanding of full stack architecture and integration between frontend and</p><p>backend systems.</p><p>\u25cf Bachelor's or Master's degree in Computer Science, Data Science, or a related field.</p><p><br></p><p><strong>Nice to Have Qualifications: </strong></p><p>\u25cf Experience with Pandas and PySpark.</p><p>\u25cf Familiarity with state management libraries (Redux, Context API) and modern JS/TS</p><p>tooling.\u25cf Experience with cloud platforms (AWS/Azure/GCP) and containerization (Docker/Kubernetes).</p><p>\u25cf Product and customer-centric mindset.</p><p>\u25cf Great Object-Oriented skills, including design patterns.</p><p>\u25cf Good to great problem-solving and communication skills.</p><p>\u25cf Experience working with cross-border, distributed teams.</p><p><br></p><p><strong>Get to know us better: </strong></p><p>https://www.zemosolabs.com</p>",
@@ -1074,6 +1229,31 @@
       "go"
     ],
     "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/software-engineer-c%23-net-and-asp-net-core-at-wells-fargo-4476780287": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "<strong>About This Role<br><br></strong>Wells Fargo is seeking a Software Engineer - C#, .NET, and ASP.NET Core<br><br><strong>In This Role, You Will<br><br></strong><ul><li>Participate in low to moderately complex initiatives and projects associated with the technology domain, including installation, upgrades, and deployment efforts</li><li>Identify opportunities for service quality and availability improvements within the technology domain environment</li><li>Design, code, test, debug, and document for low to moderately complex projects and programs associated with technology domain, including upgrades and deployments</li><li>Review and analyze technical assignments or challenges that are related to low to medium risk deliverables and that require research, evaluation, and selection of alternative technology domains</li><li>Present recommendations for resolving issues or may escalate issues as needed to meet established service level agreements</li><li>Exercise some independent judgment while also developing understanding of given technology domain in reference to security and compliance requirements</li><li>Provide information to technology colleagues, internal partners, and stakeholders<br><br></li></ul><strong>Required Qualifications<br><br></strong><ul><li>2+ years of software engineering experience, or equivalent demonstrated through one or a combination of the following: work experience, training, military experience, education</li><li>Knowledge of C#, .NET, and ASP.NET Core.</li><li>Exposure to REST API and Web application development.</li><li>Familiarity with SQL-Server or other relational database technologies.<br><br></li></ul><strong>Desired Qualifications<br><br></strong><ul><li>Knowledge of Angular or React, JavaScript, TypeScript, HTML, and CSS.</li><li>Understanding of object-oriented programming, data structures, and software design principles.</li><li>Exposure to Git source control and CI/CD concepts.</li><li>Understanding of Agile development methodologies.</li><li>Exposure to Microsoft Azure or other cloud platforms.</li><li>Strong analytical, problem-solving, and debugging skills.</li><li>Effective verbal and written communication skills.</li><li>Internship, academic project, or hands-on experience developing full-stack applications<br><br></li></ul><strong>Job Expectations<br><br></strong><ul><li>Demonstrate a strong learning mindset and willingness to acquire new technical skills.</li><li>Effectively collaborate with geographically distributed teams.</li><li>Adhere to Wells Fargo risk management, compliance, and security standards.</li><li>Participate in hybrid work arrangements as required by the organization.</li><li>Support occasional production deployments or release activities when needed.<br><br></li></ul><strong>Posting End Date<br><br></strong>13 Oct 2026<br><br><ul><li>Job posting may come down early due to volume of applicants.<br><br></li></ul><strong>We Value Equal Opportunity<br><br></strong>Wells Fargo is an equal opportunity employer. All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, disability, status as a protected veteran, or any other legally protected characteristic.<br><br>Employees support our focus on building strong customer relationships balanced with a strong risk mitigating and compliance-driven culture which firmly establishes those disciplines as critical to the success of our customers and company. They are accountable for execution of all applicable risk programs (Credit, Market, Financial Crimes, Operational, Regulatory Compliance), which includes effectively following and adhering to applicable Wells Fargo policies and procedures, appropriately fulfilling risk and compliance obligations, timely and effective escalation and remediation of issues, and making sound risk decisions. There is emphasis on proactive monitoring, governance, risk identification and escalation, as well as making sound risk decisions commensurate with the business unit\u2019s risk appetite and all risk and compliance program requirements.<br><br>Candidates applying to job openings posted in Canada: Applications for employment are encouraged from all qualified candidates, including women, persons with disabilities, aboriginal peoples and visible minorities. Accommodation for applicants with disabilities is available upon request in connection with the recruitment process.<br><br><strong>Applicants With Disabilities<br><br></strong>To request a medical accommodation during the application or interview process, visit Disability Inclusion at Wells Fargo.<br><br><strong>Drug and Alcohol Policy<br><br></strong>Wells Fargo maintains a drug free workplace. Please see our Drug and Alcohol Policy to learn more.<br><br><strong>Wells Fargo Recruitment And Hiring Requirements<br><br></strong><ul><li> Third-Party recordings are prohibited unless authorized by Wells Fargo.</li><li> Wells Fargo requires you to directly represent your own experiences during the recruiting and hiring process.<br><br></li></ul><strong>Reference Number<br><br></strong>R-579867",
+    "experience": {
+      "label": "2+ years",
+      "max": null,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, Karnataka, India",
+    "skills_detected": [
+      "javascript",
+      "typescript",
+      "react",
+      "c#",
+      "sql",
+      "azure",
+      "ci/cd",
+      "git",
+      "rest api",
+      "api"
+    ],
+    "work_mode": "Hybrid"
   },
   "li-https://in.linkedin.com/jobs/view/software-engineer-cloud-azure-at-rubrik-4475408994": {
     "attempted_at": "2026-10-07T12:20:17.370953+00:00",
@@ -1230,6 +1410,28 @@
     "jd_location": "Sas Nagar, Punjab, India",
     "skills_detected": [],
     "work_mode": "Not specified"
+  },
+  "li-https://in.linkedin.com/jobs/view/z2-python-full-stack-developer-at-ntt-data-north-america-4476797986": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "<strong>Req ID:</strong> 391596<br><br>NTT DATA strives to hire exceptional, innovative and passionate individuals who want to grow with us. If you want to be part of an inclusive, adaptable, and forward-thinking organization, apply now.<br><br>We are currently seeking a Z2_Python Full Stack Developer to join our team in Bangalore, Karn\u0101taka (IN-KA), India (IN).<br><br><strong>Position Overview<br><br></strong>We are looking for a skilled Full Stack Developer with strong experience in Python, web application development, automation, REST APIs, React, databases, and enterprise application development.<br><br>The candidate will be responsible for designing, developing, testing, deploying, and maintaining scalable applications used for engineering and business workflows. The role requires strong ownership of applications from requirement gathering through production deployment and support.<br><br><strong>Key Responsibilities<br><br></strong>Design and develop end-to-end web applications using Python, Django, Flask, FastAPI, React.js, JavaScript, HTML and CSS.<br><br>Develop scalable and optimized REST APIs for enterprise applications and data-processing workflows.<br><br>Build Python-based automation and rule-validation solutions to reduce manual engineering and business processes.<br><br>Develop applications for Excel processing, data comparison, validation, reporting,<br><br><strong>About NTT DATA<br><br></strong>NTT DATA is a $30 billion business and technology services leader, serving 75% of the Fortune Global 100. We are committed to accelerating client success and positively impacting society through responsible innovation. We are one of the world's leading AI and digital infrastructure providers, with unmatched capabilities in enterprise-scale AI, cloud, security, connectivity, data centers and application services. our consulting and Industry solutions help organizations and society move confidently and sustainably into the digital future. As a Global Top Employer, we have experts in more than 50 countries. We also offer clients access to a robust ecosystem of innovation centers as well as established and start-up partners. NTT DATA is a part of NTT Group, which invests over $3 billion each year in R&amp;D.<br><br>Whenever possible, we hire locally to NTT DATA offices or client sites. This ensures we can provide timely and effective support tailored to each client\u2019s needs. While many positions offer remote or hybrid work options, these arrangements are subject to change based on client requirements. For employees near an NTT DATA office or client site, in-office attendance may be required for meetings or events, depending on business needs. At NTT DATA, we are committed to staying flexible and meeting the evolving needs of both our clients and employees. NTT DATA recruiters will never ask for payment or banking information and will only use @nttdata.com, @nttdatafed.com and @talent.nttdataservices.com email addresses. If you are requested to provide payment or disclose banking information, please submit a contact us form, https://us.nttdata.com/en/contact-us.<br><br><strong><em>NTT DATA endeavors to make https://us.nttdata.com accessible to any and all users. If you would like to contact us regarding the accessibility of our website or need assistance completing the application process, please contact us at https://us.nttdata.com/en/contact-us. </em></strong><strong><em>This contact information is for accommodation requests only and cannot be used to inquire about the status of applications. NTT DATA is an equal opportunity employer. Qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, disability or protected veteran status. For our EEO Policy Statement, please click here. If you'd like more information on your EEO rights under the law, please click here. For Pay Transparency information, please click here.</em></strong>",
+    "experience": {
+      "label": "Not specified",
+      "max": null,
+      "min": null,
+      "source": "not_found"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bangalore Urban, Karnataka, India",
+    "skills_detected": [
+      "python",
+      "javascript",
+      "react",
+      "fastapi",
+      "django",
+      "flask",
+      "automation"
+    ],
+    "work_mode": "Hybrid"
   },
   "nk-nk-051026004120": {
     "attempted_at": "2026-10-07T11:56:17.403408+00:00",
@@ -2150,6 +2352,140 @@
     "jd_location": "Ahmedabad(Bodakdev), India",
     "skills_detected": [
       "postgresql"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-081026014355": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "role overview design, develop, deploy, and maintain web and mobile applications while collaborating with cross-functional teams to deliver scalable and secure solutions. key responsibilities develop and maintain backend and frontend applications. write clean, secure, and maintainable code. test, debug, and deploy applications. integrate third-party and internal apis. collaborate with business analysts, ui/ux designers, and devops teams. required qualifications & skills bachelors degree in computer science, it, or a related field. backend: php, python, or node.js . frontend: react, angular, or vue.js . databases: mysql, postgresql, or mongodb . good knowledge of git and ci/cd . preferred / additional skills docker and kubernetes. cloud platforms, preferably aws . mobile development using flutter or react native . knowledge of application security and secure coding practices. 2-7 yrs python, php, node.js, software, software development, development",
+    "experience": {
+      "label": "2-7 years",
+      "max": 7,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Noida, India",
+    "skills_detected": [
+      "python",
+      "react",
+      "react native",
+      "node.js",
+      "node",
+      "postgresql",
+      "mysql",
+      "mongodb",
+      "aws",
+      "docker",
+      "kubernetes",
+      "ci/cd",
+      "git",
+      "flutter"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-081026019892": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "* develop, test, and maintain * python-based applications and backend services *. * write clean, reusable, efficient, and scalable code. * develop and integrate *rest apis* using django, flask, or fastapi. * work with *sql and nosql databases* and optimize database queries. * debug, troubleshoot, and resolve application issues. * perform unit testing and ensure application quality and reliability. * integrate third-party apis and external services. * participate in code reviews and follow coding standards. * use *git/github* for version control and collaborative development. * collaborate with *developers, qa, devops, and other teams*. * understand project requirements and convert them into technical solutions. * continuously improve application performance, security, and maintainability. this hiring is for one of our client companies, and the selected candidates will be on the client's direct payroll. as per our client's hiring requirements, candidates who graduated in 2025, or 2026 are not eligible to apply. 0-5 yrs django, python, sql, software development, development, software",
+    "experience": {
+      "label": "0-5 years",
+      "max": 5,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Bengaluru, India",
+    "skills_detected": [
+      "python",
+      "fastapi",
+      "django",
+      "flask",
+      "sql",
+      "git"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-081026921000": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "responsibilities: * design, develop, test & maintain software solutions using golang, typescript & docker. * collaborate with cross-functional teams on project delivery. * ensure code quality through testing & documentation. 2-5 yrs golang, typescript, typesense, docker, software, software development, development",
+    "experience": {
+      "label": "2-5 years",
+      "max": 5,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Hubballi, India",
+    "skills_detected": [
+      "typescript",
+      "golang",
+      "docker"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-081026923478": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "required skills experience with react, angular or similar front-end frameworks. understanding of responsive design principles . proficiency in python work requirements candidate may be required to work on-site based on business and project needs 0-2 yrs react.js, angular, front end, frontend development, end, front, development",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Coimbatore, India",
+    "skills_detected": [
+      "python",
+      "react"
+    ],
+    "work_mode": "On-site"
+  },
+  "nk-nk-081026923592": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "responsibilities: * collaborate with cross-functional teams on project requirements and deliverables * ensure code quality through testing and documentation * develop user interfaces using react.js, javascript, css, node.js 2-4 yrs react.js, css, javascript, node.js, cs, development",
+    "experience": {
+      "label": "2-4 years",
+      "max": 4,
+      "min": 2,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Gurugram, India",
+    "skills_detected": [
+      "javascript",
+      "react",
+      "node.js",
+      "node"
+    ],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-081026923711": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "responsibilities: design, develop, test & maintain software solutions using engineering principles. collaborate with cross-functional teams on project delivery & support. perks and benefits free meal, food allowance, over time allowance, house rent allowance, health insurance, annual bonus, provident fund 0-6 yrs application development, software development, application programming, application software, software services, database management system, software engineering, database handling",
+    "experience": {
+      "label": "0-6 years",
+      "max": 6,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Greater Noida(Knowledge Park 2), India",
+    "skills_detected": [],
+    "work_mode": "Not specified"
+  },
+  "nk-nk-081026924227": {
+    "attempted_at": "2026-10-08T09:33:38.846023+00:00",
+    "description": "responsibilities: design, develop, test & maintain software using java, spring boot & microservices collaborate with cross-functional teams on project requirements & deliverables perks and benefits office cab/shuttle 0-2 yrs java, spring boot, microservices, boot, spring, software, development, software development",
+    "experience": {
+      "label": "0-2 years",
+      "max": 2,
+      "min": 0,
+      "source": "job_description"
+    },
+    "jd_enriched": true,
+    "jd_location": "Noida(Sector 149), India",
+    "skills_detected": [
+      "java"
     ],
     "work_mode": "Not specified"
   },
