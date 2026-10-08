@@ -666,7 +666,7 @@ def _ensure_notification_state(
     """, (canonical_opportunity_id, initial_status, timestamp, timestamp))
 
 
-def def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
+def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
                jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.execute(
