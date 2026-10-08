@@ -352,6 +352,8 @@ That is useful as a code-level default, but it is **not yet the final product be
 
 ### Required end state
 
+The V2 runtime configuration layer is now implemented in the repository.
+
 The frontend must allow the user to configure, without editing Python:
 
 - target roles
@@ -372,7 +374,7 @@ The frontend must allow the user to configure, without editing Python:
 
 User preferences should be persisted on the VM, not committed back into GitHub on every UI change.
 
-Preferred direction:
+Implemented direction:
 
 ```
 Frontend
@@ -381,10 +383,19 @@ V2 configuration API
   ↓
 persistent /data/config.json
   ↓
-matcher + notification policy
+matcher + alertability policy
 ```
 
-Application code and personal preferences should remain separate.
+Configuration updates are protected by a generated token stored at `/data/config_token` unless `JOB_RADAR_CONFIG_TOKEN` is supplied as an environment variable.
+
+Application code and personal preferences remain separate.
+
+The repository now exposes:
+- `GET /api/config`
+- `PUT /api/config` with `X-Config-Token`
+- runtime config migration/default seeding
+- validation for user-owned configuration
+- live matching against runtime configuration without a rebuild
 
 ---
 
@@ -521,14 +532,18 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Initial deterministic matcher
 ✅ Experience false-positive correction
 ✅ Phrase-aware skill/title matching
+✅ V2 persistent runtime configuration API implemented
+✅ Frontend connected to V2 configuration API in repository
+✅ Config validation + generated configuration token
+✅ Matcher regression tests added
 ```
 
 ### Currently in progress
 
 ```
-⏳ V2 configuration system
-⏳ Alertability policy
-⏳ Matcher quality validation
+⏳ Deploy/test the new configuration layer on Oracle
+⏳ Validate configurable alertability against real jobs
+⏳ Canonical identity + cross-source deduplication
 ```
 
 ### Not yet production-ready
@@ -561,15 +576,17 @@ The next implementation sequence is:
 
 ### Step A — V2 persistent configuration
 
-Create:
+**Implemented in repository; deployment verification is next.**
+
+The runtime uses:
 
 ```
 /data/config.json
 ```
 
-and a V2 configuration API.
+and a protected V2 configuration API.
 
-The API should support:
+The API supports:
 
 - read current settings
 - update settings
@@ -580,7 +597,11 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-Move all user-owned matching policy behind the configuration layer.
+**Partially implemented.**
+
+The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
+
+Next: deploy and validate settings changes against the live database, then finish the distinction between `match`, `eligible`, and `alertable` for Telegram.
 
 Do not hardcode:
 
