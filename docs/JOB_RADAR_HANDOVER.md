@@ -614,6 +614,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
 ✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
+⏳ MVP blocker: make LinkedIn experience acquisition reliable for poster-added requirements, or enforce explicit-experience-only Telegram alerts until a reliable source-access path exists
 ⏳ Manual acceptance test: measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
 ⏳ Manual acceptance test: classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
 ⏳ Manual acceptance test: validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
@@ -948,6 +949,45 @@ Corrective rule:
 
 The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
 
+
+### Observation 24 — LinkedIn authenticated page can expose poster-added requirements that the public guest detail fetch does not expose
+
+A second real LinkedIn production check used an Ampstek posting whose logged-in browser page visibly showed:
+
+```
+8+ years of work experience with Core Java
+8+ years of work experience with Python
+```
+
+The same posting's current production database record originally had no captured experience and the pre-fix Telegram alert therefore showed `Experience: Not stated`.
+
+After deploying the hardened JD parser, a read-only re-fetch of the live LinkedIn URL was performed from the Oracle container. The public guest/detail acquisition returned a short description without the poster-added `8+ years` requirements:
+
+```
+contains "8+ years": False
+extract_jd_experience = (None, None)
+extract_experience = (None, None)
+```
+
+The non-persisting simulation then remained:
+
+```
+match = True
+alertable = True
+experience = unknown
+```
+
+This proves an important limitation: the parser can only extract requirements that the production source-access layer actually retrieves. The current public logged-out LinkedIn fetch does not reliably expose every requirement visible in an authenticated browser session, especially LinkedIn's "Requirements added by the job poster" section.
+
+Corrective implication:
+
+- Do not claim the JD hardening solves all LinkedIn experience extraction.
+- Treat the current parser as correct for the text it receives, but the acquisition layer remains incomplete.
+- Before calling experience-based Telegram filtering fully trustworthy, either obtain a reliable production-access path to those poster-added requirements or require explicit captured experience for Telegram alerts.
+- Keep unknown experience available for matching/dashboard review unless product policy is deliberately changed.
+- A safer interim alert policy is `require_explicit_experience_for_alerts=true`, which prevents unknown-experience LinkedIn jobs from reaching Telegram while preserving them for dashboard review.
+
+This is now an MVP acceptance blocker for **Telegram precision**, not a reason to discard the overall V2 architecture.
 ### Observation 21 — Canonical duplication has no duplicates in the latest one-hour matching window
 
 A post-deployment one-hour audit found:
