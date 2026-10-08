@@ -762,20 +762,39 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                     opportunity_id,
                 ))
             else:
-                if not config.get("notifications_enabled", True):
-                    reasons = ["Telegram notifications disabled"]
-                elif not observations:
+                if not observations:
                     reasons = ["no persisted evaluation available"]
+                    next_status = "pending"
+                elif not config.get("notifications_enabled", True):
+                    reasons = ["Telegram notifications disabled; awaiting future re-evaluation"]
+                    next_status = "pending"
                 else:
-                    reasons = ["no fresh alertable observation"]
+                    fresh_observations = []
+                    stale_observations = []
+                    for observation in observations:
+                        item = dict(observation)
+                        age_timestamp = _alert_age_timestamp(item)
+                        if age_timestamp and age_timestamp < now_value - dt.timedelta(hours=max_age):
+                            stale_observations.append(item)
+                        else:
+                            fresh_observations.append(item)
+
+                    if not fresh_observations and stale_observations:
+                        reasons = [f"no alertable observation within {max_age} hour age window"]
+                        next_status = "suppressed"
+                    else:
+                        reasons = ["not alertable under current policy; awaiting future re-evaluation"]
+                        next_status = "pending"
+
                 conn.execute("""
                     UPDATE notification_ledger
-                    SET status='suppressed',
+                    SET status=?,
                         candidate_job_id=NULL,
                         updated_at=?,
                         decision_reason_json=?
                     WHERE canonical_opportunity_id=? AND status='pending'
                 """, (
+                    next_status,
                     timestamp,
                     json.dumps(reasons, ensure_ascii=False),
                     opportunity_id,
