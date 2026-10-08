@@ -1,128 +1,197 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>JobBeeper Local</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JobBeeper Local</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
-<aside class="sidebar">
-  <div class="brand"><span class="logo">⚡</span><div><b>JobBeeper</b><small>Your job search</small></div></div>
-  <nav>
-    <a class="nav-link active" href="#jobs" data-section="jobsSection">▦ <span>Jobs</span></a>
-    <a class="nav-link" href="#applied" data-section="appliedSection">◷ <span>Applied</span></a>
-    <a class="nav-link" href="#filters" data-section="filtersSection">☷ <span>Filters</span></a>
-<a class="nav-link" href="#settings" data-section="settingsSection">⚙ <span>Access</span></a>
-    <a class="nav-link" href="#sources" data-section="sourcesSection">▤ <span>Sources</span></a>
-  </nav>
-  <div class="profile"><div class="avatar">AB</div><div><b>Avinash Bhalla</b><small>Personal job watcher</small></div></div>
-  <div class="live"><span class="dot"></span> Live feed <small id="lastRun">waiting…</small></div>
-</aside>
-
-<main>
-  <section id="jobsSection" class="page-section active-section">
-  <header>
-    <div>
-      <h1>Jobs</h1>
-      <p>Today’s jobs from multiple sources, ranked for your profile. The feed resets at midnight IST.</p>
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">⚡</span>
+      <div><b>JobBeeper</b><small>Your job search</small></div>
     </div>
-    <div class="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
-  </header>
+    <nav>
+      <a class="nav-link active" href="#jobs" data-section="jobsSection">▦ <span>Jobs</span></a>
+      <a class="nav-link" href="#applied" data-section="appliedSection">◷ <span>Applied</span></a>
+      <a class="nav-link" href="#filters" data-section="filtersSection">☷ <span>Filters</span></a>
+      <a class="nav-link" href="#settings" data-section="settingsSection">⚙ <span>Access</span></a>
+      <a class="nav-link" href="#sources" data-section="sourcesSection">▤ <span>Sources</span></a>
+    </nav>
+    <div class="profile">
+      <div class="avatar">AB</div>
+      <div><b>Avinash Bhalla</b><small>Personal job watcher</small></div>
+    </div>
+    <div class="live"><span class="dot"></span> Live feed <small id="lastRun">waiting…</small></div>
+  </aside>
 
-  <section class="stats">
-    <div><b id="today">0</b><span>Jobs today</span></div>
-    <div><b id="matchedToday">0</b><span>Matched today</span></div>
-    <div><b id="notified">0</b><span>Alerts sent today</span></div>
-  </section>
-
-  <section class="toolbar">
-    <input id="search" placeholder="Role, company, location, skill…">
-    <select id="source"><option value="">All sources</option></select>
-    <select id="score"><option value="0">All matches</option><option value="80">80%+</option><option value="90">90%+</option></select>
-    <select id="age"><option value="72">Last 72h</option><option value="24">Last 24h</option><option value="6">Last 6h</option><option value="1">Last hour</option></select>
-    <select id="sort"><option value="newest">Newest first</option><option value="match">Best match</option></select>
-  </section>
-
-  <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><span id="auto">Today · refreshes every 10s · sources run continuously</span></div>
-  <section id="jobs" class="jobs"></section>
-  </section>
-
-  <section id="jobDetailSection" class="page-section hidden-section">
-    <div class="job-detail">
-      <button id="backToJobs" class="back-link">← Back to Jobs</button>
-      <div class="detail-hero">
+  <main>
+    <section id="jobsSection" class="page-section active-section">
+      <header>
         <div>
-          <div class="detail-source" id="detailSource"></div>
-          <h1 id="detailTitle">Job</h1>
-          <div class="detail-company" id="detailCompany"></div>
+          <h1>Jobs</h1>
+          <p>Today’s jobs from multiple sources, ranked for your profile. The feed resets at midnight IST.</p>
         </div>
-        <div class="detail-score" id="detailScore"></div>
-      </div>
-      <div class="detail-stats">
-        <div><span>EXPERIENCE</span><b id="detailExperience">Not specified</b></div>
-        <div><span>LOCATION</span><b id="detailLocation">Not specified</b></div>
-        <div><span>WORK MODE</span><b id="detailWorkMode">Not specified</b></div>
-        <div><span>POSTED</span><b id="detailPosted">Not specified</b></div>
-      </div>
-      <div class="detail-actions"><a id="detailApply" class="apply" target="_blank" rel="noopener">Apply now ↗</a></div>
-      <section class="detail-box">
-        <div class="detail-box-head"><h2>Why this matched</h2><span id="detailMatch"></span></div>
-        <div id="detailReasons" class="reason-list"></div>
+        <div class="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
+      </header>
+
+      <section class="stats">
+        <div><b id="today">0</b><span>Jobs today</span></div>
+        <div><b id="matchedToday">0</b><span>Matched today</span></div>
+        <div><b id="notified">0</b><span>Alerts sent today</span></div>
       </section>
-      <section class="detail-box">
-        <div class="detail-box-head"><h2>Detected Skills &amp; Technologies</h2><span id="detailSkillCount"></span></div>
-        <div id="detailSkills" class="chips detail-chips"></div>
+
+      <section class="toolbar">
+        <input id="search" placeholder="Role, company, location, skill…">
+        <select id="source">
+          <option value="">All sources</option>
+        </select>
+        <select id="score">
+          <option value="0">All matches</option>
+          <option value="80">80%+</option>
+          <option value="90">90%+</option>
+        </select>
+        <select id="age">
+          <option value="72">Last 72h</option>
+          <option value="24">Last 24h</option>
+          <option value="6">Last 6h</option>
+          <option value="1">Last hour</option>
+        </select>
+        <select id="sort">
+          <option value="newest">Newest first</option>
+          <option value="match">Best match</option>
+        </select>
       </section>
-      <section class="detail-box">
-        <h2>About this job</h2>
-        <div id="detailDescription" class="detail-description"></div>
-      </section>
-    </div>
-  </section>
 
-  <section id="appliedSection" class="page-section hidden-section">
-    <div class="settings-panel"><div class="section-title"><h2>Applied</h2><p>Applied-job tracking will appear here.</p></div><div class="empty">No applied jobs have been recorded yet.</div></div>
-  </section>
+      <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><span id="auto">Today ·
+          refreshes every 10s · sources run continuously</span></div>
+      <section id="jobs" class="jobs"></section>
+    </section>
 
-  <section id="filtersSection" class="page-section hidden-section">
-    <div class="settings-panel">
-      <div class="section-title"><h2>Preferences</h2><p>These settings control V2 matching and future Telegram alert eligibility. They are stored on the Oracle VM.</p></div>
-      <div class="match-explainer"><b>How it works:</b> jobs are collected first, then evaluated against these preferences. Changing preferences does not require a code change or Docker rebuild.</div>
-      <div class="settings-grid">
-        <label class="field"><span>Target roles</span><textarea id="cfgRoles" placeholder="software engineer, full stack developer, AI engineer"></textarea></label>
-        <label class="field"><span>Locations</span><textarea id="cfgLocations" placeholder="Bengaluru, Gurugram, Delhi, Remote India"></textarea></label>
-        <label class="field"><span>Skills</span><textarea id="cfgSkills" placeholder="React, Python, Node.js, FastAPI, AI, automation"></textarea></label>
-        <label class="field"><span>Exclude titles</span><textarea id="cfgExclude" placeholder="senior, staff, principal, manager, lead"></textarea></label>
-        <label class="field"><span>Exclude role/category terms</span><textarea id="cfgExcludeRoles" placeholder="QA, tester, testing"></textarea></label>
-        <label class="field"><span>Your experience</span><input id="cfgCandidateExperience" type="number" min="0" max="30" step="0.5" placeholder="2"></label>
-        <label class="field"><span>Minimum job experience</span><input id="cfgMinExperience" type="number" min="0" max="30" step="0.5" placeholder="No minimum"></label>
-        <label class="field"><span>Maximum acceptable job experience</span><input id="cfgExperience" type="number" min="0" max="30" step="0.5" placeholder="3"></label>
-        <label class="field"><span>Match threshold</span><input id="cfgThreshold" type="number" min="0" max="100" step="1" placeholder="55"></label>
-        <label class="field"><span>Maximum job age</span><select id="cfgAge"><option value="6">6 hours</option><option value="24">24 hours</option><option value="48">48 hours</option><option value="72">72 hours</option><option value="168">7 days</option></select></label>
-        <label class="field"><span>Source controls</span><div id="sourceChoices" class="choices"></div></label>
+    <section id="jobDetailSection" class="page-section hidden-section">
+      <div class="job-detail">
+        <button id="backToJobs" class="back-link">← Back to Jobs</button>
+        <div class="detail-hero">
+          <div>
+            <div class="detail-source" id="detailSource"></div>
+            <h1 id="detailTitle">Job</h1>
+            <div class="detail-company" id="detailCompany"></div>
+          </div>
+          <div class="detail-score" id="detailScore"></div>
+        </div>
+        <div class="detail-stats">
+          <div><span>EXPERIENCE</span><b id="detailExperience">Not specified</b></div>
+          <div><span>LOCATION</span><b id="detailLocation">Not specified</b></div>
+          <div><span>WORK MODE</span><b id="detailWorkMode">Not specified</b></div>
+          <div><span>POSTED</span><b id="detailPosted">Not specified</b></div>
+        </div>
+        <div class="detail-actions"><a id="detailApply" class="apply" target="_blank" rel="noopener">Apply now ↗</a>
+        </div>
+        <section class="detail-box">
+          <div class="detail-box-head">
+            <h2>Why this matched</h2><span id="detailMatch"></span>
+          </div>
+          <div id="detailReasons" class="reason-list"></div>
+        </section>
+        <section class="detail-box">
+          <div class="detail-box-head">
+            <h2>Detected Skills &amp; Technologies</h2><span id="detailSkillCount"></span>
+          </div>
+          <div id="detailSkills" class="chips detail-chips"></div>
+        </section>
+        <section class="detail-box">
+          <h2>About this job</h2>
+          <div id="detailDescription" class="detail-description"></div>
+        </section>
       </div>
-      <label class="toggle"><input id="cfgRemoteOnly" type="checkbox"><span>Remote jobs only</span></label>
-      <label class="toggle"><input id="cfgRequireExperience" type="checkbox"><span>Require explicit experience for Telegram alerts</span></label>
-      <label class="toggle"><input id="cfgTelegram" type="checkbox"><span>Telegram alerts enabled</span></label>
-      <div class="github-row"><button id="saveConfig" class="primary">Save V2 preferences</button><span id="saveStatus" class="save-status"></span></div>
-    </div>
-  </section>
+    </section>
 
-  <section id="sourcesSection" class="page-section hidden-section">
-    <div class="settings-panel"><div class="section-title"><h2>Sources</h2><p>Job sources configured in the repository will be shown here as the feed reports them.</p></div><div id="sourceStatus" class="empty">Loading source status…</div></div>
-  </section>
-
-  <section id="settingsSection" class="page-section hidden-section">
-    <div class="settings-panel">
-      <div class="section-title"><h2>Configuration access</h2><p>Updating V2 preferences is protected by a local configuration token stored on the Oracle VM.</p></div>
-      <div class="github-row">
-        <input id="configToken" type="password" autocomplete="off" placeholder="V2 configuration token">
-        <button id="saveToken" class="primary">Remember token</button>
-        <button id="clearToken" class="secondary">Clear token</button>
+    <section id="appliedSection" class="page-section hidden-section">
+      <div class="settings-panel">
+        <div class="section-title">
+          <h2>Applied</h2>
+          <p>Applied-job tracking will appear here.</p>
+        </div>
+        <div class="empty">No applied jobs have been recorded yet.</div>
       </div>
-      <div id="tokenStatus" class="save-status"></div>
-      <div class="token-help">Retrieve the token on the VM with <code>sudo docker compose -f v2/docker-compose.yml exec radar cat /data/config_token</code>. It is kept in browser session storage only.</div>
-    </div>
-  </section>
+    </section>
+
+    <section id="filtersSection" class="page-section hidden-section">
+      <div class="settings-panel">
+        <div class="section-title">
+          <h2>Preferences</h2>
+          <p>These settings control V2 matching and future Telegram alert eligibility. They are stored on the Oracle VM.
+          </p>
+        </div>
+        <div class="match-explainer"><b>How it works:</b> jobs are collected first, then evaluated against these
+          preferences. Changing preferences does not require a code change or Docker rebuild.</div>
+        <div class="settings-grid">
+          <label class="field"><span>Target roles</span><textarea id="cfgRoles"
+              placeholder="software engineer, full stack developer, AI engineer"></textarea></label>
+          <label class="field"><span>Locations</span><textarea id="cfgLocations"
+              placeholder="Bengaluru, Gurugram, Delhi, Remote India"></textarea></label>
+          <label class="field"><span>Skills</span><textarea id="cfgSkills"
+              placeholder="React, Python, Node.js, FastAPI, AI, automation"></textarea></label>
+          <label class="field"><span>Exclude titles</span><textarea id="cfgExclude"
+              placeholder="senior, staff, principal, manager, lead"></textarea></label>
+          <label class="field"><span>Exclude role/category terms</span><textarea id="cfgExcludeRoles"
+              placeholder="QA, tester, testing"></textarea></label>
+          <label class="field"><span>Your experience</span><input id="cfgCandidateExperience" type="number" min="0"
+              max="30" step="0.5" placeholder="2"></label>
+          <label class="field"><span>Minimum job experience</span><input id="cfgMinExperience" type="number" min="0"
+              max="30" step="0.5" placeholder="No minimum"></label>
+          <label class="field"><span>Maximum acceptable job experience</span><input id="cfgExperience" type="number"
+              min="0" max="30" step="0.5" placeholder="3"></label>
+          <label class="field"><span>Match threshold</span><input id="cfgThreshold" type="number" min="0" max="100"
+              step="1" placeholder="55"></label>
+          <label class="field"><span>Maximum job age</span><select id="cfgAge">
+              <option value="6">6 hours</option>
+              <option value="24">24 hours</option>
+              <option value="48">48 hours</option>
+              <option value="72">72 hours</option>
+              <option value="168">7 days</option>
+            </select></label>
+          <label class="field"><span>Source controls</span>
+            <div id="sourceChoices" class="choices"></div>
+          </label>
+        </div>
+        <label class="toggle"><input id="cfgRemoteOnly" type="checkbox"><span>Remote jobs only</span></label>
+        <label class="toggle"><input id="cfgRequireExperience" type="checkbox"><span>Require explicit experience for
+            Telegram alerts</span></label>
+        <label class="toggle"><input id="cfgTelegram" type="checkbox"><span>Telegram alerts enabled</span></label>
+        <div class="github-row"><button id="saveConfig" class="primary">Save V2 preferences</button><span
+            id="saveStatus" class="save-status"></span></div>
+      </div>
+    </section>
+
+    <section id="sourcesSection" class="page-section hidden-section">
+      <div class="settings-panel">
+        <div class="section-title">
+          <h2>Sources</h2>
+          <p>Job sources configured in the repository will be shown here as the feed reports them.</p>
+        </div>
+        <div id="sourceStatus" class="empty">Loading source status…</div>
+      </div>
+    </section>
+
+    <section id="settingsSection" class="page-section hidden-section">
+      <div class="settings-panel">
+        <div class="section-title">
+          <h2>Configuration access</h2>
+          <p>Updating V2 preferences is protected by a local configuration token stored on the Oracle VM.</p>
+        </div>
+        <div class="github-row">
+          <input id="configToken" type="password" autocomplete="off" placeholder="V2 configuration token">
+          <button id="saveToken" class="primary">Remember token</button>
+          <button id="clearToken" class="secondary">Clear token</button>
+        </div>
+        <div id="tokenStatus" class="save-status"></div>
+        <div class="token-help">Retrieve the token on the VM with
+          <code>sudo docker compose -f v2/docker-compose.yml exec radar cat /data/config_token</code>. It is kept in
+          browser session storage only.</div>
+      </div>
+    </section>
+
 </html>
