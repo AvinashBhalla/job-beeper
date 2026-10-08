@@ -507,6 +507,7 @@ def init_db() -> None:
             candidate_job_id INTEGER,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            decision_reason_json TEXT NOT NULL DEFAULT '[]',
             sent_at TEXT,
             last_error TEXT,
             FOREIGN KEY(canonical_opportunity_id) REFERENCES canonical_opportunities(id)
@@ -538,6 +539,7 @@ def init_db() -> None:
         """)
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
+        _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
@@ -683,6 +685,106 @@ def backfill_job_evaluations(config: dict[str, Any] | None = None) -> int:
             count += 1
         conn.commit()
     return count
+
+
+def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
+    for field in ("source_posted_at", "discovered_at"):
+        value = job.get(field)
+        if value:
+            parsed = parse_relative(value)
+            if parsed:
+                return parsed
+    return None
+
+
+def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
+    config = config or get_config()
+    now_value = now()
+    max_age = int(config.get("max_age_hours", 72))
+    changed = 0
+
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        pending = conn.execute("""
+            SELECT canonical_opportunity_id
+            FROM notification_ledger
+            WHERE status='pending'
+            ORDER BY created_at ASC
+        """).fetchall()
+
+        for row in pending:
+            opportunity_id = int(row["canonical_opportunity_id"])
+            observations = conn.execute("""
+                SELECT
+                    j.*,
+                    e.match,
+                    e.score,
+                    e.reasons_json,
+                    e.experience_min_years,
+                    e.experience_max_years,
+                    e.alertable,
+                    e.alertability_reasons_json
+                FROM jobs j
+                JOIN job_evaluations e ON e.job_id=j.id
+                WHERE j.canonical_opportunity_id=?
+                ORDER BY e.alertable DESC, e.score DESC, j.discovered_at DESC, j.id DESC
+            """, (opportunity_id,)).fetchall()
+
+            fresh_alertable = []
+            for observation in observations:
+                item = dict(observation)
+                if not item["alertable"]:
+                    continue
+                age_timestamp = _alert_age_timestamp(item)
+                if age_timestamp and age_timestamp < now_value - dt.timedelta(hours=max_age):
+                    continue
+                fresh_alertable.append(item)
+
+            timestamp = iso(now())
+            if fresh_alertable and config.get("notifications_enabled", True):
+                candidate = fresh_alertable[0]
+                reasons = [
+                    "new canonical opportunity",
+                    "passes match and alert policy",
+                    f"within {max_age} hour age window",
+                ]
+                conn.execute("""
+                    UPDATE notification_ledger
+                    SET status='queued',
+                        candidate_job_id=?,
+                        updated_at=?,
+                        decision_reason_json=?
+                    WHERE canonical_opportunity_id=? AND status='pending'
+                """, (
+                    candidate["id"],
+                    timestamp,
+                    json.dumps(reasons, ensure_ascii=False),
+                    opportunity_id,
+                ))
+            else:
+                if not config.get("notifications_enabled", True):
+                    reasons = ["Telegram notifications disabled"]
+                elif not observations:
+                    reasons = ["no persisted evaluation available"]
+                else:
+                    reasons = ["no fresh alertable observation"]
+                conn.execute("""
+                    UPDATE notification_ledger
+                    SET status='suppressed',
+                        candidate_job_id=NULL,
+                        updated_at=?,
+                        decision_reason_json=?
+                    WHERE canonical_opportunity_id=? AND status='pending'
+                """, (
+                    timestamp,
+                    json.dumps(reasons, ensure_ascii=False),
+                    opportunity_id,
+                ))
+            changed += 1
+
+        conn.commit()
+
+    return changed
 
 
 def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
@@ -1101,6 +1203,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
     try:
         jobs = COLLECTORS[source](config)
         new_jobs = upsert_jobs(jobs, config)
+        refresh_notification_decisions(config)
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
         source_state[source] = {
@@ -1152,7 +1255,9 @@ async def scheduler() -> None:
 async def startup() -> None:
     init_db()
     ensure_runtime_config()
-    backfill_job_evaluations(get_config())
+    config = get_config()
+    backfill_job_evaluations(config)
+    refresh_notification_decisions(config)
     ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
 
@@ -1336,6 +1441,50 @@ def jobs(minutes: int = 60, limit: int = 100):
         item["canonical_match_confidence"] = item.get("canonical_match_confidence")
         result.append(item)
     return {"jobs": result}
+
+
+@app.get("/api/notification-queue")
+def notification_queue(limit: int = 100):
+    limit = max(1, min(limit, 500))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT
+                nl.canonical_opportunity_id,
+                nl.status,
+                nl.candidate_job_id,
+                nl.created_at,
+                nl.updated_at,
+                nl.sent_at,
+                nl.last_error,
+                nl.decision_reason_json,
+                j.source,
+                j.source_job_id,
+                j.company,
+                j.title,
+                j.location,
+                j.url,
+                j.source_posted_at,
+                j.discovered_at,
+                e.score,
+                e.reasons_json,
+                e.experience_min_years,
+                e.experience_max_years
+            FROM notification_ledger nl
+            LEFT JOIN jobs j ON j.id=nl.candidate_job_id
+            LEFT JOIN job_evaluations e ON e.job_id=nl.candidate_job_id
+            WHERE nl.status IN ('queued','failed')
+            ORDER BY nl.created_at ASC
+            LIMIT ?
+        """, (limit,)).fetchall()
+
+    result=[]
+    for row in rows:
+        item=dict(row)
+        item["decision_reasons"]=json.loads(item.pop("decision_reason_json") or "[]")
+        item["match_reasons"]=json.loads(item.pop("reasons_json") or "[]")
+        result.append(item)
+    return {"notifications": result}
 
 
 @app.get("/api/opportunities/{opportunity_id}")
