@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Seventeen matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
+✅ Twenty-one matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -557,6 +557,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Persistent job evaluation state added with configuration fingerprint, match score/reasons, experience data, and alertability
 ✅ Persistent notification ledger added per canonical opportunity with historical suppression and new-opportunity pending state
 ✅ Startup backfill for missing persistent job evaluations implemented
+✅ Persistent notification decision queue implemented: pending opportunities become queued only when fresh, matched, alertable and notifications are enabled; otherwise they are suppressed with a durable reason
+✅ Notification queue API added at `/api/notification-queue`
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
@@ -568,8 +570,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
 ✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
 ✅ Real overlap validation completed: 1,206 jobs, 855 identity groups, 38 cross-source candidates, 0 auto-link candidates; observed overlaps remain safely separate
-⏳ Validate persistent job-evaluation backfill and notification-ledger state on the upgraded Oracle database
-⏳ Complete newness/eligibility/notification decision flow using the persisted evaluation and notification ledger
+⏳ Validate the persistent notification decision queue on the upgraded Oracle database
+⏳ Build Telegram delivery/claim/retry on top of the queued notification state
 ```
 
 ### Not yet production-ready
