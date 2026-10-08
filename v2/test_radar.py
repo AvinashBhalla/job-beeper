@@ -907,6 +907,33 @@ class MatcherTests(unittest.TestCase):
         # for forcing legacy Instahyre enablement back to disabled.
         self.assertTrue(merged["source_enabled"]["instahyre"])
 
+    def test_naukri_relay_retries_transient_404(self):
+        class Response:
+            def __init__(self, status_code, payload=None):
+                self.status_code = status_code
+                self._payload = payload or {"jobs": []}
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    import requests
+                    raise requests.HTTPError(f"{self.status_code} error")
+
+            def json(self):
+                return self._payload
+
+        responses = [
+            Response(404),
+            Response(200, {"updated_at": "2026-10-08T18:00:00+00:00", "jobs": []}),
+        ]
+
+        with patch.object(radar.requests, "get", side_effect=responses):
+            with patch.object(radar.time, "sleep") as sleep:
+                jobs = radar.naukri_collect()
+
+        self.assertEqual(jobs, [])
+        self.assertEqual(sleep.call_count, 1)
+        self.assertEqual(sleep.call_args.args[0], 1)
+
     def test_linkedin_fast_scan_uses_broader_recency_window(self):
         params = []
         class Response:
