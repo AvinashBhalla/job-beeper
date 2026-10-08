@@ -181,7 +181,7 @@ class MatcherTests(unittest.TestCase):
     def test_telegram_timestamp_is_human_readable_ist(self):
         self.assertEqual(
             _format_timestamp("2026-10-08T07:30:50.260596+00:00"),
-            "08 Oct 2026, 01:00 PM IST",
+            "08 Oct 2026, 1:00 PM IST",
         )
 
     def test_telegram_message_format_contains_core_fields(self):
