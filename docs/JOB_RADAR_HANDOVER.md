@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (39-test green suite + real-time Telegram gate + matcher variant improvements + production alert validation + Agent-Reach parked as future optimisation)
+**Last updated: 2026-10-08 (JD extraction hardening + test-file repair + 39-test baseline retained pending re-run of updated suite)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -600,16 +600,19 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher role-family aliases added for Software Engineer / Software Development Engineer / SDE variants
 ✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
 ✅ Unknown experience made neutral for matching while alertability remains a separate policy
-✅ Regression suite expanded to 39 tests; Docker execution is green
+✅ Regression suite baseline expanded to 39 tests; Docker execution was green before the latest JD-hardening change
+⏳ Updated JD-hardening suite expected at 42 tests; must be re-run in Docker before declaring the latest milestone green
 ✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
 ✅ Repository .gitignore now ignores Python __pycache__ artifacts
 ✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
+✅ BlueOptima-style LinkedIn JD extraction incident reproduced and JD retrieval/parser hardened for overall/total experience wording, JSON-LD, description selectors, HTML entities/non-breaking spaces and Unicode dash variants
+✅ Corrupted direct test-file update repaired by restoring the last known-good 39-test suite and adding three focused JD-extraction regression tests
 ```
 
 ### Currently in progress
 
 ```
-⏳ Pull the latest GitHub commits onto Oracle and deploy the hardened LinkedIn JD extraction/retrieval change
+⏳ Pull the latest GitHub commits onto Oracle, run the repaired updated suite (expected 42 tests), then deploy the hardened LinkedIn JD extraction/retrieval change
 ⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
 ⏳ Verify canonical-level alert deduplication using distinct canonical opportunities rather than raw job rows
@@ -907,6 +910,8 @@ re-evaluate before notification
 Supported JD wording must include phrases such as `5 to 7 years of overall software engineering experience`, common Unicode dash variants, HTML entities/non-breaking spaces and common minimum/at-least experience wording.
 
 A known experience requirement must not be hidden merely because the search card omitted it.
+
+The first automated attempt to add regression coverage directly to the test file corrupted the file structure and caused a syntax error. The file was repaired by restoring the last known-good test suite and reapplying the new tests as a clean append before the existing JD-experience test block. Future direct GitHub file edits must prefer reconstruction from a verified-good version when a patch has already become structurally suspect.
 
 ### Observation 21 — The latest production alert diagnostic showed canonical duplication is controlled but not yet fully audited
 
