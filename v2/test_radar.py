@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 import v2.radar as radar
 from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
 from v2.radar import _merge_config, alertability_details, extract_experience, match_details, normalize_job, upsert_jobs
-from v2.telegram import format_notification, send_message
+from v2.telegram import _format_timestamp, format_notification, send_message
 
 
 BASE_CONFIG = {
@@ -177,6 +177,12 @@ class MatcherTests(unittest.TestCase):
         result = match_details(enriched, BASE_CONFIG)
         self.assertFalse(result["match"])
         self.assertIn("experience minimum 5 exceeds candidate 2 years", result["reasons"][0])
+
+    def test_telegram_timestamp_is_human_readable_ist(self):
+        self.assertEqual(
+            _format_timestamp("2026-10-08T07:30:50.260596+00:00"),
+            "08 Oct 2026, 01:00 PM IST",
+        )
 
     def test_telegram_message_format_contains_core_fields(self):
         item = {
