@@ -14,6 +14,7 @@ import time
 import warnings
 from pathlib import Path
 from typing import Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
 import requests
@@ -40,6 +41,10 @@ UA = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36",
     "Accept-Language": "en-IN,en;q=0.9",
 }
+
+LINKEDIN_SEARCH_WORKERS = 6
+LINKEDIN_DETAIL_WORKERS = 6
+LINKEDIN_DEEP_SCAN_SECONDS = 300
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 db_lock = threading.Lock()
@@ -952,40 +957,56 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
     return None, None
 
 
+def _linkedin_job_id(url: str) -> str | None:
+    match = re.search(r"(?:-|/)(\d{8,})(?:[/?#]|$)", url or "")
+    return match.group(1) if match else None
+
+
 def _linkedin_job_description(url: str) -> str:
-    try:
-        response = requests.get(
-            url,
-            headers={**UA, "Accept": "text/html,application/xhtml+xml"},
-            timeout=15,
+    job_id = _linkedin_job_id(url)
+    endpoints = []
+    if job_id:
+        endpoints.append(
+            f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
         )
-        if response.status_code != 200:
-            return ""
-    except requests.RequestException:
-        return ""
+    if url:
+        endpoints.append(url)
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    selectors = (
-        "div.show-more-less-html__markup",
-        "div.description__text",
-        "section.show-more-less-html",
-        "div.decorated-job-posting__details",
-        "main",
-    )
-
-    for selector in selectors:
-        nodes = soup.select(selector)
-        if not nodes:
+    for endpoint in endpoints:
+        try:
+            response = requests.get(
+                endpoint,
+                headers={**UA, "Accept": "text/html,application/xhtml+xml"},
+                timeout=10,
+            )
+            if response.status_code != 200:
+                continue
+        except requests.RequestException:
             continue
-        text = " ".join(node.get_text(" ", strip=True) for node in nodes)
-        text = re.sub(r"\s+", " ", text).strip()
-        if text:
-            return text[:20000]
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        selectors = (
+            "div.show-more-less-html__markup",
+            "div.description__text",
+            "section.show-more-less-html",
+            "div.decorated-job-posting__details",
+            "main",
+        )
+
+        for selector in selectors:
+            nodes = soup.select(selector)
+            if not nodes:
+                continue
+            text = " ".join(node.get_text(" ", strip=True) for node in nodes)
+            text = re.sub(r"\s+", " ", text).strip()
+            if text:
+                return text[:20000]
 
     return ""
 
 
 def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
+    job.pop("needs_jd_enrichment", None)
     if job.get("source") != "linkedin":
         return job
 
@@ -995,251 +1016,141 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
 
     detail = _linkedin_job_description(job.get("url", ""))
     if not detail:
-        job.pop("needs_jd_enrichment", None)
         return job
 
     detail_experience = extract_jd_experience(detail)
-    if detail_experience == (None, None):
-        return job
-
     existing_description = job.get("description") or ""
     job["description"] = (
         f"{existing_description} JD: {detail}".strip()
     )[:30000]
+
+    if detail_experience == (None, None):
+        return job
+
     job["jd_experience_min_years"] = detail_experience[0]
     job["jd_experience_max_years"] = detail_experience[1]
-    job.pop("needs_jd_enrichment", None)
     return job
 
 
-def extract_experience(text: str) -> tuple[float | None, float | None]:
-    raw = str(text or "").lower().replace("–", "-").replace("—", "-")
-    raw = re.sub(r"\s+", " ", raw).strip()
+def _linkedin_parse_page(response: requests.Response) -> list[dict[str, Any]]:
+    jobs: list[dict[str, Any]] = []
+    soup = BeautifulSoup(response.text, "html.parser")
+    cards = soup.select("li")
 
-    ranges = re.findall(
-        r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)",
-        raw,
+    for card in cards:
+        link = card.select_one("a.base-card__full-link") or card.select_one(
+            "a[href*='/jobs/view/']"
+        )
+        title = card.select_one("h3.base-search-card__title")
+        company = card.select_one("h4.base-search-card__subtitle")
+        loc = card.select_one("span.job-search-card__location")
+        posted = card.select_one("time")
+        if not link or not title:
+            continue
+
+        url = (link.get("href") or "").split("?")[0]
+        match = re.search(r"(?:-|/)(\d{8,})$", url)
+        source_id = match.group(1) if match else hashlib.sha1(
+            url.encode()
+        ).hexdigest()[:20]
+        visible = posted.get_text(" ", strip=True) if posted else ""
+        posted_at = parse_relative(visible)
+        precision = "minute" if re.search(
+            r"(just now|\d+\s*(?:minute|min|hour|hr)s?\s*ago)",
+            visible.lower(),
+        ) else "date"
+        if not posted_at and posted and posted.get("datetime"):
+            posted_at = parse_relative(posted.get("datetime"))
+
+        jobs.append({
+            **normalize_job(
+                "linkedin", source_id,
+                company.get_text(" ", strip=True) if company else "",
+                title.get_text(" ", strip=True),
+                loc.get_text(" ", strip=True) if loc else "",
+                url, posted_at, precision,
+                card.get_text(" ", strip=True),
+            ),
+            "needs_jd_enrichment": True,
+        })
+
+    return jobs
+
+
+def _linkedin_search_page(
+    query: str,
+    location: str,
+    start: int,
+) -> list[dict[str, Any]]:
+    endpoint = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+    response = _linkedin_request(
+        endpoint,
+        {
+            "keywords": query,
+            "location": location,
+            "f_TPR": "r21600",
+            "sortBy": "DD",
+            "start": start,
+        },
     )
-    if ranges:
-        lows = [float(a) for a, _ in ranges]
-        highs = [float(b) for _, b in ranges]
-        return min(lows), max(highs)
-
-    plus = re.search(r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)", raw)
-    if plus:
-        years = float(plus.group(1))
-        return years, None
-
-    normalized = normalize_phrase(raw)
-    singles = re.findall(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", normalized)
-    if singles:
-        years = [float(x) for x in singles]
-        return min(years), max(years)
-
-    return None, None
-
-
-def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
-    config = config or get_config()
-    title = job.get("title") or ""
-    description = job.get("description") or ""
-    combined = f"{title} {description}"
-    reasons: list[str] = []
-
-    if not title_allowed(title, config):
-        return {
-            "match": False,
-            "score": 0,
-            "reasons": ["excluded title"],
-            "experience_min_years": None,
-            "experience_max_years": None,
-        }
-
-    if config.get("excluded_role_terms") and phrase_hits(config["excluded_role_terms"], title):
-        return {
-            "match": False,
-            "score": 0,
-            "reasons": ["excluded role/category"],
-            "experience_min_years": None,
-            "experience_max_years": None,
-        }
-
-    if not location_allowed(job.get("location") or "", config):
-        return {
-            "match": False,
-            "score": 0,
-            "reasons": ["location outside configured targets"],
-            "experience_min_years": None,
-            "experience_max_years": None,
-        }
-
-    score = 20
-    reasons.append("target location")
-
-    title_role_hits = phrase_hits(config.get("target_roles", []), title)
-    role_hits = title_role_hits
-    role_source = "title"
-    if not role_hits:
-        role_hits = phrase_hits(config.get("target_roles", []), description)
-        role_source = "description"
-
-    if role_hits:
-        role_bonus = 30 if role_source == "title" else 25
-        score += role_bonus
-        reasons.append(f"role ({role_source}): {role_hits[0]}")
-    else:
-        reasons.append("no configured target-role match")
-
-    skill_hits = phrase_hits(config.get("skills", []), combined)
-    if skill_hits:
-        score += min(30, 6 * len(skill_hits))
-        reasons.append("skills: " + ", ".join(skill_hits[:5]))
-
-    exp_min, exp_max = extract_experience(combined)
-    candidate_years = config.get("candidate_experience_years")
-    max_years = float(config.get("max_experience_years", 3))
-    minimum_job_years = config.get("min_experience_years")
-
-    if exp_min is not None or exp_max is not None:
-        effective_min = exp_min if exp_min is not None else exp_max
-
-        if candidate_years is not None and effective_min is not None and effective_min > float(candidate_years):
-            return {
-                "match": False,
-                "score": 0,
-                "reasons": [f"experience minimum {effective_min:g} exceeds candidate {float(candidate_years):g} years"],
-                "experience_min_years": exp_min,
-                "experience_max_years": exp_max,
-            }
-
-        if minimum_job_years is not None and exp_max is not None and exp_max < float(minimum_job_years):
-            return {
-                "match": False,
-                "score": 0,
-                "reasons": [f"job maximum experience {exp_max:g} is below configured minimum {float(minimum_job_years):g} years"],
-                "experience_min_years": exp_min,
-                "experience_max_years": exp_max,
-            }
-
-        if exp_max is not None and exp_max > max_years:
-            return {
-                "match": False,
-                "score": 0,
-                "reasons": [f"experience range exceeds configured maximum of {max_years:g} years"],
-                "experience_min_years": exp_min,
-                "experience_max_years": exp_max,
-            }
-
-        score += 15
-        experience_label = f"{effective_min:g}" + (f"-{exp_max:g}" if exp_max is not None else "+")
-        candidate_label = f"{float(candidate_years):g} years" if candidate_years is not None else "configured profile"
-        reasons.append(f"experience compatible: candidate {candidate_label}; job {experience_label}")
-    else:
-        reasons.append("experience not stated in captured source data")
-
-    threshold = int(config.get("match_threshold", 55))
-    return {
-        "match": score >= threshold and bool(role_hits),
-        "score": min(score, 100),
-        "reasons": reasons,
-        "experience_min_years": exp_min,
-        "experience_max_years": exp_max,
-    }
-
-
-def alertability_details(job: dict[str, Any], details: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    if not details["match"]:
-        return {"alertable": False, "reasons": ["not a profile match"]}
-
-    if not config.get("notifications_enabled", True):
-        return {"alertable": False, "reasons": ["Telegram notifications disabled"]}
-
-    if config.get("require_explicit_experience_for_alerts"):
-        if details.get("experience_min_years") is None and details.get("experience_max_years") is None:
-            return {"alertable": False, "reasons": ["explicit experience required for alerts"]}
-
-    return {"alertable": True, "reasons": ["passes current alert policy"]}
-
-
-
-
-def likely_match(job: dict[str, Any]) -> bool:
-    return bool(match_details(job)["match"])
-
-
-def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
-    for attempt in range(3):
-        response = requests.get(endpoint, params=params, headers=UA, timeout=25)
-        if response.status_code not in {429, 500, 502, 503, 504}:
-            response.raise_for_status()
-            return response
-        wait = min(30, 2 ** attempt * 2)
-        retry_after = response.headers.get("Retry-After")
-        if retry_after and retry_after.isdigit():
-            wait = min(60, int(retry_after))
-        time.sleep(wait)
-    response.raise_for_status()
-    return response
+    return _linkedin_parse_page(response)
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
-    endpoint = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+    last_deep = source_state.get("linkedin", {}).get("last_deep_scan_at")
+    last_deep_at = parse_relative(last_deep) if last_deep else None
+    do_deep = (
+        last_deep_at is None
+        or (now() - last_deep_at).total_seconds() >= LINKEDIN_DEEP_SCAN_SECONDS
+    )
 
-    # Keep a six-hour safety window so a transient failure does not create a
-    # permanent hole in the feed. We still request newest-first and dedupe by
-    # LinkedIn job id.
-    for query in config.get("linkedin_queries", []):
-        for location in config.get("locations", []):
-            for start in (0, 10):
-                params = {
-                    "keywords": query,
-                    "location": location,
-                    "f_TPR": "r21600",
-                    "sortBy": "DD",
-                    "start": start,
-                }
-                response = _linkedin_request(endpoint, params)
-                soup = BeautifulSoup(response.text, "html.parser")
-                cards = soup.select("li")
-                if not cards:
-                    break
-                for card in cards:
-                    link = card.select_one("a.base-card__full-link") or card.select_one(
-                        "a[href*='/jobs/view/']"
-                    )
-                    title = card.select_one("h3.base-search-card__title")
-                    company = card.select_one("h4.base-search-card__subtitle")
-                    loc = card.select_one("span.job-search-card__location")
-                    posted = card.select_one("time")
-                    if not link or not title:
-                        continue
-                    url = (link.get("href") or "").split("?")[0]
-                    match = re.search(r"(?:-|/)(\d{8,})$", url)
-                    source_id = match.group(1) if match else hashlib.sha1(
-                        url.encode()
-                    ).hexdigest()[:20]
-                    visible = posted.get_text(" ", strip=True) if posted else ""
-                    posted_at = parse_relative(visible)
-                    precision = "minute" if re.search(
-                        r"(just now|\d+\s*(?:minute|min|hour|hr)s?\s*ago)",
-                        visible.lower(),
-                    ) else "date"
-                    if not posted_at and posted and posted.get("datetime"):
-                        posted_at = parse_relative(posted.get("datetime"))
-                    jobs.append({
-                        **normalize_job(
-                            "linkedin", source_id,
-                            company.get_text(" ", strip=True) if company else "",
-                            title.get_text(" ", strip=True),
-                            loc.get_text(" ", strip=True) if loc else "",
-                            url, posted_at, precision,
-                            card.get_text(" ", strip=True),
-                        ),
-                        "needs_jd_enrichment": True,
-                    })
-                if len(cards) < 10:
-                    break
+    targets = [
+        (query, location, start)
+        for query in config.get("linkedin_queries", [])
+        for location in config.get("locations", [])
+        for start in ((0, 10) if do_deep else (0,))
+    ]
+
+    with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
+        futures = [
+            executor.submit(_linkedin_search_page, query, location, start)
+            for query, location, start in targets
+        ]
+        for future in as_completed(futures):
+            try:
+                jobs.extend(future.result())
+            except Exception as exc:
+                log.warning("linkedin page request failed: %r", exc)
+
+    if do_deep:
+        source_state.setdefault("linkedin", {})["last_deep_scan_at"] = iso(now())
+
+    unique_jobs: dict[str, dict[str, Any]] = {}
+    for job in jobs:
+        unique_jobs[job["source_job_id"]] = job
+    jobs = list(unique_jobs.values())
+
+    candidates: list[dict[str, Any]] = []
+    for job in jobs:
+        combined = f"{job.get('title', '')} {job.get('description', '')}"
+        if extract_experience(combined) != (None, None):
+            job.pop("needs_jd_enrichment", None)
+            continue
+        preliminary = match_details(job, config)
+        if preliminary["match"]:
+            candidates.append(job)
+        else:
+            job.pop("needs_jd_enrichment", None)
+
+    with ThreadPoolExecutor(max_workers=LINKEDIN_DETAIL_WORKERS) as executor:
+        futures = [executor.submit(enrich_linkedin_job, job) for job in candidates]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                log.warning("linkedin JD enrichment failed: %r", exc)
+
     return jobs
 
 
@@ -1578,7 +1489,7 @@ def dedupe_candidates(limit: int = 100):
 
 
 @app.get("/api/opportunities")
-def opportunities(minutes: int = 60, limit: int = 100):
+def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = iso(current_day_start_utc()) if today_only else iso(
@@ -1616,7 +1527,7 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
     config = get_config()
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
-    cutoff = iso(now() - dt.timedelta(minutes=minutes))
+    cutoff = iso(current_day_start_utc()) if today_only else iso(now() - dt.timedelta(minutes=minutes))
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
