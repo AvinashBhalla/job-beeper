@@ -1075,6 +1075,15 @@ class MatcherTests(unittest.TestCase):
                     "2 years experience",
                 )
 
+                # The daily lifecycle is based on discovery time, not source
+                # posting time. Move discoveries across the IST-midnight cut.
+                old_job["discovered_at"] = radar.iso(
+                    day_start - timedelta(minutes=30)
+                )
+                new_job["discovered_at"] = radar.iso(
+                    day_start + timedelta(minutes=30)
+                )
+
                 config = {
                     **BASE_CONFIG,
                     "require_explicit_experience_for_alerts": False,
