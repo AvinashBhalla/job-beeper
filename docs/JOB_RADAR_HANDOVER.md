@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (freshness acceleration + daily feed lifecycle + Telegram + JD enrichment)
+**Last updated: 2026-10-08 (34-test green suite + Telegram timestamp fix + V1 alert-path shutdown + live frontend development)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -560,7 +560,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ LinkedIn freshness acceleration implemented: 60-second fast polling, concurrent search requests, five-minute deeper pagination, and bounded concurrent JD enrichment
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Thirty-one matcher/dedupe/config/Telegram regression tests were previously green; the current repository adds a LinkedIn fast/deep scan cadence regression test (32 total, pending Oracle execution after the latest change)
+✅ Full V2 regression suite is green on Oracle: 34 tests passed
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -606,7 +606,9 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Configure Telegram credentials on Oracle and send one real Telegram integration test
 ⏳ Validate alert-path latency on Oracle: measure time from LinkedIn posting → discovery → evaluation/JD enrichment → queue → Telegram for relevant jobs; freshness is improved but not yet consistently within the few-minute target
 ✅ Telegram timestamp formatting verified: human-readable IST
-⏳ Validate real job alert delivery after enabling unknown-experience alerts
+✅ Naukri Telegram formatting preserves date-only posting precision and includes parsed experience
+✅ V1 `job-watch` Telegram workflow is inactive/disabled; V2 is the active alert path
+⏳ Validate real alert-path latency from LinkedIn posting → discovery → evaluation/JD enrichment → queue → Telegram
 ```
 
 ### Not yet production-ready
@@ -616,27 +618,56 @@ The system is therefore **ingesting real jobs continuously**.
 ⚠️ Cross-source canonical deduplication — conservative implementation is production-safe for strong evidence but needs broader source coverage
 ⚠️ New/changed opportunity detection — canonical opportunity/notification persistence is in place; broader change detection remains to be completed
 ✅ Daily active-feed UI connected in the repository: dashboard reads `/api/jobs?today_only=true` plus `/api/daily-summary`, displays Jobs today / Matched today / Alerts sent today, and refreshes every 10 seconds
-❌ Fully V2-connected frontend settings
-❌ Complete frontend live feed
-❌ Source health UI beyond basic API
-❌ V2 replacement of all useful V1 capabilities
+✅ Live frontend development path enabled: dashboard can target the deployed V2 API from a local dev server; browser/product verification and friend's UI work remain in progress
+⚠️ Source health UI and remaining V1 convenience features are still incomplete
 ```
 
 ### V1 status
 
-The old V1 workflow still exists and may still send Telegram alerts.
-
-Do not disable the V1 alert path until V2 Telegram is proven.
-
-After V2 alerts are trustworthy:
-
-- disable V1 duplicate notifications
+The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 
 ---
 
 ## 12. IMMEDIATE NEXT STEPS
 
 The next implementation sequence is:
+
+### Step A — Measure end-to-end alert latency
+
+Measure a controlled set of fresh LinkedIn jobs through the complete path:
+
+```
+source posting
+ → Oracle discovery
+ → normalization/evaluation
+ → JD enrichment when required
+ → notification queue
+ → Telegram send
+```
+
+Record median and p95 latency. Do not call the freshness target met from polling cadence alone.
+
+### Step B — Complete new/changed opportunity detection
+
+Current canonical and notification persistence establishes the foundation. The next implementation should define exactly what constitutes a changed opportunity (for example materially changed posting/description/requirements) and ensure changed opportunities are reconsidered without creating duplicate alerts.
+
+### Step C — Validate runtime configuration + recovery
+
+On Oracle, verify that frontend/API configuration changes persist, trigger re-evaluation and notification reconsideration, and survive container restart/recovery without losing ledger state.
+
+### Step D — Frontend integration
+
+Friend's frontend work continues against the deployed V2 API. Keep backend contracts stable and verify live refresh, filters/settings, job details, source health and apply links against real data.
+
+### Step E — Final MVP sign-off
+
+Only after latency, changed-opportunity handling, configuration persistence, recovery and frontend verification pass should the system be treated as the V2 MVP baseline.
+
+### Step F — Source expansion
+
+After MVP sign-off, add high-value structured sources/ATS adapters progressively.
+
+### Legacy sequence retained for historical context
 
 ### Step A — V2 persistent configuration
 
@@ -1023,14 +1054,13 @@ Canonical opportunity layer is implemented conservatively.
 Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened. The diagnostic now compares only shared normalized company/title families, avoiding expensive broad pair scans. The latest real examples confirmed that many same-title cross-source records differ only by explicit experience range and should remain separate.
 
 FRONTEND:
-Repository dashboard now uses V2 local APIs.
-Needs live browser/deployment verification.
+Repository dashboard uses V2 APIs and can target the deployed Oracle API during local development. Friend's frontend implementation is in progress.
 
 V1:
-Keep until V2 Telegram is proven; then disable duplicate V1 alerts.
+Legacy `job-watch.yml` Telegram workflow is inactive/disabled. V2 is the intended sole alert path.
 
 NEXT:
-Build V2 persistent configuration → configurable matcher/alertability → dedupe/newness → Telegram → frontend → disable V1.
+Measure end-to-end alert latency → implement changed-opportunity detection → validate runtime config persistence/re-evaluation and restart recovery → finish frontend verification → final MVP sign-off → expand sources.
 ```
 
 ---
