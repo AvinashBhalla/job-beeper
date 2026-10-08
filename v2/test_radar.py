@@ -246,6 +246,43 @@ class MatcherTests(unittest.TestCase):
         result = match_details(enriched, BASE_CONFIG)
         self.assertFalse(result["match"])
         self.assertIn("experience minimum 5 exceeds candidate 2 years", result["reasons"][0])
+    def test_existing_job_keeps_original_discovery_latency(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+
+                first = radar.normalize_job(
+                    "linkedin", "li-latency", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/latency", 
+                    radar.now() - timedelta(minutes=10), "minute",
+                    "2 years experience",
+                )
+                first_discovery = first["discovered_at"]
+                first_latency = first["discovery_latency_seconds"]
+
+                self.assertEqual(radar.upsert_jobs([first], BASE_CONFIG), 1)
+
+                second = dict(first)
+                second["discovered_at"] = radar.iso(radar.now())
+                second["source_posted_at"] = radar.iso(radar.now() - timedelta(minutes=1))
+                second["discovery_latency_seconds"] = 60
+
+                self.assertEqual(radar.upsert_jobs([second], BASE_CONFIG), 0)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT discovered_at, discovery_latency_seconds FROM jobs WHERE id=1"
+                    ).fetchone()
+
+                self.assertEqual(row[0], first_discovery)
+                self.assertEqual(row[1], first_latency)
+            finally:
+                radar.DB_PATH = original_db
+
 
     def test_daily_reset_uses_ist_midnight(self):
         start = current_day_start_utc()
