@@ -56,6 +56,8 @@ def _default_config() -> dict[str, Any]:
 def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
     merged = json.loads(json.dumps(defaults))
     merged.update(current)
+    current_version = int(current.get("config_version", 1) or 1)
+    merged["config_version"] = max(current_version, int(defaults.get("config_version", 1)))
     if isinstance(defaults.get("poll_seconds"), dict):
         merged["poll_seconds"] = {
             **defaults.get("poll_seconds", {}),
