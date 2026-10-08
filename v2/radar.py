@@ -2046,10 +2046,16 @@ def source_status():
     config = get_config()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
-            SELECT source, MAX(finished_at), SUM(jobs_seen), SUM(new_jobs)
-            FROM source_runs
-            GROUP BY source
-            ORDER BY source
+            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs
+            FROM source_runs sr
+            JOIN (
+                SELECT source, MAX(finished_at) AS latest_finished_at
+                FROM source_runs
+                GROUP BY source
+            ) latest
+              ON latest.source = sr.source
+             AND latest.latest_finished_at = sr.finished_at
+            ORDER BY sr.source
         """).fetchall()
 
     history = {
