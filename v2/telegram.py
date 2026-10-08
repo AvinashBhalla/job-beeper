@@ -188,7 +188,7 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
                 AND nl.next_attempt_at IS NOT NULL
                 AND nl.next_attempt_at <= ?
            )
-        ORDER BY nl.created_at ASC
+        ORDER BY nl.created_at DESC
         LIMIT 1
     """, (timestamp,)).fetchone()
 
