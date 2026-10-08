@@ -1366,3 +1366,11 @@ The repository and this file should be kept in sync deliberately.
 - Also fixed Source Health semantics: the API now explicitly reports the three configured sources (LinkedIn, Naukri, Instahyre) with an `enabled` flag, and the dashboard no longer treats an old disabled-source run as ACTIVE.
 - New commits: `4e26aa5` (backend freshness + source health), `1fa8b50` (regression test).
 - Before moving `v2-live-radar` to `main`, CI must pass and the live Oracle deployment must be updated with the freshness fix. After deployment, measure actual LinkedIn discovery-age distribution instead of relying on a single posting.
+
+## Pre-Main Repository Hygiene — 2026-10-08
+
+- Before promoting V2 to `main`, identified two repository-level inconsistencies.
+- The legacy `.github/workflows/job-watch.yml` still had a five-minute schedule even though the handover described V1 scheduled polling as inactive. The schedule is now disabled; the workflow remains manual-only for recovery/debugging.
+- The production Naukri relay workflow was present on `main` but absent from `v2-live-radar`. It has now been carried into V2 so promotion to `main` does not accidentally remove the relay scheduler contract.
+- The Naukri relay still publishes its data to the dedicated `naukri-relay` branch and V2 reads that relay; generated relay data on `main` is not part of the V2 runtime source of truth.
+- These changes are part of the pre-main cleanup. V2 CI must be green on the final branch head before promotion.
