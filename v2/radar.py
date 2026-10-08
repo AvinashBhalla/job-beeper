@@ -44,8 +44,9 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 6
-LINKEDIN_DETAIL_WORKERS = 6
+LINKEDIN_SEARCH_WORKERS = 4
+LINKEDIN_DETAIL_WORKERS = 4
+LINKEDIN_FAST_LOCATIONS_PER_SCAN = 2
 LINKEDIN_DEEP_SCAN_SECONDS = 300
 LINKEDIN_FAST_TPR = "r3600"
 LINKEDIN_DEEP_TPR = "r21600"
@@ -69,6 +70,7 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
+linkedin_fast_location_offset = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -87,10 +89,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     default_version = int(defaults.get("config_version", 1) or 1)
     merged["config_version"] = max(current_version, default_version)
 
-    # Version 3 makes Instahyre opt-in. Any runtime config created before
-    # this migration did not have a reliable Instahyre feed, so disable it
-    # once while preserving all other user settings.
-    if current_version < 3 <= default_version:
+    # Version 3 made Instahyre opt-in. Version 4 re-applies that safe
+    # default for runtimes created before this policy was made explicit.
+    if current_version < 4 <= default_version:
         merged.setdefault("source_enabled", {})["instahyre"] = False
 
     if isinstance(defaults.get("poll_seconds"), dict):
@@ -1672,7 +1673,7 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    global linkedin_last_deep_scan_at
+    global linkedin_last_deep_scan_at, linkedin_fast_location_offset
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1681,10 +1682,22 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         or (now() - last_deep_at).total_seconds() >= LINKEDIN_DEEP_SCAN_SECONDS
     )
 
+    configured_locations = list(config.get("locations", []))
+    if do_deep or len(configured_locations) <= LINKEDIN_FAST_LOCATIONS_PER_SCAN:
+        scan_locations = configured_locations
+    else:
+        start_idx = linkedin_fast_location_offset % len(configured_locations)
+        width = min(LINKEDIN_FAST_LOCATIONS_PER_SCAN, len(configured_locations))
+        scan_locations = [
+            configured_locations[(start_idx + offset) % len(configured_locations)]
+            for offset in range(width)
+        ]
+        linkedin_fast_location_offset = (start_idx + width) % len(configured_locations)
+
     targets = [
         (query, location, start, start != 10)
         for query in config.get("linkedin_queries", [])
-        for location in config.get("locations", [])
+        for location in scan_locations
         for start in ((0, 10) if do_deep else (0,))
     ]
 
