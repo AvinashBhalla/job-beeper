@@ -1205,7 +1205,7 @@ def _linkedin_parse_page(response: requests.Response) -> list[dict[str, Any]]:
 
     links = soup.select("a.base-card__full-link")
     if not links:
-        links = soup.select("a[href*="/jobs/view/"]")
+        links = soup.select('a[href*="/jobs/view/"]')
 
     seen_ids: set[str] = set()
     for link in links:
