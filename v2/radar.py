@@ -333,7 +333,7 @@ def _create_canonical_group(
         INSERT INTO canonical_opportunities (
             canonical_url, company_norm, title_norm, location_norm,
             representative_job_id, first_seen_at, last_seen_at, identity_version
-        ) VALUES (?,?,?,?,?,?,?,1)
+        ) VALUES (?,?,?,?,?,?,?,2)
     """, (
         canonical_url,
         identity["company_norm"],
@@ -373,11 +373,7 @@ def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, 
     best_representative = None
     for candidate in _candidate_canonical_groups(conn, job):
         candidate_source = candidate.get("representative_source")
-        same_source = candidate_source and candidate_source == job.get("source")
-        same_url = canonicalize_url(job.get("url", "")) and (
-            canonicalize_url(job.get("url", "")) == canonicalize_url(candidate.get("canonical_url", ""))
-        )
-        if same_source and not same_url:
+        if candidate_source and candidate_source == job.get("source"):
             continue
         score, method = canonical_match_score(job, candidate)
         if score > best_score:
