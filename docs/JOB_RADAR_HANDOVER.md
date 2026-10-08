@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Twenty-one matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
+✅ Twenty-two matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -557,6 +557,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Persistent job evaluation state added with configuration fingerprint, match score/reasons, experience data, and alertability
 ✅ Persistent notification ledger added per canonical opportunity with historical suppression and new-opportunity pending state
 ✅ Persistent notification decision queue added with reconsideration of fresh non-alertable opportunities
+✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Persistent notification decision queue implemented: pending opportunities become queued only when fresh, matched, alertable and notifications are enabled; otherwise they are suppressed with a durable reason
 ✅ Notification queue API added at `/api/notification-queue`
@@ -572,7 +573,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
 ✅ Real overlap validation completed: 1,206 jobs, 855 identity groups, 38 cross-source candidates, 0 auto-link candidates; observed overlaps remain safely separate
 ⏳ Validate the persistent notification decision queue on the upgraded Oracle database
-⏳ Validate reconsideration behavior on Oracle after a live configuration change
+⏳ Validate live configuration re-evaluation and notification reconsideration on Oracle after a configuration update
 ⏳ Build Telegram delivery/claim/retry on top of the queued notification state
 ```
 
@@ -825,7 +826,7 @@ The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source can
 
 ### Observation 3 — Persistent state is now the foundation for new-only alerting
 
-Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Only genuinely stale opportunities are suppressed.
+Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Configuration changes now recompute persisted evaluations before reconsidering the notification queue. Only genuinely stale opportunities are suppressed.
 
 ### Observation 4 — Matcher quality matters more than raw job count
 
