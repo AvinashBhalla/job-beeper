@@ -194,14 +194,22 @@ def normalize_phrase(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
 
+def phrase_hits(terms: list[str], text: str) -> list[str]:
+    normalized_text = f" {normalize_phrase(text)} "
+    hits: list[str] = []
+    for term in terms:
+        normalized_term = normalize_phrase(term)
+        if normalized_term and f" {normalized_term} " in normalized_text:
+            hits.append(term)
+    return hits
+
+
 def title_allowed(title: str) -> bool:
-    normalized = normalize_phrase(title)
-    tokens = set(normalized.split())
-    excluded = {
+    excluded = [
         "senior", "sr", "staff", "principal", "director", "manager",
-        "lead", "head", "architect", "intern", "vp"
-    }
-    return not bool(tokens & excluded)
+        "lead", "head", "architect", "intern", "vp", "vice president"
+    ]
+    return not phrase_hits(excluded, title)
 
 
 def location_allowed(location: str) -> bool:
@@ -246,8 +254,8 @@ def extract_experience(text: str) -> tuple[float | None, float | None]:
 
 
 def match_details(job: dict[str, Any]) -> dict[str, Any]:
-    title = (job.get("title") or "").lower()
-    description = (job.get("description") or "").lower()
+    title = (job.get("title") or "")
+    description = (job.get("description") or "")
     combined = f"{title} {description}"
 
     reasons: list[str] = []
@@ -270,39 +278,66 @@ def match_details(job: dict[str, Any]) -> dict[str, Any]:
             "experience_max_years": None,
         }
 
-    score = 25
+    score = 20
     reasons.append("target location")
 
-    role_hits = [role for role in TARGET_ROLES if role in title]
+    title_role_hits = phrase_hits(TARGET_ROLES, title)
+    role_hits = title_role_hits
+    role_source = "title"
     if not role_hits:
-        role_hits = [role for role in TARGET_ROLES if role in description]
+        role_hits = phrase_hits(TARGET_ROLES, description)
+        role_source = "description"
 
     if role_hits:
-        score += 35
-        reasons.append(f"role: {role_hits[0]}")
+        role_bonus = 30 if role_source == "title" else 25
+        score += role_bonus
+        reasons.append(f"role ({role_source}): {role_hits[0]}")
     else:
         reasons.append("no configured target-role match")
 
-    skill_hits = [skill for skill in SKILLS if skill in combined]
+    skill_hits = phrase_hits(SKILLS, combined)
     if skill_hits:
         bonus = min(30, 6 * len(skill_hits))
         score += bonus
         reasons.append("skills: " + ", ".join(skill_hits[:5]))
 
     exp_min, exp_max = extract_experience(combined)
+    candidate_years = float(CONFIG.get("candidate_experience_years", 2))
     max_years = float(CONFIG.get("max_experience_years", 3))
+
     if exp_min is not None or exp_max is not None:
         effective_min = exp_min if exp_min is not None else exp_max
-        if effective_min is not None and effective_min > max_years:
+
+        # The candidate must satisfy the advertised minimum experience.
+        if effective_min is not None and effective_min > candidate_years:
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [f"experience minimum exceeds {max_years:g} years"],
+                "reasons": [
+                    f"experience minimum {effective_min:g} years exceeds candidate {candidate_years:g} years"
+                ],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
+
+        # Do not surface roles whose stated range extends beyond the
+        # configured maximum acceptable experience.
+        if exp_max is not None and exp_max > max_years:
+            return {
+                "match": False,
+                "score": 0,
+                "reasons": [
+                    f"experience range exceeds configured maximum of {max_years:g} years"
+                ],
+                "experience_min_years": exp_min,
+                "experience_max_years": exp_max,
+            }
+
         score += 15
-        reasons.append(f"experience compatible with {max_years:g}-year limit")
+        reasons.append(
+            f"experience compatible: candidate {candidate_years:g} years; job {effective_min:g}"
+            + (f"-{exp_max:g}" if exp_max is not None else "+")
+        )
     else:
         reasons.append("experience not stated in captured source data")
 
