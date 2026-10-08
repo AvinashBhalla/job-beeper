@@ -867,6 +867,32 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(merged["config_version"], 3)
         self.assertFalse(merged["source_enabled"]["instahyre"])
 
+    def test_config_v4_migrates_instahyre_to_disabled(self):
+        defaults = {
+            "config_version": 4,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+            },
+        }
+        prior_runtime = {
+            "config_version": 3,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": True,
+            },
+        }
+        merged = _merge_config(defaults, prior_runtime)
+        self.assertEqual(merged["config_version"], 4)
+        self.assertFalse(merged["source_enabled"]["instahyre"])
+
     def test_extracts_experience_range(self):
         self.assertEqual(extract_experience("0-2 years"), (0.0, 2.0))
         self.assertEqual(extract_experience("3 to 8 yrs"), (3.0, 8.0))
