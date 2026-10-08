@@ -566,6 +566,7 @@ def init_db() -> None:
         _ensure_column(conn, "notification_ledger", "claimed_at", "TEXT")
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
+        conn.execute("UPDATE jobs SET discovery_latency_seconds=NULL WHERE discovery_latency_seconds < 0")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
@@ -586,7 +587,6 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 conn.execute("""
                     UPDATE jobs SET last_seen_at=?, source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
-                    discovery_latency_seconds=COALESCE(?, discovery_latency_seconds),
                     description=CASE WHEN length(?) > length(description) THEN ? ELSE description
                     END
                     WHERE id=?
