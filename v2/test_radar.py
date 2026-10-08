@@ -173,6 +173,8 @@ class MatcherTests(unittest.TestCase):
                 with patch.object(radar.requests, "get", return_value=Response()):
                     self.assertEqual(radar.upsert_jobs([job], BASE_CONFIG), 1)
 
+                radar.refresh_notification_decisions(BASE_CONFIG)
+
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute("""
                         SELECT e.match, e.alertable,
