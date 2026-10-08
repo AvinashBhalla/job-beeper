@@ -113,6 +113,11 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             **defaults.get("source_enabled", {}),
             **current.get("source_enabled", {}),
         }
+        # Source-disable migrations must be applied after merging persisted
+        # settings; otherwise the old runtime value can overwrite the safe
+        # repository default during migration.
+        if current_version < 4 <= default_version:
+            merged["source_enabled"]["instahyre"] = False
     return merged
 
 
