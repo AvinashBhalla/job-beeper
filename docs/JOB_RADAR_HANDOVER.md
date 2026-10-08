@@ -1333,3 +1333,12 @@ When a source is present in code but unverified, mark it unverified.
 When a scheduler exists only manually on the VM, do not describe it as repository-reproducible.
 
 The repository and this file should be kept in sync deliberately.
+
+## Dashboard UI Transplant — 2026-10-08
+
+- Updated the three dashboard files on `v2-live-radar` using the friend fork's mature `frontend-live-dev` UI.
+- Backend, collectors, matcher, notification pipeline, and runtime artifacts were not transplanted.
+- The new dashboard adds the premium feed/inspector workspace, richer filters, theme control, applied tracking, preference editing, source health, responsive navigation, and match intelligence.
+- Frontend API resolution was adapted so the dashboard uses an explicitly supplied API endpoint when present, otherwise the local relative API path.
+- Commits: `e22e113`, `dd1c021`, `9612f21`.
+- Next validation: run the browser against the Oracle API, then verify the deployed container and responsive UI.
