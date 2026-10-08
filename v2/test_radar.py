@@ -1034,6 +1034,66 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertFalse(result["match"])
 
+    def test_linkedin_fast_lane_rotates_locations(self):
+        original_state = radar.source_state
+        original_deep = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_location_cursor
+        radar.source_state = {}
+        radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+        radar.linkedin_fast_location_cursor = 0
+        config = {
+            **BASE_CONFIG,
+            "linkedin_queries": ["ai engineer"],
+            "locations": [
+                "Bengaluru, Karnataka, India",
+                "Gurugram, Haryana, India",
+                "Delhi, India",
+                "Remote, India",
+            ],
+        }
+        calls = []
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body><ul>
+              <li>
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/1234567890">Apply</a>
+                <h3 class="base-search-card__title">AI Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme</h4>
+                <span class="job-search-card__location">Bengaluru, Karnataka, India</span>
+                <time>1 minute ago</time>
+                <span>2 years experience</span>
+              </li>
+            </ul></body></html>
+            """
+
+        def fake_request(_endpoint, params):
+            calls.append((params["location"], params["start"]))
+            return Response()
+
+        try:
+            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+                radar.linkedin_collect(config)
+                first_cycle = sorted(calls)
+                calls.clear()
+                radar.linkedin_collect(config)
+                second_cycle = sorted(calls)
+
+            self.assertEqual(first_cycle, [
+                ("Bengaluru, Karnataka, India", 0),
+                ("Gurugram, Haryana, India", 0),
+            ])
+            self.assertEqual(second_cycle, [
+                ("Delhi, India", 0),
+                ("Remote, India", 0),
+            ])
+        finally:
+            radar.source_state = original_state
+            radar.linkedin_last_deep_scan_at = original_deep
+            radar.linkedin_fast_location_cursor = original_cursor
+
+
     def test_linkedin_fast_lane_and_periodic_deep_scan(self):
         original_state = radar.source_state
         radar.source_state = {}
