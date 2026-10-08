@@ -613,7 +613,7 @@ The system is therefore **ingesting real jobs continuously**.
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
 ✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Verify canonical-level alert deduplication using distinct canonical opportunities rather than raw job rows
+⏳ Classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
 ⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
 ⏳ Validate restart/recovery behavior with persisted config, evaluations and notification ledger
 ⏳ Finish browser verification of the live dashboard against real V2 API data
@@ -643,9 +643,9 @@ experience_max_years = 7
 
 and reject the posting for the current 3-year maximum before Telegram delivery.
 
-### Step B — Verify canonical-level alert deduplication
+### Step B — Verify canonical-level alert deduplication and non-sent classification
 
-On a fresh production window, count fresh matching rows, distinct canonical opportunities, distinct sent canonical opportunities and duplicate observations per canonical opportunity.
+On a fresh production window, count fresh matching rows, distinct canonical opportunities, distinct sent canonical opportunities and duplicate observations per canonical opportunity. The latest one-hour sample has 3/3 distinct canonical opportunities and 0 duplicate observations; the two non-sent opportunities still need decision-state classification.
 
 Do not interpret source-row count as alert count.
 
@@ -946,9 +946,26 @@ Corrective rule:
 
 The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
 
-### Observation 21 — The latest production alert diagnostic showed canonical duplication is controlled but not yet fully audited
+### Observation 21 — Canonical duplication has no duplicates in the latest one-hour matching window
 
-The latest 10-minute diagnostic showed 29 fresh matching rows, 25 distinct canonical opportunities and 13 distinct canonical opportunities with sent notification state. One canonical opportunity contained five fresh LinkedIn observations of the same Accenture AI/ML Engineer listing. This confirms why canonical-level counts must be used for alert analysis.
+A post-deployment one-hour audit found:
+
+- 3 fresh matching source rows
+- 3 distinct canonical opportunities
+- 3 alertable source rows
+- 1 distinct sent canonical opportunity
+- 0 canonical opportunities with multiple observations in that window
+
+This is a positive small-sample result for canonical deduplication, but it is not sufficient to declare dedupe fully proven. The two matching opportunities that were not sent still need classification (for example, already-sent/suppressed/not-new state) before evaluating alert completeness.
+
+The daily notification ledger currently contains 785 rows for the day:
+
+- 43 sent
+- 742 suppressed
+- 0 queued
+
+The daily summary reports 1,070 jobs discovered, 52 matched, 52 alertable and 43 alerts sent. These are different layers and must not be conflated: source jobs, evaluations and canonical notification records represent different units of measurement.
+
 
 ### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
 
