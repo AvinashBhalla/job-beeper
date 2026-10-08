@@ -763,20 +763,41 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     now_value = now()
     max_age = int(config.get("max_age_hours", 72))
+    alert_window_minutes = 10
+    alert_cutoff = iso(
+        now_value - dt.timedelta(minutes=alert_window_minutes)
+    )
     changed = 0
 
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        pending = conn.execute("""
-            SELECT canonical_opportunity_id
-            FROM notification_ledger
-            WHERE status='pending'
-            ORDER BY created_at ASC
-        """).fetchall()
 
-        for row in pending:
+        candidates = conn.execute(
+            """
+            SELECT canonical_opportunity_id, status
+            FROM notification_ledger
+            WHERE status IN ('pending', 'queued')
+               OR (
+                    status='suppressed'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM jobs j
+                        WHERE j.canonical_opportunity_id =
+                              notification_ledger.canonical_opportunity_id
+                          AND j.discovered_at >= ?
+                    )
+               )
+            ORDER BY created_at ASC
+            """,
+            (alert_cutoff,),
+        ).fetchall()
+
+        for row in candidates:
             opportunity_id = int(row["canonical_opportunity_id"])
-            observations = conn.execute("""
+            current_status = row["status"]
+
+            observations = conn.execute(
+                """
                 SELECT
                     j.*,
                     e.match,
@@ -789,107 +810,275 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                 FROM jobs j
                 JOIN job_evaluations e ON e.job_id=j.id
                 WHERE j.canonical_opportunity_id=?
-                ORDER BY e.match DESC, e.alertable DESC, e.score DESC, j.discovered_at DESC, j.id DESC
-            """, (opportunity_id,)).fetchall()
+                ORDER BY
+                    e.match DESC,
+                    e.alertable DESC,
+                    e.score DESC,
+                    j.discovered_at DESC,
+                    j.id DESC
+                """,
+                (opportunity_id,),
+            ).fetchall()
 
             eligible = []
             fresh_matches = []
+            recent_matches = []
             fresh_alertable = []
 
             for observation in observations:
                 item = dict(observation)
+
                 if not item["match"]:
                     continue
 
                 eligible.append(item)
 
                 age_timestamp = _alert_age_timestamp(item)
-                is_fresh = not age_timestamp or age_timestamp >= now_value - dt.timedelta(hours=max_age)
+                is_fresh = (
+                    not age_timestamp
+                    or age_timestamp >=
+                    now_value - dt.timedelta(hours=max_age)
+                )
+
                 if not is_fresh:
                     continue
 
                 fresh_matches.append(item)
-                if item["alertable"]:
-                    fresh_alertable.append(item)
 
-            timestamp = iso(now())
+                discovery_timestamp = parse_relative(
+                    item.get("discovered_at")
+                )
+                is_recently_discovered = (
+                    discovery_timestamp is not None
+                    and discovery_timestamp >=
+                    now_value - dt.timedelta(minutes=alert_window_minutes)
+                )
 
-            if fresh_alertable and config.get("notifications_enabled", True):
+                if is_recently_discovered:
+                    recent_matches.append(item)
+
+                    if item["alertable"]:
+                        fresh_alertable.append(item)
+
+            timestamp = iso(now_value)
+
+            if current_status == "queued":
+                if (
+                    fresh_alertable
+                    and config.get("notifications_enabled", True)
+                ):
+                    candidate = fresh_alertable[0]
+                    reasons = [
+                        "revalidated queued opportunity",
+                        "passes current match and alert policy",
+                        f"detected within the last {alert_window_minutes} minutes",
+                    ]
+
+                    conn.execute(
+                        """
+                        UPDATE notification_ledger
+                        SET candidate_job_id=?,
+                            updated_at=?,
+                            decision_reason_json=?
+                        WHERE canonical_opportunity_id=?
+                          AND status='queued'
+                        """,
+                        (
+                            candidate["id"],
+                            timestamp,
+                            json.dumps(reasons, ensure_ascii=False),
+                            opportunity_id,
+                        ),
+                    )
+                elif recent_matches:
+                    reasons = [
+                        "job is still fresh and relevant but is not alertable under the current policy; awaiting future re-evaluation"
+                    ]
+
+                    conn.execute(
+                        """
+                        UPDATE notification_ledger
+                        SET status='pending',
+                            candidate_job_id=NULL,
+                            updated_at=?,
+                            decision_reason_json=?
+                        WHERE canonical_opportunity_id=?
+                          AND status='queued'
+                        """,
+                        (
+                            timestamp,
+                            json.dumps(reasons, ensure_ascii=False),
+                            opportunity_id,
+                        ),
+                    )
+                else:
+                    reasons = [
+                        "queued opportunity is outside the real-time alert window"
+                    ]
+
+                    conn.execute(
+                        """
+                        UPDATE notification_ledger
+                        SET status='suppressed',
+                            candidate_job_id=NULL,
+                            updated_at=?,
+                            decision_reason_json=?
+                        WHERE canonical_opportunity_id=?
+                          AND status='queued'
+                        """,
+                        (
+                            timestamp,
+                            json.dumps(reasons, ensure_ascii=False),
+                            opportunity_id,
+                        ),
+                    )
+
+                changed += 1
+                continue
+
+            if (
+                fresh_alertable
+                and config.get("notifications_enabled", True)
+            ):
                 candidate = fresh_alertable[0]
+
                 reasons = [
-                    "new canonical opportunity",
+                    (
+                        "new canonical opportunity"
+                        if current_status == "pending"
+                        else "new source observation for previously suppressed opportunity"
+                    ),
                     "passes match and alert policy",
+                    f"detected within the last {alert_window_minutes} minutes",
                     f"within {max_age} hour age window",
                 ]
-                conn.execute("""
+
+                conn.execute(
+                    """
                     UPDATE notification_ledger
                     SET status='queued',
                         candidate_job_id=?,
                         updated_at=?,
                         decision_reason_json=?
-                    WHERE canonical_opportunity_id=? AND status='pending'
-                """, (
-                    candidate["id"],
-                    timestamp,
-                    json.dumps(reasons, ensure_ascii=False),
-                    opportunity_id,
-                ))
+                    WHERE canonical_opportunity_id=?
+                      AND status IN ('pending', 'suppressed')
+                    """,
+                    (
+                        candidate["id"],
+                        timestamp,
+                        json.dumps(reasons, ensure_ascii=False),
+                        opportunity_id,
+                    ),
+                )
+
             elif not eligible:
                 reasons = ["no profile-matching observation"]
-                conn.execute("""
+
+                conn.execute(
+                    """
                     UPDATE notification_ledger
                     SET status='suppressed',
                         candidate_job_id=NULL,
                         updated_at=?,
                         decision_reason_json=?
-                    WHERE canonical_opportunity_id=? AND status='pending'
-                """, (
-                    timestamp,
-                    json.dumps(reasons, ensure_ascii=False),
-                    opportunity_id,
-                ))
+                    WHERE canonical_opportunity_id=?
+                      AND status='pending'
+                    """,
+                    (
+                        timestamp,
+                        json.dumps(reasons, ensure_ascii=False),
+                        opportunity_id,
+                    ),
+                )
+
             elif not fresh_matches:
-                reasons = [f"no matching observation within {max_age} hour age window"]
-                conn.execute("""
+                reasons = [
+                    f"no matching observation within {max_age} hour age window"
+                ]
+
+                conn.execute(
+                    """
                     UPDATE notification_ledger
                     SET status='suppressed',
                         candidate_job_id=NULL,
                         updated_at=?,
                         decision_reason_json=?
-                    WHERE canonical_opportunity_id=? AND status='pending'
-                """, (
-                    timestamp,
-                    json.dumps(reasons, ensure_ascii=False),
-                    opportunity_id,
-                ))
+                    WHERE canonical_opportunity_id=?
+                      AND status='pending'
+                    """,
+                    (
+                        timestamp,
+                        json.dumps(reasons, ensure_ascii=False),
+                        opportunity_id,
+                    ),
+                )
+
             elif not config.get("notifications_enabled", True):
-                reasons = ["Telegram notifications disabled; awaiting future re-evaluation"]
-                conn.execute("""
+                reasons = [
+                    "Telegram notifications disabled; awaiting future re-evaluation"
+                ]
+
+                conn.execute(
+                    """
                     UPDATE notification_ledger
                     SET status='pending',
                         candidate_job_id=NULL,
                         updated_at=?,
                         decision_reason_json=?
-                    WHERE canonical_opportunity_id=? AND status='pending'
-                """, (
-                    timestamp,
-                    json.dumps(reasons, ensure_ascii=False),
-                    opportunity_id,
-                ))
+                    WHERE canonical_opportunity_id=?
+                      AND status='pending'
+                    """,
+                    (
+                        timestamp,
+                        json.dumps(reasons, ensure_ascii=False),
+                        opportunity_id,
+                    ),
+                )
+
+            elif not recent_matches:
+                reasons = [
+                    "matching job was discovered too long ago; waiting for a new source observation"
+                ]
+
+                conn.execute(
+                    """
+                    UPDATE notification_ledger
+                    SET status='suppressed',
+                        candidate_job_id=NULL,
+                        updated_at=?,
+                        decision_reason_json=?
+                    WHERE canonical_opportunity_id=?
+                      AND status IN ('pending', 'suppressed')
+                    """,
+                    (
+                        timestamp,
+                        json.dumps(reasons, ensure_ascii=False),
+                        opportunity_id,
+                    ),
+                )
+
             else:
-                reasons = ["profile match exists but not alertable under current policy; awaiting future re-evaluation"]
-                conn.execute("""
+                reasons = [
+                    "profile match exists but is not alertable under current policy; awaiting future re-evaluation"
+                ]
+
+                conn.execute(
+                    """
                     UPDATE notification_ledger
                     SET status='pending',
                         candidate_job_id=NULL,
                         updated_at=?,
                         decision_reason_json=?
-                    WHERE canonical_opportunity_id=? AND status='pending'
-                """, (
-                    timestamp,
-                    json.dumps(reasons, ensure_ascii=False),
-                    opportunity_id,
-                ))
+                    WHERE canonical_opportunity_id=?
+                      AND status='pending'
+                    """,
+                    (
+                        timestamp,
+                        json.dumps(reasons, ensure_ascii=False),
+                        opportunity_id,
+                    ),
+                )
+
             changed += 1
 
         conn.commit()

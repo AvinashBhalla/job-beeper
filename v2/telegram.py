@@ -186,15 +186,25 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
         FROM notification_ledger nl
         JOIN jobs j ON j.id = nl.candidate_job_id
         JOIN job_evaluations e ON e.job_id = nl.candidate_job_id
-        WHERE nl.status='queued'
-           OR (
-                nl.status='failed'
-                AND nl.next_attempt_at IS NOT NULL
-                AND nl.next_attempt_at <= ?
-           )
+        WHERE e.match=1
+          AND e.alertable=1
+          AND (
+                (
+                    nl.status='queued'
+                    AND j.discovered_at >= ?
+                )
+                OR (
+                    nl.status='failed'
+                    AND nl.next_attempt_at IS NOT NULL
+                    AND nl.next_attempt_at <= ?
+                )
+          )
         ORDER BY nl.created_at DESC
         LIMIT 1
-    """, (timestamp,)).fetchone()
+    """, (
+        iso(now() - dt.timedelta(minutes=10)),
+        timestamp,
+    )).fetchone()
 
     if not row:
         return None
