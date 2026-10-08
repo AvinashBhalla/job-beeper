@@ -127,6 +127,78 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_alertable_new_opportunity_moves_to_queue(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-queue", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/queue", None,
+                    "unknown", "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT status, candidate_job_id FROM notification_ledger"
+                    ).fetchone()
+                self.assertEqual(row[0], "queued")
+                self.assertEqual(row[1], 1)
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_unknown_experience_new_opportunity_is_suppressed(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-unknown", "Acme", "AI Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/unknown", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT status, decision_reason_json FROM notification_ledger"
+                    ).fetchone()
+                self.assertEqual(row[0], "suppressed")
+                self.assertIn("no fresh alertable observation", row[1])
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_stale_alertable_opportunity_is_suppressed(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-stale", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/stale", None,
+                    "unknown", "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    old = "2026-10-01T00:00:00+00:00"
+                    conn.execute(
+                        "UPDATE jobs SET source_posted_at=?, posted_precision=? WHERE id=1",
+                        (old, "minute"),
+                    )
+                    conn.commit()
+                self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT status FROM notification_ledger"
+                    ).fetchone()
+                self.assertEqual(row[0], "suppressed")
+            finally:
+                radar.DB_PATH = original_db
+
     def test_existing_opportunity_can_be_backfilled_as_suppressed(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
