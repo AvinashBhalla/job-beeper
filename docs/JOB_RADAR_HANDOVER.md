@@ -560,6 +560,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ V2 Telegram delivery worker added with persistent claim/sent/failed state, safe retry handling, and interrupted-claim recovery
 ✅ Telegram message formatting and delivery error behavior regression-tested
 ✅ New LinkedIn jobs with missing card-level experience now fetch the public job detail page and extract explicit JD experience requirements before matching
+✅ Telegram timestamps now render as human-readable IST (for example, `08 Oct 2026, 01:00 PM IST`)
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Telegram credential connectivity verified against the configured bot/chat
