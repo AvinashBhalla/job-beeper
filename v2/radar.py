@@ -1294,6 +1294,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             "jobs_seen": len(jobs),
             "new_jobs": new_jobs,
             "error": None,
+            **{k: v for k, v in source_state.get(source, {}).items() if k not in {"running", "last_success", "jobs_seen", "new_jobs", "error"}},
         }
         log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
     except Exception as exc:
