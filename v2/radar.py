@@ -1664,8 +1664,9 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
         "sortBy": "DD",
         "start": start,
     }
-    if fast:
-        params["f_EA"] = "true"
+    # The fast lane must search the full LinkedIn result set. Restricting it
+    # to Easy Apply jobs can postpone otherwise relevant fresh postings until
+    # the slower deep scan, increasing discovery latency.
     response = _linkedin_request(endpoint, params)
     return _linkedin_parse_page(response)
 
@@ -1986,23 +1987,37 @@ def update_config(payload: dict[str, Any], x_config_token: str | None = Header(d
 
 @app.get("/api/source-status")
 def source_status():
+    config = get_config()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT source, MAX(finished_at), SUM(jobs_seen), SUM(new_jobs)
-            FROM source_runs GROUP BY source ORDER BY source
+            FROM source_runs
+            GROUP BY source
+            ORDER BY source
         """).fetchall()
-    return {
-        "sources": [
-            {
-                "source": r[0],
-                "last_run": r[1],
-                "jobs_seen": r[2] or 0,
-                "new_jobs": r[3] or 0,
-                "runtime": source_state.get(r[0], {}),
-            }
-            for r in rows
-        ]
+
+    history = {
+        row[0]: {
+            "last_run": row[1],
+            "jobs_seen": row[2] or 0,
+            "new_jobs": row[3] or 0,
+        }
+        for row in rows
     }
+
+    sources = []
+    for source in ("linkedin", "naukri", "instahyre"):
+        item = history.get(source, {})
+        sources.append({
+            "source": source,
+            "enabled": bool(config.get("source_enabled", {}).get(source, True)),
+            "last_run": item.get("last_run"),
+            "jobs_seen": item.get("jobs_seen", 0),
+            "new_jobs": item.get("new_jobs", 0),
+            "runtime": source_state.get(source, {}),
+        })
+
+    return {"sources": sources}
 
 
 @app.get("/api/dedupe-candidates")
