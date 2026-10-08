@@ -3,195 +3,597 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>JobBeeper Local</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Beeper — Opportunity Radar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=obsidian_v2">
 </head>
 
 <body>
-  <aside class="sidebar">
-    <div class="brand"><span class="logo">⚡</span>
-      <div><b>JobBeeper</b><small>Your job search</small></div>
-    </div>
-    <nav>
-      <a class="nav-link active" href="#jobs" data-section="jobsSection">▦ <span>Jobs</span></a>
-      <a class="nav-link" href="#applied" data-section="appliedSection">◷ <span>Applied</span></a>
-      <a class="nav-link" href="#filters" data-section="filtersSection">☷ <span>Filters</span></a>
-      <a class="nav-link" href="#settings" data-section="settingsSection">⚙ <span>Access</span></a>
-      <a class="nav-link" href="#sources" data-section="sourcesSection">▤ <span>Sources</span></a>
-    </nav>
-    <div class="profile">
-      <div class="avatar">AB</div>
-      <div><b>Avinash Bhalla</b><small>Personal job watcher</small></div>
-    </div>
-    <div class="live"><span class="dot"></span> Live feed <small id="lastRun">waiting…</small></div>
-  </aside>
-
-  <main>
-    <section id="jobsSection" class="page-section active-section">
-      <header>
-        <div>
-          <h1>Jobs</h1>
-          <p>Today’s jobs from multiple sources, ranked for your profile. The feed resets at midnight IST.</p>
+  <div class="app-shell">
+    <!-- Desktop Left Navigation Sidebar -->
+    <aside class="app-sidebar" aria-label="Main Navigation">
+      <div class="sidebar-brand">
+        <div class="brand-beacon" aria-hidden="true">
+          <!-- Custom Opportunity Beacon / Radar Monogram -->
+          <svg class="icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.4"></circle>
+            <circle cx="12" cy="12" r="6" stroke-opacity="0.7"></circle>
+            <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+            <line x1="12" y1="12" x2="20" y2="4"></line>
+          </svg>
         </div>
-        <div class="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
+        <div class="brand-info">
+          <span class="brand-title">JOB BEEPER</span>
+          <span class="brand-descriptor">Opportunity Radar</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav-container" id="sidebarNav" aria-label="Sidebar Navigation">
+        <!-- Group 1: Workspace -->
+        <div class="nav-group">
+          <span class="nav-group-title">Workspace</span>
+          <a class="nav-link-item active" href="#jobs" data-section="jobsSection" id="navJobs">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            <span>Jobs Feed</span>
+            <span class="nav-counter" id="jobsNavCount">0</span>
+          </a>
+          <a class="nav-link-item" href="#applied" data-section="appliedSection" id="navApplied">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <span>Applied</span>
+            <span class="nav-counter" id="appliedNavCount">0</span>
+          </a>
+        </div>
+
+        <!-- Group 2: Intelligence -->
+        <div class="nav-group">
+          <span class="nav-group-title">Intelligence</span>
+          <a class="nav-link-item" href="#sources" data-section="sourcesSection" id="navSources">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            <span>Source Health</span>
+            <span class="pulse-dot" id="sidebarSourcePulse"></span>
+          </a>
+        </div>
+
+        <!-- Group 3: Configuration -->
+        <div class="nav-group">
+          <span class="nav-group-title">Configuration</span>
+          <a class="nav-link-item" href="#preferences" data-section="preferencesSection" id="navPreferences">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>
+            <span>Preferences</span>
+          </a>
+          <a class="nav-link-item" href="#access" data-section="accessSection" id="navAccess">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m21 2-2 2m-1.5 1.5L14 9m-2 2-3 3 2 2 1-1 2 2 1-1-2-2 1.5-1.5M3 21l6-6"></path><circle cx="7.5" cy="7.5" r="4.5"></circle></svg>
+            <span>Access Token</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="live-feed-status">
+          <span class="pulse-dot" id="liveDot"></span>
+          <span id="connStatusText">Live Feed</span>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);" id="liveFeedMeta">IST Midnight Reset</div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="app-main">
+      <!-- Top Operational Telemetry Ribbon -->
+      <header class="top-header-bar" role="banner">
+        <div class="header-title-wrap">
+          <h1 class="header-page-title" id="currentViewTitle">Jobs Feed</h1>
+        </div>
+
+        <div class="header-telemetry-ribbon">
+          <div class="telemetry-capsule">
+            <div class="telemetry-item" title="Total jobs discovered today">
+              <span>Today:</span>
+              <b id="telemetryDiscovered">0</b>
+              <span>discovered</span>
+            </div>
+            <div class="telemetry-divider"></div>
+            <div class="telemetry-item" title="Jobs matching your candidate profile">
+              <b id="telemetryMatched">0</b>
+              <span>matched</span>
+            </div>
+            <div class="telemetry-divider"></div>
+            <div class="telemetry-item" title="Telegram alerts sent today">
+              <b id="telemetryAlerts">0</b>
+              <span>alerted</span>
+            </div>
+          </div>
+
+          <!-- Custom Theme Appearance Popover Trigger -->
+          <div class="theme-dropdown-wrap" id="themeDropdownWrap">
+            <button type="button" class="theme-toggle-btn" id="themeToggleBtn" aria-label="Appearance settings" aria-haspopup="true" aria-expanded="false" title="Change appearance">
+              <span id="themeBtnIcon" aria-hidden="true" style="display:inline-flex;align-items:center;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+              </span>
+              <span id="themeBtnLabel">System</span>
+              <svg class="icon icon-sm chevron-icon" viewBox="0 0 24 24" style="width:12px;height:12px;color:var(--text-muted);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="theme-popover-menu" id="themePopoverMenu" role="menu" aria-label="Appearance options">
+              <div class="theme-menu-header">Appearance</div>
+              <button type="button" class="theme-option-item selected" data-theme-value="system" role="menuitem">
+                <span class="theme-option-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+                </span>
+                <div class="theme-option-text">
+                  <span class="theme-option-title">System</span>
+                  <span class="theme-option-desc">Follow device appearance</span>
+                </div>
+                <span class="theme-check-icon" aria-hidden="true">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+              </button>
+              <button type="button" class="theme-option-item" data-theme-value="light" role="menuitem">
+                <span class="theme-option-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                </span>
+                <div class="theme-option-text">
+                  <span class="theme-option-title">Light</span>
+                  <span class="theme-option-desc">Always use light mode</span>
+                </div>
+                <span class="theme-check-icon" aria-hidden="true">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+              </button>
+              <button type="button" class="theme-option-item" data-theme-value="dark" role="menuitem">
+                <span class="theme-option-icon">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                </span>
+                <div class="theme-option-text">
+                  <span class="theme-option-title">Dark</span>
+                  <span class="theme-option-desc">Always use dark mode</span>
+                </div>
+                <span class="theme-check-icon" aria-hidden="true">
+                  <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <button type="button" id="refreshFeedBtn" class="header-action-btn" title="Refresh live feed (auto 10s)">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></svg>
+            <span>Sync</span>
+          </button>
+        </div>
       </header>
 
-      <section class="stats">
-        <div><b id="today">0</b><span>Jobs today</span></div>
-        <div><b id="matchedToday">0</b><span>Matched today</span></div>
-        <div><b id="notified">0</b><span>Alerts sent today</span></div>
-      </section>
+      <div class="workspace-views-container">
+        <!-- ===================================================================
+             1. JOBS FEED SECTION (Split Master / Inspector)
+             =================================================================== -->
+        <section id="jobsSection" class="workspace-page active-page" aria-label="Jobs Feed Workspace">
+          <div class="feed-split-layout">
+            <!-- Left Master Feed Pane -->
+            <div class="feed-master-pane">
+              <!-- Filter Toolbar -->
+              <div class="feed-filter-toolbar" role="search" aria-label="Job Search and Filters">
+                <div class="search-controls-row">
+                  <div class="search-box-wrap">
+                    <svg class="icon icon-sm search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+                    <input type="text" id="searchInput" class="search-input-field" placeholder="Search title, company, skill, location (⌘K)…" aria-label="Search jobs">
+                    <span id="searchClearBtn" class="search-clear-trigger" aria-label="Clear search">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg>
+                    </span>
+                  </div>
 
-      <section class="toolbar">
-        <input id="search" placeholder="Role, company, location, skill…">
-        <select id="source">
-          <option value="">All sources</option>
-        </select>
-        <select id="score">
-          <option value="0">All matches</option>
-          <option value="80">80%+</option>
-          <option value="90">90%+</option>
-        </select>
-        <select id="age">
-          <option value="72">Last 72h</option>
-          <option value="24">Last 24h</option>
-          <option value="6">Last 6h</option>
-          <option value="1">Last hour</option>
-        </select>
-        <select id="sort">
-          <option value="newest">Newest first</option>
-          <option value="match">Best match</option>
-        </select>
-      </section>
+                  <!-- Custom Accessible Dropdown Mount Points -->
+                  <div id="sourceFilterMount" class="dropdown-mount-cell"></div>
+                  <div id="scoreFilterMount" class="dropdown-mount-cell"></div>
+                  <div id="ageFilterMount" class="dropdown-mount-cell"></div>
+                  <div id="sortFilterMount" class="dropdown-mount-cell"></div>
+                </div>
 
-      <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><span id="auto">Today ·
-          refreshes every 10s · sources run continuously</span></div>
-      <section id="jobs" class="jobs"></section>
-    </section>
+                <div class="filter-secondary-row">
+                  <div class="quick-toggles-wrap">
+                    <button type="button" id="toggleAlertable" class="quick-toggle-btn" aria-pressed="false">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+                      <span>Alertable Only</span>
+                    </button>
+                    <button type="button" id="toggleRemote" class="quick-toggle-btn" aria-pressed="false">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" x2="22" y1="12" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                      <span>Remote Only</span>
+                    </button>
+                  </div>
 
-    <section id="jobDetailSection" class="page-section hidden-section">
-      <div class="job-detail">
-        <button id="backToJobs" class="back-link">← Back to Jobs</button>
-        <div class="detail-hero">
-          <div>
-            <div class="detail-source" id="detailSource"></div>
-            <h1 id="detailTitle">Job</h1>
-            <div class="detail-company" id="detailCompany"></div>
+                  <div class="active-filter-pills" id="activeFiltersBar">
+                    <!-- Dynamic Filter Tags -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feed Status Strip -->
+              <div class="feed-status-strip">
+                <span id="feedCountText">Showing <b>0</b> jobs</span>
+                <span style="font-family:var(--font-mono);font-size:11px;" id="feedAutoRefreshText">Auto-refresh: 10s</span>
+              </div>
+
+              <!-- High-Density Opportunity Feed Scroll List -->
+              <div class="feed-scroll-list" id="jobsListContainer" role="feed" aria-busy="false">
+                <!-- Opportunity cards dynamically injected -->
+              </div>
+            </div>
+
+            <!-- Right Inspector Research Pane -->
+            <aside class="inspector-research-pane is-hidden" id="jobInspector" aria-label="Opportunity Inspector">
+              <div class="inspector-top-bar">
+                <div style="display:flex;align-items:center;gap:var(--space-8);">
+                  <span class="opportunity-source-text" id="inspSource" style="font-weight:600;color:var(--text-primary);">SOURCE</span>
+                  <span style="color:var(--divider-strong);">·</span>
+                  <span class="meta-mono" style="font-size:12px;color:var(--text-muted);" id="inspPostedAgo"></span>
+                </div>
+                <div style="display:flex;gap:var(--space-6);align-items:center;">
+                  <button type="button" class="btn-action-secondary" id="inspCopyBtn" title="Copy Opportunity URL">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+                    <span>Copy</span>
+                  </button>
+                  <button type="button" class="header-action-btn" id="inspCloseBtn" aria-label="Close Inspector">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="inspector-body-scroll" id="inspBody">
+                <div class="inspector-header-section">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-12);">
+                    <div>
+                      <h2 class="inspector-job-title" id="inspTitle">Role Title</h2>
+                      <div class="inspector-company-line" id="inspCompany">Company Name</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div class="score-display-num" id="inspScore" style="font-size:24px;color:var(--accent-primary);">0%</div>
+                      <div class="score-display-label">MATCH</div>
+                    </div>
+                  </div>
+
+                  <div class="inspector-cta-row">
+                    <a href="#" target="_blank" rel="noopener" class="btn-action-primary" id="inspApplyBtn">
+                      <span>Apply Direct</span>
+                      <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="7" x2="17" y1="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                    </a>
+                    <button type="button" class="btn-action-secondary" id="inspMarkAppliedBtn">
+                      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                      <span id="inspAppliedBtnLabel">Mark Applied</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Structured Opportunity Specifications -->
+                <div class="specs-matrix">
+                  <div class="spec-cell">
+                    <span class="spec-cell-label">Experience</span>
+                    <span class="spec-cell-value" id="inspExperience">Not specified</span>
+                  </div>
+                  <div class="spec-cell">
+                    <span class="spec-cell-label">Location</span>
+                    <span class="spec-cell-value" id="inspLocation">Not specified</span>
+                  </div>
+                  <div class="spec-cell">
+                    <span class="spec-cell-label">Work Mode</span>
+                    <span class="spec-cell-value" id="inspWorkMode">Not specified</span>
+                  </div>
+                  <div class="spec-cell">
+                    <span class="spec-cell-label">Priority Alert</span>
+                    <span class="spec-cell-value" id="inspAlertabilityBadge" style="color:var(--status-success);">Standard Match</span>
+                  </div>
+                  <div class="spec-cell">
+                    <span class="spec-cell-label">Source Posted</span>
+                    <span class="spec-cell-mono" id="inspSourcePosted">Not specified</span>
+                  </div>
+                  <div class="spec-cell">
+                    <span class="spec-cell-label">Discovered</span>
+                    <span class="spec-cell-mono" id="inspDiscovered">Not specified</span>
+                  </div>
+                </div>
+
+                <!-- Match Intelligence Explanation -->
+                <div class="inspector-section">
+                  <span class="inspector-section-title">Match Intelligence</span>
+                  <div style="display:flex;flex-direction:column;gap:6px;" id="inspReasonsList">
+                    <!-- Injected by JS -->
+                  </div>
+                </div>
+
+                <!-- Detected Skills -->
+                <div class="inspector-section">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;">
+                    <span class="inspector-section-title">Detected Skills</span>
+                    <span class="meta-mono" style="font-size:11px;color:var(--text-muted);" id="inspSkillsCount">0 detected</span>
+                  </div>
+                  <div class="opportunity-signals-row" id="inspSkillsContainer">
+                    <!-- Skill chips -->
+                  </div>
+                </div>
+
+                <!-- Original Description -->
+                <div class="inspector-section">
+                  <span class="inspector-section-title">Job Description</span>
+                  <div class="description-formatted-view" id="inspDescription">No description available.</div>
+                </div>
+              </div>
+            </aside>
           </div>
-          <div class="detail-score" id="detailScore"></div>
-        </div>
-        <div class="detail-stats">
-          <div><span>EXPERIENCE</span><b id="detailExperience">Not specified</b></div>
-          <div><span>LOCATION</span><b id="detailLocation">Not specified</b></div>
-          <div><span>WORK MODE</span><b id="detailWorkMode">Not specified</b></div>
-          <div><span>POSTED</span><b id="detailPosted">Not specified</b></div>
-        </div>
-        <div class="detail-actions"><a id="detailApply" class="apply" target="_blank" rel="noopener">Apply now ↗</a>
-        </div>
-        <section class="detail-box">
-          <div class="detail-box-head">
-            <h2>Why this matched</h2><span id="detailMatch"></span>
+        </section>
+
+        <!-- ===================================================================
+             2. APPLIED JOBS SECTION
+             =================================================================== -->
+        <section id="appliedSection" class="workspace-page" aria-label="Applied Workspace">
+          <div class="view-content-wrapper">
+            <div class="view-headline-row">
+              <div>
+                <h2 class="view-title-main">Applied Opportunities</h2>
+                <p class="view-subtitle-main">Local application tracking preserved in your browser.</p>
+              </div>
+              <div style="display:flex;gap:var(--space-6);">
+                <button type="button" id="exportAppliedJsonBtn" class="btn-pill btn-pill-secondary">Export JSON</button>
+                <button type="button" id="exportAppliedCsvBtn" class="btn-pill btn-pill-secondary">Export CSV</button>
+              </div>
+            </div>
+
+            <!-- Applied Summary KPIs -->
+            <div class="applied-kpi-grid">
+              <div class="applied-kpi-box">
+                <span class="applied-kpi-label">Total Applied</span>
+                <b class="applied-kpi-number" id="appliedStatTotal">0</b>
+              </div>
+              <div class="applied-kpi-box">
+                <span class="applied-kpi-label">Interviewing</span>
+                <b class="applied-kpi-number" id="appliedStatInterviewing" style="color:#79c0ff;">0</b>
+              </div>
+              <div class="applied-kpi-box">
+                <span class="applied-kpi-label">Offers</span>
+                <b class="applied-kpi-number" id="appliedStatOffers" style="color:var(--status-success);">0</b>
+              </div>
+              <div class="applied-kpi-box">
+                <span class="applied-kpi-label">Rejected</span>
+                <b class="applied-kpi-number" id="appliedStatRejected" style="color:var(--status-error);">0</b>
+              </div>
+            </div>
+
+            <!-- Applied Dataset Table -->
+            <div class="data-table-container">
+              <table class="table-dataset">
+                <thead>
+                  <tr>
+                    <th>Opportunity &amp; Company</th>
+                    <th>Source</th>
+                    <th>Date Applied</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="appliedTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div id="detailReasons" class="reason-list"></div>
         </section>
-        <section class="detail-box">
-          <div class="detail-box-head">
-            <h2>Detected Skills &amp; Technologies</h2><span id="detailSkillCount"></span>
+
+        <!-- ===================================================================
+             3. MATCHING PREFERENCES SECTION
+             =================================================================== -->
+        <section id="preferencesSection" class="workspace-page" aria-label="Preferences Workspace">
+          <div class="view-content-wrapper">
+            <div class="view-headline-row">
+              <div>
+                <h2 class="view-title-main">Matching Preferences</h2>
+                <p class="view-subtitle-main">Target roles, skills, experience limits, and alerting criteria on the Oracle VM.</p>
+              </div>
+            </div>
+
+            <!-- Matching Criteria Group -->
+            <div class="settings-block">
+              <span class="settings-block-title">Matching Criteria</span>
+              
+              <div class="form-field-group">
+                <label class="form-field-label" for="rolesInput">
+                  <span>Target Roles</span>
+                  <small>Press Enter or comma to create tag</small>
+                </label>
+                <div class="tag-input-shell" id="rolesTagContainer">
+                  <input type="text" id="rolesInput" class="tag-text-input" placeholder="e.g. Software Engineer, Full Stack Developer…">
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="form-field-label" for="locationsInput">
+                  <span>Target Locations</span>
+                  <small>Press Enter to create tag</small>
+                </label>
+                <div class="tag-input-shell" id="locationsTagContainer">
+                  <input type="text" id="locationsInput" class="tag-text-input" placeholder="e.g. Bengaluru, Gurugram, Remote India…">
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="form-field-label" for="skillsInput">
+                  <span>Skills &amp; Technologies</span>
+                  <small>Press Enter to create tag</small>
+                </label>
+                <div class="tag-input-shell" id="skillsTagContainer">
+                  <input type="text" id="skillsInput" class="tag-text-input" placeholder="e.g. React, Python, FastAPI, TypeScript…">
+                </div>
+              </div>
+            </div>
+
+            <!-- Exclusions Group -->
+            <div class="settings-block">
+              <span class="settings-block-title">Exclusions</span>
+
+              <div class="form-field-group">
+                <label class="form-field-label" for="excludeTitlesInput">
+                  <span>Exclude Job Titles</span>
+                  <small>Rejected automatically</small>
+                </label>
+                <div class="tag-input-shell" id="excludeTitlesTagContainer">
+                  <input type="text" id="excludeTitlesInput" class="tag-text-input" placeholder="e.g. Senior, Staff, Principal, Lead, Manager…">
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label class="form-field-label" for="excludeRolesInput">
+                  <span>Exclude Role Categories</span>
+                </label>
+                <div class="tag-input-shell" id="excludeRolesTagContainer">
+                  <input type="text" id="excludeRolesInput" class="tag-text-input" placeholder="e.g. QA, Tester, DevOps, Testing…">
+                </div>
+              </div>
+            </div>
+
+            <!-- Experience & Thresholds -->
+            <div class="settings-block">
+              <span class="settings-block-title">Experience &amp; Thresholds</span>
+
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:var(--space-10);">
+                <div class="form-field-group">
+                  <label class="form-field-label" for="cfgCandidateExp">Candidate Experience (Years)</label>
+                  <input type="number" id="cfgCandidateExp" class="number-field-input" min="0" max="30" step="0.5" placeholder="2">
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="cfgMinExp">Minimum Job Experience (Years)</label>
+                  <input type="number" id="cfgMinExp" class="number-field-input" min="0" max="30" step="0.5" placeholder="None">
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="cfgMaxExp">Max Acceptable Experience</label>
+                  <input type="number" id="cfgMaxExp" class="number-field-input" min="0" max="30" step="0.5" placeholder="3">
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="cfgMatchThreshold">Match Threshold (%)</label>
+                  <input type="number" id="cfgMatchThreshold" class="number-field-input" min="0" max="100" step="1" placeholder="55">
+                </div>
+              </div>
+
+              <!-- Sources & Toggles -->
+              <div style="display:flex;flex-direction:column;gap:var(--space-6);margin-top:var(--space-8);">
+                <div style="display:flex;gap:var(--space-12);flex-wrap:wrap;" id="cfgSourcesWrap">
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="linkedin" checked> LinkedIn</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="naukri" checked> Naukri</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="instahyre"> Instahyre</label>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRemoteOnly"> Remote opportunities only</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRequireExp"> Require explicit experience for Telegram alerts</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgTelegramAlerts"> Telegram alerts enabled</label>
+                </div>
+              </div>
+
+              <!-- Save Actions Bar -->
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:var(--space-10);border-top:1px solid var(--border-default);margin-top:var(--space-8);">
+                <span id="saveStatusMessage" style="font-size:11.5px;color:var(--text-muted);"></span>
+                <button type="button" class="btn-pill btn-pill-primary" id="savePreferencesBtn">Save Preferences to V2</button>
+              </div>
+            </div>
           </div>
-          <div id="detailSkills" class="chips detail-chips"></div>
         </section>
-        <section class="detail-box">
-          <h2>About this job</h2>
-          <div id="detailDescription" class="detail-description"></div>
+
+        <!-- ===================================================================
+             4. SOURCE HEALTH SECTION
+             =================================================================== -->
+        <section id="sourcesSection" class="workspace-page" aria-label="Source Health Workspace">
+          <div class="view-content-wrapper">
+            <div class="view-headline-row">
+              <div>
+                <h2 class="view-title-main">Source Health &amp; Ingestion Telemetry</h2>
+                <p class="view-subtitle-main">Real-time status of scrapers, rate-limits, and discovery metrics.</p>
+              </div>
+              <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
+            </div>
+
+            <div class="data-table-container">
+              <table class="table-dataset">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Jobs Seen</th>
+                    <th>New Today</th>
+                    <th>Last Success (IST)</th>
+                    <th>Diagnostics</th>
+                  </tr>
+                </thead>
+                <tbody id="sourceHealthTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================
+             5. CONFIGURATION ACCESS SECTION
+             =================================================================== -->
+        <section id="accessSection" class="workspace-page" aria-label="Configuration Access">
+          <div class="view-content-wrapper">
+            <div class="view-headline-row">
+              <div>
+                <h2 class="view-title-main">Configuration Access</h2>
+                <p class="view-subtitle-main">V2 authentication token required for updating preferences on the Oracle VM.</p>
+              </div>
+            </div>
+
+            <div class="settings-block">
+              <div class="form-field-group">
+                <label class="form-field-label" for="accessMainTokenInput">
+                  <span>Configuration Token</span>
+                  <small>Kept in browser session storage only</small>
+                </label>
+                <div style="display:flex;gap:var(--space-6);align-items:center;">
+                  <input type="password" id="accessMainTokenInput" class="number-field-input" style="flex:1;font-family:var(--font-mono);" placeholder="Enter token..." autocomplete="off">
+                  <button type="button" class="btn-pill btn-pill-secondary" id="accessMainTokenToggleBtn">Show/Hide</button>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:var(--space-8);align-items:center;margin-top:var(--space-6);">
+                <button type="button" class="btn-pill btn-pill-primary" id="accessSaveTokenBtn">Remember Token</button>
+                <button type="button" class="btn-pill btn-pill-secondary" id="accessClearTokenBtn">Clear Token</button>
+                <span id="accessStatusMsg" style="font-size:11.5px;color:var(--text-muted);"></span>
+              </div>
+
+              <div style="margin-top:var(--space-12);padding:var(--space-10);background-color:var(--bg-subtle);border:1px solid var(--border-default);border-radius:var(--radius-xs);font-size:11.5px;color:var(--text-muted);">
+                <b style="color:var(--text-primary);display:block;margin-bottom:4px;">To retrieve the token on your Oracle VM:</b>
+                <code style="font-family:var(--font-mono);color:#79c0ff;background-color:var(--bg-elevated);padding:2px 6px;border-radius:3px;">sudo docker compose -f v2/docker-compose.yml exec radar cat /data/config_token</code>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
-    </section>
+    </main>
+  </div>
 
-    <section id="appliedSection" class="page-section hidden-section">
-      <div class="settings-panel">
-        <div class="section-title">
-          <h2>Applied</h2>
-          <p>Applied-job tracking will appear here.</p>
-        </div>
-        <div class="empty">No applied jobs have been recorded yet.</div>
-      </div>
-    </section>
+  <!-- Mobile Bottom Tab Navigation -->
+  <nav class="mobile-bottom-navigation" aria-label="Mobile Bottom Navigation">
+    <a href="#jobs" class="mobile-tab-btn active" data-section="jobsSection">
+      <svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+      <span>Jobs</span>
+    </a>
+    <a href="#applied" class="mobile-tab-btn" data-section="appliedSection">
+      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+      <span>Applied</span>
+    </a>
+    <a href="#sources" class="mobile-tab-btn" data-section="sourcesSection">
+      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+      <span>Health</span>
+    </a>
+    <a href="#preferences" class="mobile-tab-btn" data-section="preferencesSection">
+      <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
 
-    <section id="filtersSection" class="page-section hidden-section">
-      <div class="settings-panel">
-        <div class="section-title">
-          <h2>Preferences</h2>
-          <p>These settings control V2 matching and future Telegram alert eligibility. They are stored on the Oracle VM.
-          </p>
-        </div>
-        <div class="match-explainer"><b>How it works:</b> jobs are collected first, then evaluated against these
-          preferences. Changing preferences does not require a code change or Docker rebuild.</div>
-        <div class="settings-grid">
-          <label class="field"><span>Target roles</span><textarea id="cfgRoles"
-              placeholder="software engineer, full stack developer, AI engineer"></textarea></label>
-          <label class="field"><span>Locations</span><textarea id="cfgLocations"
-              placeholder="Bengaluru, Gurugram, Delhi, Remote India"></textarea></label>
-          <label class="field"><span>Skills</span><textarea id="cfgSkills"
-              placeholder="React, Python, Node.js, FastAPI, AI, automation"></textarea></label>
-          <label class="field"><span>Exclude titles</span><textarea id="cfgExclude"
-              placeholder="senior, staff, principal, manager, lead"></textarea></label>
-          <label class="field"><span>Exclude role/category terms</span><textarea id="cfgExcludeRoles"
-              placeholder="QA, tester, testing"></textarea></label>
-          <label class="field"><span>Your experience</span><input id="cfgCandidateExperience" type="number" min="0"
-              max="30" step="0.5" placeholder="2"></label>
-          <label class="field"><span>Minimum job experience</span><input id="cfgMinExperience" type="number" min="0"
-              max="30" step="0.5" placeholder="No minimum"></label>
-          <label class="field"><span>Maximum acceptable job experience</span><input id="cfgExperience" type="number"
-              min="0" max="30" step="0.5" placeholder="3"></label>
-          <label class="field"><span>Match threshold</span><input id="cfgThreshold" type="number" min="0" max="100"
-              step="1" placeholder="55"></label>
-          <label class="field"><span>Maximum job age</span><select id="cfgAge">
-              <option value="6">6 hours</option>
-              <option value="24">24 hours</option>
-              <option value="48">48 hours</option>
-              <option value="72">72 hours</option>
-              <option value="168">7 days</option>
-            </select></label>
-          <label class="field"><span>Source controls</span>
-            <div id="sourceChoices" class="choices"></div>
-          </label>
-        </div>
-        <label class="toggle"><input id="cfgRemoteOnly" type="checkbox"><span>Remote jobs only</span></label>
-        <label class="toggle"><input id="cfgRequireExperience" type="checkbox"><span>Require explicit experience for
-            Telegram alerts</span></label>
-        <label class="toggle"><input id="cfgTelegram" type="checkbox"><span>Telegram alerts enabled</span></label>
-        <div class="github-row"><button id="saveConfig" class="primary">Save V2 preferences</button><span
-            id="saveStatus" class="save-status"></span></div>
-      </div>
-    </section>
+  <!-- Toast Notification Mount Host -->
+  <div class="toast-notifications-host" id="toastContainer" aria-live="polite"></div>
 
-    <section id="sourcesSection" class="page-section hidden-section">
-      <div class="settings-panel">
-        <div class="section-title">
-          <h2>Sources</h2>
-          <p>Job sources configured in the repository will be shown here as the feed reports them.</p>
-        </div>
-        <div id="sourceStatus" class="empty">Loading source status…</div>
-      </div>
-    </section>
-
-    <section id="settingsSection" class="page-section hidden-section">
-      <div class="settings-panel">
-        <div class="section-title">
-          <h2>Configuration access</h2>
-          <p>Updating V2 preferences is protected by a local configuration token stored on the Oracle VM.</p>
-        </div>
-        <div class="github-row">
-          <input id="configToken" type="password" autocomplete="off" placeholder="V2 configuration token">
-          <button id="saveToken" class="primary">Remember token</button>
-          <button id="clearToken" class="secondary">Clear token</button>
-        </div>
-        <div id="tokenStatus" class="save-status"></div>
-        <div class="token-help">Retrieve the token on the VM with
-          <code>sudo docker compose -f v2/docker-compose.yml exec radar cat /data/config_token</code>. It is kept in
-          browser session storage only.</div>
-      </div>
-    </section>
+  <script src="app.js?v=obsidian_v2"></script>
+</body>
 
 </html>
