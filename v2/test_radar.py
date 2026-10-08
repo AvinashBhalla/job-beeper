@@ -420,6 +420,52 @@ class MatcherTests(unittest.TestCase):
                 radar.DB_PATH = original_db
 
 
+    def test_jobs_today_only_filters_before_ist_midnight(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                day_start = radar.current_day_start_utc()
+
+                old_job = normalize_job(
+                    "linkedin",
+                    "li-old-day",
+                    "Acme",
+                    "Software Engineer",
+                    "Bengaluru",
+                    "https://linkedin.com/jobs/view/old-day",
+                    day_start - timedelta(minutes=30),
+                    "minute",
+                    "2 years experience",
+                )
+                new_job = normalize_job(
+                    "linkedin",
+                    "li-new-day",
+                    "Acme",
+                    "Software Engineer",
+                    "Bengaluru",
+                    "https://linkedin.com/jobs/view/new-day",
+                    day_start + timedelta(minutes=30),
+                    "minute",
+                    "2 years experience",
+                )
+                config = {
+                    **BASE_CONFIG,
+                    "require_explicit_experience_for_alerts": False,
+                }
+                self.assertEqual(upsert_jobs([old_job, new_job], config), 2)
+
+                result = radar.jobs(today_only=True, limit=100)
+                ids = {row["source_job_id"] for row in result["jobs"]}
+
+                self.assertNotIn("li-old-day", ids)
+                self.assertIn("li-new-day", ids)
+            finally:
+                radar.DB_PATH = original_db
+
     def test_daily_reset_uses_ist_midnight(self):
         start = current_day_start_utc()
         local = start.astimezone(radar.IST)
