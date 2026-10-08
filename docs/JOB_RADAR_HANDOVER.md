@@ -605,7 +605,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Telegram notification engine implementation complete; credentialed Bot API connectivity verified; first real job alerts delivered successfully
 ❌ Cross-source canonical deduplication
 ❌ New/changed opportunity detection
-⏳ Daily active-feed UI integration into the dashboard
+✅ Daily active-feed UI connected: dashboard now reads `/api/jobs?today_only=true` plus `/api/daily-summary`, displays Jobs today / Matched today / Alerts sent today, and keeps newest/match sorting
 ❌ Fully V2-connected frontend settings
 ❌ Complete frontend live feed
 ❌ Source health UI beyond basic API
