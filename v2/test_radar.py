@@ -665,6 +665,51 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertFalse(result["match"])
 
+    def test_linkedin_fast_lane_and_periodic_deep_scan(self):
+        original_state = radar.source_state
+        radar.source_state = {}
+        config = {
+            **BASE_CONFIG,
+            "linkedin_queries": ["ai engineer"],
+            "locations": ["Bengaluru, Karnataka, India"],
+        }
+        calls = []
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body><ul>
+              <li>
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/1234567890">Apply</a>
+                <h3 class="base-search-card__title">AI Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme</h4>
+                <span class="job-search-card__location">Bengaluru, Karnataka, India</span>
+                <time>1 minute ago</time>
+                <span>2 years experience</span>
+              </li>
+            </ul></body></html>
+            """
+
+        def fake_request(_endpoint, params):
+            calls.append(params["start"])
+            return Response()
+
+        try:
+            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+                first = radar.linkedin_collect(config)
+                first_starts = sorted(calls)
+                calls.clear()
+                second = radar.linkedin_collect(config)
+                second_starts = sorted(calls)
+
+            self.assertEqual(len(first), 1)
+            self.assertEqual(first_starts, [0, 10])
+            self.assertEqual(len(second), 1)
+            self.assertEqual(second_starts, [0])
+        finally:
+            radar.source_state = original_state
+
+
 
 if __name__ == "__main__":
     unittest.main()
