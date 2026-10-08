@@ -44,11 +44,10 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 4
+LINKEDIN_SEARCH_WORKERS = 2
 LINKEDIN_DETAIL_WORKERS = 4
-LINKEDIN_FAST_LOCATIONS_PER_SCAN = 2
 LINKEDIN_DEEP_SCAN_SECONDS = 300
-LINKEDIN_FAST_TPR = "r3600"
+LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
@@ -70,7 +69,6 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
-linkedin_fast_location_offset = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -89,10 +87,21 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     default_version = int(defaults.get("config_version", 1) or 1)
     merged["config_version"] = max(current_version, default_version)
 
-    # Version 3 made Instahyre opt-in. Version 4 re-applies that safe
+    # Version 3 made Instahyre opt-in. Version 4 re-applied that safe
     # default for runtimes created before this policy was made explicit.
     if current_version < 4 <= default_version:
         merged.setdefault("source_enabled", {})["instahyre"] = False
+
+    # Version 5 repairs persisted source-query configuration. Query families
+    # are repository-owned, not exposed by the preferences UI, so stale
+    # runtime query sets must not silently reduce fresh-job coverage.
+    if current_version < 5 <= default_version:
+        merged["linkedin_queries"] = json.loads(
+            json.dumps(defaults.get("linkedin_queries", []))
+        )
+        merged["naukri_queries"] = json.loads(
+            json.dumps(defaults.get("naukri_queries", []))
+        )
 
     if isinstance(defaults.get("poll_seconds"), dict):
         merged["poll_seconds"] = {
@@ -1673,7 +1682,7 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    global linkedin_last_deep_scan_at, linkedin_fast_location_offset
+    global linkedin_last_deep_scan_at
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1683,21 +1692,10 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     configured_locations = list(config.get("locations", []))
-    if do_deep or len(configured_locations) <= LINKEDIN_FAST_LOCATIONS_PER_SCAN:
-        scan_locations = configured_locations
-    else:
-        start_idx = linkedin_fast_location_offset % len(configured_locations)
-        width = min(LINKEDIN_FAST_LOCATIONS_PER_SCAN, len(configured_locations))
-        scan_locations = [
-            configured_locations[(start_idx + offset) % len(configured_locations)]
-            for offset in range(width)
-        ]
-        linkedin_fast_location_offset = (start_idx + width) % len(configured_locations)
-
     targets = [
         (query, location, start, start != 10)
         for query in config.get("linkedin_queries", [])
-        for location in scan_locations
+        for location in configured_locations
         for start in ((0, 10) if do_deep else (0,))
     ]
 
@@ -1996,6 +1994,51 @@ def update_config(payload: dict[str, Any], x_config_token: str | None = Header(d
     refresh_job_evaluations(saved)
     refresh_notification_decisions(saved)
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
+
+
+@app.get("/api/latency-summary")
+def latency_summary(hours: int = 24):
+    hours = max(1, min(hours, 168))
+    cutoff = iso(now() - dt.timedelta(hours=hours))
+
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT source, discovery_latency_seconds
+            FROM jobs
+            WHERE discovered_at >= ?
+              AND discovery_latency_seconds IS NOT NULL
+              AND discovery_latency_seconds >= 0
+              AND source IN ('linkedin', 'naukri', 'instahyre')
+            ORDER BY source, discovery_latency_seconds ASC
+        """, (cutoff,)).fetchall()
+
+    by_source: dict[str, list[int]] = {}
+    for source, latency in rows:
+        by_source.setdefault(source, []).append(int(latency))
+
+    def percentile(values: list[int], p: float) -> int | None:
+        if not values:
+            return None
+        index = min(len(values) - 1, max(0, round((len(values) - 1) * p)))
+        return values[index]
+
+    summary = {}
+    for source in ("linkedin", "naukri", "instahyre"):
+        values = by_source.get(source, [])
+        under_60 = sum(1 for value in values if value <= 60)
+        under_120 = sum(1 for value in values if value <= 120)
+        under_300 = sum(1 for value in values if value <= 300)
+        summary[source] = {
+            "samples": len(values),
+            "p50_seconds": percentile(values, 0.50),
+            "p90_seconds": percentile(values, 0.90),
+            "max_seconds": max(values) if values else None,
+            "under_60_seconds": under_60,
+            "under_120_seconds": under_120,
+            "under_300_seconds": under_300,
+        }
+
+    return {"hours": hours, "sources": summary}
 
 
 @app.get("/api/source-status")
