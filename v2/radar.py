@@ -69,6 +69,7 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
+linkedin_fast_location_cursor = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -1687,7 +1688,7 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    global linkedin_last_deep_scan_at
+    global linkedin_last_deep_scan_at, linkedin_fast_location_cursor
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1697,11 +1698,26 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     configured_locations = list(config.get("locations", []))
+    if do_deep or len(configured_locations) <= 2:
+        scan_locations = configured_locations
+    else:
+        # Keep the fast lane bounded: cover two locations per minute and
+        # rotate so every configured location is visited within two cycles.
+        start_index = linkedin_fast_location_cursor % len(configured_locations)
+        scan_locations = [
+            configured_locations[(start_index + offset) % len(configured_locations)]
+            for offset in range(min(2, len(configured_locations)))
+        ]
+        linkedin_fast_location_cursor = (
+            start_index + len(scan_locations)
+        ) % len(configured_locations)
+
+    scan_starts = (0, 10) if do_deep else (0,)
     targets = [
         (query, location, start, start != 10)
         for query in config.get("linkedin_queries", [])
-        for location in configured_locations
-        for start in ((0, 10) if do_deep else (0,))
+        for location in scan_locations
+        for start in scan_starts
     ]
 
     with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
