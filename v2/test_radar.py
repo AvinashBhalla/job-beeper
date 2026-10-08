@@ -8,7 +8,15 @@ from tempfile import TemporaryDirectory
 
 import v2.radar as radar
 from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
-from v2.radar import _merge_config, alertability_details, extract_experience, match_details, normalize_job, upsert_jobs
+from v2.radar import (
+    _merge_config,
+    alertability_details,
+    current_day_start_utc,
+    extract_experience,
+    match_details,
+    normalize_job,
+    upsert_jobs,
+)
 from v2.telegram import _format_timestamp, format_notification, send_message
 
 
@@ -238,6 +246,13 @@ class MatcherTests(unittest.TestCase):
         result = match_details(enriched, BASE_CONFIG)
         self.assertFalse(result["match"])
         self.assertIn("experience minimum 5 exceeds candidate 2 years", result["reasons"][0])
+
+    def test_daily_reset_uses_ist_midnight(self):
+        start = current_day_start_utc()
+        local = start.astimezone(radar.IST)
+        self.assertEqual(local.hour, 0)
+        self.assertEqual(local.minute, 0)
+        self.assertEqual(local.second, 0)
 
     def test_telegram_timestamp_is_human_readable_ist(self):
         self.assertEqual(
