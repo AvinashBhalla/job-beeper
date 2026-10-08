@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Twenty-five matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
+✅ Twenty-eight matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
