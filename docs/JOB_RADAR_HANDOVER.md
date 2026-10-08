@@ -561,6 +561,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Telegram message formatting and delivery error behavior regression-tested
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
+✅ Telegram credential connectivity verified against the configured bot/chat
+✅ Real-data analysis confirmed the explicit-experience alert gate was blocking relevant LinkedIn matches; runtime policy is being relaxed so unknown experience can alert when the profile match itself is strong enough
 ✅ Persistent notification decision queue implemented: pending opportunities become queued only when fresh, matched, alertable and notifications are enabled; otherwise they are suppressed with a durable reason
 ✅ Notification queue API added at `/api/notification-queue`
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
@@ -577,13 +579,14 @@ The system is therefore **ingesting real jobs continuously**.
 ⏳ Validate the persistent notification decision queue on the upgraded Oracle database
 ⏳ Validate live configuration re-evaluation and notification reconsideration on Oracle after a configuration update
 ✅ Build Telegram delivery/claim/retry on top of the queued notification state
-⏳ Configure Telegram credentials on Oracle and send one real test notification
+✅ Configure Telegram credentials on Oracle and send one real Telegram integration test
+⏳ Validate real job alert delivery after enabling unknown-experience alerts
 ```
 
 ### Not yet production-ready
 
 ```
-✅ Telegram notification engine implementation complete; real credentialed delivery validation remains
+✅ Telegram notification engine implementation complete; credentialed Bot API connectivity verified; real job alert validation remains
 ❌ Cross-source canonical deduplication
 ❌ New/changed opportunity detection
 ❌ Fully V2-connected frontend settings
