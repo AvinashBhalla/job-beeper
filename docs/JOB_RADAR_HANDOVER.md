@@ -951,6 +951,25 @@ Corrective rule:
 The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
 
 
+### Observation 26 — The merged UI enhancement PR did not contain a major visual frontend redesign
+
+The merged pull request `#3` ("Ui enhancement") was inspected after local Git was proven to match `v2-live-radar` at merge commit `33b3c410`.
+
+The PR's effective changed-file list contains only:
+
+```
+dashboard/index.html
+```
+
+Its patch is primarily HTML reformatting/indentation plus the configuration-access section. It does **not** modify:
+
+- `dashboard/styles.css`
+- `dashboard/app.js`
+
+Therefore, a substantially different visual frontend cannot appear in the current `v2-live-radar` merely by checking out the merged PR. The local checkout is correct; a larger redesign would require the friend/client-side UI changes to be committed to GitHub, including the relevant CSS/JS/assets.
+
+Do not treat the current branch's merged PR as evidence that a full visual redesign was delivered.
+
 ### Observation 25 — Manual acceptance found a one-hour LinkedIn discovery lag for a Full Stack Engineer posting
 
 A real Telegram alert for ReqPedia's `Full Stack Engineer` posting showed approximately:
