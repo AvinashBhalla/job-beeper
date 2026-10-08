@@ -166,8 +166,21 @@ class MatcherTests(unittest.TestCase):
                     row = conn.execute(
                         "SELECT status, decision_reason_json FROM notification_ledger"
                     ).fetchone()
-                self.assertEqual(row[0], "suppressed")
-                self.assertIn("no fresh alertable observation", row[1])
+                self.assertEqual(row[0], "pending")
+                self.assertIn("awaiting future re-evaluation", row[1])
+
+                relaxed = {
+                    **BASE_CONFIG,
+                    "require_explicit_experience_for_alerts": False,
+                }
+                self.assertEqual(radar.refresh_notification_decisions(relaxed), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT status, candidate_job_id FROM notification_ledger"
+                    ).fetchone()
+                self.assertEqual(row[0], "queued")
+                self.assertEqual(row[1], 1)
             finally:
                 radar.DB_PATH = original_db
 
