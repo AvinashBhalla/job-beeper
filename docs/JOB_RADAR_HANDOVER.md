@@ -255,6 +255,8 @@ Currently experimental and **disabled by default in V2**.
 
 The current public JSON probe returned HTTP 400 for the tested request. We do not treat this as a reliable source until its current interface is verified.
 
+Repository defaults and the V2 runtime migration now make Instahyre opt-in. Config schema version 3 disables Instahyre when migrating a pre-v3 runtime config.
+
 Zero results or request errors must not automatically justify increasing polling or scraping volume.
 
 ### Future ATS sources
@@ -412,13 +414,17 @@ It includes:
 - Sources
 - job detail view
 
-However, the current dashboard's configuration/save flow is tied to the older V1 GitHub workflow/configuration path.
+The dashboard has now been rewritten to use the V2 local APIs for jobs, source status and configuration.
 
-Therefore:
+Current repository direction:
 
-**Do not assume the existing Filters UI is a working V2 settings system.**
+- configuration reads/writes through /api/config
+- config token is held in browser session storage
+- job feed reads from /api/jobs
+- source health reads from /api/source-status
+- V2 runtime serves the dashboard directly
 
-It needs to be connected to the V2 configuration API and V2 matcher/alerting system.
+Deployment/browser verification is still pending.
 
 ---
 
@@ -533,14 +539,15 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Config validation + generated configuration token
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
-✅ Existing runtime config migration added; unverified Instahyre is disabled by default
+✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
+✅ Six matcher regression tests pass, including experience parsing and alertability
 ```
 
 ### Currently in progress
 
 ```
-⏳ Deploy/test the new configuration layer and matcher fixes on Oracle
-⏳ Validate configurable alertability against real jobs
+⏳ Deploy the config-schema v3 migration on Oracle and verify /data/config.json
+⏳ Validate frontend-driven configuration changes against live matching/alertability
 ⏳ Canonical identity + cross-source deduplication
 ```
 
@@ -574,7 +581,9 @@ The next implementation sequence is:
 
 ### Step A — V2 persistent configuration
 
-**Implemented in repository; deployment verification is next.**
+**Implemented in repository; deployment verification is the immediate task.**
+
+The latest code adds a config-schema v3 migration that explicitly turns Instahyre off for legacy/pre-v3 runtime configurations.
 
 The runtime uses:
 
@@ -595,7 +604,7 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented.**
+**Partially implemented and regression-tested.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
@@ -888,7 +897,9 @@ Oracle systemd timer → GitHub workflow → Naukri → relay branch → V2.
 Proven and running every 5 minutes.
 
 INSTAHYRE:
-Experimental; currently returns 0.
+Experimental; current probe returns HTTP 400.
+Disabled by default.
+Config-schema v3 migration makes it opt-in for legacy runtime configs.
 
 V2:
 Running on port 8000.
@@ -913,8 +924,8 @@ Not yet fully implemented.
 Must happen before Telegram.
 
 FRONTEND:
-Exists, but current configuration flow is V1-oriented.
-Must be connected to V2 APIs.
+Repository dashboard now uses V2 local APIs.
+Needs live browser/deployment verification.
 
 V1:
 Keep until V2 Telegram is proven; then disable duplicate V1 alerts.
