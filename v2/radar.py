@@ -21,7 +21,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score
+from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
