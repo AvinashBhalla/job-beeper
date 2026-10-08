@@ -23,19 +23,24 @@ Based on JobBeeper's public product pages:
    - Public examples show a preference-match percentage and reasons such as role, location and followed-company matches.
    - Every alert should carry deterministic match reasons. AI can enrich later, but should not be required for basic correctness.
 
-5. **Direct application**
+5. **Daily active-feed lifecycle**
+   - JobBeeper publicly describes a live/recent feed and continuous daily monitoring, but the public pages do not establish a literal midnight deletion rule.
+   - For our personal implementation, the active dashboard/feed should reset at India local midnight: yesterday's jobs leave the visible daily feed and today's counts start from zero.
+   - Historical observations remain in SQLite for deduplication, alert history, auditability and analytics.
+
+6. **Direct application**
    - JobBeeper sends the original/direct employer link and does not automatically apply.
    - We preserve canonical source URLs and never automate application submission.
 
-6. **Company-level aggregation**
+7. **Company-level aggregation**
    - Public company pages aggregate roles across multiple sources (for example LinkedIn, Naukri, Instahyre, Greenhouse and SmartRecruiters).
    - Our normalized job model must support source + company identity + canonical job identity so cross-source duplicates can be merged.
 
-7. **Newest-first feeds**
+8. **Newest-first feeds**
    - Public browse/company pages present newest openings first.
    - Dashboard ordering should prioritize freshness, while retaining a separate match score.
 
-8. **Source health**
+9. **Source health**
    - Public coverage spans many heterogeneous sources. Our implementation must therefore tolerate individual source failures without stopping the entire run.
    - Failed sources use persistent exponential backoff; manual runs may bypass cooldowns for debugging.
 
