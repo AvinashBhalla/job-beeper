@@ -404,7 +404,7 @@ setupNavigation();
     await loadConfig();
     await loadJobs();
     await loadSourceStatus();
-    setInterval(loadJobs,30000);
+    setInterval(loadJobs,10000);
     setInterval(loadSourceStatus,30000);
   }catch(error){
     $("statusText").textContent="V2 backend unavailable";
