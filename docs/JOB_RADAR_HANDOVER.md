@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (39-test green suite + real-time Telegram gate + matcher variant improvements + production alert validation + Agent-Reach parked as future optimisation)
+**Last updated: 2026-10-08 (today-only regression test corrected; 43-test suite pending final Oracle re-run)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -600,18 +600,28 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher role-family aliases added for Software Engineer / Software Development Engineer / SDE variants
 ✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
 ✅ Unknown experience made neutral for matching while alertability remains a separate policy
-✅ Regression suite expanded to 39 tests; Docker execution is green
+✅ Regression suite baseline expanded to 39 tests; Docker execution was green before the latest JD-hardening change
+⏳ Updated suite is now restored to the expected 43 tests (39 baseline + 3 JD-hardening tests + 1 today-only feed test); must be re-run in Docker before declaring the latest milestone green
 ✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
 ✅ Repository .gitignore now ignores Python __pycache__ artifacts
 ✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
+✅ BlueOptima-style LinkedIn JD extraction incident reproduced and JD retrieval/parser hardened for overall/total experience wording, JSON-LD, description selectors, HTML entities/non-breaking spaces and Unicode dash variants
+✅ Corrupted direct test-file update repaired by restoring the last known-good 39-test suite and adding three focused JD-extraction regression tests
+✅ V2 CI strengthened to run py_compile on both production/test Python and the full unittest suite, preventing structurally broken test files from reaching the branch undetected
+✅ Repaired a second test-file corruption incident: the branch temporarily contained only a truncated tail of `v2/test_radar.py`; the file was restored from the known-good 39-test commit and all four required new regression cases were reapplied cleanly, restoring the expected 43-test suite
+✅ Corrected the today-only regression test after discovering the restored version had not actually moved `discovered_at` across IST midnight; the production contract remains correct and the test now models it correctly
+✅ Found and fixed a separate `/api/jobs?today_only=true` bug: the endpoint accepted the flag but previously ignored it, and `/api/opportunities` referenced an undefined `today_only` variable; today-only filtering is now explicitly driven by India-local midnight and covered by regression tests
+✅ Fixed the first today-only regression test itself: it had moved only source posting timestamps across midnight while discovery timestamps remained current; the corrected test now moves `discovered_at` across IST midnight and verifies both `/api/jobs` and `/api/opportunities`
 ```
 
 ### Currently in progress
 
 ```
+⏳ Pull the latest GitHub commits onto Oracle, run the restored updated suite (expected 43 tests), then deploy the hardened LinkedIn JD extraction/retrieval and today-only feed fixes
+⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
+⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Verify notification dedupe at the canonical-opportunity level using fresh production samples (the 20-row diagnostic can contain multiple observations of the same canonical opportunity, so distinct canonical counts must be measured before MVP sign-off)
-⏳ Commit/reconcile the latest matcher changes on the active branch after the Docker-green production validation, keeping GitHub and Oracle working-tree state aligned
+⏳ Verify canonical-level alert deduplication using distinct canonical opportunities rather than raw job rows
 ⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
 ⏳ Validate restart/recovery behavior with persisted config, evaluations and notification ledger
 ⏳ Finish browser verification of the live dashboard against real V2 API data
@@ -619,26 +629,37 @@ The system is therefore **ingesting real jobs continuously**.
 ⏳ Validate source-health UI and remaining convenience features
 ⏳ Final V2 MVP sign-off after latency, dedupe, config persistence/recovery and frontend verification
 ```
-
 ### V1 status
 
 The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
 
-### Step A — Verify canonical-level alert deduplication
+### Step A — Deploy and verify hardened LinkedIn JD extraction
 
-Run a production diagnostic on the latest 10-minute sample and count:
+Pull the latest v2-live-radar commits onto Oracle, rebuild/recreate the V2 container and verify a real LinkedIn posting whose browser JD explicitly states:
 
-- fresh matching rows
-- distinct canonical opportunities
-- distinct canonical opportunities with `sent`
-- duplicate source observations per canonical opportunity
+```
+5 to 7 years of overall software engineering experience
+```
 
-Do not treat a row count as an alert count.
+The system must capture:
 
-### Step B — Measure end-to-end alert latency
+```
+experience_min_years = 5
+experience_max_years = 7
+```
 
-Measure a controlled set of fresh jobs through:
+and reject the posting for the current 3-year maximum before Telegram delivery.
+
+### Step B — Verify canonical-level alert deduplication
+
+On a fresh production window, count fresh matching rows, distinct canonical opportunities, distinct sent canonical opportunities and duplicate observations per canonical opportunity.
+
+Do not interpret source-row count as alert count.
+
+### Step C — Measure end-to-end alert latency
+
+Measure:
 
 ```
 source posting
@@ -652,55 +673,26 @@ source posting
 
 Record median and p95 latency.
 
-### Step C — Reconcile GitHub and Oracle working-tree state
-
-The matcher improvement has been Docker-tested and is active in the current Oracle runtime validation. Commit and push the validated matcher/test/.gitignore changes so the active branch and deployed runtime are aligned.
-
-Then update this handover in the same milestone.
-
 ### Step D — Validate runtime configuration + recovery
 
-Verify that frontend/API changes:
-
-- persist in `/data/config.json`
-- re-evaluate existing jobs
-- reconsider pending notification state correctly
-- survive container restart/recovery
+Verify frontend/API changes persist in /data/config.json, trigger evaluation/notification reconsideration correctly and survive container restart.
 
 ### Step E — Finish frontend verification
 
-Validate:
-
-- live refresh
-- current-day feed
-- daily counters
-- filters/settings
-- job details
-- source health
-- direct apply links
+Validate live refresh, current-day feed, daily counters, filters/settings, job details, source health and direct apply links.
 
 ### Step F — Changed-opportunity detection
 
-Define what constitutes a materially changed opportunity, for example:
+Define material changes including experience requirements, description/requirements, location/work mode and application URL changes, then reconsider without duplicate alerts.
 
-- changed experience requirement
-- materially changed description/requirements
-- changed location/work mode
-- changed application URL
+### Step G — Source-access optimisation evaluation
 
-Reconsider the opportunity without producing duplicate alerts.
+Only after the core V2 path is stable, benchmark Agent-Reach against the current LinkedIn collector for freshness, detail quality, latency, 429/failure rate and Oracle resource usage.
 
-### Step G — MVP sign-off
+### Step H — MVP sign-off
 
 Only after the above checks pass should the current architecture be treated as the stable V2 MVP baseline.
 
-### Step H — Source expansion
-
-After MVP sign-off:
-
-- benchmark Agent-Reach against the existing LinkedIn collector
-- add high-value structured ATS sources progressively
-- keep each source isolated behind an adapter
 ## 13. ENGINEERING RULES FOR FUTURE AGENTS
 
 ### Before changing a source
@@ -891,6 +883,70 @@ docker compose ... run --rm --no-deps radar python3 -m unittest discover -s v2 -
 
 Do not install ad-hoc host Python dependencies just to run the suite.
 
+### Observation 20 — LinkedIn JD experience can be present in the browser while missing from Telegram
+
+A real BlueOptima LinkedIn posting exposed a correctness gap:
+
+```
+Browser JD:
+5 to 7 years of overall software engineering experience.
+
+Telegram:
+Experience: Not stated
+```
+
+The important distinction is that the source posting can contain an explicit experience requirement even when the search-card payload does not. The V2 detail acquisition or parsing layer can therefore be the failure point.
+
+Corrective rule:
+
+```
+LinkedIn card has no experience
+        ↓
+preliminary profile match
+        ↓
+fetch public job detail
+        ↓
+prefer explicit overall/total experience statements
+        ↓
+persist min/max experience
+        ↓
+re-evaluate before notification
+```
+
+Supported JD wording must include phrases such as `5 to 7 years of overall software engineering experience`, common Unicode dash variants, HTML entities/non-breaking spaces and common minimum/at-least experience wording.
+
+A known experience requirement must not be hidden merely because the search card omitted it.
+
+During direct GitHub maintenance, a second test-file corruption was discovered after an earlier repair: the branch contained only a truncated 2,943-character tail of `v2/test_radar.py`, causing `IndentationError` at file line 1 on Oracle. The safe recovery procedure is now to restore the last known-good complete test file and reapply new tests, rather than attempting line-range reconstruction from a potentially truncated current file.
+
+The first automated attempt to add regression coverage directly to the test file corrupted the file structure and caused a syntax error. The file was repaired by restoring the last known-good test suite and reapplying the new tests as a clean append before the existing JD-experience test block. Future direct GitHub file edits must prefer reconstruction from a verified-good version when a patch has already become structurally suspect.
+
+### Observation 23 — The today-only regression test initially failed because discovery time was not actually moved
+
+The production endpoint correctly filters `discovered_at` against the India-local midnight boundary. A restored test fixture initially moved only `source_posted_at`, leaving `discovered_at` at the current time, so the old synthetic job was correctly included.
+
+The test has now been corrected to move `discovered_at` itself across the IST-midnight boundary. This is a test-fixture correction, not a production logic correction.
+
+### Observation 22 — The daily feed API had a latent today-only parameter bug
+
+The dashboard requests `/api/jobs?today_only=true`, but the endpoint previously calculated its cutoff from the default `minutes` parameter instead of the India-local midnight boundary. Separately, `/api/opportunities` referenced `today_only` without declaring it as a parameter.
+
+Corrective rule:
+
+```
+/api/jobs?today_only=true
+    → current India-local midnight cutoff
+
+/api/opportunities?today_only=true
+    → current India-local midnight cutoff
+```
+
+The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
+
+### Observation 21 — The latest production alert diagnostic showed canonical duplication is controlled but not yet fully audited
+
+The latest 10-minute diagnostic showed 29 fresh matching rows, 25 distinct canonical opportunities and 13 distinct canonical opportunities with sent notification state. One canonical opportunity contained five fresh LinkedIn observations of the same Accenture AI/ML Engineer listing. This confirms why canonical-level counts must be used for alert analysis.
+
 ### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
 
 Agent-Reach may reduce the amount of bespoke web-access code for some future sources, particularly LinkedIn or generic web/ATS discovery.
@@ -973,8 +1029,9 @@ Oracle Always Free VM + Docker + SQLite.
 
 LINKEDIN:
 Direct ingestion from Oracle. Proven.
-Current polling is approximately every 60 seconds with a bounded fast/deep scan strategy.
+Polling is approximately every 60 seconds with bounded fast/deep scanning.
 Historical 429/rate-limit pressure exists and must be measured, not solved by blindly increasing request volume.
+JD enrichment is required for cards missing experience; detail retrieval/parsing has a known BlueOptima-style incident under hardening.
 
 NAUKRI:
 Do NOT scrape from Oracle.
@@ -983,7 +1040,6 @@ Proven and running every 5 minutes.
 
 INSTAHYRE:
 Experimental and disabled by default.
-Do not depend on it.
 
 V2:
 Running on port 8000.
@@ -995,17 +1051,13 @@ Supports Software Engineer / Software Development Engineer / SDE variants.
 Supports skill + generic developer/engineer title matching such as Javascript Developer.
 Unknown experience is neutral for matching.
 Configured maximum experience remains strict.
-39 regression tests are green in Docker.
-
-CONFIG:
-Defaults in v2/config.json.
-Runtime preferences persist under /data/config.json through the protected V2 configuration API.
+39 regression tests were green before the latest JD-hardening change; the latest branch now contains JD and today-only feed coverage and must pass the updated 43-test suite.
 
 TELEGRAM:
 Working.
-Alerts require match + alertable state and recent discovery for queued items.
-The real-time queued-alert window is 10 minutes.
-Fresh production validation showed 20 matching rows, 20 alertable rows and 17 rows linked to sent canonical notification state; distinct canonical alert count still needs verification.
+Queued alerts require match + alertability + recent discovery.
+The recent-discovery queue window is 10 minutes; failed delivery retries are still allowed after that window.
+Fresh alert diagnostics must be counted by canonical opportunity, not source rows.
 
 DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
@@ -1020,12 +1072,13 @@ V1:
 Legacy job-watch Telegram workflow is inactive/disabled.
 
 AGENT-REACH:
-Parked as a future optimisation.
-Do not make it a runtime dependency yet.
+Parked as a future source-access optimisation.
+Do not make it a runtime dependency until the core V2 MVP is stable and benchmarked.
 
 NEXT:
-Verify canonical-level dedupe → measure end-to-end alert latency → commit/reconcile latest matcher changes → validate config persistence/recovery → finish frontend verification → implement changed-opportunity detection → MVP sign-off → expand sources.
+Deploy JD hardening → verify 5–7-year extraction end-to-end → verify canonical alert counts → measure end-to-end latency → validate config persistence/recovery → finish frontend verification → changed-opportunity detection → MVP sign-off → benchmark Agent-Reach and expand sources.
 ```
+
 ## 18. SOURCE OF TRUTH HIERARCHY
 
 When information conflicts, use this order:

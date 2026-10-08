@@ -966,5 +966,154 @@ class MatcherTests(unittest.TestCase):
 
 
 
+    def test_jd_experience_extraction_handles_overall_experience_range(self):
+        jd = """
+        What You Need to Succeed:
+        5 to 7 years of overall software engineering experience.
+        Minimum Bachelor's degree.
+        """
+        self.assertEqual(
+            radar.extract_jd_experience(jd),
+            (5.0, 7.0),
+        )
+
+    def test_linkedin_detail_prefers_experience_bearing_candidate(self):
+        class Response:
+            status_code = 200
+            text = """
+            <html>
+              <head>
+                <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "JobPosting",
+                  "description": "5 to 7 years of overall software engineering experience."
+                }
+                </script>
+              </head>
+              <body>
+                <div class="description__text">Build great products.</div>
+              </body>
+            </html>
+            """
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            detail = radar._linkedin_job_description(
+                "https://www.linkedin.com/jobs/view/full-stack-developer-4477150767"
+            )
+
+        self.assertIn(
+            "5 to 7 years of overall software engineering experience",
+            detail,
+        )
+
+    def test_linkedin_enrichment_captures_overall_experience_range(self):
+        job = normalize_job(
+            "linkedin",
+            "li-blueoptima",
+            "BlueOptima",
+            "Full Stack Developer",
+            "Bengaluru, Karnataka, India",
+            "https://www.linkedin.com/jobs/view/full-stack-developer-4477150767",
+            None,
+            "minute",
+            "Full Stack Developer BlueOptima Bengaluru",
+        )
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body>
+            <div class="description__text">
+              Responsibilities and qualifications.
+              5 to 7 years of overall software engineering experience.
+              At least 2 years of web UI development experience.
+            </div>
+            </body></html>
+            """
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            enriched = radar.enrich_linkedin_job(job)
+
+        self.assertEqual(enriched["jd_experience_min_years"], 5.0)
+        self.assertEqual(enriched["jd_experience_max_years"], 7.0)
+        self.assertIn(
+            "5 to 7 years of overall software engineering experience",
+            enriched["description"],
+        )
+
+    def test_jobs_today_only_filters_before_ist_midnight(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                day_start = radar.current_day_start_utc()
+
+                old_job = normalize_job(
+                    "linkedin",
+                    "li-old-day",
+                    "Acme",
+                    "Software Engineer",
+                    "Bengaluru",
+                    "https://linkedin.com/jobs/view/old-day",
+                    day_start - timedelta(minutes=30),
+                    "minute",
+                    "2 years experience",
+                )
+                new_job = normalize_job(
+                    "linkedin",
+                    "li-new-day",
+                    "Acme",
+                    "Software Engineer",
+                    "Bengaluru",
+                    "https://linkedin.com/jobs/view/new-day",
+                    day_start + timedelta(minutes=30),
+                    "minute",
+                    "2 years experience",
+                )
+
+                # The daily lifecycle is based on discovery time, not source
+                # posting time. Move discoveries across the IST-midnight cut.
+                old_job["discovered_at"] = radar.iso(
+                    day_start - timedelta(minutes=30)
+                )
+                new_job["discovered_at"] = radar.iso(
+                    day_start + timedelta(minutes=30)
+                )
+
+                config = {
+                    **BASE_CONFIG,
+                    "require_explicit_experience_for_alerts": False,
+                }
+
+                self.assertEqual(
+                    upsert_jobs([old_job, new_job], config),
+                    2,
+                )
+
+                result = radar.jobs(today_only=True, limit=100)
+                ids = {row["source_job_id"] for row in result["jobs"]}
+
+                self.assertNotIn("li-old-day", ids)
+                self.assertIn("li-new-day", ids)
+
+                opportunity_result = radar.opportunities(
+                    today_only=True,
+                    limit=100,
+                )
+                representative_ids = {
+                    row["representative_job_id"]
+                    for row in opportunity_result["opportunities"]
+                }
+
+                self.assertNotIn(1, representative_ids)
+                self.assertIn(2, representative_ids)
+            finally:
+                radar.DB_PATH = original_db
+
+
 if __name__ == "__main__":
     unittest.main()
