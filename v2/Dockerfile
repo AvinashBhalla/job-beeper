@@ -6,6 +6,7 @@ COPY v2/requirements.txt /app/v2/requirements.txt
 RUN pip install --no-cache-dir -r /app/v2/requirements.txt
 
 COPY v2 /app/v2
+COPY dashboard /app/dashboard
 RUN mkdir -p /data
 
 ENV JOB_RADAR_DB=/data/jobs.db
