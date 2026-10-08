@@ -592,7 +592,7 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     WHERE id=?
                 """, (
                     j["discovered_at"], j["source_posted_at"], j["posted_precision"],
-                    j["posted_precision"], j["discovery_latency_seconds"],
+                    j["posted_precision"],
                     j["description"], j["description"], existing[0]
                 ))
                 if not existing[1]:
