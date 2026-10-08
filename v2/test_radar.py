@@ -151,6 +151,27 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(method, "metadata_experience")
         self.assertTrue(auto_link_allowed(score, method))
 
+    def test_incompatible_experience_ranges_are_not_duplicate_candidates(self):
+        left = {
+            "company": "IBM",
+            "title": "Application Developer-Java & Web Technologies",
+            "location": "Bengaluru, Karnataka",
+            "url": "https://linkedin.com/jobs/view/123",
+            "description": "Application Developer-Java & Web Technologies",
+        }
+        right = {
+            "company": "IBM",
+            "title": "Application Developer-Java & Web Technologies",
+            "location": "Bengaluru, India",
+            "url": "https://naukri.com/job-listings/456",
+            "description": "5 to 7 years experience.",
+            "canonical_url": "",
+        }
+        score, method = canonical_match_score(left, right)
+        self.assertEqual(score, 0)
+        self.assertEqual(method, "none")
+        self.assertFalse(auto_link_allowed(score, method))
+
     def test_same_company_title_location_without_corroboration_is_not_auto_linked(self):
         left = {
             "company": "Acme Technologies",
