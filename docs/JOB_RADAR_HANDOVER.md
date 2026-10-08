@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (JD extraction hardening + today-only feed fix + test-file repair + updated suite pending Oracle re-run)
+**Last updated: 2026-10-08 (today-only regression semantics fixed; 43-test suite pending Oracle re-run)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -608,7 +608,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ BlueOptima-style LinkedIn JD extraction incident reproduced and JD retrieval/parser hardened for overall/total experience wording, JSON-LD, description selectors, HTML entities/non-breaking spaces and Unicode dash variants
 ✅ Corrupted direct test-file update repaired by restoring the last known-good 39-test suite and adding three focused JD-extraction regression tests
 ✅ V2 CI strengthened to run py_compile on both production/test Python and the full unittest suite, preventing structurally broken test files from reaching the branch undetected
-✅ Found and fixed a separate `/api/jobs?today_only=true` bug: the endpoint accepted the flag but previously ignored it, and `/api/opportunities` referenced an undefined `today_only` variable; today-only filtering is now explicitly driven by India-local midnight and covered by regression test
+✅ Found and fixed a separate `/api/jobs?today_only=true` bug: the endpoint accepted the flag but previously ignored it, and `/api/opportunities` referenced an undefined `today_only` variable; today-only filtering is now explicitly driven by India-local midnight and covered by regression tests
+✅ Fixed the first today-only regression test itself: it had moved only source posting timestamps across midnight while discovery timestamps remained current; the corrected test now moves `discovered_at` across IST midnight and verifies both `/api/jobs` and `/api/opportunities`
 ```
 
 ### Currently in progress
@@ -930,7 +931,7 @@ Corrective rule:
     → current India-local midnight cutoff
 ```
 
-The fix is now on `v2-live-radar` and a regression test covers the `/api/jobs` today-only behavior. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
+The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
 
 ### Observation 21 — The latest production alert diagnostic showed canonical duplication is controlled but not yet fully audited
 
