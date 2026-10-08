@@ -4,11 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (43-test suite green; hardened deployment verified against BlueOptima JD parsing)
+**Last updated: 2026-10-09 (43-test suite green; Agent-Reach experiment completed to decision point; authenticated bridge proven but real LinkedIn MCP tools still hang on Oracle)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by the current 43-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
+> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by the current 43-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and the Agent-Reach experiment has now been taken to a concrete decision point: authenticated Windows-to-Linux session bridging works, but real LinkedIn MCP tool execution remains unreliable on the Oracle VM, so Agent-Reach is parked and is not a V2 runtime dependency.
 
 ---
 
@@ -198,7 +198,6 @@ Problems included:
 V1 remains useful as reference/fallback only.
 
 Do not recreate the V1 architecture unless there is a specific, justified reason.
-
 ---
 
 ## 5. IMPORTANT SOURCE DECISIONS
@@ -218,18 +217,19 @@ Current approach:
 Current V2 LinkedIn freshness target:
 
 - poll every 60 seconds
-- fast lane scans `start=0` every poll with LinkedIn low-applicant filtering (`f_EA=true`) and a one-hour recency window
-- scan `start=0` on every poll
-- scan `start=10` as a deeper six-hour sweep every 5 minutes, without the low-applicant filter
-- run LinkedIn search requests concurrently with a bounded worker pool
-- fetch only plausible alert candidates for JD enrichment, also concurrently
+- fast lane searches `start=0` for **every configured query and location** on every poll
+- fast-lane recency is six hours (`f_TPR=r21600`)
+- every five minutes, the fast cycle also includes a deeper `start=10` scan
+- the fast lane does **not** use an Easy-Apply-only filter
+- LinkedIn search concurrency is bounded to 2 workers
+- plausible alert candidates are enriched concurrently with 4 detail workers
 - prefer the public LinkedIn guest job-detail endpoint for enrichment
 - parse one job per actual LinkedIn job-card link instead of iterating every nested `<li>`, preventing duplicate/nested-list explosions
+- persistent runtime query lists are repaired by config-version migration so stale `/data/config.json` query families cannot silently remove important role variants
 
-This is intended to reduce discovery lag without blindly multiplying request volume. The target is to make a newly surfaced LinkedIn posting reach the matcher/Telegram path within a few minutes under normal source behavior. Actual median/p95 latency must be measured from runtime logs before declaring that target met.
+This is intended to reduce discovery lag without blindly multiplying request volume. The target is to make a newly surfaced LinkedIn posting reach the matcher/Telegram path within a few minutes under normal source behavior. Actual latency must be measured from post-fix runtime observations before declaring the target met.
 
 LinkedIn direct collection from Oracle has been **proven**.
-
 ### Naukri
 
 Direct Naukri access from Oracle was abandoned after:
@@ -278,18 +278,52 @@ Repository defaults and the V2 runtime migration now make Instahyre opt-in. Conf
 
 Zero results or request errors must not automatically justify increasing polling or scraping volume.
 
-### Agent-Reach — future optimisation, not current dependency
+### Agent-Reach — experiment completed and parked
 
-The repository `Panniantong/agent-reach` was evaluated conceptually as a possible source-access optimisation.
+Agent-Reach was evaluated and then actually exercised on the Oracle VM so the project could make a decision from runtime evidence rather than documentation claims.
+
+Experiment environment:
+
+- Agent-Reach v1.5.0 installed in the isolated `~/.agent-reach-venv`
+- Agent-Reach was **not** installed into the Job Radar repository or V2 Docker image
+- LinkedIn MCP Server v4.26.2 was run through `uvx mcp-server-linkedin@4.26.2`
+- Lightweight TigerVNC + Openbox was used only to provide an X display for the headed browser on Oracle
+- Node.js 22.23.3 was installed with `nvm` for MCP Inspector tooling; the existing system Node runtime was not replaced
+
+Authentication experiment:
+
+1. A fresh `--login` from the Oracle datacenter browser stalled at LinkedIn's security-check page.
+2. LinkedIn login was completed successfully through the managed MCP browser on Windows.
+3. Windows `--status` confirmed a valid source session.
+4. The portable MCP session artifacts were transferred to Oracle.
+5. Oracle `--status` recognized the Windows-authenticated source as a foreign-runtime profile and prepared a fresh Linux bridge.
+
+End-to-end bridge result:
+
+- MCP `initialize` succeeded on Oracle.
+- `tools/list` succeeded and exposed LinkedIn job capabilities including `search_jobs` and `get_job_details`.
+- During the first real authenticated tool execution, the Linux browser was created successfully and imported 5 LinkedIn bridge cookies, including `li_at`.
+- The VNC browser visibly reached the authenticated LinkedIn feed.
+- Therefore **Windows authentication → portable session → Linux Chromium bridge → authenticated LinkedIn page is proven**.
+
+Failure boundary:
+
+- Real read-only MCP tool calls such as `get_my_profile` and `search_jobs` did not complete.
+- The MCP Inspector client timed out after 60 seconds, while the MCP server eventually hit its own 180-second tool timeout.
+- The server logged that the optional remember-me container did not appear, but the source code gives that selector check a bounded 3-second timeout and returns `False`; this is not sufficient evidence that the remember-me check itself is the root cause.
+- The remaining failure is therefore in the post-bridge browser/tool execution path (navigation/extraction/runtime interaction), and it was **not fully resolved** during the experiment.
+- After the failed tool execution, the browser was cleaned up, so it disappearing from VNC is expected.
 
 Decision:
 
-- **Do not replace the current V2 collectors with Agent-Reach now.**
-- Keep LinkedIn direct ingestion and the Naukri GitHub relay as the working production paths.
-- Revisit Agent-Reach after the V2 MVP is stable.
-- The first future experiment should benchmark it against the existing LinkedIn collector on freshness, job-detail quality, latency, failure/429 rate, and Oracle CPU/RAM impact.
-- Treat Naukri support as unverified until a real end-to-end Naukri retrieval test proves it.
-- Potential later use: generic web/ATS access for structured career sources, but source-specific adapters remain preferred where stable APIs exist.
+- **Do not integrate Agent-Reach or authenticated LinkedIn MCP into V2 production now.**
+- Do not replace the current LinkedIn guest collector because of this experiment.
+- Do not make Agent-Reach a scheduler, source, or runtime dependency.
+- Keep the isolated Oracle Agent-Reach environment available only for future controlled benchmarking.
+- Revisit only after core V2 MVP acceptance is complete, and preferably with a fresh upstream/runtime benchmark rather than continuing indefinite debugging on the current Oracle setup.
+
+The main learning is important: **Agent-Reach can solve access/authentication mechanics, but that does not prove fast, reliable production job acquisition. Source completeness, tool reliability, latency, rate-limit behavior, and resource cost still need empirical validation.**
+
 ### Future ATS sources
 
 The product should progressively prioritize structured/source-specific adapters such as:
@@ -397,8 +431,7 @@ The V2 runtime configuration layer is now implemented in the repository.
 
 The frontend must allow the user to configure, without editing Python:
 
-- target roles
-- keywords
+- target roles- keywords
 - skills
 - locations
 - remote preference
@@ -521,6 +554,18 @@ V2 container is running:
 
 The deployed service is verified through its root redirect and V2 APIs. There is no `/api/health` endpoint in the current implementation; `/` redirects to `/dashboard/`.
 
+### Agent-Reach experiment runtime (isolated)
+
+Agent-Reach is not part of the V2 Docker runtime. The Oracle experiment used:
+
+- `~/.agent-reach-venv`
+- `uvx mcp-server-linkedin@4.26.2`
+- TigerVNC + Openbox only to provide a private X display
+- Node.js 22 via `nvm` for MCP Inspector tooling
+
+No Agent-Reach process, browser session, or credentials are required by the production V2 service.
+
+
 ### Naukri systemd scheduler
 
 The following units exist:
@@ -597,8 +642,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ LinkedIn freshness acceleration implemented: 60-second fast polling, bounded concurrency, five-minute deeper pagination, bounded concurrent JD enrichment
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs disable unverified Instahyre
-✅ Canonical opportunity schema and conservative cross-source linking implemented
-✅ Canonical opportunity API and dedupe diagnostics implemented
+✅ Canonical opportunity schema and conservative cross-source linking implemented✅ Canonical opportunity API and dedupe diagnostics implemented
 ✅ Persistent job evaluation state with score/reasons/experience/alertability
 ✅ Persistent notification ledger per canonical opportunity
 ✅ Telegram claim/retry/recovery path implemented
@@ -626,26 +670,33 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Corrected the today-only regression test after discovering the restored version had not actually moved `discovered_at` across IST midnight; the production contract remains correct and the test now models it correctly
 ✅ Found and fixed a separate `/api/jobs?today_only=true` bug: the endpoint accepted the flag but previously ignored it, and `/api/opportunities` referenced an undefined `today_only` variable; today-only filtering is now explicitly driven by India-local midnight and covered by regression tests
 ✅ Fixed the first today-only regression test itself: it had moved only source posting timestamps across midnight while discovery timestamps remained current; the corrected test now moves `discovered_at` across IST midnight and verifies both `/api/jobs` and `/api/opportunities`
+✅ Agent-Reach v1.5.0 evaluated in an isolated Oracle environment without coupling it to V2 production
+✅ LinkedIn MCP v4.26.2 authenticated session bridge proven end-to-end from Windows source session to Oracle Linux Chromium
+✅ MCP initialization and tool discovery proven on Oracle; `search_jobs` / `get_job_details` exposed
+✅ Agent-Reach experiment stopped at the real-tool execution boundary because authenticated read operations still hang; integration is deliberately parked rather than promoted to production
 ```
 
 ### Currently in progress
 
-> **MVP implementation status:** Core V2 MVP development is complete. Remaining work is acceptance validation and bug fixing only; new feature development should wait for MVP sign-off.
+> **MVP implementation status:** Core V2 implementation is feature-complete. Remaining work is acceptance validation, operational hardening and bug fixing only. Agent-Reach is parked and is not part of MVP delivery.
 
 ```
-✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
-⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
-✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
-⏳ MVP blocker: make LinkedIn experience acquisition reliable for poster-added requirements, or enforce explicit-experience-only Telegram alerts until a reliable source-access path exists
-⏳ Re-test LinkedIn freshness after the role-query coverage correction and measure 429 rate / discovery lag
-⏳ Manual acceptance test: measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Manual acceptance test: classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
-⏳ Manual acceptance test: validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
-⏳ Manual acceptance test: validate restart/recovery behavior with persisted config, evaluations and notification ledger
-⏳ Manual acceptance test: finish browser verification of the live dashboard against real V2 API data
-⏳ Post-MVP enhancement: complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
-⏳ Manual acceptance test: validate source-health UI and remaining convenience features
+✅ Latest V2 code path uses a 60-second LinkedIn fast poll, six-hour fast/deep recency, full query/location coverage, 2 bounded search workers and 4 JD-detail workers
+✅ Persistent runtime config is version 5 with expanded LinkedIn/Naukri query families and Instahyre disabled
+✅ Naukri relay fetch has bounded retries for transient 404/429/5xx conditions
+✅ 43-test V2 Docker regression suite is green on the hardened branch
+✅ BlueOptima-style 5–7-year JD extraction is hardened and verified at the parser/evaluation layer
+✅ Agent-Reach/authenticated LinkedIn experiment completed to a decision point and deliberately parked
+⏳ Re-test LinkedIn freshness using a short post-fix window and measure discovery-age distribution plus 429/failure rate
+⏳ Verify Naukri relay reliability across several normal five-minute cycles after the transient-404 retry change
+⏳ Manual acceptance: measure true end-to-end alert latency from source discovery through evaluation/JD enrichment/queue/Telegram
+⏳ Manual acceptance: classify currently non-sent matching opportunities and verify canonical-level notification decisions
+⏳ Manual acceptance: validate runtime configuration changes from frontend/API through reevaluation and notification reconsideration
+⏳ Manual acceptance: validate restart/recovery with persisted config, evaluations and notification ledger
+⏳ Manual acceptance: finish browser verification of the live dashboard against real V2 API data
+⏳ Manual acceptance: validate source-health UI and remaining convenience features
 ⏳ Final V2 MVP sign-off after manual acceptance checks pass
+⏸️ Agent-Reach: no further debugging during MVP; revisit only for controlled post-MVP benchmarking
 ```
 ### V1 status
 
@@ -677,7 +728,7 @@ Do not interpret source-row count as alert count.
 
 ### Step C — Measure end-to-end alert latency and LinkedIn freshness
 
-Measure both alert latency and source freshness:
+Measure both alert latency and source freshness (the current API exposes p50/p90/max source-discovery latency):
 
 ```
 source posting
@@ -689,7 +740,7 @@ source posting
  → Telegram send
 ```
 
-Record median and p95 latency.
+Record median, p90 and max latency.
 
 ### Step D — Validate runtime configuration + recovery
 
@@ -703,9 +754,9 @@ Validate live refresh, current-day feed, daily counters, filters/settings, job d
 
 Define material changes including experience requirements, description/requirements, location/work mode and application URL changes, then reconsider without duplicate alerts.
 
-### Step G — Source-access optimisation evaluation
+### Step G — Keep Agent-Reach parked during MVP acceptance
 
-Only after the core V2 path is stable, benchmark Agent-Reach against the current LinkedIn collector for freshness, detail quality, latency, 429/failure rate and Oracle resource usage.
+The initial Agent-Reach experiment is complete enough to make the current decision. Do not spend more MVP time debugging the authenticated MCP browser path. After V2 sign-off, a new controlled benchmark may compare Agent-Reach/LinkedIn MCP against the guest collector for freshness, JD completeness, latency, 429/failure rate, session reliability and Oracle resource usage.
 
 ### Step H — MVP sign-off
 
@@ -797,7 +848,6 @@ The next gate is measured runtime latency, not merely a shorter configured inter
 ### Observation 4 — Real cross-source overlap is currently ambiguous, not safely deduplicable
 
 The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source candidates, with 0 auto-link candidates. The observed same-title/company/location examples include materially different explicit experience ranges, so the system correctly keeps them separate.
-
 ### Observation 5 — Daily feed reset is a presentation lifecycle, not data deletion
 
 The active user-facing feed resets at India local midnight. Historical job observations remain in SQLite so deduplication, notification history and auditability are not lost. The API now exposes a current-day feed and daily summary without deleting historical data.
@@ -997,8 +1047,7 @@ Do not treat the current branch's merged PR as evidence that a full visual redes
 A real Telegram alert for ReqPedia's `Full Stack Engineer` posting showed approximately:
 
 ```
-Posted:     6:28 PM IST
-Discovered: 7:28 PM IST
+Posted:     6:28 PM ISTDiscovered: 7:28 PM IST
 ```
 
 The LinkedIn browser page showed the posting at about one hour old with over 100 applicants. This is outside the intended freshness goal for the radar.
@@ -1082,19 +1131,34 @@ The daily notification ledger currently contains 785 rows for the day:
 The daily summary reports 1,070 jobs discovered, 52 matched, 52 alertable and 43 alerts sent. These are different layers and must not be conflated: source jobs, evaluations and canonical notification records represent different units of measurement.
 
 
-### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
+### Observation 19 — Agent-Reach was taken from theory to a controlled runtime experiment
 
-Agent-Reach may reduce the amount of bespoke web-access code for some future sources, particularly LinkedIn or generic web/ATS discovery.
+The project did not stop at documentation-level evaluation. Agent-Reach v1.5.0 plus LinkedIn MCP v4.26.2 were actually exercised on Oracle.
 
-It is deliberately parked until:
+The experiment proved the authentication bridge path:
 
-- current ingestion/matching/alerting is stable
-- alert latency and dedupe are measured
-- resource impact on the tiny Oracle VM is understood
+```
+Windows authenticated LinkedIn session
+        ↓
+portable MCP source session
+        ↓
+Oracle foreign-runtime bridge
+        ↓
+Linux Patchright Chromium
+        ↓
+LinkedIn authenticated feed
+```
 
-Do not introduce it into production source flow merely because it supports more platforms on paper.
+The experiment then failed at the next boundary: real MCP read operations such as `get_my_profile` and `search_jobs` hung until the server-side 180-second tool timeout.
 
----
+The source inspection also showed the logged "remember-me container did not appear in time" message is only a bounded 3-second selector wait that returns `False`; it should not be treated as the proven root cause. The exact post-bridge navigation/extraction hang remains unresolved.
+
+Product conclusion:
+
+- Authentication portability is feasible.
+- Agent-Reach does **not** currently provide a reliable production LinkedIn acquisition path on this Oracle environment.
+- This experiment is enough evidence to park the integration rather than spend more MVP time debugging it.
+- The correct future evaluation is a controlled benchmark against the existing collector, not a production replacement motivated by platform breadth alone.
 
 ## 15. WHAT NOT TO DO
 
@@ -1198,7 +1262,6 @@ DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
 Ambiguous cross-source overlap stays separate.
 Do not count source rows as distinct alerts.
-
 FRONTEND:
 Dashboard uses V2 APIs and can target the deployed Oracle API during local development.
 Friend's frontend work remains in progress; browser/product verification is still required.
@@ -1207,11 +1270,11 @@ V1:
 Legacy job-watch Telegram workflow is inactive/disabled.
 
 AGENT-REACH:
-Parked as a future source-access optimisation.
-Do not make it a runtime dependency until the core V2 MVP is stable and benchmarked.
+Experiment completed. Windows-authenticated session → Oracle foreign-runtime browser bridge works, but real LinkedIn MCP read tools still hang on Oracle. Parked; not a V2 dependency.
+Do not resume during MVP acceptance.
 
 NEXT:
-Deploy JD hardening → verify 5–7-year extraction end-to-end → verify canonical alert counts → measure end-to-end latency → validate config persistence/recovery → finish frontend verification → changed-opportunity detection → MVP sign-off → benchmark Agent-Reach and expand sources.
+Verify post-fix LinkedIn freshness/429 behavior → verify Naukri relay reliability → verify canonical alert counts → measure end-to-end latency → validate config persistence/recovery → finish frontend verification → changed-opportunity detection → MVP sign-off → only then benchmark Agent-Reach and expand sources.
 ```
 
 ## 18. SOURCE OF TRUTH HIERARCHY
@@ -1398,7 +1461,6 @@ The repository and this file should be kept in sync deliberately.
 - Next Oracle action after CI passes: rebuild the container again so the v4 migration and reduced-burst LinkedIn collector become active. Then inspect `/api/config` to confirm Instahyre is false and inspect LinkedIn source runs/latency over several fresh postings.
 
 ## Critical LinkedIn Delay Root Cause — 2026-10-08
-
 - Manual acceptance found a severe case: Infosys `AI-Driven - Full Stack Engineer` was shown by LinkedIn as posted around 6:13 PM IST but was first discovered/alerted around 11:13 PM IST.
 - Runtime `/data/config.json` exposed the root cause: although repository `v2/config.json` had the broadened LinkedIn query families, the persistent runtime configuration had an older narrowed set that did not include `full stack engineer`, `react engineer`, `python engineer`, `frontend engineer`, `backend engineer`, or other required variants. Therefore the live Oracle collector was not actually searching the same query vocabulary as the repository.
 - The alert was delayed because the posting did not enter the fast lane through the missing query variant; the slower/deeper scan eventually found it. The timestamp gap therefore represented a real acquisition/coverage failure, not a Telegram delivery delay.
@@ -1417,3 +1479,58 @@ The repository and this file should be kept in sync deliberately.
 - CI is green for the Naukri retry change.
 - Next validation should use `/api/latency-summary?hours=1` after several fresh LinkedIn cycles and compare new Telegram alerts against dashboard jobs. Do not use the 24-hour aggregate as the post-fix SLA baseline.
 - Platform expansion remains blocked until this short-window freshness check and LinkedIn experience acquisition are validated.
+## 31. AGENT-REACH EXPERIMENT — FINAL LEARNING & HANDOVER
+
+This section records the exact decision boundary so a future agent does not repeat the same setup from scratch.
+
+### What was proven
+
+- Agent-Reach can be installed and kept completely isolated from the Job Radar repository.
+- LinkedIn MCP v4.26.2 can create a valid authenticated source session on Windows.
+- That session can be recognized on Linux as a foreign-runtime source profile.
+- Oracle can create the Linux Patchright Chromium runtime from that foreign profile.
+- The bridge can import the required LinkedIn cookies, including `li_at`.
+- The bridged browser can visibly reach the authenticated LinkedIn feed in VNC.
+- MCP HTTP transport, `initialize`, and `tools/list` all work.
+
+### What was not proven
+
+- `get_my_profile` did not complete.
+- `search_jobs` did not complete.
+- Therefore reliable authenticated LinkedIn job acquisition through the MCP tool layer is **not proven**.
+
+### Why this matters to Job Radar
+
+The original reasons for exploring Agent-Reach were speed, richer authenticated JD content, future source coverage and reduced bespoke scraping. The experiment only established the access/authentication half. It did **not** establish the operational half needed by a continuously running job radar: predictable tool latency, robust navigation/extraction, controlled request volume, and stable long-running sessions on the small Oracle VM.
+
+### Decision
+
+```
+CURRENT V2 COLLECTORS
+    ↓
+remain production
+
+AGENT-REACH / LINKEDIN MCP
+    ↓
+parked after controlled experiment
+    ↓
+revisit only post-MVP via benchmark
+```
+
+Do not modify `main` or `v2-live-radar` source ingestion code solely because of this experiment. The production LinkedIn collector remains the guest/API-style collector already implemented in V2, and Naukri remains the GitHub relay path.
+
+### Future benchmark, when justified
+
+A future benchmark should compare the two paths over the same controlled time window and record:
+
+- fresh-job discovery latency
+- JD completeness, especially poster-added experience requirements
+- tool failure/timeout rate
+- LinkedIn 429/failure frequency
+- duplicate rate
+- session persistence/re-authentication frequency
+- CPU/RAM impact on Oracle
+- number of source requests per useful job
+
+Only a measured win should justify replacing or augmenting the production collector.
+
