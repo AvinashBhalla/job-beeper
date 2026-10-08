@@ -14,6 +14,7 @@ import time
 import warnings
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
@@ -214,8 +215,17 @@ def authorize_config_update(provided_token: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid or missing X-Config-Token.")
 
 
+IST = ZoneInfo("Asia/Kolkata")
+
+
 def now() -> dt.datetime:
     return dt.datetime.now(UTC)
+
+
+def current_day_start_utc() -> dt.datetime:
+    local_now = now().astimezone(IST)
+    local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return local_midnight.astimezone(UTC)
 
 
 def iso(value: dt.datetime | None) -> str | None:
@@ -1571,7 +1581,9 @@ def dedupe_candidates(limit: int = 100):
 def opportunities(minutes: int = 60, limit: int = 100):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
-    cutoff = iso(now() - dt.timedelta(minutes=minutes))
+    cutoff = iso(current_day_start_utc()) if today_only else iso(
+        now() - dt.timedelta(minutes=minutes)
+    )
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
@@ -1600,7 +1612,7 @@ def opportunities(minutes: int = 60, limit: int = 100):
 
 
 @app.get("/api/jobs")
-def jobs(minutes: int = 60, limit: int = 100):
+def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
     config = get_config()
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
@@ -1702,6 +1714,45 @@ def opportunity_detail(opportunity_id: int):
     return {
         "opportunity": dict(opportunity),
         "observations": [dict(row) for row in observations],
+    }
+
+
+@app.get("/api/daily-summary")
+def daily_summary():
+    cutoff = iso(current_day_start_utc())
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        total = conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE discovered_at >= ?", (cutoff,)
+        ).fetchone()[0]
+        matched = conn.execute("""
+            SELECT COUNT(*)
+            FROM jobs j
+            JOIN job_evaluations e ON e.job_id=j.id
+            WHERE j.discovered_at >= ? AND e.match=1
+        """, (cutoff,)).fetchone()[0]
+        alertable = conn.execute("""
+            SELECT COUNT(*)
+            FROM jobs j
+            JOIN job_evaluations e ON e.job_id=j.id
+            WHERE j.discovered_at >= ? AND e.alertable=1
+        """, (cutoff,)).fetchone()[0]
+        alerted = conn.execute("""
+            SELECT COUNT(*)
+            FROM notification_ledger nl
+            JOIN jobs j ON j.id=nl.candidate_job_id
+            WHERE j.discovered_at >= ? AND nl.status='sent'
+        """, (cutoff,)).fetchone()[0]
+
+    local_now = now().astimezone(IST)
+    return {
+        "date": local_now.strftime("%Y-%m-%d"),
+        "timezone": "Asia/Kolkata",
+        "total_jobs_discovered": total,
+        "matched_jobs": matched,
+        "alertable_jobs": alertable,
+        "alerts_sent": alerted,
+        "resets_at_local_midnight": True,
     }
 
 
