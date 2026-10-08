@@ -581,6 +581,9 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     _assign_canonical(conn, int(existing[0]))
                 _persist_job_evaluation(conn, int(existing[0]), config)
             else:
+                if j.get("needs_jd_enrichment"):
+                    j = enrich_linkedin_job(j)
+
                 cur = conn.execute("""
                     INSERT INTO jobs (
                         source, source_job_id, company, title, location, url,
@@ -918,6 +921,87 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
 
 
 
+def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
+    raw = str(text or "").strip()
+    if not raw:
+        return None, None
+
+    # Prefer lines/sentences that explicitly mention experience. LinkedIn job
+    # pages can contain several unrelated numeric values, so avoid aggregating
+    # every number across the whole page.
+    chunks = [
+        chunk.strip()
+        for chunk in re.split(r"(?<=[.!?])\s+|\n+|•", raw)
+        if chunk.strip()
+    ]
+    priority = [chunk for chunk in chunks if re.search(r"\bexperience\b", chunk, re.I)]
+    for chunk in priority + chunks:
+        result = extract_experience(chunk)
+        if result != (None, None):
+            return result
+    return None, None
+
+
+def _linkedin_job_description(url: str) -> str:
+    try:
+        response = requests.get(
+            url,
+            headers={**UA, "Accept": "text/html,application/xhtml+xml"},
+            timeout=15,
+        )
+        if response.status_code != 200:
+            return ""
+    except requests.RequestException:
+        return ""
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    selectors = (
+        "div.show-more-less-html__markup",
+        "div.description__text",
+        "section.show-more-less-html",
+        "div.decorated-job-posting__details",
+        "main",
+    )
+
+    for selector in selectors:
+        nodes = soup.select(selector)
+        if not nodes:
+            continue
+        text = " ".join(node.get_text(" ", strip=True) for node in nodes)
+        text = re.sub(r"\s+", " ", text).strip()
+        if text:
+            return text[:20000]
+
+    return ""
+
+
+def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
+    if job.get("source") != "linkedin":
+        return job
+
+    combined = f"{job.get('title', '')} {job.get('description', '')}"
+    if extract_experience(combined) != (None, None):
+        return job
+
+    detail = _linkedin_job_description(job.get("url", ""))
+    if not detail:
+        job.pop("needs_jd_enrichment", None)
+        return job
+
+    detail_experience = extract_jd_experience(detail)
+    if detail_experience == (None, None):
+        return job
+
+    existing_description = job.get("description") or ""
+    job["description"] = (
+        f"{existing_description} JD: {detail}".strip()
+    )[:30000]
+    job["jd_experience_min_years"] = detail_experience[0]
+    job["jd_experience_max_years"] = detail_experience[1]
+    job.pop("needs_jd_enrichment", None)
+    return job
+
+
 def extract_experience(text: str) -> tuple[float | None, float | None]:
     raw = str(text or "").lower().replace("–", "-").replace("—", "-")
     raw = re.sub(r"\s+", " ", raw).strip()
@@ -1133,14 +1217,17 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     ) else "date"
                     if not posted_at and posted and posted.get("datetime"):
                         posted_at = parse_relative(posted.get("datetime"))
-                    jobs.append(normalize_job(
-                        "linkedin", source_id,
-                        company.get_text(" ", strip=True) if company else "",
-                        title.get_text(" ", strip=True),
-                        loc.get_text(" ", strip=True) if loc else "",
-                        url, posted_at, precision,
-                        card.get_text(" ", strip=True),
-                    ))
+                    jobs.append({
+                        **normalize_job(
+                            "linkedin", source_id,
+                            company.get_text(" ", strip=True) if company else "",
+                            title.get_text(" ", strip=True),
+                            loc.get_text(" ", strip=True) if loc else "",
+                            url, posted_at, precision,
+                            card.get_text(" ", strip=True),
+                        ),
+                        "needs_jd_enrichment": True,
+                    })
                 if len(cards) < 10:
                     break
     return jobs
