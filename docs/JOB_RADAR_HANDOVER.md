@@ -548,7 +548,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Canonical persistence/backfill regression tests added
 ✅ Conservative dedupe rule: auto-link only strong evidence; ambiguous metadata stays separate
 ✅ Cross-source dedupe diagnostic endpoint added for real LinkedIn/Naukri overlap validation
-✅ Dedupe diagnostic optimized to group by normalized company before pair comparison
+✅ Dedupe diagnostic optimized to group by normalized company/title identity before pair comparison
 ✅ Same-source canonical auto-linking disabled except exact canonical URL evidence
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
@@ -558,7 +558,7 @@ The system is therefore **ingesting real jobs continuously**.
 
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
-⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (optimized query path)
+⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
 ⏳ Validate rebuilt canonical groups and identify safe high-confidence cross-source merge signals
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
@@ -937,7 +937,7 @@ Must alert only on new + relevant + eligible + deduplicated jobs.
 
 DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
-Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened.
+Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened. The diagnostic now compares only shared normalized company/title families, avoiding expensive broad pair scans.
 
 FRONTEND:
 Repository dashboard now uses V2 local APIs.
