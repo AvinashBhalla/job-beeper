@@ -177,6 +177,28 @@ class MatcherTests(unittest.TestCase):
         finally:
             module.requests.post = original_post
 
+    def test_rejected_new_opportunity_is_suppressed(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-rejected", "Acme", "Senior Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/rejected", None,
+                    "unknown", "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT status, decision_reason_json FROM notification_ledger"
+                    ).fetchone()
+                self.assertEqual(row[0], "suppressed")
+                self.assertIn("no profile-matching observation", row[1])
+            finally:
+                radar.DB_PATH = original_db
+
     def test_alertable_new_opportunity_moves_to_queue(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
