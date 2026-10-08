@@ -50,6 +50,7 @@ app = FastAPI(title="Job Radar V2", version="2.0.0")
 db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
+linkedin_last_deep_scan_at: str | None = None
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -1240,8 +1241,9 @@ def _linkedin_search_page(query: str, location: str, start: int) -> list[dict[st
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    global linkedin_last_deep_scan_at
     jobs: list[dict[str, Any]] = []
-    last_deep = source_state.get("linkedin", {}).get("last_deep_scan_at")
+    last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
     do_deep = (
         last_deep_at is None
@@ -1267,7 +1269,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 log.warning("linkedin page request failed: %r", exc)
 
     if do_deep:
-        source_state.setdefault("linkedin", {})["last_deep_scan_at"] = iso(now())
+        linkedin_last_deep_scan_at = iso(now())
 
     unique_jobs: dict[str, dict[str, Any]] = {
         job["source_job_id"]: job for job in jobs
