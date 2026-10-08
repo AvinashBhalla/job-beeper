@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -49,6 +50,20 @@ LINKEDIN_FAST_TPR = "r3600"
 LINKEDIN_DEEP_TPR = "r21600"
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
+
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("JOB_RADAR_CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "PUT", "OPTIONS"],
+    allow_headers=["*"],
+)
 db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
