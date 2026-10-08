@@ -4,11 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (today-only regression test corrected; 43-test suite pending final Oracle re-run)
+**Last updated: 2026-10-08 (43-test suite green in Docker; V2 container recreated on Oracle)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by a 39-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
+> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by the current 43-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
 
 ---
 
@@ -364,7 +364,7 @@ That is intentional and configurable.
 The full V2 Docker regression suite now has:
 
 ```
-39 tests — ALL GREEN
+43 tests — ALL GREEN
 ```
 
 Important regression cases now include:
@@ -467,7 +467,7 @@ Current repository direction:
 - source health reads from /api/source-status
 - V2 runtime serves the dashboard directly
 
-Deployment/browser verification is still pending.
+Oracle deployment is now complete; browser/product verification remains pending.
 
 ---
 
@@ -600,8 +600,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher role-family aliases added for Software Engineer / Software Development Engineer / SDE variants
 ✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
 ✅ Unknown experience made neutral for matching while alertability remains a separate policy
-✅ Regression suite baseline expanded to 39 tests; Docker execution was green before the latest JD-hardening change
-⏳ Updated suite is now restored to the expected 43 tests (39 baseline + 3 JD-hardening tests + 1 today-only feed test); must be re-run in Docker before declaring the latest milestone green
+✅ V2 regression suite expanded to 43 tests; Docker execution is now green after JD-hardening and today-only feed coverage
+✅ Updated 43-test suite passes in Docker (39 baseline + 3 JD-hardening tests + 1 today-only feed test)
 ✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
 ✅ Repository .gitignore now ignores Python __pycache__ artifacts
 ✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
@@ -617,7 +617,7 @@ The system is therefore **ingesting real jobs continuously**.
 ### Currently in progress
 
 ```
-⏳ Pull the latest GitHub commits onto Oracle, run the restored updated suite (expected 43 tests), then deploy the hardened LinkedIn JD extraction/retrieval and today-only feed fixes
+✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
 ⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
@@ -634,9 +634,9 @@ The system is therefore **ingesting real jobs continuously**.
 The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
 
-### Step A — Deploy and verify hardened LinkedIn JD extraction
+### Step A — Verify hardened LinkedIn JD extraction end-to-end
 
-Pull the latest v2-live-radar commits onto Oracle, rebuild/recreate the V2 container and verify a real LinkedIn posting whose browser JD explicitly states:
+With the latest container running, verify a real LinkedIn posting whose browser JD explicitly states:
 
 ```
 5 to 7 years of overall software engineering experience
