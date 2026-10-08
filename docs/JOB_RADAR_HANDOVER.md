@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Twenty-eight matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
+✅ Twenty-nine matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -584,6 +584,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ First real V2 job alerts delivered to Telegram: 3 opportunities sent successfully
 ✅ Configure Telegram credentials on Oracle and send one real Telegram integration test
 ⏳ Validate the new LinkedIn JD experience enrichment on Oracle against a newly discovered job
+✅ Telegram timestamp formatting verified: human-readable IST
 ⏳ Validate real job alert delivery after enabling unknown-experience alerts
 ```
 
@@ -642,7 +643,7 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented and regression-tested. The matcher/dedupe suite currently contains twenty-one tests, and the latest Oracle deployment run passed all of them.**
+**Partially implemented and regression-tested. The matcher/dedupe suite currently contains twenty-nine tests, and the latest Oracle deployment run passed all of them.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
