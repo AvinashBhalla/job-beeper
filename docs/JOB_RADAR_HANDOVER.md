@@ -548,6 +548,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Canonical persistence/backfill regression tests added
 ✅ Conservative dedupe rule: auto-link only strong evidence; ambiguous metadata stays separate
 ✅ Cross-source dedupe diagnostic endpoint added for real LinkedIn/Naukri overlap validation
+✅ Dedupe diagnostic optimized to group by normalized company before pair comparison
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
 
@@ -555,7 +556,7 @@ The system is therefore **ingesting real jobs continuously**.
 
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
-⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates`
+⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (optimized query path)
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
 
