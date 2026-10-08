@@ -1299,15 +1299,72 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
     score = 20
     reasons.append("target location")
 
+    normalized_title = normalize_phrase(title)
+    configured_roles = {
+        normalize_phrase(role): role
+        for role in config.get("target_roles", [])
+    }
+
     title_role_hits = phrase_hits(config.get("target_roles", []), title)
     role_hits = title_role_hits
     role_source = "title"
+
+    # Common equivalent naming used by job portals:
+    # Software Engineer ~= Software Development Engineer ~= SDE
+    software_engineer_targeted = (
+        "software engineer" in configured_roles
+        or "software developer" in configured_roles
+    )
+
+    if not role_hits and software_engineer_targeted:
+        if re.search(
+            r"\bsoftware development engineer(?:\s+(?:[ivx]+|\d+))?\b",
+            normalized_title,
+        ) or re.search(
+            r"\bsde(?:\s+(?:[ivx]+|\d+))?\b",
+            normalized_title,
+        ):
+            role_hits = [
+                configured_roles.get("software engineer", "software engineer")
+            ]
+
+    # Full-stack spelling variants.
+    if not role_hits:
+        full_stack_targeted = (
+            "full stack developer" in configured_roles
+            or "full stack engineer" in configured_roles
+        )
+        if full_stack_targeted and re.search(
+            r"\bfull[- ]?stack\s+(?:developer|engineer)\b",
+            normalized_title,
+        ):
+            role_hits = [
+                configured_roles.get(
+                    "full stack developer",
+                    configured_roles.get(
+                        "full stack engineer",
+                        "full stack developer",
+                    ),
+                )
+            ]
+
+    # A configured skill plus a generic developer/engineer title is a valid
+    # role-family signal. Example: "Javascript Developer".
+    if not role_hits:
+        generic_title = bool(
+            re.search(r"\b(?:developer|engineer)\b", normalized_title)
+        )
+        title_skill_hits = phrase_hits(config.get("skills", []), title)
+
+        if generic_title and title_skill_hits:
+            role_hits = [f"{title_skill_hits[0]} developer"]
+
     if not role_hits:
         role_hits = phrase_hits(config.get("target_roles", []), description)
         role_source = "description"
 
     if role_hits:
-        role_bonus = 30 if role_source == "title" else 25
+        role_bonus = 35 if role_source == "title" else 30
         score += role_bonus
         reasons.append(f"role ({role_source}): {role_hits[0]}")
     else:
@@ -1326,20 +1383,34 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
     if exp_min is not None or exp_max is not None:
         effective_min = exp_min if exp_min is not None else exp_max
 
-        if candidate_years is not None and effective_min is not None and effective_min > float(candidate_years):
+        if (
+            candidate_years is not None
+            and effective_min is not None
+            and effective_min > float(candidate_years)
+        ):
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [f"experience minimum {effective_min:g} exceeds candidate {float(candidate_years):g} years"],
+                "reasons": [
+                    f"experience minimum {effective_min:g} exceeds "
+                    f"candidate {float(candidate_years):g} years"
+                ],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
 
-        if minimum_job_years is not None and exp_max is not None and exp_max < float(minimum_job_years):
+        if (
+            minimum_job_years is not None
+            and exp_max is not None
+            and exp_max < float(minimum_job_years)
+        ):
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [f"job maximum experience {exp_max:g} is below configured minimum {float(minimum_job_years):g} years"],
+                "reasons": [
+                    f"job maximum experience {exp_max:g} is below "
+                    f"configured minimum {float(minimum_job_years):g} years"
+                ],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
@@ -1348,19 +1419,35 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [f"experience range exceeds configured maximum of {max_years:g} years"],
+                "reasons": [
+                    f"experience range exceeds configured maximum "
+                    f"of {max_years:g} years"
+                ],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
 
         score += 15
-        experience_label = f"{effective_min:g}" + (f"-{exp_max:g}" if exp_max is not None else "+")
-        candidate_label = f"{float(candidate_years):g} years" if candidate_years is not None else "configured profile"
-        reasons.append(f"experience compatible: candidate {candidate_label}; job {experience_label}")
+        experience_label = (
+            f"{effective_min:g}"
+            + (f"-{exp_max:g}" if exp_max is not None else "+")
+        )
+        candidate_label = (
+            f"{float(candidate_years):g} years"
+            if candidate_years is not None
+            else "configured profile"
+        )
+        reasons.append(
+            f"experience compatible: candidate {candidate_label}; "
+            f"job {experience_label}"
+        )
     else:
+        # Unknown experience is neutral for matching. The separate
+        # alertability policy decides whether it can generate an alert.
         reasons.append("experience not stated in captured source data")
 
     threshold = int(config.get("match_threshold", 55))
+
     return {
         "match": score >= threshold and bool(role_hits),
         "score": min(score, 100),

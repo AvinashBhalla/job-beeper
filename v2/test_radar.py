@@ -45,6 +45,66 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 
 class MatcherTests(unittest.TestCase):
+
+    def test_software_development_engineer_variant_matches(self):
+        config = {
+            **BASE_CONFIG,
+            "require_explicit_experience_for_alerts": False,
+        }
+        details = match_details(
+            make_job(
+                "Software Development Engineer 2",
+                "",
+                "Bengaluru, Karnataka, India",
+            ),
+            config,
+        )
+        self.assertTrue(details["match"])
+        self.assertGreaterEqual(details["score"], 55)
+        self.assertIn("software engineer", " ".join(details["reasons"]).lower())
+
+    def test_javascript_developer_matches_from_skill_plus_title(self):
+        config = {
+            **BASE_CONFIG,
+            "target_roles": ["software engineer", "software developer"],
+            "skills": ["javascript", "python"],
+            "require_explicit_experience_for_alerts": False,
+        }
+        details = match_details(
+            make_job(
+                "Javascript Developer",
+                "",
+                "Delhi, India",
+            ),
+            {
+                **config,
+                "locations": ["Delhi, India"],
+            },
+        )
+        self.assertTrue(details["match"])
+        self.assertGreaterEqual(details["score"], 55)
+        self.assertIn("javascript", " ".join(details["reasons"]).lower())
+
+    def test_unknown_experience_does_not_block_direct_role_match(self):
+        config = {
+            **BASE_CONFIG,
+            "require_explicit_experience_for_alerts": False,
+        }
+        details = match_details(
+            make_job(
+                "Software Engineer",
+                "",
+                "Bengaluru, Karnataka, India",
+            ),
+            config,
+        )
+        self.assertTrue(details["match"])
+        self.assertGreaterEqual(details["score"], 55)
+        self.assertIn(
+            "experience not stated",
+            " ".join(details["reasons"]).lower(),
+        )
+
     def test_database_links_strong_cross_source_duplicate(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH

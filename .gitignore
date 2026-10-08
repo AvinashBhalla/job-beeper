@@ -1,3 +1,4 @@
 .playwright-profile/
 playwright/artifacts/
 .env
+__pycache__/
