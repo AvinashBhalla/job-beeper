@@ -74,7 +74,7 @@
     "workflow",
     "orchestration"
   ],
-  "candidate_experience_years": 2.0,
+  "candidate_experience_years": 2,
   "match_threshold": 55,
   "title_exclude": [
     "senior",
@@ -92,7 +92,7 @@
     "vp",
     "vice president"
   ],
-  "max_experience_years": 3.0,
+  "max_experience_years": 3,
   "remote_only": false,
   "min_experience_years": null,
   "max_age_hours": 72,
@@ -104,5 +104,5 @@
     "naukri": true,
     "instahyre": false
   },
-  "config_version": 3
+  "config_version": 4
 }
