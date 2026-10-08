@@ -608,18 +608,20 @@ The system is therefore **ingesting real jobs continuously**.
 
 ### Currently in progress
 
+> **MVP implementation status:** Core V2 MVP development is complete. Remaining work is acceptance validation and bug fixing only; new feature development should wait for MVP sign-off.
+
 ```
 ✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
 ✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
-⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
-⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
-⏳ Validate restart/recovery behavior with persisted config, evaluations and notification ledger
-⏳ Finish browser verification of the live dashboard against real V2 API data
-⏳ Complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
-⏳ Validate source-health UI and remaining convenience features
-⏳ Final V2 MVP sign-off after latency, dedupe, config persistence/recovery and frontend verification
+⏳ Manual acceptance test: measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
+⏳ Manual acceptance test: classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
+⏳ Manual acceptance test: validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
+⏳ Manual acceptance test: validate restart/recovery behavior with persisted config, evaluations and notification ledger
+⏳ Manual acceptance test: finish browser verification of the live dashboard against real V2 API data
+⏳ Post-MVP enhancement: complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
+⏳ Manual acceptance test: validate source-health UI and remaining convenience features
+⏳ Final V2 MVP sign-off after manual acceptance checks pass
 ```
 ### V1 status
 
@@ -683,7 +685,7 @@ Only after the core V2 path is stable, benchmark Agent-Reach against the current
 
 ### Step H — MVP sign-off
 
-Only after the above checks pass should the current architecture be treated as the stable V2 MVP baseline.
+Core implementation is complete. The current architecture becomes the stable V2 MVP baseline after manual acceptance checks pass for alert correctness, latency, canonical dedupe, configuration persistence/recovery and frontend behavior.
 
 ## 13. ENGINEERING RULES FOR FUTURE AGENTS
 
