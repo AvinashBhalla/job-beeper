@@ -16,12 +16,20 @@
 
 Job Radar is a **personal, always-on job discovery and matching system**.
 
+### Product benchmark and intended target
+
+JobBeeper is the explicit product benchmark for this project. We use its publicly observable behavior as the baseline, while building a personal implementation optimized for Avinash's needs: lower noise, configurable preferences, persistent state, transparent matching, broad multi-source coverage over time, and reliable Telegram-first delivery.
+
+The goal is not to claim that this system is universally "better than JobBeeper." The goal is to make it **better suited to this user's workflow**, with measurable improvements in relevance, control, freshness, deduplication and delivery reliability.
+
 The objective is not to build a generic scraper or a dashboard full of jobs.
 
 The intended experience is:
 
 ```
 Continuously discover fresh jobs
+        ↓
+Maintain a daily active feed
         ↓
 Normalize and store them
         ↓
@@ -561,7 +569,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Telegram message formatting and delivery error behavior regression-tested
 ✅ New LinkedIn jobs with missing card-level experience now fetch the public job detail page and extract explicit JD experience requirements before matching
 ✅ End-to-end regression test verifies a LinkedIn JD requirement such as 5+ years is applied before notification eligibility
-✅ Telegram timestamps now render as human-readable IST (for example, `08 Oct 2026, 01:00 PM IST`)
+✅ Telegram timestamps now render as human-readable IST (for example, `08 Oct 2026, 1:00 PM IST`)
+✅ Daily active-feed lifecycle added: `/api/jobs?today_only=true` and `/api/daily-summary` reset visible daily counts at India local midnight while retaining historical SQLite data
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Telegram credential connectivity verified against the configured bot/chat
@@ -595,6 +604,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Telegram notification engine implementation complete; credentialed Bot API connectivity verified; first real job alerts delivered successfully
 ❌ Cross-source canonical deduplication
 ❌ New/changed opportunity detection
+❌ Daily active-feed UI integration into the dashboard
 ❌ Fully V2-connected frontend settings
 ❌ Complete frontend live feed
 ❌ Source health UI beyond basic API
@@ -830,11 +840,19 @@ Preserve canonical application links.
 
 ## 14. CURRENT IMPORTANT OBSERVATIONS
 
-### Observation 1 — Ingestion is no longer the main blocker
+### Observation 1 — JobBeeper is the public product benchmark, not the private implementation source
+
+The repository contains docs/JOBBEEPER_REFERENCE.md, which records only publicly observable JobBeeper behavior. The project goal is to reproduce those useful product properties with a simpler personal architecture, then optimize specifically for this user's workflow rather than claim generic superiority.
+
+### Observation 2 — Ingestion is no longer the main blocker
 
 ### Observation 2 — Real cross-source overlap is currently ambiguous, not safely deduplicable
 
 The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source candidates, with 0 auto-link candidates. The observed same-title/company/location examples include materially different explicit experience ranges, so the system correctly keeps them separate.
+
+### Observation 4 — Daily feed reset is a presentation lifecycle, not data deletion
+
+The active user-facing feed resets at India local midnight. Historical job observations remain in SQLite so deduplication, notification history and auditability are not lost. The API now exposes a current-day feed and daily summary without deleting historical data.
 
 ### Observation 3 — Persistent state is now the foundation for new-only alerting
 
