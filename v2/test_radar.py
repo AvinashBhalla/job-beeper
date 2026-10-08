@@ -867,6 +867,73 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(merged["config_version"], 3)
         self.assertFalse(merged["source_enabled"]["instahyre"])
 
+    def test_config_v5_repairs_persisted_source_queries(self):
+        defaults = {
+            "config_version": 5,
+            "linkedin_queries": [
+                "software engineer OR software developer",
+                "full stack developer OR full stack engineer OR frontend developer OR frontend engineer OR backend developer OR backend engineer",
+            ],
+            "naukri_queries": ["software engineer", "full stack developer"],
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+            },
+        }
+        prior_runtime = {
+            "config_version": 4,
+            "linkedin_queries": [
+                "software engineer OR software developer",
+                "full stack developer OR frontend developer OR backend developer",
+            ],
+            "naukri_queries": ["software engineer"],
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": True,
+            },
+        }
+        merged = _merge_config(defaults, prior_runtime)
+        self.assertEqual(merged["config_version"], 5)
+        self.assertEqual(merged["linkedin_queries"], defaults["linkedin_queries"])
+        self.assertEqual(merged["naukri_queries"], defaults["naukri_queries"])
+        self.assertFalse(merged["source_enabled"]["instahyre"])
+
+    def test_linkedin_fast_scan_uses_broader_recency_window(self):
+        params = []
+        class Response:
+            status_code = 200
+            text = """
+            <html><body><ul>
+              <li>
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/1234567890">Apply</a>
+                <h3 class="base-search-card__title">Software Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme</h4>
+                <span class="job-search-card__location">Bengaluru, Karnataka, India</span>
+                <time>30 minutes ago</time>
+              </li>
+            </ul></body></html>
+            """
+        def fake_request(_endpoint, request_params):
+            params.append(dict(request_params))
+            return Response()
+        config = {
+            **BASE_CONFIG,
+            "linkedin_queries": ["software engineer"],
+            "locations": ["Bengaluru, Karnataka, India"],
+        }
+        with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+            radar.linkedin_collect(config)
+        self.assertTrue(params)
+        self.assertEqual(params[0]["f_TPR"], "r21600")
+        self.assertNotIn("f_EA", params[0])
+
     def test_config_v4_migrates_instahyre_to_disabled(self):
         defaults = {
             "config_version": 4,
