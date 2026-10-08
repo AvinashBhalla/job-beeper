@@ -31,8 +31,12 @@ SQLite is intentional for the first hosted single-user deployment. It is durable
 - `GET /api/jobs?minutes=60`
 - `GET /api/jobs/<id>`
 - `GET /api/source-status`
+- `GET /api/config`
+- `PUT /api/config` (requires `X-Config-Token`)
 
-The UI will be built only after live ingestion is proven.
+Runtime user preferences are persisted at `/data/config.json`. The configuration API is protected by a generated token stored at `/data/config_token`, unless `JOB_RADAR_CONFIG_TOKEN` is supplied to the container.
+
+The dashboard is packaged with V2 and is served at `/dashboard/` by the FastAPI process. It reads jobs and settings from the V2 API rather than the legacy V1 GitHub JSON feed.
 
 ## Run
 
