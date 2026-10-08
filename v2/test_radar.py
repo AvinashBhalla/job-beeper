@@ -1,6 +1,6 @@
 import unittest
 
-from v2.radar import alertability_details, extract_experience, match_details
+from v2.radar import _merge_config, alertability_details, extract_experience, match_details
 
 
 BASE_CONFIG = {
@@ -28,6 +28,32 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 
 class MatcherTests(unittest.TestCase):
+    def test_legacy_config_migrates_instahyre_to_opt_in(self):
+        defaults = {
+            "config_version": 3,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+            },
+            "poll_seconds": {
+                "linkedin": 120,
+                "naukri": 600,
+                "instahyre": 600,
+            },
+        }
+        legacy = {
+            "config_version": 2,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": True,
+            },
+        }
+        merged = _merge_config(defaults, legacy)
+        self.assertEqual(merged["config_version"], 3)
+        self.assertFalse(merged["source_enabled"]["instahyre"])
+
     def test_extracts_experience_range(self):
         self.assertEqual(extract_experience("0-2 years"), (0.0, 2.0))
         self.assertEqual(extract_experience("3 to 8 yrs"), (3.0, 8.0))
