@@ -1,329 +1,400 @@
 function setupNavigation(){
   const links=[...document.querySelectorAll(".nav-link")];
   const sections=[...document.querySelectorAll(".page-section")];
+
   function show(id){
     const target=document.getElementById(id)||document.getElementById("jobsSection");
     sections.forEach(s=>{
-      const isTarget=s===target;
-      s.classList.toggle("hidden-section",!isTarget);
-      s.classList.toggle("active-section",isTarget);
+      const active=s===target;
+      s.classList.toggle("hidden-section",!active);
+      s.classList.toggle("active-section",active);
     });
     links.forEach(a=>a.classList.toggle("active",a.dataset.section===target.id));
-    if(target.id!=="jobsSection" && location.hash!=="#"+target.id.replace("Section","")){
-      history.replaceState(null,"","#"+target.id.replace("Section",""));
-    }
   }
+
   window.showPage=show;
-  links.forEach(a=>a.addEventListener("click",e=>{
-    e.preventDefault();
-    show(a.dataset.section);
+
+  links.forEach(link=>link.addEventListener("click",event=>{
+    event.preventDefault();
+    show(link.dataset.section);
+    const hash=link.getAttribute("href");
+    if(hash) history.replaceState(null,"",hash);
   }));
+
   const initial=(location.hash||"").slice(1);
-  if(initial.startsWith("job/")) setTimeout(()=>showJobDetail(decodeURIComponent(initial.slice(4))),0);
-  show(initial==="filters"?"filtersSection":initial==="settings"?"settingsSection":initial==="sources"?"sourcesSection":initial==="applied"?"appliedSection":"jobsSection");
+  show(
+    initial==="filters" ? "filtersSection" :
+    initial==="settings" ? "settingsSection" :
+    initial==="sources" ? "sourcesSection" :
+    initial==="applied" ? "appliedSection" :
+    "jobsSection"
+  );
 }
-const REPO = "AvinashBhalla/job-beeper";
-const RAW = "https://raw.githubusercontent.com/" + REPO + "/main/";
-const API = "https://api.github.com";
-let state = {jobs: []};
-let config = null;
-let scanning = false;
-let scanPollTimer = null;
-const $ = id => document.getElementById(id);
-const ageHours = iso => iso ? (Date.now() - new Date(iso).getTime()) / 3600000 : 9999;
-const fmtAge = iso => {
-  if (!iso) return "time unknown";
-  const h = ageHours(iso);
-  if (h < 1) return Math.max(1, Math.round(h*60)) + " min ago";
-  if (h < 24) return Math.round(h) + " hr ago";
-  return Math.round(h/24) + " days ago";
-};
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const csv = s => s.split(",").map(x=>x.trim()).filter(Boolean);
-const fieldLabels = {
-  frontend:"Frontend", backend:"Backend", full_stack:"Full Stack", automation:"Automation",
-  ai_ml:"AI / ML", python:"Python", javascript_typescript:"JavaScript / TypeScript",
-  devops:"DevOps", mobile:"Mobile", data:"Data"
-};
+
+const API="/api";
+let state={jobs:[]};
+let config=null;
+
+const $=id=>document.getElementById(id);
+
+function esc(value){
+  return String(value ?? "").replace(/[&<>"]/g,char=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"
+  }[char]));
+}
+
+function csv(value){
+  return value.split(",").map(x=>x.trim()).filter(Boolean);
+}
+
+function jobTimestamp(job){
+  return job.source_posted_at || job.discovered_at || null;
+}
+
+function ageHours(timestamp){
+  return timestamp ? Math.max(0,(Date.now()-new Date(timestamp).getTime())/3600000) : 9999;
+}
+
+function fmtAge(timestamp){
+  if(!timestamp) return "time unknown";
+  const hours=ageHours(timestamp);
+  if(hours<1) return Math.max(1,Math.round(hours*60))+" min ago";
+  if(hours<24) return Math.round(hours)+" hr ago";
+  return Math.round(hours/24)+" days ago";
+}
+
+function fmtTimestamp(timestamp){
+  return timestamp ? new Date(timestamp).toLocaleString() : "Not specified";
+}
 
 function populateSources(jobs){
-  const current = $("source").value;
-  const names = [...new Set(jobs.map(j=>j.source).filter(Boolean))].sort();
-  $("source").innerHTML = '<option value="">All sources</option>' + names.map(s=>'<option>'+esc(s)+'</option>').join("");
-  $("source").value = names.includes(current) ? current : "";
+  const current=$("source").value;
+  const names=[...new Set(jobs.map(j=>j.source).filter(Boolean))].sort();
+  $("source").innerHTML='<option value="">All sources</option>'+
+    names.map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join("");
+  $("source").value=names.includes(current) ? current : "";
+}
+
+function renderSourceChoices(){
+  const enabled=config?.source_enabled || {};
+  const sources=[
+    ["linkedin","LinkedIn"],
+    ["naukri","Naukri"],
+    ["instahyre","Instahyre"]
+  ];
+  $("sourceChoices").innerHTML=sources.map(([key,label])=>
+    '<label class="choice"><input type="checkbox" data-source="'+key+'" '+
+    (enabled[key]!==false ? "checked" : "")+'><span>'+label+'</span></label>'
+  ).join("");
+}
+
+function loadForm(){
+  const c=config;
+  $("cfgRoles").value=(c.target_roles||[]).join(", ");
+  $("cfgLocations").value=(c.locations||[]).join(", ");
+  $("cfgSkills").value=(c.skills||[]).join(", ");
+  $("cfgExclude").value=(c.title_exclude||[]).join(", ");
+  $("cfgExcludeRoles").value=(c.excluded_role_terms||[]).join(", ");
+  $("cfgCandidateExperience").value=c.candidate_experience_years ?? "";
+  $("cfgMinExperience").value=c.min_experience_years ?? "";
+  $("cfgExperience").value=c.max_experience_years ?? 3;
+  $("cfgThreshold").value=c.match_threshold ?? 55;
+  $("cfgRemoteOnly").checked=!!c.remote_only;
+  $("cfgRequireExperience").checked=!!c.require_explicit_experience_for_alerts;
+  $("cfgTelegram").checked=c.notifications_enabled!==false;
+  renderSourceChoices();
+}
+
+function collectConfig(){
+  const next=JSON.parse(JSON.stringify(config||{}));
+  next.target_roles=csv($("cfgRoles").value);
+  next.locations=csv($("cfgLocations").value);
+  next.skills=csv($("cfgSkills").value);
+  next.title_exclude=csv($("cfgExclude").value);
+  next.excluded_role_terms=csv($("cfgExcludeRoles").value);
+
+  const candidate=$("cfgCandidateExperience").value.trim();
+  const minimum=$("cfgMinExperience").value.trim();
+
+  next.candidate_experience_years=candidate==="" ? null : Number(candidate);
+  next.min_experience_years=minimum==="" ? null : Number(minimum);
+  next.max_experience_years=Number($("cfgExperience").value);
+  next.match_threshold=Number($("cfgThreshold").value);
+  next.remote_only=$("cfgRemoteOnly").checked;
+  next.require_explicit_experience_for_alerts=$("cfgRequireExperience").checked;
+  next.notifications_enabled=$("cfgTelegram").checked;
+
+  next.source_enabled={};
+  document.querySelectorAll("[data-source]").forEach(input=>{
+    next.source_enabled[input.dataset.source]=input.checked;
+  });
+
+  return next;
+}
+
+function configToken(){
+  return sessionStorage.getItem("jobradar_config_token") || $("configToken").value.trim();
+}
+
+function setToken(value){
+  if(value) sessionStorage.setItem("jobradar_config_token",value);
+  $("configToken").value="";
+}
+
+function clearToken(){
+  sessionStorage.removeItem("jobradar_config_token");
+  $("configToken").value="";
+  $("tokenStatus").textContent="Configuration token cleared.";
+}
+
+async function loadConfig(){
+  const response=await fetch(API+"/config",{cache:"no-store"});
+  if(!response.ok) throw new Error("V2 configuration unavailable.");
+  const data=await response.json();
+  config=data.config;
+  loadForm();
+}
+
+async function saveConfig(){
+  const token=configToken();
+  if(!token){
+    $("saveStatus").textContent="Enter the V2 configuration token in Access first.";
+    return;
+  }
+
+  const next=collectConfig();
+  $("saveStatus").textContent="Saving V2 preferences…";
+
+  try{
+    const response=await fetch(API+"/config",{
+      method:"PUT",
+      headers:{
+        "Content-Type":"application/json",
+        "X-Config-Token":token
+      },
+      body:JSON.stringify(next)
+    });
+
+    if(!response.ok){
+      let detail="";
+      try{
+        const body=await response.json();
+        detail=body.detail || "";
+      }catch(_){}
+      if(response.status===401){
+        $("saveStatus").textContent="Invalid configuration token.";
+      }else{
+        $("saveStatus").textContent="Could not save preferences"+(detail ? ": "+detail : ".");
+      }
+      return;
+    }
+
+    const data=await response.json();
+    config=data.config;
+    loadForm();
+    $("saveStatus").textContent="Preferences saved. Matching uses them immediately.";
+  }catch(error){
+    $("saveStatus").textContent="Configuration API unavailable.";
+  }
 }
 
 function showJobDetail(id){
-  const j=state.jobs.find(x=>String(x.id)===String(id));
-  if(!j) return;
-  document.querySelectorAll(".page-section").forEach(s=>{
-    const active=s.id==="jobDetailSection";
-    s.classList.toggle("hidden-section",!active);
-    s.classList.toggle("active-section",active);
+  const job=state.jobs.find(item=>String(item.id)===String(id));
+  if(!job) return;
+
+  document.querySelectorAll(".page-section").forEach(section=>{
+    const active=section.id==="jobDetailSection";
+    section.classList.toggle("hidden-section",!active);
+    section.classList.toggle("active-section",active);
   });
-  document.querySelectorAll(".nav-link").forEach(a=>a.classList.remove("active"));
-  $("detailSource").textContent=(j.source||"").toUpperCase();
-  $("detailTitle").textContent=j.title||"Untitled job";
-  $("detailCompany").textContent=j.company||"";
-  $("detailScore").innerHTML="<b>"+esc(j.score ?? 0)+"%</b><small>MATCH</small>";
-  $("detailExperience").textContent=j.experience?.label || "Not specified";
-  $("detailLocation").textContent=j.jd_location || j.location || "Not specified";
-  $("detailWorkMode").textContent=j.work_mode || "Not specified";
-  $("detailPosted").textContent=j.posted ? new Date(j.posted).toLocaleString() : "Not specified";
-  $("detailApply").href=j.url||"#";
-  $("detailMatch").textContent=(j.score ?? 0)+"% match";
-  const reasons=(j.reasons||[]).map(x=>"<div class='reason'><span>✓</span>"+esc(x)+"</div>").join("");
-  $("detailReasons").innerHTML=reasons || "<div class='empty'>No specific match reasons were recorded.</div>";
-  const skills=j.skills_detected||[];
-  $("detailSkillCount").textContent=skills.length+" skills";
-  $("detailSkills").innerHTML=skills.map(x=>"<span>"+esc(x)+"</span>").join("") || "<span>Not detected</span>";
-  $("detailDescription").textContent=j.description || "The source did not expose the full job description during this scan. Use Apply now to view the original posting.";
+
+  document.querySelectorAll(".nav-link").forEach(link=>link.classList.remove("active"));
+
+  $("detailSource").textContent=(job.source||"").toUpperCase();
+  $("detailTitle").textContent=job.title||"Untitled job";
+  $("detailCompany").textContent=job.company||"";
+  $("detailScore").innerHTML="<b>"+esc(job.match_score ?? 0)+"%</b><small>MATCH</small>";
+
+  const experience=(job.experience_min_years!=null || job.experience_max_years!=null)
+    ? String(job.experience_min_years ?? "?")+"–"+String(job.experience_max_years ?? "?")+" years"
+    : "Not specified";
+
+  $("detailExperience").textContent=experience;
+  $("detailLocation").textContent=job.location||"Not specified";
+  $("detailWorkMode").textContent=job.location?.toLowerCase().includes("remote") ? "Remote / hybrid indicated" : "Not specified";
+  $("detailPosted").textContent=fmtTimestamp(job.source_posted_at);
+
+  $("detailApply").href=job.url||"#";
+
+  $("detailMatch").textContent=job.alertable ? "Eligible for alerting" : "Not currently alertable";
+
+  const reasons=(job.match_reasons||[]).map(reason=>
+    "<div class='reason'><span>✓</span>"+esc(reason)+"</div>"
+  ).join("");
+
+  const alertReasons=(job.alertability_reasons||[]).map(reason=>
+    "<div class='reason'><span>•</span>"+esc(reason)+"</div>"
+  ).join("");
+
+  $("detailReasons").innerHTML=(reasons||"<div class='empty'>No match reasons.</div>")+
+    (alertReasons ? "<div class='reason-list'>"+alertReasons+"</div>" : "");
+
+  $("detailSkillCount").textContent=(config?.skills||[]).length+" configured skills";
+  $("detailSkills").innerHTML="<span>Match reasons above show detected configured skills.</span>";
+
+  $("detailDescription").textContent=job.description ||
+    "The source did not expose a full description during this scan. Open the original posting for details.";
+
   history.pushState(null,"","#job/"+encodeURIComponent(id));
   window.scrollTo({top:0,behavior:"instant"});
 }
+
 function closeJobDetail(){
   if(window.showPage) window.showPage("jobsSection");
   history.pushState(null,"","#jobs");
 }
 
 function render(){
-  const q = $("search").value.toLowerCase().trim();
-  const src = $("source").value;
-  const minScore = Number($("score").value);
-  const maxAge = Number($("age").value);
-  let jobs = state.jobs.filter(j=>{
-    const hay = [j.title,j.company,j.location,j.source,(j.reasons||[]).join(" ")].join(" ").toLowerCase();
-    return (!q || hay.includes(q)) && (!src || j.source===src) &&
-      (j.score ?? 0) >= minScore && ageHours(j.posted) <= maxAge;
+  if(!config) return;
+
+  const query=$("search").value.toLowerCase().trim();
+  const source=$("source").value;
+  const minimumScore=Number($("score").value);
+  const maximumAge=Number($("age").value);
+
+  let jobs=state.jobs.filter(job=>{
+    const timestamp=jobTimestamp(job);
+    const hay=[
+      job.title,job.company,job.location,job.source,
+      ...(job.match_reasons||[]),
+      ...(job.alertability_reasons||[])
+    ].join(" ").toLowerCase();
+
+    return (!query || hay.includes(query)) &&
+      (!source || job.source===source) &&
+      (job.match_score ?? 0)>=minimumScore &&
+      ageHours(timestamp)<=maximumAge;
   });
-  if ($("sort").value === "match") {
-    jobs.sort((a,b)=>(b.score||0)-(a.score||0) || String(b.posted||"").localeCompare(String(a.posted||"")));
-  } else {
-    jobs.sort((a,b)=>String(b.posted||"").localeCompare(String(a.posted||"")) || (b.score||0)-(a.score||0));
+
+  if($("sort").value==="match"){
+    jobs.sort((a,b)=>
+      (b.match_score||0)-(a.match_score||0) ||
+      String(jobTimestamp(b)||"").localeCompare(String(jobTimestamp(a)||""))
+    );
+  }else{
+    jobs.sort((a,b)=>
+      String(jobTimestamp(b)||"").localeCompare(String(jobTimestamp(a)||"")) ||
+      (b.match_score||0)-(a.match_score||0)
+    );
   }
-  $("count").textContent = jobs.length + " jobs";
-  $("jobs").innerHTML = jobs.map(j=>`
-    <article class="card">
-      <div class="cardmain">
-        <div class="titleline"><h2><button class="job-title-link" data-job-id="${esc(j.id)}">${esc(j.title)}</button></h2><span class="new">${ageHours(j.posted)<1 ? "NEW" : fmtAge(j.posted)}</span></div>
-        <div class="company">${esc(j.company)}</div>
-        <div class="meta">⌖ ${esc(j.location || "Location not listed")} · ◷ ${fmtAge(j.posted)} · <b>${esc(j.source)}</b></div>
-        <div class="chips">${(j.reasons||[]).slice(0,7).map(x=>'<span>'+esc(x)+'</span>').join("")}</div>
-      </div>
-      <div class="actions">
-        <div class="score ${(j.score||0)>=90?"hot":""}">${j.score ?? 0}%<small>match</small></div>
-        <a class="apply" href="${esc(j.url)}" target="_blank" rel="noopener">Apply now ↗</a>
-      </div>
-    </article>`).join("") || '<div class="empty">No matching jobs in the current feed.</div>';
+
+  $("count").textContent=jobs.length+" jobs";
+
+  $("jobs").innerHTML=jobs.map(job=>{
+    const timestamp=jobTimestamp(job);
+    const alertBadge=job.alertable
+      ? "<span class='new'>ALERTABLE</span>"
+      : "";
+
+    return `
+      <article class="card">
+        <div class="cardmain">
+          <div class="titleline">
+            <h2><button class="job-title-link" data-job-id="${esc(job.id)}">${esc(job.title)}</button></h2>
+            ${alertBadge}
+          </div>
+          <div class="company">${esc(job.company)}</div>
+          <div class="meta">⌖ ${esc(job.location||"Location not listed")} · ◷ ${esc(fmtAge(timestamp))} · <b>${esc(job.source)}</b></div>
+          <div class="chips">
+            ${(job.match_reasons||[]).slice(0,7).map(reason=>"<span>"+esc(reason)+"</span>").join("")}
+          </div>
+        </div>
+        <div class="actions">
+          <div class="score ${(job.match_score||0)>=90?"hot":""}">${esc(job.match_score||0)}%<small>match</small></div>
+          <a class="apply" href="${esc(job.url)}" target="_blank" rel="noopener">Apply now ↗</a>
+        </div>
+      </article>`;
+  }).join("") || '<div class="empty">No jobs in the current feed.</div>';
 }
 
-function renderFields(){
-  const selected = new Set(config?.filters?.fields || []);
-  $("fieldChoices").innerHTML = Object.entries(fieldLabels).map(([key,label]) =>
-    `<label class="choice"><input type="checkbox" data-field="${key}" ${selected.has(key)?"checked":""}><span>${label}</span></label>`
-  ).join("");
-}
-
-function loadForm(){
-  const f=config.filters;
-  $("cfgKeywords").value=(f.keywords||[]).join(", ");
-  $("cfgLocations").value=(f.locations||[]).join(", ");
-  $("cfgSkills").value=(f.skills||[]).join(", ");
-  $("cfgExclude").value=(f.title_exclude||[]).join(", ");
-  $("cfgCandidateExperience").value=f.candidate_experience_years ?? "";
-  $("cfgMinExperience").value=f.min_experience_years ?? "";
-  $("cfgExperience").value=String(f.max_experience_years ?? 3);
-  $("cfgAge").value=String(f.max_age_hours ?? 72);
-  $("cfgRemoteOnly").checked=!!f.remote_only;
-  $("cfgTelegram").checked=f.notifications_enabled !== false;
-  renderFields();
-}
-
-function collectConfig(){
-  const next=JSON.parse(JSON.stringify(config));
-  const f=next.filters;
-  f.keywords=csv($("cfgKeywords").value);
-  f.locations=csv($("cfgLocations").value);
-  f.skills=csv($("cfgSkills").value);
-  f.title_exclude=csv($("cfgExclude").value);
-  f.fields=[...document.querySelectorAll("[data-field]:checked")].map(x=>x.dataset.field);
-  const candidateExperience=$("cfgCandidateExperience").value.trim();
-  const minExperience=$("cfgMinExperience").value.trim();
-  f.min_experience_years=minExperience==="" ? null : Number(minExperience);
-  f.candidate_experience_years=candidateExperience==="" ? null : Number(candidateExperience);
-  f.max_experience_years=Number($("cfgExperience").value);
-  f.max_age_hours=Number($("cfgAge").value);
-  f.remote_only=$("cfgRemoteOnly").checked;
-  f.notifications_enabled=$("cfgTelegram").checked;
-  f.search_from_filters=true;
-  return next;
-}
-
-function token(){
-  return sessionStorage.getItem("jobbeeper_github_token") || $("githubToken").value.trim();
-}
-
-function apiHeaders(t){
-  return {"Accept":"application/vnd.github+json","Authorization":"Bearer "+t,"X-GitHub-Api-Version":"2026-03-10","Content-Type":"application/json"};
-}
-
-async function waitForWorkflow(t, startedAt){
-  const deadline=Date.now()+10*60*1000;
-  scanning=true;
-  const button=$("scanNow");
-  if(button) button.disabled=true;
-
+async function loadJobs(){
   try{
-    while(Date.now()<deadline){
-      const url=API+"/repos/"+REPO+"/actions/runs?branch=main&event=workflow_dispatch&per_page=10";
-      const r=await fetch(url,{headers:apiHeaders(t),cache:"no-store"});
-      if(!r.ok) throw new Error(await githubError(r,"Could not read GitHub workflow status."));
-      const data=await r.json();
-      const cutoff=startedAt-15000;
-      const runs=(data.workflow_runs||[]).filter(run=>{
-        return run.path===".github/workflows/job-watch.yml" &&
-          new Date(run.created_at).getTime()>=cutoff;
-      });
-      const run=runs[0];
+    const maxAge=Math.max(1,Number(config?.max_age_hours||72));
+    const minutes=Math.min(maxAge*60,10080);
 
-      if(!run){
-        $("statusText").textContent="GitHub accepted the scan · waiting for workflow to start…";
-      }else if(run.status==="queued" || run.status==="requested" || run.status==="waiting"){
-        $("statusText").textContent="GitHub scan queued · waiting for results…";
-      }else if(run.status==="in_progress"){
-        $("statusText").textContent="GitHub is scanning sources · waiting for results…";
-      }else{
-        if(run.conclusion==="success"){
-          $("statusText").textContent="Scan complete · loading latest GitHub results…";
-          await load();
-        }else{
-          $("statusText").textContent="Scan "+(run.conclusion||"finished")+". Check GitHub Actions for details.";
-        }
-        return run.conclusion==="success";
-      }
+    const response=await fetch(API+"/jobs?minutes="+encodeURIComponent(minutes)+"&limit=500",{
+      cache:"no-store"
+    });
 
-      await new Promise(resolve=>setTimeout(resolve,5000));
-    }
+    if(!response.ok) throw new Error("Jobs unavailable");
 
-    $("statusText").textContent="Scan is still running on GitHub. The feed will refresh when it finishes.";
-    return false;
-  }catch(e){
-    $("statusText").textContent=e.message;
-    return false;
-  }finally{
-    scanning=false;
-    if(button) button.disabled=false;
+    const data=await response.json();
+    state={jobs:data.jobs||[]};
+
+    $("total").textContent=state.jobs.length;
+    $("today").textContent=state.jobs.filter(job=>ageHours(jobTimestamp(job))<24).length;
+    $("notified").textContent=state.jobs.filter(job=>job.alertable).length;
+    $("lastRun").textContent=state.jobs.length ? "· live" : "";
+
+    $("statusText").textContent="Live · V2 backend";
+    populateSources(state.jobs);
+    render();
+  }catch(error){
+    $("statusText").textContent="Feed unavailable";
   }
 }
-async function dispatchScan(){
-  const t=token();
-  if(!t){
-    $("statusText").textContent="Add your GitHub token in Settings to start a scan.";
+
+async function loadSourceStatus(){
+  try{
+    const response=await fetch(API+"/source-status",{cache:"no-store"});
+    if(!response.ok) throw new Error();
+    const data=await response.json();
+    const rows=(data.sources||[]).map(source=>{
+      const runtime=source.runtime||{};
+      const stateLabel=runtime.error ? "ERROR" : runtime.running ? "RUNNING" : "OK";
+      return "<div class='reason'><span>•</span><b>"+esc(source.source)+"</b> — "+
+        stateLabel+" · seen "+esc(source.jobs_seen)+" · new "+esc(source.new_jobs)+
+        (runtime.last_success ? " · last success "+esc(fmtTimestamp(runtime.last_success)) : "")+
+        (runtime.error ? " · "+esc(runtime.error) : "")+
+        "</div>";
+    }).join("");
+    $("sourceStatus").innerHTML=rows || '<div class="empty">No source runs recorded yet.</div>';
+  }catch(error){
+    $("sourceStatus").textContent="Source status unavailable.";
+  }
+}
+
+$("saveConfig").onclick=saveConfig;
+$("saveToken").onclick=()=>{
+  const value=$("configToken").value.trim();
+  if(!value){
+    $("tokenStatus").textContent="Enter the token first.";
     return;
   }
-  $("statusText").textContent="Starting source scan…";
-  try{
-    const startedAt=Date.now();
-    const r=await fetch(API+"/repos/"+REPO+"/actions/workflows/job-watch.yml/dispatches",{
-      method:"POST",headers:apiHeaders(t),body:JSON.stringify({ref:"main"})
-    });
-    if(!r.ok) throw new Error(await githubError(r,"Could not start the workflow. Enable Actions: Read and write."));
-    $("statusText").textContent="Scan queued · waiting for GitHub results…";
-    await waitForWorkflow(t,startedAt);
-  }catch(e){
-    scanning=false;
-    const button=$("scanNow");
-    if(button) button.disabled=false;
-    $("statusText").textContent=e.message;
-  }
-}
-
-function b64utf8(text){
-  const bytes=new TextEncoder().encode(text);
-  let binary="";
-  for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
-  return btoa(binary);
-}
-
-async function githubError(response, fallback){
-  let detail="";
-  try{
-    const body=await response.json();
-    detail=body.message || "";
-  }catch(_){}
-  return fallback+" ("+response.status+")"+(detail ? ": "+detail : "");
-}
-
-async function saveAndRun(){
-  const t=token();
-  if(!t){ $("saveStatus").textContent="Add your GitHub token first."; return; }
-  const next=collectConfig();
-  $("saveStatus").textContent="Checking GitHub access…";
-  try{
-    const getr=await fetch(API+"/repos/"+REPO+"/contents/config.json?ref=main",{headers:apiHeaders(t)});
-    if(!getr.ok){
-      throw new Error(await githubError(getr,"GitHub cannot read this repository with the supplied token. Check that the fine-grained token is authorized for AvinashBhalla/job-beeper and has Contents: Read."));
-    }
-    const current=await getr.json();
-    $("saveStatus").textContent="Saving filters…";
-    const putr=await fetch(API+"/repos/"+REPO+"/contents/config.json",{
-      method:"PUT",headers:apiHeaders(t),
-      body:JSON.stringify({message:"Update job filters from dashboard",content:b64utf8(JSON.stringify(next,null,2)+"\n"),sha:current.sha,branch:"main"})
-    });
-    if(!putr.ok){
-      throw new Error(await githubError(putr,"GitHub can read the repository but cannot write config.json. Enable Contents: Read and write for this repository."));
-    }
-    $("saveStatus").textContent="Filters saved. Starting scan…";
-    const startedAt=Date.now();
-    const runr=await fetch(API+"/repos/"+REPO+"/actions/workflows/job-watch.yml/dispatches",{
-      method:"POST",headers:apiHeaders(t),body:JSON.stringify({ref:"main"})
-    });
-    if(!runr.ok){
-      throw new Error(await githubError(runr,"Filters were saved, but GitHub could not start the workflow. Enable Actions: Read and write."));
-    }
-    config=next;
-    sessionStorage.setItem("jobbeeper_github_token",t);
-    if ($("githubToken")) $("githubToken").value="";
-    $("saveStatus").textContent="Filters saved · waiting for GitHub scan results…";
-    const completed=await waitForWorkflow(t,startedAt);
-    if(completed) $("saveStatus").textContent="Filters saved · GitHub scan finished. Latest results are loaded.";
-  }catch(e){ $("saveStatus").textContent=e.message; }
-}
-
-async function loadConfig(){
-  const r=await fetch(RAW+"config.json?t="+Date.now(),{cache:"no-store"});
-  if(!r.ok) throw new Error("Config unavailable");
-  config=await r.json();
-  loadForm();
-}
-
-async function load(){
-  try{
-    const r = await fetch(RAW+"dashboard/data/jobs.json?t="+Date.now(), {cache:"no-store"});
-    if(!r.ok) throw new Error(r.status);
-    const data = await r.json();
-    state = data;
-    $("total").textContent = data.jobs?.length ?? 0;
-    $("today").textContent = data.jobs?.filter(j=>ageHours(j.posted)<24).length ?? 0;
-    $("notified").textContent = data.new_alerts ?? 0;
-    $("lastRun").textContent = data.last_run ? "· " + new Date(data.last_run).toLocaleTimeString() : "";
-    if(!scanning){
-      $("statusText").textContent = "Live · checked " + (data.last_run ? new Date(data.last_run).toLocaleTimeString() : "now");
-    }
-    populateSources(data.jobs||[]);
-    render();
-  }catch(e){ $("statusText").textContent = "Feed unavailable"; }
-}
-
-$("githubToken").value="";
-$("clearToken").onclick=()=>{sessionStorage.removeItem("jobbeeper_github_token");$("githubToken").value="";$("saveStatus").textContent="Token cleared.";};
-$("saveConfig").onclick=saveAndRun;
-["search","source","score","age","sort"].forEach(id=>$(id).addEventListener("input",render));
-$("refresh").onclick=load;
-$("scanNow").onclick=dispatchScan;
+  setToken(value);
+  $("tokenStatus").textContent="Token remembered for this browser session.";
+};
+$("clearToken").onclick=clearToken;
+$("refresh").onclick=()=>loadJobs();
 $("backToJobs").onclick=closeJobDetail;
-document.addEventListener("click",e=>{const b=e.target.closest(".job-title-link");if(b)showJobDetail(b.dataset.jobId);});
+
+["search","source","score","age","sort"].forEach(id=>$(id).addEventListener("input",render));
+document.addEventListener("click",event=>{
+  const button=event.target.closest(".job-title-link");
+  if(button) showJobDetail(button.dataset.jobId);
+});
+
 setupNavigation();
-loadConfig().catch(e=>{ if ($("saveStatus")) $("saveStatus").textContent="Could not load config."; });
-load();
-setInterval(load,30000);
+
+(async()=>{
+  try{
+    await loadConfig();
+    await loadJobs();
+    await loadSourceStatus();
+    setInterval(loadJobs,30000);
+    setInterval(loadSourceStatus,30000);
+  }catch(error){
+    $("statusText").textContent="V2 backend unavailable";
+    $("saveStatus").textContent="Could not load V2 configuration.";
+  }
+})();
