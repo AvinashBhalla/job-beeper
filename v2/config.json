@@ -1,7 +1,7 @@
 {
   "poll_seconds": {
-    "linkedin": 120,
-    "naukri": 600,
+    "linkedin": 60,
+    "naukri": 300,
     "instahyre": 600
   },
   "locations": [
