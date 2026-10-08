@@ -309,7 +309,8 @@ def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -
 
     rows = conn.execute("""
         SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
-               j.id AS representative_job_id, j.company, j.title, j.location, j.url,
+               j.id AS representative_job_id, j.source AS representative_source,
+               j.company, j.title, j.location, j.url,
                j.description, j.source_posted_at, j.discovered_at
         FROM canonical_opportunities co
         JOIN jobs j ON j.id = co.representative_job_id
@@ -371,9 +372,12 @@ def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, 
     best_score = 0
     best_method = "none"
     best_representative = None
+    identity = canonical_identity(job)
     for candidate in _candidate_canonical_groups(conn, job):
         candidate_source = candidate.get("representative_source")
-        if candidate_source and candidate_source == job.get("source"):
+        same_source = candidate_source and candidate_source == job.get("source")
+        same_canonical_url = bool(identity["url_norm"]) and candidate.get("canonical_url") == identity["url_norm"]
+        if same_source and not same_canonical_url:
             continue
         score, method = canonical_match_score(job, candidate)
         if score > best_score:
