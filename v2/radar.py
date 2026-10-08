@@ -57,7 +57,15 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     merged = json.loads(json.dumps(defaults))
     merged.update(current)
     current_version = int(current.get("config_version", 1) or 1)
-    merged["config_version"] = max(current_version, int(defaults.get("config_version", 1)))
+    default_version = int(defaults.get("config_version", 1) or 1)
+    merged["config_version"] = max(current_version, default_version)
+
+    # Version 3 makes Instahyre opt-in. Any runtime config created before
+    # this migration did not have a reliable Instahyre feed, so disable it
+    # once while preserving all other user settings.
+    if current_version < 3 <= default_version:
+        merged.setdefault("source_enabled", {})["instahyre"] = False
+
     if isinstance(defaults.get("poll_seconds"), dict):
         merged["poll_seconds"] = {
             **defaults.get("poll_seconds", {}),
