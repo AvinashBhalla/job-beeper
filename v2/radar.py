@@ -1088,6 +1088,35 @@ def jobs(minutes: int = 60, limit: int = 100):
     return {"jobs": result}
 
 
+@app.get("/api/opportunities/{opportunity_id}")
+def opportunity_detail(opportunity_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        opportunity = conn.execute("""
+            SELECT id, canonical_url, company_norm, title_norm, location_norm,
+                   first_seen_at, last_seen_at, representative_job_id
+            FROM canonical_opportunities
+            WHERE id=?
+        """, (opportunity_id,)).fetchone()
+        if not opportunity:
+            raise HTTPException(status_code=404, detail="Opportunity not found")
+
+        observations = conn.execute("""
+            SELECT id, source, source_job_id, company, title, location, url,
+                   source_posted_at, posted_precision, discovered_at,
+                   discovery_latency_seconds, canonical_match_method,
+                   canonical_match_confidence
+            FROM jobs
+            WHERE canonical_opportunity_id=?
+            ORDER BY COALESCE(source_posted_at, discovered_at) DESC, id ASC
+        """, (opportunity_id,)).fetchall()
+
+    return {
+        "opportunity": dict(opportunity),
+        "observations": [dict(row) for row in observations],
+    }
+
+
 @app.get("/api/jobs/{job_id}")
 def job_detail(job_id: int):
     with sqlite3.connect(DB_PATH) as conn:
