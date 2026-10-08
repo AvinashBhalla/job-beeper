@@ -508,6 +508,9 @@ def init_db() -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             decision_reason_json TEXT NOT NULL DEFAULT '[]',
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at TEXT,
+            claimed_at TEXT,
             sent_at TEXT,
             last_error TEXT,
             FOREIGN KEY(canonical_opportunity_id) REFERENCES canonical_opportunities(id)
@@ -540,6 +543,9 @@ def init_db() -> None:
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
         _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
+        _ensure_column(conn, "notification_ledger", "attempt_count", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "notification_ledger", "next_attempt_at", "TEXT")
+        _ensure_column(conn, "notification_ledger", "claimed_at", "TEXT")
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
@@ -1267,6 +1273,24 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         log.exception("%s collector failed", source)
 
 
+async def notification_worker() -> None:
+    while not stop_event.is_set():
+        try:
+            from v2.telegram import deliver_queued_notifications, credentials_available
+
+            if credentials_available():
+                delivered = await asyncio.to_thread(deliver_queued_notifications, 10)
+                if delivered:
+                    log.info("telegram: delivered=%s", delivered)
+        except Exception:
+            log.exception("telegram worker failed")
+
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=15)
+        except asyncio.TimeoutError:
+            pass
+
+
 async def scheduler() -> None:
     next_run = {name: 0.0 for name in COLLECTORS}
     while not stop_event.is_set():
@@ -1300,14 +1324,16 @@ async def startup() -> None:
     refresh_notification_decisions(config)
     ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
+    app.state.notification_worker_task = asyncio.create_task(notification_worker())
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
     stop_event.set()
-    task = getattr(app.state, "scheduler_task", None)
-    if task:
-        await task
+    for task_name in ("scheduler_task", "notification_worker_task"):
+        task = getattr(app.state, task_name, None)
+        if task:
+            await task
 
 
 @app.get("/health")
