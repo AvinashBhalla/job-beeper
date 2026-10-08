@@ -25,15 +25,15 @@
   <header>
     <div>
       <h1>Jobs</h1>
-      <p>Fresh jobs from multiple sources, ranked for your profile.</p>
+      <p>Today’s jobs from multiple sources, ranked for your profile. The feed resets at midnight IST.</p>
     </div>
     <div class="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
   </header>
 
   <section class="stats">
-    <div><b id="total">0</b><span>Total jobs</span></div>
-    <div><b id="today">0</b><span>Fresh feed</span></div>
-    <div><b id="notified">0</b><span>Alertable now</span></div>
+    <div><b id="today">0</b><span>Jobs today</span></div>
+    <div><b id="matchedToday">0</b><span>Matched today</span></div>
+    <div><b id="notified">0</b><span>Alerts sent today</span></div>
   </section>
 
   <section class="toolbar">
@@ -44,7 +44,7 @@
     <select id="sort"><option value="newest">Newest first</option><option value="match">Best match</option></select>
   </section>
 
-  <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><span id="auto">Feed refresh: 30s · sources run continuously</span></div>
+  <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><span id="auto">Today · refreshes every 30s · sources run continuously</span></div>
   <section id="jobs" class="jobs"></section>
   </section>
 
