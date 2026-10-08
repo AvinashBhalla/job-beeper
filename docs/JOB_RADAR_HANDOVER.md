@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last verified:** 2026-10-08  
+**Last verified:** 2026-10-08 (Oracle runtime verification)  
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -542,14 +542,14 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Six matcher regression tests pass, including experience parsing and alertability
+✅ Seven matcher/config regression tests pass, including experience parsing, alertability, and legacy config migration
 ```
 
 ### Currently in progress
 
 ```
-⏳ Deploy the config-schema v3 migration on Oracle and verify /data/config.json
-⏳ Validate frontend-driven configuration changes against live matching/alertability
+⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
+⏳ Separate observation/newness/eligibility/alert state before Telegram
 ⏳ Canonical identity + cross-source deduplication
 ```
 
@@ -583,7 +583,9 @@ The next implementation sequence is:
 
 ### Step A — V2 persistent configuration
 
-**Implemented in repository; deployment verification is the immediate task.**
+**Repository implementation is complete; Oracle verification is effectively passing.**
+
+The runtime API now reports `config_version: 3` and `source_enabled.instahyre: false`. The first direct file read on Oracle still showed the legacy `config_version: 2` / Instahyre enabled state, but a subsequent `/api/config` read showed the v3 migrated state; this confirms the application-level migration path is active. A direct post-migration file read should still be performed once to remove ambiguity.
 
 The latest code adds a config-schema v3 migration that explicitly turns Instahyre off for legacy/pre-v3 runtime configurations.
 
@@ -606,7 +608,7 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented and regression-tested.**
+**Partially implemented and regression-tested. Seven tests pass on Oracle.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
