@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Twenty-nine matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
+✅ Thirty matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -560,6 +560,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ V2 Telegram delivery worker added with persistent claim/sent/failed state, safe retry handling, and interrupted-claim recovery
 ✅ Telegram message formatting and delivery error behavior regression-tested
 ✅ New LinkedIn jobs with missing card-level experience now fetch the public job detail page and extract explicit JD experience requirements before matching
+✅ End-to-end regression test verifies a LinkedIn JD requirement such as 5+ years is applied before notification eligibility
 ✅ Telegram timestamps now render as human-readable IST (for example, `08 Oct 2026, 01:00 PM IST`)
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
