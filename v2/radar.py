@@ -291,6 +291,19 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
 
 def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -> list[dict[str, Any]]:
     identity = canonical_identity(job)
+    if identity["url_norm"]:
+        rows = conn.execute("""
+            SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
+                   j.id AS representative_job_id, j.company, j.title, j.location, j.url,
+                   j.description, j.source_posted_at, j.discovered_at
+            FROM canonical_opportunities co
+            JOIN jobs j ON j.id = co.representative_job_id
+            WHERE co.canonical_url=?
+            LIMIT 20
+        """, (identity["url_norm"],)).fetchall()
+        if rows:
+            return [dict(row) for row in rows]
+
     rows = conn.execute("""
         SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
                j.id AS representative_job_id, j.company, j.title, j.location, j.url,
