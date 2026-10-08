@@ -2065,7 +2065,7 @@ def dedupe_candidates(limit: int = 100):
 
 
 @app.get("/api/opportunities")
-def opportunities(minutes: int = 60, limit: int = 100):
+def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = iso(current_day_start_utc()) if today_only else iso(
@@ -2103,7 +2103,11 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
     config = get_config()
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
-    cutoff = iso(now() - dt.timedelta(minutes=minutes))
+    cutoff = (
+        iso(current_day_start_utc())
+        if today_only
+        else iso(now() - dt.timedelta(minutes=minutes))
+    )
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
