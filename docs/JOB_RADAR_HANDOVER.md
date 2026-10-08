@@ -251,15 +251,11 @@ Example successful relay properties:
 
 ### Instahyre
 
-Currently experimental.
+Currently experimental and **disabled by default in V2**.
 
-The current public JSON probe returns:
+The current public JSON probe returned HTTP 400 for the tested request. We do not treat this as a reliable source until its current interface is verified.
 
-- 0 jobs
-
-Do not treat this as a reliable source yet.
-
-Zero results must not automatically justify increasing polling or scraping volume.
+Zero results or request errors must not automatically justify increasing polling or scraping volume.
 
 ### Future ATS sources
 
@@ -536,12 +532,14 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Frontend connected to V2 configuration API in repository
 ✅ Config validation + generated configuration token
 ✅ Matcher regression tests added
+✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
+✅ Existing runtime config migration added; unverified Instahyre is disabled by default
 ```
 
 ### Currently in progress
 
 ```
-⏳ Deploy/test the new configuration layer on Oracle
+⏳ Deploy/test the new configuration layer and matcher fixes on Oracle
 ⏳ Validate configurable alertability against real jobs
 ⏳ Canonical identity + cross-source deduplication
 ```
