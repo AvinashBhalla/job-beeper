@@ -36,7 +36,6 @@ jobs:
         run: |
           python - <<'PY'
           import datetime as dt
-          import hashlib
           import json
           from pathlib import Path
 
@@ -51,6 +50,7 @@ jobs:
           seen = set()
 
           for query in queries:
+              print(f"Collecting Naukri query: {query}", flush=True)
               frame = scrape_jobs(
                   site_name=["naukri"],
                   search_term=query,
@@ -63,7 +63,10 @@ jobs:
               )
 
               if frame is None or frame.empty:
+                  print(f"No results for: {query}", flush=True)
                   continue
+
+              print(f"Results for {query}: {len(frame)}", flush=True)
 
               for row in frame.to_dict("records"):
                   url = str(row.get("job_url") or row.get("job_url_direct") or "")
@@ -101,7 +104,22 @@ jobs:
                       "description": description,
                   })
 
-          jobs.sort(key=lambda x: x.get("posted") or "", reverse=True)
+          def posted_sort_key(job):
+              value = job.get("posted")
+              if not value:
+                  return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+              if isinstance(value, str):
+                  try:
+                      parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+                      return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+                  except ValueError:
+                      return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+              if hasattr(value, "to_pydatetime"):
+                  parsed = value.to_pydatetime()
+                  return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+              return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+
+          jobs.sort(key=posted_sort_key, reverse=True)
 
           payload = {
               "updated_at": now.isoformat(),
