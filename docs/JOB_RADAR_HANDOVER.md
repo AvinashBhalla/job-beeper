@@ -223,6 +223,7 @@ Current V2 LinkedIn freshness target:
 - run LinkedIn search requests concurrently with a bounded worker pool
 - fetch only plausible alert candidates for JD enrichment, also concurrently
 - prefer the public LinkedIn guest job-detail endpoint for enrichment
+- parse one job per actual LinkedIn job-card link instead of iterating every nested `<li>`, preventing duplicate/nested-list explosions
 
 This is intended to reduce discovery lag without blindly multiplying request volume. The target is to make a newly surfaced LinkedIn posting reach the matcher/Telegram path within a few minutes under normal source behavior. Actual median/p95 latency must be measured from runtime logs before declaring that target met.
 
@@ -857,7 +858,7 @@ The repository contains docs/JOBBEEPER_REFERENCE.md, which records only publicly
 
 The first real Telegram alert observed on 2026-10-08 had a source posting time around 1:16 PM IST and discovery around 1:38 PM IST. The ~22-minute lag is too slow for competitive job hunting. The root cause was not only the two-minute scheduler interval: the LinkedIn collector performed 32 search requests sequentially (query × location × pagination) and then performed candidate JD enrichment sequentially before upserting/evaluating the batch. The collector has now been changed to a 60-second fast lane with bounded concurrent search requests, periodic deep pagination, and concurrent candidate JD enrichment.
 
-The next gate is measured runtime latency, not merely a shorter configured interval.
+The next gate is measured runtime latency, not merely a shorter configured interval. A bad acceleration build briefly caused the matcher symbols to disappear and the broad `<li>` parser to over-count one collection run; that build was repaired before further rollout.
 
 ### Observation 3 — Ingestion is otherwise functioning
 
