@@ -550,6 +550,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Cross-source dedupe diagnostic endpoint added for real LinkedIn/Naukri overlap validation
 ✅ Dedupe diagnostic optimized to group by normalized company/title identity before pair comparison
 ✅ Same-source canonical auto-linking disabled except exact canonical URL evidence
+✅ Fixed canonical rebuild startup import regression after identity-version hardening
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
@@ -559,6 +560,7 @@ The system is therefore **ingesting real jobs continuously**.
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
 ⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
+⏳ Confirm the v2 identity-version rebuild completes successfully on the persistent Oracle database
 ⏳ Validate rebuilt canonical groups and identify safe high-confidence cross-source merge signals
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
