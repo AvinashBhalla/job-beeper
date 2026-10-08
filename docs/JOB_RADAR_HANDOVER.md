@@ -552,6 +552,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Same-source canonical auto-linking disabled except exact canonical URL evidence
 ✅ Fixed canonical rebuild startup import regression after identity-version hardening
 ✅ Fixed canonical group creation/source-isolation regressions before persistent database rebuild
+✅ Fixed canonical metadata candidate source propagation so same-source distinct listings remain separate while exact canonical URLs may still merge
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
@@ -561,7 +562,7 @@ The system is therefore **ingesting real jobs continuously**.
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
 ⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
-⏳ Confirm the v2 identity-version rebuild completes successfully on the persistent Oracle database
+✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
 ⏳ Validate rebuilt canonical groups and identify safe high-confidence cross-source merge signals
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
@@ -833,7 +834,11 @@ The system should represent uncertainty and make policy decisions from that expl
 
 A UI control that only changes an old V1 config is not a V2 feature.
 
-### Observation 5 — The current source roadmap is broader than the first three sources
+### Observation 5 — Same-source isolation must be enforced at candidate retrieval time
+
+The canonical layer now carries the representative source through metadata candidate queries, so same-source listings cannot be merged merely from company/title/location similarity. Exact canonical URL evidence remains eligible for linking.
+
+### Observation 6 — The current source roadmap is broader than the first three sources
 
 The long-term goal includes useful ATS/career sources.
 
