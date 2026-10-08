@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last verified:** 2026-10-08 (Oracle runtime verification + canonical dedupe implementation)  
+**Last verified: 2026-10-08 (Oracle runtime verification + Telegram delivery implementation)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Twenty-two matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
+✅ Twenty-five matcher/dedupe/config/Telegram regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -557,6 +557,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Persistent job evaluation state added with configuration fingerprint, match score/reasons, experience data, and alertability
 ✅ Persistent notification ledger added per canonical opportunity with historical suppression and new-opportunity pending state
 ✅ Persistent notification decision queue added with reconsideration of fresh non-alertable opportunities
+✅ V2 Telegram delivery worker added with persistent claim/sent/failed state, safe retry handling, and interrupted-claim recovery
+✅ Telegram message formatting and delivery error behavior regression-tested
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Persistent notification decision queue implemented: pending opportunities become queued only when fresh, matched, alertable and notifications are enabled; otherwise they are suppressed with a durable reason
@@ -574,13 +576,14 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Real overlap validation completed: 1,206 jobs, 855 identity groups, 38 cross-source candidates, 0 auto-link candidates; observed overlaps remain safely separate
 ⏳ Validate the persistent notification decision queue on the upgraded Oracle database
 ⏳ Validate live configuration re-evaluation and notification reconsideration on Oracle after a configuration update
-⏳ Build Telegram delivery/claim/retry on top of the queued notification state
+✅ Build Telegram delivery/claim/retry on top of the queued notification state
+⏳ Configure Telegram credentials on Oracle and send one real test notification
 ```
 
 ### Not yet production-ready
 
 ```
-❌ Telegram notification engine
+✅ Telegram notification engine implementation complete; real credentialed delivery validation remains
 ❌ Cross-source canonical deduplication
 ❌ New/changed opportunity detection
 ❌ Fully V2-connected frontend settings
@@ -826,9 +829,13 @@ The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source can
 
 ### Observation 3 — Persistent state is now the foundation for new-only alerting
 
-Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Configuration changes now recompute persisted evaluations before reconsidering the notification queue. Only genuinely stale opportunities are suppressed.
+Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Configuration changes recompute persisted evaluations before reconsidering the notification queue.
 
-### Observation 4 — Matcher quality matters more than raw job count
+### Observation 4 — Telegram is now the next external integration
+
+The V2 Telegram layer consumes only queued canonical opportunities, atomically claims delivery work, formats an explainable direct-apply alert, records sent or failed, retries only explicitly retryable failures, and recovers interrupted claims after restart. Credentials are supplied through container environment variables and are never stored in the repository.
+
+### Observation 5 — Matcher quality matters more than raw job count
 
 The objective is not to maximize jobs stored.
 
@@ -840,25 +847,25 @@ worthwhile alerts / total alerts
 
 Noise is a product failure.
 
-### Observation 5 — Unknown data must remain unknown
+### Observation 6 — Unknown data must remain unknown
 
 If LinkedIn does not expose experience, do not manufacture one.
 
 The system should represent uncertainty and make policy decisions from that explicit state.
 
-### Observation 6 — Frontend configuration must be real
+### Observation 7 — Frontend configuration must be real
 
 A UI control that only changes an old V1 config is not a V2 feature.
 
-### Observation 7 — Same-source isolation must be enforced at candidate retrieval time
+### Observation 8 — Same-source isolation must be enforced at candidate retrieval time
 
 The canonical layer now carries the representative source through metadata candidate queries, so same-source listings cannot be merged merely from company/title/location similarity. Exact canonical URL evidence remains eligible for linking.
 
-### Observation 8 — Experience ranges reveal real requisition variants
+### Observation 9 — Experience ranges reveal real requisition variants
 
 Real IBM examples showed identical company/title/location across LinkedIn and Naukri with different explicit Naukri ranges such as 5–7, 6–7, and 6–8 years, and IBM Cloud FullStack variants at 15–20, 14–20, and 18–20 years. These are not safe duplicate merges. Canonical matching now treats incompatible explicit experience ranges as distinct opportunities.
 
-### Observation 9 — The current source roadmap is broader than the first three sources
+### Observation 10 — The current source roadmap is broader than the first three sources
 
 The long-term goal includes useful ATS/career sources.
 
