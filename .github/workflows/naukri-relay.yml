@@ -1,0 +1,150 @@
+name: naukri-relay
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: naukri-relay
+  cancel-in-progress: true
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Naukri collector dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 python-jobspy==1.2.0
+
+      - name: Collect Naukri jobs
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          from pathlib import Path
+
+          from jobspy import scrape_jobs
+
+          ROOT = Path(".")
+          config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+          queries = config["sources"]["naukri"]
+          now = dt.datetime.now(dt.timezone.utc)
+
+          jobs = []
+          seen = set()
+
+          for query in queries:
+              print(f"Collecting Naukri query: {query}", flush=True)
+              frame = scrape_jobs(
+                  site_name=["naukri"],
+                  search_term=query,
+                  location="India",
+                  results_wanted=30,
+                  hours_old=72,
+                  fetch_description=True,
+                  description_format="plain",
+                  verbose=0,
+              )
+
+              if frame is None or frame.empty:
+                  print(f"No results for: {query}", flush=True)
+                  continue
+
+              print(f"Results for {query}: {len(frame)}", flush=True)
+
+              for row in frame.to_dict("records"):
+                  url = str(row.get("job_url") or row.get("job_url_direct") or "")
+                  if not url:
+                      continue
+
+                  raw_id = str(row.get("id") or url)
+                  source_id = "nk-" + raw_id
+                  if source_id in seen:
+                      continue
+                  seen.add(source_id)
+
+                  posted = row.get("date_posted")
+                  if hasattr(posted, "isoformat"):
+                      posted = posted.isoformat()
+
+                  experience = row.get("experience_range")
+                  skills = row.get("skills")
+                  description = " ".join(
+                      str(x) for x in [
+                          row.get("description"),
+                          experience,
+                          skills,
+                      ] if x
+                  )
+
+                  jobs.append({
+                      "id": source_id,
+                      "source": "naukri",
+                      "company": str(row.get("company") or row.get("company_name") or ""),
+                      "title": str(row.get("title") or ""),
+                      "location": str(row.get("location") or ""),
+                      "url": url,
+                      "posted": posted,
+                      "description": description,
+                  })
+
+          def posted_sort_key(job):
+              value = job.get("posted")
+              if not value:
+                  return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+              if isinstance(value, str):
+                  try:
+                      parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+                      return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+                  except ValueError:
+                      return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+              if hasattr(value, "to_pydatetime"):
+                  parsed = value.to_pydatetime()
+                  return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+              return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+
+          jobs.sort(key=posted_sort_key, reverse=True)
+
+          payload = {
+              "updated_at": now.isoformat(),
+              "count": len(jobs),
+              "jobs": jobs[:500],
+          }
+
+          out = ROOT / "naukri_relay.json"
+          out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+          print(f"Naukri relay: {len(jobs)} unique jobs")
+          PY
+
+      - name: Publish relay branch
+        run: |
+          test -s naukri_relay.json
+
+          git config user.name "job-watch-bot"
+          git config user.email "bot@users.noreply.github.com"
+
+          git checkout --orphan naukri-relay
+          git rm -rf . >/dev/null 2>&1 || true
+          mkdir -p dashboard/data
+          cp naukri_relay.json dashboard/data/naukri_relay.json
+
+          git add dashboard/data/naukri_relay.json
+          git commit -m "relay latest Naukri feed"
+          git push origin HEAD:naukri-relay --force
