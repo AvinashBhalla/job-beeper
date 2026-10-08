@@ -1055,18 +1055,12 @@ def dedupe_candidates(limit: int = 100):
             JOIN jobs b
               ON a.id < b.id
              AND a.source != b.source
+             AND lower(trim(a.company)) = lower(trim(b.company))
         """).fetchall()
 
     candidates = []
     for row in rows:
         left = dict(row)
-        right = {
-            "company": left["company_b"],
-            "title": left["title_b"],
-            "location": left["location_b"],
-            "url": left["url_b"],
-            "description": left["description_b"],
-        }
         left_job = {
             "company": left["company_a"],
             "title": left["title_a"],
@@ -1074,7 +1068,14 @@ def dedupe_candidates(limit: int = 100):
             "url": left["url_a"],
             "description": left["description_a"],
         }
-        score, method = canonical_match_score(left_job, right)
+        right_job = {
+            "company": left["company_b"],
+            "title": left["title_b"],
+            "location": left["location_b"],
+            "url": left["url_b"],
+            "description": left["description_b"],
+        }
+        score, method = canonical_match_score(left_job, right_job)
         if score <= 0:
             continue
         candidates.append({
