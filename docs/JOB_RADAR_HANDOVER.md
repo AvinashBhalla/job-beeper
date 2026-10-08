@@ -4,9 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated:** 2026-10-08  
+**Last verified:** 2026-10-08  
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
+
+> **Reconciliation note:** This document was updated after a direct repository review. Where older handover claims conflicted with current code, the current code/runtime state is recorded below. In particular: V2 Telegram is not yet implemented; cross-source canonical dedupe is incomplete; the current Naukri relay schema does not guarantee structured experience/skills fields; and the repository must not claim a reproducible systemd scheduler unless its unit files are committed.
 
 ---
 
@@ -973,3 +975,72 @@ The final test is not "does it scrape?"
 The final test is:
 
 > **Can the user leave it running and trust that when Telegram rings, the job is probably worth opening?**
+
+
+---
+
+## 29. HISTORICAL DEBUGGING / OPERATIONS NOTES
+
+These details are intentionally preserved because they explain why several architectural decisions must not be casually reversed.
+
+### Oracle VM browser incident
+
+The tiny Oracle VM previously reached approximately:
+
+- load average ~15
+- ~69% CPU steal
+- ~13% iowait
+- 208 zombie processes
+- many Chromium / chrome_crashpad children
+
+Stopping the old Docker runtime cleared the zombie buildup and returned the VM to a healthy idle state.
+
+**Conclusion:** production V2 must remain browser-free unless there is compelling measured evidence otherwise.
+
+### GitHub scheduler reliability
+
+The project initially relied on frequent GitHub cron execution. Actual observed workflow history later showed long gaps, so a five-minute cron expression must not be described as guaranteed five-minute execution.
+
+**Conclusion:** persistent scheduling belongs on the VM. GitHub Actions is a relay/acquisition worker where useful.
+
+### V1 `seen.json` warning
+
+V1 could add a rejected job to `seen.json`. This means a later configuration change could fail to reconsider it.
+
+**Conclusion:** V2 must maintain separate observation/evaluation/alert state.
+
+### GitHub CLI compatibility
+
+The Ubuntu VM had an older GitHub CLI where `gh auth login --git-protocol ...` was unsupported. The working authentication path was:
+
+```
+gh auth login --hostname github.com --web
+```
+
+For run watching, use:
+
+```
+gh run watch <run-id> --repo AvinashBhalla/job-beeper --exit-status
+```
+
+Do not assume newer flags such as `--compact` exist.
+
+---
+
+## 30. DOCUMENTATION MAINTENANCE RULE
+
+After every significant milestone, update:
+
+- Current release checkpoint
+- Current important observations
+- Immediate next steps
+- Source status
+- Runtime/deployment status if changed
+
+When a feature is visually present but backend-incomplete, mark it incomplete.
+
+When a source is present in code but unverified, mark it unverified.
+
+When a scheduler exists only manually on the VM, do not describe it as repository-reproducible.
+
+The repository and this file should be kept in sync deliberately.
