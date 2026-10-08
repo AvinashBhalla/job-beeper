@@ -218,8 +218,9 @@ Current approach:
 Current V2 LinkedIn freshness target:
 
 - poll every 60 seconds
+- fast lane scans `start=0` every poll with LinkedIn low-applicant filtering (`f_EA=true`) and a one-hour recency window
 - scan `start=0` on every poll
-- scan `start=10` as a deeper sweep every 5 minutes
+- scan `start=10` as a deeper six-hour sweep every 5 minutes, without the low-applicant filter
 - run LinkedIn search requests concurrently with a bounded worker pool
 - fetch only plausible alert candidates for JD enrichment, also concurrently
 - prefer the public LinkedIn guest job-detail endpoint for enrichment
