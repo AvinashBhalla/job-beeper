@@ -13,7 +13,7 @@
     <a class="nav-link active" href="#jobs" data-section="jobsSection">▦ <span>Jobs</span></a>
     <a class="nav-link" href="#applied" data-section="appliedSection">◷ <span>Applied</span></a>
     <a class="nav-link" href="#filters" data-section="filtersSection">☷ <span>Filters</span></a>
-<a class="nav-link" href="#settings" data-section="settingsSection">⚙ <span>Settings</span></a>
+<a class="nav-link" href="#settings" data-section="settingsSection">⚙ <span>Access</span></a>
     <a class="nav-link" href="#sources" data-section="sourcesSection">▤ <span>Sources</span></a>
   </nav>
   <div class="profile"><div class="avatar">AB</div><div><b>Avinash Bhalla</b><small>Personal job watcher</small></div></div>
@@ -44,7 +44,7 @@
     <select id="sort"><option value="newest">Newest first</option><option value="match">Best match</option></select>
   </section>
 
-  <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><button id="scanNow">⚡ Scan sources now</button><span id="auto">Feed refresh: 30s · source scan: scheduled</span></div>
+  <div class="feedhead"><b id="count">0 jobs</b><button id="refresh">↻ Refresh feed</button><span id="auto">Feed refresh: 30s · sources run continuously</span></div>
   <section id="jobs" class="jobs"></section>
   </section>
 
@@ -87,34 +87,43 @@
 
   <section id="filtersSection" class="page-section hidden-section">
     <div class="settings-panel">
-      <div class="section-title"><h2>Filters</h2><p>Control which jobs are fetched, ranked, and sent to Telegram.</p></div>
-      <div class="match-explainer"><b>Match score:</b> role/field relevance + skills + location + freshness + experience fit. The score is capped at 100. The reasons shown on each job card are the terms that contributed to its match.</div>
+      <div class="section-title"><h2>Preferences</h2><p>These settings control V2 matching and future Telegram alert eligibility. They are stored on the Oracle VM.</p></div>
+      <div class="match-explainer"><b>How it works:</b> jobs are collected first, then evaluated against these preferences. Changing preferences does not require a code change or Docker rebuild.</div>
       <div class="settings-grid">
-        <label class="field"><span>Keywords</span><textarea id="cfgKeywords" placeholder="software engineer, react developer, automation engineer"></textarea></label>
+        <label class="field"><span>Target roles</span><textarea id="cfgRoles" placeholder="software engineer, full stack developer, AI engineer"></textarea></label>
         <label class="field"><span>Locations</span><textarea id="cfgLocations" placeholder="Bengaluru, Gurugram, Delhi, Remote India"></textarea></label>
         <label class="field"><span>Skills</span><textarea id="cfgSkills" placeholder="React, Python, Node.js, FastAPI, AI, automation"></textarea></label>
         <label class="field"><span>Exclude titles</span><textarea id="cfgExclude" placeholder="senior, staff, principal, manager, lead"></textarea></label>
-        <label class="field"><span>Your experience</span><input id="cfgCandidateExperience" type="number" min="0" max="30" step="0.5" placeholder="e.g. 2"></label>
+        <label class="field"><span>Exclude role/category terms</span><textarea id="cfgExcludeRoles" placeholder="QA, tester, testing"></textarea></label>
+        <label class="field"><span>Your experience</span><input id="cfgCandidateExperience" type="number" min="0" max="30" step="0.5" placeholder="2"></label>
         <label class="field"><span>Minimum job experience</span><input id="cfgMinExperience" type="number" min="0" max="30" step="0.5" placeholder="No minimum"></label>
-        <label class="field"><span>Maximum experience required</span><select id="cfgExperience"><option value="1">1 year</option><option value="2">2 years</option><option value="3">3 years</option><option value="4">4 years</option><option value="5">5 years</option><option value="6">6 years</option><option value="10">10 years</option></select></label>
-        <label class="field"><span>Maximum job age</span><select id="cfgAge"><option value="6">6 hours</option><option value="24">24 hours</option><option value="48">48 hours</option><option value="72">72 hours</option><option value="168">7 days</option></select></label>
-        <div class="field"><span>Job fields</span><div id="fieldChoices" class="choices"></div></div>
+        <label class="field"><span>Maximum acceptable job experience</span><input id="cfgExperience" type="number" min="0" max="30" step="0.5" placeholder="3"></label>
+        <label class="field"><span>Match threshold</span><input id="cfgThreshold" type="number" min="0" max="100" step="1" placeholder="55"></label>
+        <label class="field"><span>Source controls</span><div id="sourceChoices" class="choices"></div></label>
       </div>
       <label class="toggle"><input id="cfgRemoteOnly" type="checkbox"><span>Remote jobs only</span></label>
-      <label class="toggle"><input id="cfgTelegram" type="checkbox" checked><span>Telegram alerts enabled</span></label>
+      <label class="toggle"><input id="cfgRequireExperience" type="checkbox"><span>Require explicit experience for Telegram alerts</span></label>
+      <label class="toggle"><input id="cfgTelegram" type="checkbox"><span>Telegram alerts enabled</span></label>
+      <div class="github-row"><button id="saveConfig" class="primary">Save V2 preferences</button><span id="saveStatus" class="save-status"></span></div>
     </div>
   </section>
 
-  <section id="settingsSection" class="page-section hidden-section">
+  <section id="sourcesSection" class="page-section hidden-section">
+    <div class="settings-panel"><div class="section-title"><h2>Sources</h2><p>Job sources configured in the repository will be shown here as the feed reports them.</p></div><div id="sourceStatus" class="empty">Loading source status…</div></div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html<section id="settingsSection" class="page-section hidden-section">
     <div class="settings-panel">
-      <div class="section-title"><h2>GitHub connection</h2><p>Enter your fine-grained token here. It is kept only in this browser session and is never sent to the job scraper.</p></div>
+      <div class="section-title"><h2>Configuration access</h2><p>Updating V2 preferences is protected by a local configuration token stored on the Oracle VM.</p></div>
       <div class="github-row">
-        <input id="githubToken" type="password" autocomplete="off" placeholder="github_pat_…">
-        <button id="saveConfig" class="primary">Save filters &amp; run scan</button>
+        <input id="configToken" type="password" autocomplete="off" placeholder="V2 configuration token">
+        <button id="saveToken" class="primary">Remember token</button>
         <button id="clearToken" class="secondary">Clear token</button>
       </div>
-      <div id="saveStatus" class="save-status"></div>
-      <div class="token-help"><b>Required token permissions:</b> repository <b>Contents: Read and write</b> and <b>Actions: Read and write</b>.</div>
+      <div id="tokenStatus" class="save-status"></div>
+      <div class="token-help">Retrieve the token on the VM with <code>sudo docker compose -f v2/docker-compose.yml exec radar cat /data/config_token</code>. It is kept in browser session storage only.</div>
     </div>
   </section>
 
