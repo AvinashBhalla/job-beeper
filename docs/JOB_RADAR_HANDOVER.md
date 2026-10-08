@@ -1396,3 +1396,14 @@ The repository and this file should be kept in sync deliberately.
 - This is a measured compromise between freshness and rate-limit pressure: target location coverage remains within roughly two fast cycles under normal runtime conditions, while request bursts are materially smaller.
 - New commits on `main`: `520da25` (scan-burst reduction + config migration), `6bf496c` (config version), `8b6f558` (migration regression test).
 - Next Oracle action after CI passes: rebuild the container again so the v4 migration and reduced-burst LinkedIn collector become active. Then inspect `/api/config` to confirm Instahyre is false and inspect LinkedIn source runs/latency over several fresh postings.
+
+## Critical LinkedIn Delay Root Cause — 2026-10-08
+
+- Manual acceptance found a severe case: Infosys `AI-Driven - Full Stack Engineer` was shown by LinkedIn as posted around 6:13 PM IST but was first discovered/alerted around 11:13 PM IST.
+- Runtime `/data/config.json` exposed the root cause: although repository `v2/config.json` had the broadened LinkedIn query families, the persistent runtime configuration had an older narrowed set that did not include `full stack engineer`, `react engineer`, `python engineer`, `frontend engineer`, `backend engineer`, or other required variants. Therefore the live Oracle collector was not actually searching the same query vocabulary as the repository.
+- The alert was delayed because the posting did not enter the fast lane through the missing query variant; the slower/deeper scan eventually found it. The timestamp gap therefore represented a real acquisition/coverage failure, not a Telegram delivery delay.
+- V5 config migration now treats LinkedIn/Naukri query families as repository-owned configuration and repairs stale persisted runtime query sets when upgrading from a pre-v5 runtime. This keeps the deployed collector aligned with the GitHub source of truth.
+- LinkedIn fast recency window is now 6 hours instead of 1 hour, so a job missed by a transient query/source condition can still be found by the fast lane without waiting for the periodic deep scan.
+- Existing fast-lane Easy Apply restriction was already removed. Search concurrency is bounded to reduce 429 pressure.
+- CI on the latest `main` head is green after correcting the V5 migration test semantics.
+- The next production validation must rebuild Oracle from latest `main`, confirm the live runtime query list contains the full repository vocabulary, then measure fresh LinkedIn discovery latency and 429 frequency over multiple cycles.
