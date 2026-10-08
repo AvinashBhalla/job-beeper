@@ -753,20 +753,31 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                 FROM jobs j
                 JOIN job_evaluations e ON e.job_id=j.id
                 WHERE j.canonical_opportunity_id=?
-                ORDER BY e.alertable DESC, e.score DESC, j.discovered_at DESC, j.id DESC
+                ORDER BY e.match DESC, e.alertable DESC, e.score DESC, j.discovered_at DESC, j.id DESC
             """, (opportunity_id,)).fetchall()
 
+            eligible = []
+            fresh_matches = []
             fresh_alertable = []
+
             for observation in observations:
                 item = dict(observation)
-                if not item["alertable"]:
+                if not item["match"]:
                     continue
+
+                eligible.append(item)
+
                 age_timestamp = _alert_age_timestamp(item)
-                if age_timestamp and age_timestamp < now_value - dt.timedelta(hours=max_age):
+                is_fresh = not age_timestamp or age_timestamp >= now_value - dt.timedelta(hours=max_age)
+                if not is_fresh:
                     continue
-                fresh_alertable.append(item)
+
+                fresh_matches.append(item)
+                if item["alertable"]:
+                    fresh_alertable.append(item)
 
             timestamp = iso(now())
+
             if fresh_alertable and config.get("notifications_enabled", True):
                 candidate = fresh_alertable[0]
                 reasons = [
@@ -787,40 +798,58 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                     json.dumps(reasons, ensure_ascii=False),
                     opportunity_id,
                 ))
-            else:
-                if not observations:
-                    reasons = ["no persisted evaluation available"]
-                    next_status = "pending"
-                elif not config.get("notifications_enabled", True):
-                    reasons = ["Telegram notifications disabled; awaiting future re-evaluation"]
-                    next_status = "pending"
-                else:
-                    fresh_observations = []
-                    stale_observations = []
-                    for observation in observations:
-                        item = dict(observation)
-                        age_timestamp = _alert_age_timestamp(item)
-                        if age_timestamp and age_timestamp < now_value - dt.timedelta(hours=max_age):
-                            stale_observations.append(item)
-                        else:
-                            fresh_observations.append(item)
-
-                    if not fresh_observations and stale_observations:
-                        reasons = [f"no alertable observation within {max_age} hour age window"]
-                        next_status = "suppressed"
-                    else:
-                        reasons = ["not alertable under current policy; awaiting future re-evaluation"]
-                        next_status = "pending"
-
+            elif not eligible:
+                reasons = ["no profile-matching observation"]
                 conn.execute("""
                     UPDATE notification_ledger
-                    SET status=?,
+                    SET status='suppressed',
                         candidate_job_id=NULL,
                         updated_at=?,
                         decision_reason_json=?
                     WHERE canonical_opportunity_id=? AND status='pending'
                 """, (
-                    next_status,
+                    timestamp,
+                    json.dumps(reasons, ensure_ascii=False),
+                    opportunity_id,
+                ))
+            elif not fresh_matches:
+                reasons = [f"no matching observation within {max_age} hour age window"]
+                conn.execute("""
+                    UPDATE notification_ledger
+                    SET status='suppressed',
+                        candidate_job_id=NULL,
+                        updated_at=?,
+                        decision_reason_json=?
+                    WHERE canonical_opportunity_id=? AND status='pending'
+                """, (
+                    timestamp,
+                    json.dumps(reasons, ensure_ascii=False),
+                    opportunity_id,
+                ))
+            elif not config.get("notifications_enabled", True):
+                reasons = ["Telegram notifications disabled; awaiting future re-evaluation"]
+                conn.execute("""
+                    UPDATE notification_ledger
+                    SET status='pending',
+                        candidate_job_id=NULL,
+                        updated_at=?,
+                        decision_reason_json=?
+                    WHERE canonical_opportunity_id=? AND status='pending'
+                """, (
+                    timestamp,
+                    json.dumps(reasons, ensure_ascii=False),
+                    opportunity_id,
+                ))
+            else:
+                reasons = ["profile match exists but not alertable under current policy; awaiting future re-evaluation"]
+                conn.execute("""
+                    UPDATE notification_ledger
+                    SET status='pending',
+                        candidate_job_id=NULL,
+                        updated_at=?,
+                        decision_reason_json=?
+                    WHERE canonical_opportunity_id=? AND status='pending'
+                """, (
                     timestamp,
                     json.dumps(reasons, ensure_ascii=False),
                     opportunity_id,
@@ -830,7 +859,6 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
         conn.commit()
 
     return changed
-
 
 def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
                jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
