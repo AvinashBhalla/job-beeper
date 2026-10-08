@@ -21,6 +21,8 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score
+
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
 DB_PATH = Path(os.getenv("JOB_RADAR_DB", ROOT / "jobs.db"))
@@ -274,6 +276,124 @@ def normalize_job(source: str, source_id: str, company: str, title: str,
     }
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
+    row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    return dict(row)
+
+
+def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -> list[dict[str, Any]]:
+    identity = canonical_identity(job)
+    rows = conn.execute("""
+        SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
+               j.id AS representative_job_id, j.company, j.title, j.location, j.url,
+               j.description, j.source_posted_at, j.discovered_at
+        FROM canonical_opportunities co
+        JOIN jobs j ON j.id = co.representative_job_id
+        WHERE co.company_norm=? AND co.location_norm=?
+        ORDER BY co.last_seen_at DESC
+        LIMIT 100
+    """, (identity["company_norm"], identity["location_norm"])).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _create_canonical_group(
+    conn: sqlite3.Connection,
+    job_id: int,
+    job: dict[str, Any],
+    method: str,
+    confidence: int,
+) -> int:
+    identity = canonical_identity(job)
+    canonical_url = identity["url_norm"] or None
+    cur = conn.execute("""
+        INSERT INTO canonical_opportunities (
+            canonical_url, company_norm, title_norm, location_norm,
+            representative_job_id, first_seen_at, last_seen_at, identity_version
+        ) VALUES (?,?,?,?,?,?,?,1)
+    """, (
+        canonical_url,
+        identity["company_norm"],
+        identity["title_norm"],
+        identity["location_norm"],
+        job_id,
+        job["discovered_at"],
+        job["discovered_at"],
+    ))
+    canonical_id = int(cur.lastrowid)
+    conn.execute("""
+        UPDATE jobs
+        SET canonical_opportunity_id=?,
+            canonical_match_method=?,
+            canonical_match_confidence=?
+        WHERE id=?
+    """, (canonical_id, method, confidence, job_id))
+    return canonical_id
+
+
+def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, int]:
+    job = _job_for_canonical(conn, job_id)
+    if not job:
+        raise ValueError(f"Job {job_id} does not exist")
+
+    existing_id = job.get("canonical_opportunity_id")
+    if existing_id:
+        conn.execute(
+            "UPDATE canonical_opportunities SET last_seen_at=? WHERE id=?",
+            (job["last_seen_at"], existing_id),
+        )
+        return int(existing_id), job.get("canonical_match_method") or "existing", int(job.get("canonical_match_confidence") or 0)
+
+    best_id = None
+    best_score = 0
+    best_method = "none"
+    best_representative = None
+    for candidate in _candidate_canonical_groups(conn, job):
+        score, method = canonical_match_score(job, candidate)
+        if score > best_score:
+            best_id = int(candidate["id"])
+            best_score = score
+            best_method = method
+            best_representative = candidate
+
+    if best_id is not None and auto_link_allowed(best_score, best_method):
+        conn.execute("""
+            UPDATE jobs
+            SET canonical_opportunity_id=?,
+                canonical_match_method=?,
+                canonical_match_confidence=?
+            WHERE id=?
+        """, (best_id, best_method, best_score, job_id))
+        conn.execute(
+            "UPDATE canonical_opportunities SET last_seen_at=? WHERE id=?",
+            (job["last_seen_at"], best_id),
+        )
+        return best_id, best_method, best_score
+
+    new_id = _create_canonical_group(conn, job_id, job, "new", 0)
+    return new_id, "new", 0
+
+
+def backfill_canonical_opportunities() -> None:
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT id FROM jobs
+            WHERE canonical_opportunity_id IS NULL
+            ORDER BY first_seen_at ASC, id ASC
+        """).fetchall()
+        for row in rows:
+            _assign_canonical(conn, int(row["id"]))
+        conn.commit()
+
+
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
@@ -293,6 +413,9 @@ def init_db() -> None:
             description TEXT NOT NULL DEFAULT '',
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
+            canonical_opportunity_id INTEGER,
+            canonical_match_method TEXT,
+            canonical_match_confidence INTEGER,
             UNIQUE(source, source_job_id)
         )
         """)
@@ -307,7 +430,27 @@ def init_db() -> None:
             error TEXT
         )
         """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS canonical_opportunities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            canonical_url TEXT,
+            company_norm TEXT NOT NULL,
+            title_norm TEXT NOT NULL,
+            location_norm TEXT NOT NULL,
+            representative_job_id INTEGER NOT NULL,
+            first_seen_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            identity_version INTEGER NOT NULL DEFAULT 1
+        )
+        """)
+        _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
+        _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
+        _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
+    backfill_canonical_opportunities()
 
 
 def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
@@ -315,7 +458,7 @@ def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         for j in jobs:
             existing = conn.execute(
-                "SELECT id FROM jobs WHERE source=? AND source_job_id=?",
+                "SELECT id, canonical_opportunity_id FROM jobs WHERE source=? AND source_job_id=?",
                 (j["source"], j["source_job_id"])
             ).fetchone()
             if existing:
@@ -323,15 +466,18 @@ def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
                     UPDATE jobs SET last_seen_at=?, source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
                     discovery_latency_seconds=COALESCE(?, discovery_latency_seconds),
-                    description=CASE WHEN length(?) > length(description) THEN ? ELSE description END
+                    description=CASE WHEN length(?) > length(description) THEN ? ELSE description
+                    END
                     WHERE id=?
                 """, (
                     j["discovered_at"], j["source_posted_at"], j["posted_precision"],
                     j["posted_precision"], j["discovery_latency_seconds"],
                     j["description"], j["description"], existing[0]
                 ))
+                if not existing[1]:
+                    _assign_canonical(conn, int(existing[0]))
             else:
-                conn.execute("""
+                cur = conn.execute("""
                     INSERT INTO jobs (
                         source, source_job_id, company, title, location, url,
                         source_posted_at, posted_precision, discovered_at,
@@ -344,10 +490,10 @@ def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
                     j["discovery_latency_seconds"], j["description"],
                     j["discovered_at"], j["discovered_at"]
                 ))
+                _assign_canonical(conn, int(cur.lastrowid))
                 new_count += 1
         conn.commit()
     return new_count
-
 
 def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
                jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
@@ -877,6 +1023,38 @@ def source_status():
     }
 
 
+@app.get("/api/opportunities")
+def opportunities(minutes: int = 60, limit: int = 100):
+    minutes = max(1, min(minutes, 10080))
+    limit = max(1, min(limit, 500))
+    cutoff = iso(now() - dt.timedelta(minutes=minutes))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT
+                co.id,
+                co.canonical_url,
+                co.company_norm,
+                co.title_norm,
+                co.location_norm,
+                co.first_seen_at,
+                co.last_seen_at,
+                co.representative_job_id,
+                COUNT(j.id) AS observation_count,
+                COUNT(DISTINCT j.source) AS source_count,
+                GROUP_CONCAT(DISTINCT j.source) AS sources
+            FROM canonical_opportunities co
+            JOIN jobs j ON j.canonical_opportunity_id = co.id
+            WHERE co.last_seen_at >= ?
+            GROUP BY co.id
+            ORDER BY co.last_seen_at DESC
+            LIMIT ?
+        """, (cutoff, limit)).fetchall()
+    return {
+        "opportunities": [dict(row) for row in rows]
+    }
+
+
 @app.get("/api/jobs")
 def jobs(minutes: int = 60, limit: int = 100):
     config = get_config()
@@ -903,6 +1081,9 @@ def jobs(minutes: int = 60, limit: int = 100):
         item["experience_max_years"] = details["experience_max_years"]
         item["alertable"] = alertability["alertable"]
         item["alertability_reasons"] = alertability["reasons"]
+        item["canonical_opportunity_id"] = item.get("canonical_opportunity_id")
+        item["canonical_match_method"] = item.get("canonical_match_method")
+        item["canonical_match_confidence"] = item.get("canonical_match_confidence")
         result.append(item)
     return {"jobs": result}
 
