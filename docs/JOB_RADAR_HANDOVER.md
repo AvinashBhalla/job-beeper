@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Seven matcher/config regression tests pass, including experience parsing, alertability, and legacy config migration
+✅ Thirteen matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -612,7 +612,7 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented and regression-tested. Seven tests pass on Oracle.**
+**Partially implemented and regression-tested. The matcher/dedupe suite currently contains thirteen tests; Oracle deployment validation is pending for the new dedupe tests.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
