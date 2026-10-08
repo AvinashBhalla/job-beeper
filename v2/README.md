@@ -36,6 +36,7 @@ V2 now keeps source observations in `jobs` and canonical cross-source groupings 
 - `GET /api/config`
 - `PUT /api/config` (requires `X-Config-Token`)
 - `GET /api/opportunities?minutes=60` (canonical opportunity groups)
+- `GET /api/opportunities/<id>` (opportunity observations)
 
 Runtime user preferences are persisted at `/data/config.json`. The configuration API is protected by a generated token stored at `/data/config_token`, unless `JOB_RADAR_CONFIG_TOKEN` is supplied to the container.
 
