@@ -51,10 +51,18 @@ def iso(value: dt.datetime | None) -> str | None:
     return value.astimezone(UTC).isoformat() if value else None
 
 
-def parse_relative(value: str | None, base: dt.datetime | None = None) -> dt.datetime | None:
-    if not value:
+def parse_relative(value: str | float | int | None, base: dt.datetime | None = None) -> dt.datetime | None:
+    if value is None or value == "":
         return None
     base = base or now()
+    if isinstance(value, (int, float)):
+        timestamp = float(value)
+        if timestamp > 1e11:
+            timestamp /= 1000
+        try:
+            return dt.datetime.fromtimestamp(timestamp, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
     text = str(value).strip().lower()
     if text in {"just now", "now", "today"}:
         return base
