@@ -543,14 +543,16 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
 ✅ Seven matcher/config regression tests pass, including experience parsing, alertability, and legacy config migration
+✅ Canonical opportunity schema and conservative cross-source linking implemented
+✅ Canonical opportunity API added
 ```
 
 ### Currently in progress
 
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
+⏳ Validate canonical grouping against real LinkedIn + Naukri overlaps
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
-⏳ Canonical identity + cross-source deduplication
 ```
 
 ### Not yet production-ready
@@ -654,7 +656,7 @@ Unknown experience should remain configurable rather than silently becoming an a
 
 ### Step D — Canonical identity and cross-source deduplication
 
-The same job may appear on LinkedIn, Naukri and a company ATS.
+The same job may appear on LinkedIn, Naukri and a company ATS. V2 now stores source observations separately and assigns them to canonical opportunities when identity evidence is strong enough.
 
 The system must support:
 
