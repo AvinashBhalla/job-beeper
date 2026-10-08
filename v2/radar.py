@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -49,6 +50,20 @@ LINKEDIN_FAST_TPR = "r3600"
 LINKEDIN_DEEP_TPR = "r21600"
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
+
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("JOB_RADAR_CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "PUT", "OPTIONS"],
+    allow_headers=["*"],
+)
 db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
@@ -566,6 +581,7 @@ def init_db() -> None:
         _ensure_column(conn, "notification_ledger", "claimed_at", "TEXT")
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
+        conn.execute("UPDATE jobs SET discovery_latency_seconds=NULL WHERE discovery_latency_seconds < 0")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
@@ -586,13 +602,12 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 conn.execute("""
                     UPDATE jobs SET last_seen_at=?, source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
-                    discovery_latency_seconds=COALESCE(?, discovery_latency_seconds),
                     description=CASE WHEN length(?) > length(description) THEN ? ELSE description
                     END
                     WHERE id=?
                 """, (
                     j["discovered_at"], j["source_posted_at"], j["posted_precision"],
-                    j["posted_precision"], j["discovery_latency_seconds"],
+                    j["posted_precision"],
                     j["description"], j["description"], existing[0]
                 ))
                 if not existing[1]:

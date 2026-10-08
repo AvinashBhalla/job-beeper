@@ -42,7 +42,7 @@ def _credentials() -> tuple[str, str] | None:
 IST = ZoneInfo("Asia/Kolkata")
 
 
-def _format_timestamp(value: str | None) -> str:
+def _format_timestamp(value: str | None, precision: str | None = None) -> str:
     if not value:
         return "Unknown"
     try:
@@ -54,6 +54,8 @@ def _format_timestamp(value: str | None) -> str:
         parsed = parsed.replace(tzinfo=UTC)
 
     local = parsed.astimezone(IST)
+    if precision == "date":
+        return local.strftime("%d %b %Y") + " (date only)"
     return local.strftime("%d %b %Y, %I:%M %p IST").replace(" 0", " ")
 
 
@@ -66,6 +68,7 @@ def format_notification(item: dict[str, Any]) -> str:
     url = item.get("url") or ""
 
     posted = item.get("source_posted_at")
+    posted_precision = item.get("posted_precision")
     discovered = item.get("discovered_at")
     experience_min = item.get("experience_min_years")
     experience_max = item.get("experience_max_years")
@@ -93,7 +96,7 @@ def format_notification(item: dict[str, Any]) -> str:
         title,
         f"Company: {company}",
         f"📍 {location}",
-        f"🕐 Posted: {_format_timestamp(posted)}",
+        f"🕐 Posted: {_format_timestamp(posted, posted_precision)}",
         f"🔎 Discovered: {_format_timestamp(discovered)}",
         f"🧾 Experience: {experience}",
         f"Source: {source}",
@@ -174,6 +177,7 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
             j.location,
             j.url,
             j.source_posted_at,
+            j.posted_precision,
             j.discovered_at,
             e.score,
             e.reasons_json AS match_reasons_json,
@@ -188,7 +192,7 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
                 AND nl.next_attempt_at IS NOT NULL
                 AND nl.next_attempt_at <= ?
            )
-        ORDER BY nl.created_at ASC
+        ORDER BY nl.created_at DESC
         LIMIT 1
     """, (timestamp,)).fetchone()
 

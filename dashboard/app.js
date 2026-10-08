@@ -31,7 +31,8 @@ function setupNavigation(){
   );
 }
 
-const API="/api";
+const requestedApi = new URLSearchParams(location.search).get("api");
+const API = (requestedApi || "/api").replace(/\\/+$/, "");
 let state={jobs:[]};
 let config=null;
 
@@ -349,7 +350,7 @@ async function loadJobs(){
     $("notified").textContent=summary.alerts_sent ?? 0;
     $("lastRun").textContent=state.jobs.length ? "· "+summary.date : "";
 
-    $("statusText").textContent="Live · Today · V2 backend";
+    $("statusText").textContent=requestedApi ? "Live · Today · Remote V2 backend" : "Live · Today · V2 backend";
     populateSources(state.jobs);
     render();
   }catch(error){
