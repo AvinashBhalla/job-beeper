@@ -843,7 +843,7 @@ class MatcherTests(unittest.TestCase):
 
     def test_legacy_config_migrates_instahyre_to_opt_in(self):
         defaults = {
-            "config_version": 3,
+            "config_version": 4,
             "source_enabled": {
                 "linkedin": True,
                 "naukri": True,
@@ -856,7 +856,7 @@ class MatcherTests(unittest.TestCase):
             },
         }
         legacy = {
-            "config_version": 2,
+            "config_version": 3,
             "source_enabled": {
                 "linkedin": True,
                 "naukri": True,
@@ -864,7 +864,7 @@ class MatcherTests(unittest.TestCase):
             },
         }
         merged = _merge_config(defaults, legacy)
-        self.assertEqual(merged["config_version"], 3)
+        self.assertEqual(merged["config_version"], 4)
         self.assertFalse(merged["source_enabled"]["instahyre"])
 
     def test_config_v5_repairs_persisted_source_queries(self):
