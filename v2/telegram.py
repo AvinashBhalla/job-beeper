@@ -6,6 +6,7 @@ import logging
 import os
 import sqlite3
 import time
+from zoneinfo import ZoneInfo
 from typing import Any
 
 import requests
@@ -36,6 +37,24 @@ def _credentials() -> tuple[str, str] | None:
     if not token or not chat_id:
         return None
     return token, chat_id
+
+
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def _format_timestamp(value: str | None) -> str:
+    if not value:
+        return "Unknown"
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+
+    local = parsed.astimezone(IST)
+    return local.strftime("%d %b %Y, %I:%M %p IST").replace(" 0", " ")
 
 
 def format_notification(item: dict[str, Any]) -> str:
@@ -74,8 +93,8 @@ def format_notification(item: dict[str, Any]) -> str:
         title,
         f"Company: {company}",
         f"📍 {location}",
-        f"🕐 Posted: {posted or 'Unknown'}",
-        f"🔎 Discovered: {discovered or 'Unknown'}",
+        f"🕐 Posted: {_format_timestamp(posted)}",
+        f"🔎 Discovered: {_format_timestamp(discovered)}",
         f"🧾 Experience: {experience}",
         f"Source: {source}",
     ]
