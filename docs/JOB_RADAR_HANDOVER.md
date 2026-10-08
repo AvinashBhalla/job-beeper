@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last verified: 2026-10-08 (Oracle runtime verification + Telegram delivery implementation)
+**Last verified: 2026-10-08 (Oracle runtime verification + daily feed lifecycle + Telegram + JD enrichment)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -571,6 +571,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ End-to-end regression test verifies a LinkedIn JD requirement such as 5+ years is applied before notification eligibility
 ✅ Telegram timestamps now render as human-readable IST (for example, `08 Oct 2026, 1:00 PM IST`)
 ✅ Daily active-feed lifecycle added: `/api/jobs?today_only=true` and `/api/daily-summary` reset visible daily counts at India local midnight while retaining historical SQLite data
+✅ Product benchmark explicitly documented: JobBeeper is the public behavior benchmark; this project is optimized for the user's personal workflow rather than claiming universal superiority
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Telegram credential connectivity verified against the configured bot/chat
@@ -604,7 +605,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Telegram notification engine implementation complete; credentialed Bot API connectivity verified; first real job alerts delivered successfully
 ❌ Cross-source canonical deduplication
 ❌ New/changed opportunity detection
-❌ Daily active-feed UI integration into the dashboard
+⏳ Daily active-feed UI integration into the dashboard
 ❌ Fully V2-connected frontend settings
 ❌ Complete frontend live feed
 ❌ Source health UI beyond basic API
@@ -654,7 +655,7 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented and regression-tested. The matcher/dedupe suite currently contains twenty-nine tests, and the latest Oracle deployment run passed all of them.**
+**Partially implemented and regression-tested. The matcher/dedupe suite currently contains thirty-one tests, with the latest repository suite green before the daily-feed change.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
@@ -846,7 +847,7 @@ The repository contains docs/JOBBEEPER_REFERENCE.md, which records only publicly
 
 ### Observation 2 — Ingestion is no longer the main blocker
 
-### Observation 2 — Real cross-source overlap is currently ambiguous, not safely deduplicable
+### Observation 3 — Real cross-source overlap is currently ambiguous, not safely deduplicable
 
 The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source candidates, with 0 auto-link candidates. The observed same-title/company/location examples include materially different explicit experience ranges, so the system correctly keeps them separate.
 
@@ -854,19 +855,19 @@ The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source can
 
 The active user-facing feed resets at India local midnight. Historical job observations remain in SQLite so deduplication, notification history and auditability are not lost. The API now exposes a current-day feed and daily summary without deleting historical data.
 
-### Observation 3 — Persistent state is now the foundation for new-only alerting
+### Observation 5 — Persistent state is now the foundation for new-only alerting
 
 Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Configuration changes recompute persisted evaluations before reconsidering the notification queue.
 
-### Observation 4 — LinkedIn card data is not sufficient for experience
+### Observation 6 — LinkedIn card data is not sufficient for experience
 
 LinkedIn search cards do not reliably expose the experience requirement even when the full job page does. New LinkedIn jobs without a parsed card-level experience now receive one public JD fetch before matching. Explicit requirements such as "5+ years of full-time software development experience" are extracted into the stored description, allowing the normal experience eligibility rules to reject unsuitable roles before Telegram.
 
-### Observation 11 — Telegram is now the next external integration
+### Observation 7 — Telegram is now the next external integration
 
 The V2 Telegram layer consumes only queued canonical opportunities, atomically claims delivery work, formats an explainable direct-apply alert, records sent or failed, retries only explicitly retryable failures, and recovers interrupted claims after restart. Credentials are supplied through container environment variables and are never stored in the repository. The first real credentialed run successfully delivered three job alerts.
 
-### Observation 11 — Matcher quality matters more than raw job count
+### Observation 8 — Matcher quality matters more than raw job count
 
 The objective is not to maximize jobs stored.
 
@@ -878,13 +879,13 @@ worthwhile alerts / total alerts
 
 Noise is a product failure.
 
-### Observation 11 — Unknown data must remain unknown
+### Observation 9 — Unknown data must remain unknown
 
 If LinkedIn does not expose experience, do not manufacture one.
 
 The system should represent uncertainty and make policy decisions from that explicit state.
 
-### Observation 11 — Frontend configuration must be real
+### Observation 10 — Frontend configuration must be real
 
 A UI control that only changes an old V1 config is not a V2 feature.
 
@@ -892,11 +893,11 @@ A UI control that only changes an old V1 config is not a V2 feature.
 
 The canonical layer now carries the representative source through metadata candidate queries, so same-source listings cannot be merged merely from company/title/location similarity. Exact canonical URL evidence remains eligible for linking.
 
-### Observation 11 — Experience ranges reveal real requisition variants
+### Observation 12 — Experience ranges reveal real requisition variants
 
 Real IBM examples showed identical company/title/location across LinkedIn and Naukri with different explicit Naukri ranges such as 5–7, 6–7, and 6–8 years, and IBM Cloud FullStack variants at 15–20, 14–20, and 18–20 years. These are not safe duplicate merges. Canonical matching now treats incompatible explicit experience ranges as distinct opportunities.
 
-### Observation 11 — The current source roadmap is broader than the first three sources
+### Observation 13 — The current source roadmap is broader than the first three sources
 
 The long-term goal includes useful ATS/career sources.
 
@@ -1048,7 +1049,8 @@ V2 is successful when it can continuously:
 10. send only worthwhile new matches to Telegram
 11. expose the same useful information in the frontend
 12. allow preference changes from the frontend without editing code
-13. tolerate an individual source failing without taking down the radar
+13. reset the visible daily feed and daily counts at India local midnight while retaining backend history
+14. tolerate an individual source failing without taking down the radar
 
 The final test is not "does it scrape?"
 
