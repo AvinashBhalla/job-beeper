@@ -139,6 +139,65 @@ class MatcherTests(unittest.TestCase):
         """
         self.assertEqual(radar.extract_jd_experience(jd), (5.0, None))
 
+    def test_jd_enrichment_is_applied_before_notification_decision(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+
+                job = normalize_job(
+                    "linkedin",
+                    "li-jd-flow",
+                    "NTT DATA North America",
+                    "Z3_Python developer",
+                    "Bangalore Urban, Karnataka, India",
+                    "https://in.linkedin.com/jobs/view/z3-python-developer",
+                    None,
+                    "minute",
+                    "Z3_Python developer NTT DATA North America Bangalore",
+                )
+                job["needs_jd_enrichment"] = True
+
+                class Response:
+                    status_code = 200
+                    text = """
+                    <html><body><main>
+                    Job Qualifications
+                    Mandatory Skills
+                    5+ years of full-time software development experience as a Python Developer.
+                    Expertise in FASTAPI Python framework.
+                    </main></body></html>
+                    """
+
+                with patch.object(radar.requests, "get", return_value=Response()):
+                    self.assertEqual(radar.upsert_jobs([job], BASE_CONFIG), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT e.match, e.alertable,
+                               e.experience_min_years, e.experience_max_years
+                        FROM job_evaluations e
+                        WHERE e.job_id=1
+                    """).fetchone()
+
+                    notification = conn.execute("""
+                        SELECT status
+                        FROM notification_ledger
+                        WHERE canonical_opportunity_id=(
+                            SELECT canonical_opportunity_id
+                            FROM jobs WHERE id=1
+                        )
+                    """).fetchone()
+
+                self.assertEqual(row[0], 0)
+                self.assertEqual(row[1], 0)
+                self.assertEqual(row[2], 5.0)
+                self.assertIsNone(row[3])
+                self.assertEqual(notification[0], "suppressed")
+            finally:
+                radar.DB_PATH = original_db
+
     def test_new_linkedin_job_is_enriched_from_jd_before_matching(self):
         job = normalize_job(
             "linkedin",
