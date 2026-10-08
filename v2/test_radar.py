@@ -674,6 +674,7 @@ class MatcherTests(unittest.TestCase):
             "locations": ["Bengaluru, Karnataka, India"],
         }
         calls = []
+        params_seen = []
 
         class Response:
             status_code = 200
@@ -692,6 +693,7 @@ class MatcherTests(unittest.TestCase):
 
         def fake_request(_endpoint, params):
             calls.append(params["start"])
+            params_seen.append(dict(params))
             return Response()
 
         try:
@@ -704,6 +706,12 @@ class MatcherTests(unittest.TestCase):
 
             self.assertEqual(len(first), 1)
             self.assertEqual(first_starts, [0, 10])
+            fast = next(p for p in params_seen if p["start"] == 0)
+            deep = next(p for p in params_seen if p["start"] == 10)
+            self.assertEqual(fast["f_TPR"], radar.LINKEDIN_FAST_TPR)
+            self.assertEqual(fast["f_EA"], "true")
+            self.assertEqual(deep["f_TPR"], radar.LINKEDIN_DEEP_TPR)
+            self.assertNotIn("f_EA", deep)
             self.assertEqual(len(second), 1)
             self.assertEqual(second_starts, [0])
         finally:
