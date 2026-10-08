@@ -666,6 +666,25 @@ def _ensure_notification_state(
     """, (canonical_opportunity_id, initial_status, timestamp, timestamp))
 
 
+def backfill_job_evaluations(config: dict[str, Any] | None = None) -> int:
+    config = config or get_config()
+    count = 0
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT j.id
+            FROM jobs j
+            LEFT JOIN job_evaluations e ON e.job_id = j.id
+            WHERE e.job_id IS NULL
+            ORDER BY j.first_seen_at ASC, j.id ASC
+        """).fetchall()
+        for row in rows:
+            _persist_job_evaluation(conn, int(row["id"]), config)
+            count += 1
+        conn.commit()
+    return count
+
+
 def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
                jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
     with db_lock, sqlite3.connect(DB_PATH) as conn:
@@ -1133,6 +1152,7 @@ async def scheduler() -> None:
 async def startup() -> None:
     init_db()
     ensure_runtime_config()
+    backfill_job_evaluations(get_config())
     ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
 
