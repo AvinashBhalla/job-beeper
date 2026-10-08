@@ -604,7 +604,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Build Telegram delivery/claim/retry on top of the queued notification state
 ✅ First real V2 job alerts delivered to Telegram: 3 opportunities sent successfully
 ✅ Configure Telegram credentials on Oracle and send one real Telegram integration test
-⏳ Validate the accelerated LinkedIn discovery path on Oracle and measure real discovery latency
+⏳ Validate alert-path latency on Oracle: measure time from LinkedIn posting → discovery → evaluation/JD enrichment → queue → Telegram for relevant jobs; freshness is improved but not yet consistently within the few-minute target
 ✅ Telegram timestamp formatting verified: human-readable IST
 ⏳ Validate real job alert delivery after enabling unknown-experience alerts
 ```
