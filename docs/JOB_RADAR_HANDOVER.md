@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last verified:** 2026-10-08 (Oracle runtime verification)  
+**Last verified:** 2026-10-08 (Oracle runtime verification + canonical dedupe implementation)  
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -545,13 +545,15 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Seven matcher/config regression tests pass, including experience parsing, alertability, and legacy config migration
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
+✅ Canonical persistence/backfill regression tests added
+✅ Conservative dedupe rule: auto-link only strong evidence; ambiguous metadata stays separate
 ```
 
 ### Currently in progress
 
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
-⏳ Validate canonical grouping against real LinkedIn + Naukri overlaps
+⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
 
@@ -657,6 +659,8 @@ Unknown experience should remain configurable rather than silently becoming an a
 ### Step D — Canonical identity and cross-source deduplication
 
 The same job may appear on LinkedIn, Naukri and a company ATS. V2 now stores source observations separately and assigns them to canonical opportunities when identity evidence is strong enough.
+
+Current canonical implementation uses normalized company/location/title metadata, canonical URL normalization, experience corroboration, and description similarity. Strong matches are auto-linked; ambiguous company/title/location matches are intentionally kept separate.
 
 The system must support:
 
@@ -926,8 +930,8 @@ Not yet production-ready.
 Must alert only on new + relevant + eligible + deduplicated jobs.
 
 DEDUPLICATION:
-Not yet fully implemented.
-Must happen before Telegram.
+Canonical opportunity layer is implemented conservatively.
+Real LinkedIn/Naukri validation and further reconciliation of probable duplicates remain.
 
 FRONTEND:
 Repository dashboard now uses V2 local APIs.
