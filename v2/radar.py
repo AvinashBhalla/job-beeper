@@ -1276,7 +1276,13 @@ def run_source(source: str, config: dict[str, Any]) -> None:
 async def notification_worker() -> None:
     while not stop_event.is_set():
         try:
-            from v2.telegram import deliver_queued_notifications, credentials_available
+            from v2.telegram import (
+                credentials_available,
+                deliver_queued_notifications,
+                recover_stale_claims,
+            )
+
+            await asyncio.to_thread(recover_stale_claims)
 
             if credentials_available():
                 delivered = await asyncio.to_thread(deliver_queued_notifications, 10)
