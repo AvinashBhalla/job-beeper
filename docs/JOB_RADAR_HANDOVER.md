@@ -556,6 +556,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Fixed canonical matching to reject cross-source candidates with incompatible explicit experience ranges
 ✅ Persistent job evaluation state added with configuration fingerprint, match score/reasons, experience data, and alertability
 ✅ Persistent notification ledger added per canonical opportunity with historical suppression and new-opportunity pending state
+✅ Persistent notification decision queue added with reconsideration of fresh non-alertable opportunities
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Persistent notification decision queue implemented: pending opportunities become queued only when fresh, matched, alertable and notifications are enabled; otherwise they are suppressed with a durable reason
 ✅ Notification queue API added at `/api/notification-queue`
@@ -571,6 +572,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
 ✅ Real overlap validation completed: 1,206 jobs, 855 identity groups, 38 cross-source candidates, 0 auto-link candidates; observed overlaps remain safely separate
 ⏳ Validate the persistent notification decision queue on the upgraded Oracle database
+⏳ Validate reconsideration behavior on Oracle after a live configuration change
 ⏳ Build Telegram delivery/claim/retry on top of the queued notification state
 ```
 
@@ -629,11 +631,11 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented and regression-tested. The matcher/dedupe suite currently contains eighteen tests, and the latest Oracle deployment run passed all of them.**
+**Partially implemented and regression-tested. The matcher/dedupe suite currently contains twenty-one tests, and the latest Oracle deployment run passed all of them.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
-Next: deploy and validate settings changes against the live database, then finish the distinction between `match`, `eligible`, and `alertable` for Telegram.
+Next: validate live configuration changes against the persisted notification queue, then build Telegram delivery/claim/retry.
 
 Do not hardcode:
 
@@ -823,9 +825,7 @@ The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source can
 
 ### Observation 3 — Persistent state is now the foundation for new-only alerting
 
-Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state.
-
-LinkedIn and Naukri ingestion are working well enough to move into product-quality matching/notification work.
+Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Only genuinely stale opportunities are suppressed.
 
 ### Observation 4 — Matcher quality matters more than raw job count
 
