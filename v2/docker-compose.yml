@@ -10,6 +10,8 @@ services:
       - radar-data:/data
     environment:
       JOB_RADAR_DB: /data/jobs.db
+      JOB_RADAR_TELEGRAM_BOT_TOKEN: ${JOB_RADAR_TELEGRAM_BOT_TOKEN:-}
+      JOB_RADAR_TELEGRAM_CHAT_ID: ${JOB_RADAR_TELEGRAM_CHAT_ID:-}
 
 volumes:
   radar-data:
