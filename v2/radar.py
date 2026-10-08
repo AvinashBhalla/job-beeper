@@ -858,6 +858,7 @@ def source_status():
 
 @app.get("/api/jobs")
 def jobs(minutes: int = 60, limit: int = 100):
+    config = get_config()
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = iso(now() - dt.timedelta(minutes=minutes))
