@@ -157,7 +157,7 @@ class MatcherTests(unittest.TestCase):
             "title": "Application Developer-Java & Web Technologies",
             "location": "Bengaluru, Karnataka",
             "url": "https://linkedin.com/jobs/view/123",
-            "description": "Application Developer-Java & Web Technologies",
+            "description": "Application Developer-Java & Web Technologies. 2-4 years experience.",
         }
         right = {
             "company": "IBM",
