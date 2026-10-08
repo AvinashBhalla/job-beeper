@@ -1,5 +1,7 @@
 import unittest
 
+from unittest.mock import patch
+
 import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -127,6 +129,54 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(row[0], "pending")
             finally:
                 radar.DB_PATH = original_db
+
+    def test_jd_experience_extraction_prefers_experience_text(self):
+        jd = """
+        Job Qualifications
+        Mandatory Skills
+        5+ years of full-time software development experience as a Python Developer.
+        Expertise in FASTAPI Python framework.
+        """
+        self.assertEqual(radar.extract_jd_experience(jd), (5.0, None))
+
+    def test_new_linkedin_job_is_enriched_from_jd_before_matching(self):
+        job = normalize_job(
+            "linkedin",
+            "li-jd",
+            "NTT DATA North America",
+            "Z3_Python developer",
+            "Bangalore Urban, Karnataka, India",
+            "https://in.linkedin.com/jobs/view/z3-python-developer",
+            None,
+            "minute",
+            "Z3_Python developer NTT DATA North America Bengaluru",
+        )
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body>
+            <main>
+            Job Qualifications
+            Mandatory Skills
+            5+ years of full-time software development experience as a Python Developer.
+            Expertise in FASTAPI Python framework.
+            </main>
+            </body></html>
+            """
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            enriched = radar.enrich_linkedin_job(job)
+
+        self.assertIn("JD:", enriched["description"])
+        self.assertEqual(
+            radar.extract_experience(enriched["description"]),
+            (5.0, None),
+        )
+
+        result = match_details(enriched, BASE_CONFIG)
+        self.assertFalse(result["match"])
+        self.assertIn("experience minimum 5 exceeds candidate 2 years", result["reasons"][0])
 
     def test_telegram_message_format_contains_core_fields(self):
         item = {
