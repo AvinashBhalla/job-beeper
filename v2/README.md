@@ -25,6 +25,8 @@ The collector is deliberately small and low-volume. LinkedIn's guest endpoint cu
 
 SQLite is intentional for the first hosted single-user deployment. It is durable on a persistent VM and removes the V1 JSON-file/git-commit feedback loop.
 
+V2 now keeps source observations in `jobs` and canonical cross-source groupings in `canonical_opportunities`. Canonical linking is deliberately conservative: exact canonical URLs or strongly corroborated company/title/location matches may merge; ambiguous metadata matches remain separate.
+
 ## API
 
 - `GET /health`
@@ -33,6 +35,7 @@ SQLite is intentional for the first hosted single-user deployment. It is durable
 - `GET /api/source-status`
 - `GET /api/config`
 - `PUT /api/config` (requires `X-Config-Token`)
+- `GET /api/opportunities?minutes=60` (canonical opportunity groups)
 
 Runtime user preferences are persisted at `/data/config.json`. The configuration API is protected by a generated token stored at `/data/config_token`, unless `JOB_RADAR_CONFIG_TOKEN` is supplied to the container.
 
