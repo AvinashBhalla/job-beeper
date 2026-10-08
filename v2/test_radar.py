@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 import v2.radar as radar
 from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
 from v2.radar import _merge_config, alertability_details, extract_experience, match_details, normalize_job, upsert_jobs
+from v2.telegram import format_notification, send_message
 
 
 BASE_CONFIG = {
@@ -126,6 +127,55 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(row[0], "pending")
             finally:
                 radar.DB_PATH = original_db
+
+    def test_telegram_message_format_contains_core_fields(self):
+        item = {
+            "score": 88,
+            "title": "Software Engineer - AI",
+            "company": "Acme",
+            "location": "Bengaluru",
+            "source": "linkedin",
+            "source_posted_at": "2026-10-08T07:00:00+00:00",
+            "discovered_at": "2026-10-08T07:05:00+00:00",
+            "experience_min_years": 2,
+            "experience_max_years": 3,
+            "url": "https://example.com/apply/123",
+            "match_reasons_json": "[\"role (title): software engineer\", \"skills: python, ai\"]",
+        }
+        message = format_notification(item)
+        self.assertIn("88% MATCH", message)
+        self.assertIn("Software Engineer - AI", message)
+        self.assertIn("Acme", message)
+        self.assertIn("Bengaluru", message)
+        self.assertIn("Apply → https://example.com/apply/123", message)
+
+    def test_telegram_send_success(self):
+        original_post = __import__("v2.telegram", fromlist=["requests"]).requests.post
+        class Response:
+            status_code = 200
+            def json(self):
+                return {"ok": True, "result": {"message_id": 1}}
+        module = __import__("v2.telegram", fromlist=["requests"])
+        module.requests.post = lambda *args, **kwargs: Response()
+        try:
+            send_message("token", "chat", "hello")
+        finally:
+            module.requests.post = original_post
+
+    def test_telegram_rejects_auth_error_without_retry(self):
+        module = __import__("v2.telegram", fromlist=["requests"])
+        original_post = module.requests.post
+        class Response:
+            status_code = 401
+            def json(self):
+                return {"ok": False, "description": "Unauthorized"}
+        module.requests.post = lambda *args, **kwargs: Response()
+        try:
+            with self.assertRaises(Exception) as ctx:
+                send_message("token", "chat", "hello")
+            self.assertFalse(getattr(ctx.exception, "retryable", True))
+        finally:
+            module.requests.post = original_post
 
     def test_alertable_new_opportunity_moves_to_queue(self):
         with TemporaryDirectory() as tmp:
