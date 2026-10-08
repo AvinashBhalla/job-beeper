@@ -74,6 +74,41 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_existing_jobs_can_be_backfilled_into_evaluation_state(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+
+                job = normalize_job(
+                    "linkedin", "li-1", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/1", None,
+                    "unknown", "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([job]), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("DELETE FROM job_evaluations")
+                    conn.commit()
+
+                count = radar.backfill_job_evaluations(BASE_CONFIG)
+                self.assertEqual(count, 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT match, score, alertable
+                        FROM job_evaluations
+                        WHERE job_id=1
+                    """).fetchone()
+
+                self.assertIsNotNone(row)
+                self.assertEqual(row[0], 1)
+                self.assertGreaterEqual(row[1], 55)
+                self.assertEqual(row[2], 1)
+            finally:
+                radar.DB_PATH = original_db
+
     def test_new_opportunity_gets_pending_notification_state(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
