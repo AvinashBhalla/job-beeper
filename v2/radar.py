@@ -1077,18 +1077,20 @@ def dedupe_candidates(limit: int = 100):
             ORDER BY id ASC
         """).fetchall()
 
-    by_company: dict[str, list[dict[str, Any]]] = {}
+    by_identity: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in rows:
         item = dict(row)
-        key = canonical_identity(item)["company_norm"]
-        if key:
-            by_company.setdefault(key, []).append(item)
+        identity = canonical_identity(item)
+        key = (identity["company_norm"], identity["title_norm"])
+        if key[0] and key[1]:
+            by_identity.setdefault(key, []).append(item)
 
     candidates = []
-    for group in by_company.values():
+    for group in by_identity.values():
         sources = {item["source"] for item in group}
         if len(sources) < 2:
             continue
+
         for i, left in enumerate(group):
             for right in group[i + 1:]:
                 if left["source"] == right["source"]:
@@ -1118,7 +1120,7 @@ def dedupe_candidates(limit: int = 100):
     return {
         "candidates": candidates[:limit],
         "jobs_considered": len(rows),
-        "company_groups": len(by_company),
+        "identity_groups": len(by_identity),
     }
 
 
