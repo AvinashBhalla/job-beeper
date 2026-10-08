@@ -17,8 +17,8 @@
   ],
   "linkedin_queries": [
     "software engineer OR software developer",
-    "full stack developer OR frontend developer OR backend developer",
-    "react developer OR python developer OR automation engineer",
+    "full stack developer OR full stack engineer OR frontend developer OR frontend engineer OR backend developer OR backend engineer",
+    "react developer OR react engineer OR python developer OR python engineer OR automation engineer",
     "AI engineer OR LLM engineer OR AI developer"
   ],
   "naukri_queries": [

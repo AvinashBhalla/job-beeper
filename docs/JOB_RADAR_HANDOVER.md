@@ -615,6 +615,7 @@ The system is therefore **ingesting real jobs continuously**.
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
 ✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
 ⏳ MVP blocker: make LinkedIn experience acquisition reliable for poster-added requirements, or enforce explicit-experience-only Telegram alerts until a reliable source-access path exists
+⏳ Re-test LinkedIn freshness after the role-query coverage correction and measure 429 rate / discovery lag
 ⏳ Manual acceptance test: measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
 ⏳ Manual acceptance test: classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
 ⏳ Manual acceptance test: validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
@@ -652,9 +653,9 @@ On a fresh production window, count fresh matching rows, distinct canonical oppo
 
 Do not interpret source-row count as alert count.
 
-### Step C — Measure end-to-end alert latency
+### Step C — Measure end-to-end alert latency and LinkedIn freshness
 
-Measure:
+Measure both alert latency and source freshness:
 
 ```
 source posting
@@ -949,6 +950,37 @@ Corrective rule:
 
 The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
 
+
+### Observation 25 — Manual acceptance found a one-hour LinkedIn discovery lag for a Full Stack Engineer posting
+
+A real Telegram alert for ReqPedia's `Full Stack Engineer` posting showed approximately:
+
+```
+Posted:     6:28 PM IST
+Discovered: 7:28 PM IST
+```
+
+The LinkedIn browser page showed the posting at about one hour old with over 100 applicants. This is outside the intended freshness goal for the radar.
+
+Inspection of the current repository configuration showed that the LinkedIn fast-lane query vocabulary previously included `full stack developer` but not `full stack engineer`, even though `full stack engineer` is a configured target role. The fast-lane query has now been broadened to cover engineer/developer variants without increasing the number of LinkedIn query families:
+
+- full stack developer / engineer
+- frontend developer / engineer
+- backend developer / engineer
+- React developer / engineer
+- Python developer / engineer
+- automation engineer
+
+This is a targeted freshness/coverage correction. It may reduce misses for role-name variants, but it does not by itself prove that all fresh LinkedIn jobs will arrive within the desired latency. LinkedIn 429 responses remain a known operational constraint and must be measured after this change rather than solved by blindly increasing request volume.
+
+Acceptance rule:
+
+```
+fresh suitable job
+→ should surface within a few minutes under normal source conditions
+```
+
+A one-hour discovery lag is a failed freshness acceptance case and must remain visible in future runtime validation.
 
 ### Observation 24 — LinkedIn authenticated page can expose poster-added requirements that the public guest detail fetch does not expose
 
