@@ -283,6 +283,7 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, definition
 
 
 def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
+    conn.row_factory = sqlite3.Row
     row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not row:
         return None
@@ -290,6 +291,7 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
 
 
 def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -> list[dict[str, Any]]:
+    conn.row_factory = sqlite3.Row
     identity = canonical_identity(job)
     if identity["url_norm"]:
         rows = conn.execute("""
