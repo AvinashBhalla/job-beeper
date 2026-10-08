@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import sqlite3
 import threading
 import time
@@ -16,16 +17,17 @@ from typing import Any
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
+DASHBOARD_PATH = ROOT.parent / "dashboard"
 DB_PATH = Path(os.getenv("JOB_RADAR_DB", ROOT / "jobs.db"))
-CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+DEFAULT_CONFIG_PATH = ROOT / "config.json"
+RUNTIME_CONFIG_PATH = DB_PATH.parent / "config.json"
+CONFIG_TOKEN_PATH = DB_PATH.parent / "config_token"
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
-
-TARGET_ROLES = [str(x).lower() for x in CONFIG.get("target_roles", [])]
-SKILLS = [str(x).lower() for x in CONFIG.get("skills", [])]
-MATCH_THRESHOLD = int(CONFIG.get("match_threshold", 55))
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 log = logging.getLogger("job-radar")
@@ -41,6 +43,155 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 stop_event = asyncio.Event()
+config_lock = threading.RLock()
+
+
+
+
+
+def _default_config() -> dict[str, Any]:
+    return json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+    merged = json.loads(json.dumps(defaults))
+    merged.update(current)
+    if isinstance(defaults.get("poll_seconds"), dict):
+        merged["poll_seconds"] = {
+            **defaults.get("poll_seconds", {}),
+            **current.get("poll_seconds", {}),
+        }
+    if isinstance(defaults.get("source_enabled"), dict):
+        merged["source_enabled"] = {
+            **defaults.get("source_enabled", {}),
+            **current.get("source_enabled", {}),
+        }
+    return merged
+
+
+def validate_config(config: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(config, dict):
+        raise HTTPException(status_code=422, detail="Configuration must be a JSON object.")
+
+    for key in ("target_roles", "skills", "locations", "title_exclude", "excluded_role_terms"):
+        value = config.get(key)
+        if value is None:
+            config[key] = []
+            continue
+        if not isinstance(value, list) or any(not isinstance(x, str) or not x.strip() for x in value):
+            raise HTTPException(status_code=422, detail=f"{key} must be a list of non-empty strings.")
+        config[key] = [x.strip() for x in value]
+
+    if not config["target_roles"]:
+        raise HTTPException(status_code=422, detail="At least one target role is required.")
+    if not config["locations"]:
+        raise HTTPException(status_code=422, detail="At least one target location is required.")
+
+    for key in ("candidate_experience_years", "min_experience_years"):
+        value = config.get(key)
+        if value is not None:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=422, detail=f"{key} must be a number or null.")
+            if number < 0 or number > 30:
+                raise HTTPException(status_code=422, detail=f"{key} must be between 0 and 30.")
+            config[key] = number
+
+    try:
+        max_experience = float(config.get("max_experience_years", 3))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="max_experience_years must be a number.")
+    if max_experience < 0 or max_experience > 30:
+        raise HTTPException(status_code=422, detail="max_experience_years must be between 0 and 30.")
+    config["max_experience_years"] = max_experience
+
+    if config.get("min_experience_years") is not None and config["min_experience_years"] > max_experience:
+        raise HTTPException(status_code=422, detail="Minimum job experience cannot exceed maximum experience.")
+
+    threshold = int(config.get("match_threshold", 55))
+    if not 0 <= threshold <= 100:
+        raise HTTPException(status_code=422, detail="match_threshold must be between 0 and 100.")
+    config["match_threshold"] = threshold
+
+    for key in ("remote_only", "notifications_enabled", "require_explicit_experience_for_alerts"):
+        config[key] = bool(config.get(key, False))
+
+    source_enabled = config.get("source_enabled", {})
+    if not isinstance(source_enabled, dict):
+        raise HTTPException(status_code=422, detail="source_enabled must be an object.")
+    config["source_enabled"] = {
+        "linkedin": bool(source_enabled.get("linkedin", True)),
+        "naukri": bool(source_enabled.get("naukri", True)),
+        "instahyre": bool(source_enabled.get("instahyre", True)),
+    }
+
+    poll_seconds = config.get("poll_seconds", {})
+    if not isinstance(poll_seconds, dict):
+        raise HTTPException(status_code=422, detail="poll_seconds must be an object.")
+    config["poll_seconds"] = {
+        name: max(60, int(poll_seconds.get(name, default)))
+        for name, default in {
+            "linkedin": 120,
+            "naukri": 600,
+            "instahyre": 600,
+        }.items()
+    }
+
+    return config
+
+
+def ensure_runtime_config() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    defaults = _default_config()
+    if RUNTIME_CONFIG_PATH.exists():
+        try:
+            current = json.loads(RUNTIME_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            current = {}
+    else:
+        current = {}
+    merged = validate_config(_merge_config(defaults, current))
+    serialized = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
+    if not RUNTIME_CONFIG_PATH.exists() or RUNTIME_CONFIG_PATH.read_text(encoding="utf-8") != serialized:
+        tmp = RUNTIME_CONFIG_PATH.with_suffix(".tmp")
+        tmp.write_text(serialized, encoding="utf-8")
+        os.replace(tmp, RUNTIME_CONFIG_PATH)
+
+
+def get_config() -> dict[str, Any]:
+    with config_lock:
+        ensure_runtime_config()
+        return json.loads(RUNTIME_CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+def save_config(config: dict[str, Any]) -> dict[str, Any]:
+    validated = validate_config(_merge_config(_default_config(), config))
+    with config_lock:
+        tmp = RUNTIME_CONFIG_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(validated, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        os.replace(tmp, RUNTIME_CONFIG_PATH)
+    return validated
+
+
+def ensure_config_token() -> None:
+    if os.getenv("JOB_RADAR_CONFIG_TOKEN"):
+        return
+    if CONFIG_TOKEN_PATH.exists():
+        return
+    CONFIG_TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    token = secrets.token_urlsafe(32)
+    CONFIG_TOKEN_PATH.write_text(token + "\n", encoding="utf-8")
+    CONFIG_TOKEN_PATH.chmod(0o600)
+
+
+def get_config_token() -> str:
+    return os.getenv("JOB_RADAR_CONFIG_TOKEN") or CONFIG_TOKEN_PATH.read_text(encoding="utf-8").strip()
+
+
+def authorize_config_update(provided_token: str | None) -> None:
+    if not provided_token or not secrets.compare_digest(provided_token, get_config_token()):
+        raise HTTPException(status_code=401, detail="Invalid or missing X-Config-Token.")
 
 
 def now() -> dt.datetime:
@@ -204,29 +355,38 @@ def phrase_hits(terms: list[str], text: str) -> list[str]:
     return hits
 
 
-def title_allowed(title: str) -> bool:
-    excluded = [
-        "senior", "sr", "staff", "principal", "director", "manager",
-        "lead", "head", "architect", "intern", "vp", "vice president"
-    ]
-    return not phrase_hits(excluded, title)
+def title_allowed(title: str, config: dict[str, Any]) -> bool:
+    return not phrase_hits(config.get("title_exclude", []), title)
 
 
-def location_allowed(location: str) -> bool:
+def location_terms(config: dict[str, Any]) -> list[str]:
+    terms: list[str] = []
+    aliases = {
+        "bengaluru": ["bengaluru", "bangalore"],
+        "bangalore": ["bengaluru", "bangalore"],
+        "gurugram": ["gurugram", "gurgaon"],
+        "gurgaon": ["gurugram", "gurgaon"],
+    }
+    for raw in config.get("locations", []):
+        primary = normalize_phrase(str(raw).split(",")[0])
+        if not primary:
+            continue
+        terms.append(primary)
+        if primary in aliases:
+            terms.extend(aliases[primary])
+    return sorted(set(terms))
+
+
+def location_allowed(location: str, config: dict[str, Any]) -> bool:
     value = normalize_phrase(location)
-    return (
-        re.search(r"\bbengaluru\b", value) is not None
-        or re.search(r"\bbangalore\b", value) is not None
-        or re.search(r"\bgurugram\b", value) is not None
-        or re.search(r"\bgurgaon\b", value) is not None
-        or re.search(r"\bdelhi\b", value) is not None
-        or (
-            "remote" in value
-            and ("india" in value or not any(
-                x in value for x in ["usa", "united states", "canada", "uk", "europe", "australia"]
-            ))
-        )
-    )
+    if not value:
+        return False
+    if config.get("remote_only") and not phrase_hits(["remote"], value):
+        return False
+    terms = location_terms(config)
+    return any(phrase_hits([term], value) for term in terms)
+
+
 
 
 def extract_experience(text: str) -> tuple[float | None, float | None]:
@@ -253,27 +413,36 @@ def extract_experience(text: str) -> tuple[float | None, float | None]:
     return None, None
 
 
-def match_details(job: dict[str, Any]) -> dict[str, Any]:
-    title = (job.get("title") or "")
-    description = (job.get("description") or "")
+def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
+    config = config or get_config()
+    title = job.get("title") or ""
+    description = job.get("description") or ""
     combined = f"{title} {description}"
-
     reasons: list[str] = []
 
-    if not title_allowed(title):
+    if not title_allowed(title, config):
         return {
             "match": False,
             "score": 0,
-            "reasons": ["excluded senior/leadership title"],
+            "reasons": ["excluded title"],
             "experience_min_years": None,
             "experience_max_years": None,
         }
 
-    if not location_allowed(job.get("location") or ""):
+    if config.get("excluded_role_terms") and phrase_hits(config["excluded_role_terms"], title):
         return {
             "match": False,
             "score": 0,
-            "reasons": ["location outside configured cities/remote India"],
+            "reasons": ["excluded role/category"],
+            "experience_min_years": None,
+            "experience_max_years": None,
+        }
+
+    if not location_allowed(job.get("location") or "", config):
+        return {
+            "match": False,
+            "score": 0,
+            "reasons": ["location outside configured targets"],
             "experience_min_years": None,
             "experience_max_years": None,
         }
@@ -281,11 +450,11 @@ def match_details(job: dict[str, Any]) -> dict[str, Any]:
     score = 20
     reasons.append("target location")
 
-    title_role_hits = phrase_hits(TARGET_ROLES, title)
+    title_role_hits = phrase_hits(config.get("target_roles", []), title)
     role_hits = title_role_hits
     role_source = "title"
     if not role_hits:
-        role_hits = phrase_hits(TARGET_ROLES, description)
+        role_hits = phrase_hits(config.get("target_roles", []), description)
         role_source = "description"
 
     if role_hits:
@@ -295,59 +464,77 @@ def match_details(job: dict[str, Any]) -> dict[str, Any]:
     else:
         reasons.append("no configured target-role match")
 
-    skill_hits = phrase_hits(SKILLS, combined)
+    skill_hits = phrase_hits(config.get("skills", []), combined)
     if skill_hits:
-        bonus = min(30, 6 * len(skill_hits))
-        score += bonus
+        score += min(30, 6 * len(skill_hits))
         reasons.append("skills: " + ", ".join(skill_hits[:5]))
 
     exp_min, exp_max = extract_experience(combined)
-    candidate_years = float(CONFIG.get("candidate_experience_years", 2))
-    max_years = float(CONFIG.get("max_experience_years", 3))
+    candidate_years = config.get("candidate_experience_years")
+    max_years = float(config.get("max_experience_years", 3))
+    minimum_job_years = config.get("min_experience_years")
 
     if exp_min is not None or exp_max is not None:
         effective_min = exp_min if exp_min is not None else exp_max
 
-        # The candidate must satisfy the advertised minimum experience.
-        if effective_min is not None and effective_min > candidate_years:
+        if candidate_years is not None and effective_min is not None and effective_min > float(candidate_years):
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [
-                    f"experience minimum {effective_min:g} years exceeds candidate {candidate_years:g} years"
-                ],
+                "reasons": [f"experience minimum {effective_min:g} exceeds candidate {float(candidate_years):g} years"],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
 
-        # Do not surface roles whose stated range extends beyond the
-        # configured maximum acceptable experience.
+        if minimum_job_years is not None and exp_max is not None and exp_max < float(minimum_job_years):
+            return {
+                "match": False,
+                "score": 0,
+                "reasons": [f"job maximum experience {exp_max:g} is below configured minimum {float(minimum_job_years):g} years"],
+                "experience_min_years": exp_min,
+                "experience_max_years": exp_max,
+            }
+
         if exp_max is not None and exp_max > max_years:
             return {
                 "match": False,
                 "score": 0,
-                "reasons": [
-                    f"experience range exceeds configured maximum of {max_years:g} years"
-                ],
+                "reasons": [f"experience range exceeds configured maximum of {max_years:g} years"],
                 "experience_min_years": exp_min,
                 "experience_max_years": exp_max,
             }
 
         score += 15
-        reasons.append(
-            f"experience compatible: candidate {candidate_years:g} years; job {effective_min:g}"
-            + (f"-{exp_max:g}" if exp_max is not None else "+")
-        )
+        experience_label = f"{effective_min:g}" + (f"-{exp_max:g}" if exp_max is not None else "+")
+        candidate_label = f"{float(candidate_years):g} years" if candidate_years is not None else "configured profile"
+        reasons.append(f"experience compatible: candidate {candidate_label}; job {experience_label}")
     else:
         reasons.append("experience not stated in captured source data")
 
+    threshold = int(config.get("match_threshold", 55))
     return {
-        "match": score >= MATCH_THRESHOLD and bool(role_hits),
+        "match": score >= threshold and bool(role_hits),
         "score": min(score, 100),
         "reasons": reasons,
         "experience_min_years": exp_min,
         "experience_max_years": exp_max,
     }
+
+
+def alertability_details(job: dict[str, Any], details: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    if not details["match"]:
+        return {"alertable": False, "reasons": ["not a profile match"]}
+
+    if not config.get("notifications_enabled", True):
+        return {"alertable": False, "reasons": ["Telegram notifications disabled"]}
+
+    if config.get("require_explicit_experience_for_alerts"):
+        if details.get("experience_min_years") is None and details.get("experience_max_years") is None:
+            return {"alertable": False, "reasons": ["explicit experience required for alerts"]}
+
+    return {"alertable": True, "reasons": ["passes current alert policy"]}
+
+
 
 
 def likely_match(job: dict[str, Any]) -> bool:
@@ -369,15 +556,15 @@ def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Respons
     return response
 
 
-def linkedin_collect() -> list[dict[str, Any]]:
+def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     endpoint = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 
     # Keep a six-hour safety window so a transient failure does not create a
     # permanent hole in the feed. We still request newest-first and dedupe by
     # LinkedIn job id.
-    for query in CONFIG["linkedin_queries"]:
-        for location in CONFIG["locations"]:
+    for query in config.get("linkedin_queries", []):
+        for location in config.get("locations", []):
             for start in (0, 10):
                 params = {
                     "keywords": query,
@@ -491,11 +678,17 @@ def naukri_collect() -> list[dict[str, Any]]:
     return jobs
 
 
-def instahyre_collect() -> list[dict[str, Any]]:
+def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
     response = requests.get(
         endpoint,
-        params={"jobLocations": "Bangalore", "limit": 35},
+        params={
+            "jobLocations": next(
+                (str(x).split(",")[0] for x in config.get("locations", []) if "remote" not in str(x).lower()),
+                "Bangalore",
+            ),
+            "limit": 35,
+        },
         headers={**UA, "Referer": "https://www.instahyre.com/"},
         timeout=25,
     )
@@ -536,12 +729,12 @@ def instahyre_collect() -> list[dict[str, Any]]:
 
 COLLECTORS = {
     "linkedin": linkedin_collect,
-    "naukri": naukri_collect,
+    "naukri": lambda config: naukri_collect(),
     "instahyre": instahyre_collect,
 }
 
 
-def run_source(source: str) -> None:
+def run_source(source: str, config: dict[str, Any]) -> None:
     if source_state.get(source, {}).get("running"):
         log.warning("%s: previous run still active; skipping this cycle", source)
         return
@@ -549,7 +742,7 @@ def run_source(source: str) -> None:
     started_at = now()
     source_state.setdefault(source, {})["running"] = True
     try:
-        jobs = COLLECTORS[source]()
+        jobs = COLLECTORS[source](config)
         new_jobs = upsert_jobs(jobs)
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
@@ -576,13 +769,22 @@ def run_source(source: str) -> None:
 
 async def scheduler() -> None:
     next_run = {name: 0.0 for name in COLLECTORS}
-    intervals = CONFIG["poll_seconds"]
     while not stop_event.is_set():
+        config = get_config()
         current = time.monotonic()
+        intervals = config.get("poll_seconds", {})
+        enabled = config.get("source_enabled", {})
+
         for name in COLLECTORS:
-            if current >= next_run[name] and not source_state.get(name, {}).get("running"):
-                next_run[name] = current + intervals[name]
-                asyncio.create_task(asyncio.to_thread(run_source, name))
+            if not enabled.get(name, True):
+                continue
+            if source_state.get(name, {}).get("running"):
+                continue
+            interval = max(60, int(intervals.get(name, 600)))
+            if current >= next_run[name]:
+                next_run[name] = current + interval
+                asyncio.create_task(asyncio.to_thread(run_source, name, config))
+
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=2)
         except asyncio.TimeoutError:
@@ -592,6 +794,8 @@ async def scheduler() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     init_db()
+    ensure_runtime_config()
+    ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
 
 
@@ -612,6 +816,23 @@ def health():
         "db": str(DB_PATH),
         "sources": source_state,
     }
+
+
+
+@app.get("/api/config")
+def read_config():
+    return {
+        "config": get_config(),
+        "runtime_path": str(RUNTIME_CONFIG_PATH),
+        "config_update_protected": True,
+    }
+
+
+@app.put("/api/config")
+def update_config(payload: dict[str, Any], x_config_token: str | None = Header(default=None, alias="X-Config-Token")):
+    authorize_config_update(x_config_token)
+    saved = save_config(payload)
+    return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
 @app.get("/api/source-status")
@@ -637,7 +858,7 @@ def source_status():
 
 @app.get("/api/jobs")
 def jobs(minutes: int = 60, limit: int = 100):
-    minutes = max(1, min(minutes, 1440))
+    minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = iso(now() - dt.timedelta(minutes=minutes))
     with sqlite3.connect(DB_PATH) as conn:
@@ -651,12 +872,15 @@ def jobs(minutes: int = 60, limit: int = 100):
     result = []
     for row in rows:
         item = dict(row)
-        details = match_details(item)
+        details = match_details(item, config)
+        alertability = alertability_details(item, details, config)
         item["likely_match"] = details["match"]
         item["match_score"] = details["score"]
         item["match_reasons"] = details["reasons"]
         item["experience_min_years"] = details["experience_min_years"]
         item["experience_max_years"] = details["experience_max_years"]
+        item["alertable"] = alertability["alertable"]
+        item["alertability_reasons"] = alertability["reasons"]
         result.append(item)
     return {"jobs": result}
 
@@ -669,3 +893,11 @@ def job_detail(job_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
     return dict(row)
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/dashboard/")
+
+
+if DASHBOARD_PATH.exists():
+    app.mount("/dashboard", StaticFiles(directory=DASHBOARD_PATH, html=True), name="dashboard")
