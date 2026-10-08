@@ -64,7 +64,18 @@ function fmtAge(timestamp){
 }
 
 function fmtTimestamp(timestamp){
-  return timestamp ? new Date(timestamp).toLocaleString() : "Not specified";
+  if(!timestamp) return "Not specified";
+  const date=new Date(timestamp);
+  if(Number.isNaN(date.getTime())) return "Not specified";
+  return date.toLocaleString("en-IN",{
+    timeZone:"Asia/Kolkata",
+    day:"2-digit",
+    month:"short",
+    year:"numeric",
+    hour:"numeric",
+    minute:"2-digit",
+    hour12:true
+  })+" IST";
 }
 
 function populateSources(jobs){
@@ -321,24 +332,24 @@ function render(){
 
 async function loadJobs(){
   try{
-    const maxAge=Math.max(1,Number(config?.max_age_hours||72));
-    const minutes=Math.min(maxAge*60,10080);
+    const [jobsResponse,summaryResponse]=await Promise.all([
+      fetch(API+"/jobs?today_only=true&limit=500",{cache:"no-store"}),
+      fetch(API+"/daily-summary",{cache:"no-store"})
+    ]);
 
-    const response=await fetch(API+"/jobs?minutes="+encodeURIComponent(minutes)+"&limit=500",{
-      cache:"no-store"
-    });
+    if(!jobsResponse.ok || !summaryResponse.ok) throw new Error("V2 daily feed unavailable");
 
-    if(!response.ok) throw new Error("Jobs unavailable");
+    const data=await jobsResponse.json();
+    const summary=await summaryResponse.json();
 
-    const data=await response.json();
     state={jobs:data.jobs||[]};
 
-    $("total").textContent=state.jobs.length;
-    $("today").textContent=state.jobs.filter(job=>ageHours(jobTimestamp(job))<24).length;
-    $("notified").textContent=state.jobs.filter(job=>job.alertable).length;
-    $("lastRun").textContent=state.jobs.length ? "· live" : "";
+    $("today").textContent=summary.total_jobs_discovered ?? state.jobs.length;
+    $("matchedToday").textContent=summary.matched_jobs ?? state.jobs.filter(job=>job.likely_match).length;
+    $("notified").textContent=summary.alerts_sent ?? 0;
+    $("lastRun").textContent=state.jobs.length ? "· "+summary.date : "";
 
-    $("statusText").textContent="Live · V2 backend";
+    $("statusText").textContent="Live · Today · V2 backend";
     populateSources(state.jobs);
     render();
   }catch(error){
