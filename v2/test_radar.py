@@ -1,5 +1,6 @@
 import unittest
 
+import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -57,7 +58,7 @@ class MatcherTests(unittest.TestCase):
                 )
                 self.assertEqual(upsert_jobs([first]), 1)
                 self.assertEqual(upsert_jobs([second]), 1)
-                with __import__("sqlite3").connect(radar.DB_PATH) as conn:
+                with sqlite3.connect(radar.DB_PATH) as conn:
                     rows = conn.execute("""
                         SELECT source, canonical_opportunity_id
                         FROM jobs
