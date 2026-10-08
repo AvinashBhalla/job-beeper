@@ -1754,13 +1754,40 @@ NAUKRI_RELAY_URL = (
 
 
 def naukri_collect() -> list[dict[str, Any]]:
-    response = requests.get(
-        NAUKRI_RELAY_URL,
-        params={"t": int(time.time())},
-        headers=UA,
-        timeout=20,
-    )
-    response.raise_for_status()
+    response: requests.Response | None = None
+    retryable_statuses = {404, 429, 500, 502, 503, 504}
+    for attempt in range(4):
+        try:
+            candidate = requests.get(
+                NAUKRI_RELAY_URL,
+                params={"t": int(time.time())},
+                headers=UA,
+                timeout=20,
+            )
+            if candidate.status_code in retryable_statuses:
+                response = candidate
+                if attempt == 3:
+                    response.raise_for_status()
+                wait = min(8, 2 ** attempt)
+                log.warning(
+                    "naukri relay fetch returned HTTP %s; retrying in %ss",
+                    candidate.status_code,
+                    wait,
+                )
+                time.sleep(wait)
+                continue
+            candidate.raise_for_status()
+            response = candidate
+            break
+        except requests.RequestException:
+            if attempt == 3:
+                raise
+            wait = min(8, 2 ** attempt)
+            log.warning("naukri relay fetch failed; retrying in %ss", wait)
+            time.sleep(wait)
+
+    if response is None:
+        raise RuntimeError("Naukri relay fetch returned no response")
     payload = response.json()
     relay_jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
     relay_collected_at = payload.get("updated_at") if isinstance(payload, dict) else None
