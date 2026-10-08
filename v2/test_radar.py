@@ -305,6 +305,7 @@ class MatcherTests(unittest.TestCase):
             "location": "Bengaluru",
             "source": "linkedin",
             "source_posted_at": "2026-10-08T07:00:00+00:00",
+            "posted_precision": "minute",
             "discovered_at": "2026-10-08T07:05:00+00:00",
             "experience_min_years": 2,
             "experience_max_years": 3,
@@ -317,6 +318,30 @@ class MatcherTests(unittest.TestCase):
         self.assertIn("Acme", message)
         self.assertIn("Bengaluru", message)
         self.assertIn("Apply → https://example.com/apply/123", message)
+
+    def test_naukri_notification_preserves_date_precision_and_experience(self):
+        item = {
+            "score": 66,
+            "title": "React Developer",
+            "company": "Senniper Technologies India",
+            "location": "Gurugram, India",
+            "source": "naukri",
+            "source_posted_at": "2026-10-08T00:00:00+00:00",
+            "posted_precision": "date",
+            "discovered_at": "2026-10-08T09:00:00+00:00",
+            "experience_min_years": 2,
+            "experience_max_years": 4,
+            "url": "https://www.naukri.com/job-listings/example",
+            "match_reasons_json": "[\"react\", \"node.js\", \"location fit\", \"experience fit\"]",
+        }
+
+        message = format_notification(item)
+
+        self.assertIn("Posted: 08 Oct 2026 (date only)", message)
+        self.assertNotIn("Posted: 08 Oct 2026, 12:00 AM IST", message)
+        self.assertIn("🧾 Experience: 2-4", message)
+        self.assertIn("Source: naukri", message)
+        self.assertIn("React Developer", message)
 
     def test_telegram_send_success(self):
         original_post = __import__("v2.telegram", fromlist=["requests"]).requests.post
