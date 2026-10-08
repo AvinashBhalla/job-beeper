@@ -173,6 +173,7 @@ class MatcherTests(unittest.TestCase):
                     **BASE_CONFIG,
                     "require_explicit_experience_for_alerts": False,
                 }
+                self.assertEqual(radar.refresh_job_evaluations(relaxed), 1)
                 self.assertEqual(radar.refresh_notification_decisions(relaxed), 1)
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute(
@@ -180,6 +181,39 @@ class MatcherTests(unittest.TestCase):
                     ).fetchone()
                 self.assertEqual(row[0], "queued")
                 self.assertEqual(row[1], 1)
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_config_change_re_evaluates_existing_jobs(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-config", "Acme", "AI Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/config", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT alertable FROM job_evaluations WHERE job_id=1"
+                    ).fetchone()
+                self.assertEqual(row[0], 0)
+
+                relaxed = {
+                    **BASE_CONFIG,
+                    "require_explicit_experience_for_alerts": False,
+                }
+                self.assertEqual(radar.refresh_job_evaluations(relaxed), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT alertable FROM job_evaluations WHERE job_id=1"
+                    ).fetchone()
+                self.assertEqual(row[0], 1)
             finally:
                 radar.DB_PATH = original_db
 
