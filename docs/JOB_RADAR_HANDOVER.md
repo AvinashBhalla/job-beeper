@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (today-only regression semantics fixed; 43-test suite pending Oracle re-run)
+**Last updated: 2026-10-08 (test-suite corruption repaired; 43-test suite restored and pending Oracle re-run)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -601,13 +601,14 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
 ✅ Unknown experience made neutral for matching while alertability remains a separate policy
 ✅ Regression suite baseline expanded to 39 tests; Docker execution was green before the latest JD-hardening change
-⏳ Updated suite is now expected at 43 tests (42 after JD hardening plus today-only feed coverage); must be re-run in Docker before declaring the latest milestone green
+⏳ Updated suite is now restored to the expected 43 tests (39 baseline + 3 JD-hardening tests + 1 today-only feed test); must be re-run in Docker before declaring the latest milestone green
 ✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
 ✅ Repository .gitignore now ignores Python __pycache__ artifacts
 ✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
 ✅ BlueOptima-style LinkedIn JD extraction incident reproduced and JD retrieval/parser hardened for overall/total experience wording, JSON-LD, description selectors, HTML entities/non-breaking spaces and Unicode dash variants
 ✅ Corrupted direct test-file update repaired by restoring the last known-good 39-test suite and adding three focused JD-extraction regression tests
 ✅ V2 CI strengthened to run py_compile on both production/test Python and the full unittest suite, preventing structurally broken test files from reaching the branch undetected
+✅ Repaired a second test-file corruption incident: the branch temporarily contained only a truncated tail of `v2/test_radar.py`; the file was restored from the known-good 39-test commit and all four required new regression cases were reapplied cleanly, restoring the expected 43-test suite
 ✅ Found and fixed a separate `/api/jobs?today_only=true` bug: the endpoint accepted the flag but previously ignored it, and `/api/opportunities` referenced an undefined `today_only` variable; today-only filtering is now explicitly driven by India-local midnight and covered by regression tests
 ✅ Fixed the first today-only regression test itself: it had moved only source posting timestamps across midnight while discovery timestamps remained current; the corrected test now moves `discovered_at` across IST midnight and verifies both `/api/jobs` and `/api/opportunities`
 ```
@@ -615,7 +616,7 @@ The system is therefore **ingesting real jobs continuously**.
 ### Currently in progress
 
 ```
-⏳ Pull the latest GitHub commits onto Oracle, run the repaired updated suite (expected 43 tests), then deploy the hardened LinkedIn JD extraction/retrieval and today-only feed fixes
+⏳ Pull the latest GitHub commits onto Oracle, run the restored updated suite (expected 43 tests), then deploy the hardened LinkedIn JD extraction/retrieval and today-only feed fixes
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
 ⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
 ⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
@@ -914,6 +915,8 @@ re-evaluate before notification
 Supported JD wording must include phrases such as `5 to 7 years of overall software engineering experience`, common Unicode dash variants, HTML entities/non-breaking spaces and common minimum/at-least experience wording.
 
 A known experience requirement must not be hidden merely because the search card omitted it.
+
+During direct GitHub maintenance, a second test-file corruption was discovered after an earlier repair: the branch contained only a truncated 2,943-character tail of `v2/test_radar.py`, causing `IndentationError` at file line 1 on Oracle. The safe recovery procedure is now to restore the last known-good complete test file and reapply new tests, rather than attempting line-range reconstruction from a potentially truncated current file.
 
 The first automated attempt to add regression coverage directly to the test file corrupted the file structure and caused a syntax error. The file was repaired by restoring the last known-good test suite and reapplying the new tests as a clean append before the existing JD-experience test block. Future direct GitHub file edits must prefer reconstruction from a verified-good version when a patch has already become structurally suspect.
 
