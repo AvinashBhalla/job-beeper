@@ -296,7 +296,8 @@ def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -
     if identity["url_norm"]:
         rows = conn.execute("""
             SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
-                   j.id AS representative_job_id, j.company, j.title, j.location, j.url,
+                   j.id AS representative_job_id, j.source AS representative_source,
+                   j.company, j.title, j.location, j.url,
                    j.description, j.source_posted_at, j.discovered_at
             FROM canonical_opportunities co
             JOIN jobs j ON j.id = co.representative_job_id
@@ -371,6 +372,13 @@ def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, 
     best_method = "none"
     best_representative = None
     for candidate in _candidate_canonical_groups(conn, job):
+        candidate_source = candidate.get("representative_source")
+        same_source = candidate_source and candidate_source == job.get("source")
+        same_url = canonicalize_url(job.get("url", "")) and (
+            canonicalize_url(job.get("url", "")) == canonicalize_url(candidate.get("canonical_url", ""))
+        )
+        if same_source and not same_url:
+            continue
         score, method = canonical_match_score(job, candidate)
         if score > best_score:
             best_id = int(candidate["id"])
@@ -396,7 +404,38 @@ def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, 
     return new_id, "new", 0
 
 
+CANONICAL_IDENTITY_VERSION = 2
+
+
+def canonical_schema_needs_rebuild(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT MIN(identity_version), MAX(identity_version) FROM canonical_opportunities"
+    ).fetchone()
+    if not row or row[0] is None:
+        return False
+    return int(row[0]) < CANONICAL_IDENTITY_VERSION or int(row[1]) < CANONICAL_IDENTITY_VERSION
+
+
+def rebuild_canonical_opportunities(conn: sqlite3.Connection) -> None:
+    conn.execute("UPDATE jobs SET canonical_opportunity_id=NULL, canonical_match_method=NULL, canonical_match_confidence=NULL")
+    conn.execute("DELETE FROM canonical_opportunities")
+
+
 def backfill_canonical_opportunities() -> None:
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        if canonical_schema_needs_rebuild(conn):
+            rebuild_canonical_opportunities(conn)
+        rows = conn.execute("""
+            SELECT id FROM jobs
+            WHERE canonical_opportunity_id IS NULL
+            ORDER BY first_seen_at ASC, id ASC
+        """).fetchall()
+        for row in rows:
+            _assign_canonical(conn, int(row["id"]))
+        conn.commit()
+
+
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
