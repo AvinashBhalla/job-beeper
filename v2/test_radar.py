@@ -45,6 +45,66 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 
 class MatcherTests(unittest.TestCase):
+
+    def test_software_development_engineer_variant_matches(self):
+        config = {
+            **BASE_CONFIG,
+            "require_explicit_experience_for_alerts": False,
+        }
+        details = match_details(
+            make_job(
+                "Software Development Engineer 2",
+                "",
+                "Bengaluru, Karnataka, India",
+            ),
+            config,
+        )
+        self.assertTrue(details["match"])
+        self.assertGreaterEqual(details["score"], 55)
+        self.assertIn("software engineer", " ".join(details["reasons"]).lower())
+
+    def test_javascript_developer_matches_from_skill_plus_title(self):
+        config = {
+            **BASE_CONFIG,
+            "target_roles": ["software engineer", "software developer"],
+            "skills": ["javascript", "python"],
+            "require_explicit_experience_for_alerts": False,
+        }
+        details = match_details(
+            make_job(
+                "Javascript Developer",
+                "",
+                "Delhi, India",
+            ),
+            {
+                **config,
+                "locations": ["Delhi, India"],
+            },
+        )
+        self.assertTrue(details["match"])
+        self.assertGreaterEqual(details["score"], 55)
+        self.assertIn("javascript", " ".join(details["reasons"]).lower())
+
+    def test_unknown_experience_does_not_block_direct_role_match(self):
+        config = {
+            **BASE_CONFIG,
+            "require_explicit_experience_for_alerts": False,
+        }
+        details = match_details(
+            make_job(
+                "Software Engineer",
+                "",
+                "Bengaluru, Karnataka, India",
+            ),
+            config,
+        )
+        self.assertTrue(details["match"])
+        self.assertGreaterEqual(details["score"], 55)
+        self.assertIn(
+            "experience not stated",
+            " ".join(details["reasons"]).lower(),
+        )
+
     def test_database_links_strong_cross_source_duplicate(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
@@ -412,6 +472,131 @@ class MatcherTests(unittest.TestCase):
                     ).fetchone()
                 self.assertEqual(row[0], "queued")
                 self.assertEqual(row[1], 1)
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_queued_opportunity_reverts_to_pending_when_alertability_is_lost(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+
+                relaxed = {
+                    **BASE_CONFIG,
+                    "require_explicit_experience_for_alerts": False,
+                }
+
+                job = normalize_job(
+                    "linkedin", "li-queue-revalidate", "Acme", "AI Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/revalidate", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+
+                self.assertEqual(upsert_jobs([job], relaxed), 1)
+                self.assertEqual(
+                    radar.refresh_notification_decisions(relaxed),
+                    1,
+                )
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT status, candidate_job_id
+                        FROM notification_ledger
+                    """).fetchone()
+
+                self.assertEqual(row[0], "queued")
+                self.assertEqual(row[1], 1)
+
+                self.assertEqual(
+                    radar.refresh_job_evaluations(BASE_CONFIG),
+                    1,
+                )
+                self.assertEqual(
+                    radar.refresh_notification_decisions(BASE_CONFIG),
+                    1,
+                )
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT status, candidate_job_id
+                        FROM notification_ledger
+                    """).fetchone()
+
+                self.assertEqual(row[0], "pending")
+                self.assertIsNone(row[1])
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_new_observation_reactivates_suppressed_alertable_opportunity(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+
+                shared_url = "https://example.com/jobs/software-engineer"
+
+                old_job = normalize_job(
+                    "linkedin",
+                    "li-old",
+                    "Acme",
+                    "Senior Software Engineer",
+                    "Bengaluru",
+                    shared_url,
+                    None,
+                    "unknown",
+                    "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([old_job], BASE_CONFIG), 1)
+                self.assertEqual(
+                    radar.refresh_notification_decisions(BASE_CONFIG),
+                    1,
+                )
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT status, canonical_opportunity_id
+                        FROM notification_ledger
+                    """).fetchone()
+
+                self.assertEqual(row[0], "suppressed")
+                original_canonical_id = row[1]
+
+                new_job = normalize_job(
+                    "naukri",
+                    "nk-new",
+                    "Acme",
+                    "Software Engineer",
+                    "Bengaluru",
+                    shared_url,
+                    None,
+                    "unknown",
+                    "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([new_job], BASE_CONFIG), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT canonical_opportunity_id
+                        FROM jobs
+                        WHERE source='naukri' AND source_job_id='nk-new'
+                    """).fetchone()
+
+                self.assertEqual(row[0], original_canonical_id)
+
+                changed = radar.refresh_notification_decisions(BASE_CONFIG)
+                self.assertEqual(changed, 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute("""
+                        SELECT status, candidate_job_id
+                        FROM notification_ledger
+                        WHERE canonical_opportunity_id=?
+                    """, (original_canonical_id,)).fetchone()
+
+                self.assertEqual(row[0], "queued")
+                self.assertIsNotNone(row[1])
             finally:
                 radar.DB_PATH = original_db
 

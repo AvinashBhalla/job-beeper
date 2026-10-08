@@ -4,11 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (freshness acceleration + daily feed lifecycle + Telegram + JD enrichment)
+**Last updated: 2026-10-08 (39-test green suite + real-time Telegram gate + matcher variant improvements + production alert validation + Agent-Reach parked as future optimisation)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Reconciliation note:** This document is maintained against the current repository/runtime direction. Telegram delivery is implemented and has delivered real alerts; canonical cross-source dedupe is implemented conservatively; the Naukri relay remains the required Oracle-safe acquisition path; and the repository must not claim a reproducible systemd scheduler unless its unit files are committed.
+> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by a 39-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
 
 ---
 
@@ -278,6 +278,18 @@ Repository defaults and the V2 runtime migration now make Instahyre opt-in. Conf
 
 Zero results or request errors must not automatically justify increasing polling or scraping volume.
 
+### Agent-Reach — future optimisation, not current dependency
+
+The repository `Panniantong/agent-reach` was evaluated conceptually as a possible source-access optimisation.
+
+Decision:
+
+- **Do not replace the current V2 collectors with Agent-Reach now.**
+- Keep LinkedIn direct ingestion and the Naukri GitHub relay as the working production paths.
+- Revisit Agent-Reach after the V2 MVP is stable.
+- The first future experiment should benchmark it against the existing LinkedIn collector on freshness, job-detail quality, latency, failure/429 rate, and Oracle CPU/RAM impact.
+- Treat Naukri support as unverified until a real end-to-end Naukri retrieval test proves it.
+- Potential later use: generic web/ATS access for structured career sources, but source-specific adapters remain preferred where stable APIs exist.
 ### Future ATS sources
 
 The product should progressively prioritize structured/source-specific adapters such as:
@@ -319,32 +331,49 @@ source
 - experience
 - match score
 - match reasons
+- separate alertability policy
 
-### Current known matcher lessons
+### Current matcher lessons and fixes
 
-The first V2 matcher produced obvious false positives.
+The matcher previously had two important problems in real runtime data:
 
-Example bad matches included:
+1. It treated job-title vocabulary too literally. Variants such as `Software Development Engineer 2` and `Javascript Developer` could fail the configured role test even though they were clearly relevant.
+2. Unknown experience could leave an otherwise strong profile match below the alert threshold.
 
-- Accenture roles advertised as 3–8 or 3–15 years being accepted
-- `ai` appearing as a false skill because of substring matching
-- generic roles crossing the threshold only because they had a matching title
+The current matcher now includes:
 
-These were corrected.
+- phrase-aware configured-term matching rather than naive substring matching
+- role-family aliases for `Software Engineer` / `Software Development Engineer` / `SDE`
+- full-stack spelling variants
+- a generic developer/engineer + configured-skill signal for titles such as `Javascript Developer`
+- direct title-role scoring high enough to clear the existing 55 baseline when the source omits experience
+- strict rejection when stated experience exceeds the candidate or configured maximum
+- unknown experience treated as **neutral for matching**
+- alertability evaluated separately from matching
 
-Current matcher code was tightened in commit:
+The separate alertability policy currently allows unknown experience because the runtime setting is:
 
 ```
-d5ec338 — V2: tighten experience and skill matching
+require_explicit_experience_for_alerts = false
 ```
 
-The current matcher:
+That is intentional and configurable.
 
-- uses phrase-aware matching rather than naive substring matching for configured terms
-- rejects jobs whose stated minimum experience exceeds the candidate experience
-- rejects jobs whose stated maximum range exceeds the configured 3-year ceiling
-- retains match reasons
-- can represent unknown experience
+### Regression coverage
+
+The full V2 Docker regression suite now has:
+
+```
+39 tests — ALL GREEN
+```
+
+Important regression cases now include:
+
+- `Software Development Engineer 2` → matches
+- `Javascript Developer` → matches when JavaScript is configured
+- direct `Software Engineer` with unknown experience → matches
+- senior/lead/principal/intern exclusions remain enforced
+- explicit experience above the 3-year maximum remains rejected
 
 ### Important policy principle
 
@@ -355,12 +384,7 @@ A job can be:
 - relevant enough to show in the frontend
 - but not sufficiently verified to send to Telegram automatically
 
-Unknown experience should therefore not automatically become a Telegram alert merely because title/location/skills look good.
-
-The eventual product should expose an explicit configurable policy for this.
-
----
-
+The policy must remain configurable rather than being silently inferred from score alone.
 ## 7. CURRENT CONFIGURATION PRINCIPLE
 
 The current V2 implementation reads `v2/config.json`.
@@ -556,230 +580,127 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ V2 persistent runtime configuration API implemented
 ✅ Frontend connected to V2 configuration API in repository
 ✅ Config validation + generated configuration token
-✅ Matcher regression tests added
-✅ LinkedIn freshness acceleration implemented: 60-second fast polling, concurrent search requests, five-minute deeper pagination, and bounded concurrent JD enrichment
+✅ LinkedIn freshness acceleration implemented: 60-second fast polling, bounded concurrency, five-minute deeper pagination, bounded concurrent JD enrichment
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
-✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Thirty-one matcher/dedupe/config/Telegram regression tests were previously green; the current repository adds a LinkedIn fast/deep scan cadence regression test (32 total, pending Oracle execution after the latest change)
+✅ Runtime config migration hardened: pre-v3 configs disable unverified Instahyre
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
-✅ Canonical opportunity API added
-✅ Canonical persistence/backfill regression tests added
-✅ Conservative dedupe rule: auto-link only strong evidence; ambiguous metadata stays separate
-✅ Cross-source dedupe diagnostic endpoint added for real LinkedIn/Naukri overlap validation
-✅ Dedupe diagnostic optimized to group by normalized company/title identity before pair comparison
-✅ Same-source canonical auto-linking disabled except exact canonical URL evidence
-✅ Fixed canonical rebuild startup import regression after identity-version hardening
-✅ Fixed canonical group creation/source-isolation regressions before persistent database rebuild
-✅ Fixed canonical metadata candidate source propagation so same-source distinct listings remain separate while exact canonical URLs may still merge
-✅ Fixed canonical matching to reject cross-source candidates with incompatible explicit experience ranges
-✅ Persistent job evaluation state added with configuration fingerprint, match score/reasons, experience data, and alertability
-✅ Persistent notification ledger added per canonical opportunity with historical suppression and new-opportunity pending state
-✅ Persistent notification decision queue added with reconsideration of fresh non-alertable opportunities
-✅ V2 Telegram delivery worker added with persistent claim/sent/failed state, safe retry handling, and interrupted-claim recovery
-✅ Telegram message formatting and delivery error behavior regression-tested
-✅ New LinkedIn jobs with missing card-level experience now fetch the public job detail page and extract explicit JD experience requirements before matching
-✅ End-to-end regression test verifies a LinkedIn JD requirement such as 5+ years is applied before notification eligibility
-✅ Telegram timestamps now render as human-readable IST (for example, `08 Oct 2026, 1:00 PM IST`)
-✅ Daily active-feed lifecycle added: `/api/jobs?today_only=true` and `/api/daily-summary` reset visible daily counts at India local midnight while retaining historical SQLite data
-✅ Product benchmark explicitly documented: JobBeeper is the public behavior benchmark; this project is optimized for the user's personal workflow rather than claiming universal superiority
-✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
-✅ Startup backfill for missing persistent job evaluations implemented
-✅ Telegram credential connectivity verified against the configured bot/chat
-✅ Real-data analysis confirmed the explicit-experience alert gate was blocking relevant LinkedIn matches; runtime policy is being relaxed so unknown experience can alert when the profile match itself is strong enough
-✅ Persistent notification decision queue implemented: pending opportunities become queued only when fresh, matched, alertable and notifications are enabled; fresh profile matches that are temporarily non-alertable remain pending; rejected or stale opportunities are suppressed with a durable reason
-✅ Notification queue API added at `/api/notification-queue`
-✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
-✅ SQLite row-factory regression fixed in canonical assignment path
+✅ Canonical opportunity API and dedupe diagnostics implemented
+✅ Persistent job evaluation state with score/reasons/experience/alertability
+✅ Persistent notification ledger per canonical opportunity
+✅ Telegram claim/retry/recovery path implemented
+✅ Telegram credentials verified on Oracle and real delivery verified
+✅ Telegram timestamps render in human-readable IST; Naukri keeps date-only posting precision
+✅ Daily active feed resets at India local midnight without deleting historical SQLite data
+✅ V1 job-watch Telegram workflow is inactive/disabled; V2 is the intended alert path
+✅ Real-time Telegram eligibility gate implemented: queued alerts require discovery within the last 10 minutes
+✅ Queued opportunities are revalidated against current match/alertability state before delivery
+✅ Previously suppressed opportunities can be reconsidered only when a genuinely recent new source observation appears
+✅ Old backlog is suppressed rather than replayed by a notification refresh
+✅ Failed Telegram deliveries remain retryable after the fresh-queue window so transient delivery failures do not lose a valid alert
+✅ Matcher role-family aliases added for Software Engineer / Software Development Engineer / SDE variants
+✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
+✅ Unknown experience made neutral for matching while alertability remains a separate policy
+✅ Regression suite expanded to 39 tests; Docker execution is green
+✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
+✅ Repository .gitignore now ignores Python __pycache__ artifacts
+✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
 ```
 
 ### Currently in progress
 
 ```
-⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
-✅ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
-✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
-✅ Real overlap validation completed: 1,206 jobs, 855 identity groups, 38 cross-source candidates, 0 auto-link candidates; observed overlaps remain safely separate
-⏳ Validate the persistent notification decision queue on the upgraded Oracle database
-⏳ Validate live configuration re-evaluation and notification reconsideration on Oracle after a configuration update
-✅ Build Telegram delivery/claim/retry on top of the queued notification state
-✅ First real V2 job alerts delivered to Telegram: 3 opportunities sent successfully
-✅ Configure Telegram credentials on Oracle and send one real Telegram integration test
-⏳ Validate alert-path latency on Oracle: measure time from LinkedIn posting → discovery → evaluation/JD enrichment → queue → Telegram for relevant jobs; freshness is improved but not yet consistently within the few-minute target
-✅ Telegram timestamp formatting verified: human-readable IST
-⏳ Validate real job alert delivery after enabling unknown-experience alerts
-```
-
-### Not yet production-ready
-
-```
-✅ Telegram notification engine implementation complete; credentialed Bot API connectivity verified; first real job alerts delivered successfully
-⚠️ Cross-source canonical deduplication — conservative implementation is production-safe for strong evidence but needs broader source coverage
-⚠️ New/changed opportunity detection — canonical opportunity/notification persistence is in place; broader change detection remains to be completed
-✅ Daily active-feed UI connected in the repository: dashboard reads `/api/jobs?today_only=true` plus `/api/daily-summary`, displays Jobs today / Matched today / Alerts sent today, and refreshes every 10 seconds
-❌ Fully V2-connected frontend settings
-❌ Complete frontend live feed
-❌ Source health UI beyond basic API
-❌ V2 replacement of all useful V1 capabilities
+⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
+⏳ Verify notification dedupe at the canonical-opportunity level using fresh production samples (the 20-row diagnostic can contain multiple observations of the same canonical opportunity, so distinct canonical counts must be measured before MVP sign-off)
+⏳ Commit/reconcile the latest matcher changes on the active branch after the Docker-green production validation, keeping GitHub and Oracle working-tree state aligned
+⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
+⏳ Validate restart/recovery behavior with persisted config, evaluations and notification ledger
+⏳ Finish browser verification of the live dashboard against real V2 API data
+⏳ Complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
+⏳ Validate source-health UI and remaining convenience features
+⏳ Final V2 MVP sign-off after latency, dedupe, config persistence/recovery and frontend verification
 ```
 
 ### V1 status
 
-The old V1 workflow still exists and may still send Telegram alerts.
-
-Do not disable the V1 alert path until V2 Telegram is proven.
-
-After V2 alerts are trustworthy:
-
-- disable V1 duplicate notifications
-
----
-
+The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
 
-The next implementation sequence is:
+### Step A — Verify canonical-level alert deduplication
 
-### Step A — V2 persistent configuration
+Run a production diagnostic on the latest 10-minute sample and count:
 
-**Repository implementation is complete; Oracle verification is effectively passing.**
+- fresh matching rows
+- distinct canonical opportunities
+- distinct canonical opportunities with `sent`
+- duplicate source observations per canonical opportunity
 
-The runtime API now reports `config_version: 3` and `source_enabled.instahyre: false`. The first direct file read on Oracle still showed the legacy `config_version: 2` / Instahyre enabled state, but a subsequent `/api/config` read showed the v3 migrated state; this confirms the application-level migration path is active. A direct post-migration file read should still be performed once to remove ambiguity.
+Do not treat a row count as an alert count.
 
-The latest code adds a config-schema v3 migration that explicitly turns Instahyre off for legacy/pre-v3 runtime configurations.
+### Step B — Measure end-to-end alert latency
 
-The runtime uses:
-
-```
-/data/config.json
-```
-
-and a protected V2 configuration API.
-
-The API supports:
-
-- read current settings
-- update settings
-- validate settings
-- return current effective settings
-
-The application should use the effective runtime configuration rather than immutable module-level values loaded only once at process startup.
-
-### Step B — Configurable matching
-
-**Partially implemented and regression-tested. The matcher/dedupe suite currently contains thirty-one tests, with the latest repository suite green before the daily-feed change.**
-
-The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
-
-Next: validate live configuration changes against the persisted notification queue, then build Telegram delivery/claim/retry.
-
-Do not hardcode:
-
-- experience policy
-- target roles
-- location policy
-- exclusions
-- alertability rules
-
-Defaults may live in `v2/config.json`, but runtime preferences belong in persistent configuration.
-
-### Step C — Alertability
-
-Introduce a clear distinction:
+Measure a controlled set of fresh jobs through:
 
 ```
-job relevance
-      +
-eligibility
-      +
-newness
-      +
-notification policy
-      =
-Telegram alert decision
+source posting
+ → source discovery
+ → normalization/evaluation
+ → JD enrichment when required
+ → notification decision
+ → queue
+ → Telegram send
 ```
 
-Recommended default:
+Record median and p95 latency.
 
-- explicit experience compatible with candidate
-- configured maximum experience respected
-- relevant role
-- allowed geography
-- not excluded
-- genuinely new
-- not previously alerted
+### Step C — Reconcile GitHub and Oracle working-tree state
 
-Unknown experience should remain configurable rather than silently becoming an alert.
+The matcher improvement has been Docker-tested and is active in the current Oracle runtime validation. Commit and push the validated matcher/test/.gitignore changes so the active branch and deployed runtime are aligned.
 
-### Step D — Canonical identity and cross-source deduplication
+Then update this handover in the same milestone.
 
-The same job may appear on LinkedIn, Naukri and a company ATS. V2 now stores source observations separately and assigns them to canonical opportunities when identity evidence is strong enough. The current diagnostic endpoint exposes non-zero cross-source candidate pairs so merge policy can be validated on real data before lowering thresholds.
+### Step D — Validate runtime configuration + recovery
 
-Current canonical implementation uses normalized company/location/title metadata, canonical URL normalization, experience corroboration, and description similarity. Strong cross-source matches are auto-linked; ambiguous company/title/location matches are intentionally kept separate. Distinct listings from the same source are never metadata-merged, preventing accidental collapse of separate requisitions.
+Verify that frontend/API changes:
 
-The system must support:
+- persist in `/data/config.json`
+- re-evaluate existing jobs
+- reconsider pending notification state correctly
+- survive container restart/recovery
 
-- source identity
-- company identity
-- canonical job identity
-- cross-source grouping
+### Step E — Finish frontend verification
 
-One opportunity should not generate multiple alerts.
+Validate:
 
-### Step E — Telegram
-
-Target alert:
-
-```
-🚨 94% MATCH
-
-Software Engineer – AI
-Company: XYZ
-📍 Bengaluru
-🕐 Posted 8 minutes ago
-🔎 Discovered 2 minutes ago
-
-✓ Software Engineer
-✓ Python
-✓ AI / LLM
-✓ Bengaluru
-✓ 2–3 years
-
-Apply →
-```
-
-Telegram must be:
-
-- new-only
-- match-filtered
-- deduplicated
-- explainable
-- direct-link based
-
-### Step F — Frontend
-
-Connect the existing dashboard to the V2 API.
-
-Frontend should show:
-
-- fresh jobs
-- match score
-- source
-- company
-- location
-- posted time
-- discovery time
-- match reasons
-- apply link
+- live refresh
+- current-day feed
+- daily counters
+- filters/settings
+- job details
 - source health
-- configurable preferences
+- direct apply links
 
-Do not prioritize visual polish over correctness.
+### Step F — Changed-opportunity detection
 
-### Step G — V1 shutdown
+Define what constitutes a materially changed opportunity, for example:
 
-Only after V2 Telegram has proven reliable.
+- changed experience requirement
+- materially changed description/requirements
+- changed location/work mode
+- changed application URL
 
----
+Reconsider the opportunity without producing duplicate alerts.
 
+### Step G — MVP sign-off
+
+Only after the above checks pass should the current architecture be treated as the stable V2 MVP baseline.
+
+### Step H — Source expansion
+
+After MVP sign-off:
+
+- benchmark Agent-Reach against the existing LinkedIn collector
+- add high-value structured ATS sources progressively
+- keep each source isolated behind an adapter
 ## 13. ENGINEERING RULES FOR FUTURE AGENTS
 
 ### Before changing a source
@@ -919,6 +840,69 @@ The long-term goal includes useful ATS/career sources.
 
 Do not expand source count aggressively until the core normalization, dedupe, matching, alerting and configuration architecture is solid.
 
+### Observation 15 — The first real-time reactivation fix caused backlog alerts and required a discovery-time gate
+
+The initial fix that allowed suppressed opportunities to reactivate correctly also created a failure mode where older opportunities could become Telegram alerts when a refresh was run.
+
+The corrective rule is now:
+
+```
+queued Telegram alert eligibility
+    requires
+job.discovered_at within the last 10 minutes
+```
+
+This is intentionally separate from the normal job matching age window of 72 hours.
+
+A failed Telegram delivery can still retry after that 10-minute discovery window, because it represents an already-valid fresh alert whose delivery temporarily failed.
+
+### Observation 16 — Production matching is now materially better than the previous literal role matcher
+
+The live diagnostic showed relevant roles such as automation engineering and AI engineering reaching match/alertable state, and the matcher now recognizes common role variants that previously scored too low.
+
+A latest 10-minute diagnostic showed:
+
+- 20 matching job rows
+- 20 alertable rows
+- 0 fresh queued rows remaining at query time
+- 17 rows whose linked canonical notification state was `sent`
+
+This is evidence that the pipeline is functioning, but it is **not yet a distinct-alert count**. Canonical-level dedupe must be checked before calling alert quality proven.
+
+### Observation 17 — Recent source ingestion is healthy enough for continued measurement
+
+The latest source activity window showed:
+
+- LinkedIn continuing roughly minute-level polls with multiple successful runs and newly discovered jobs
+- Naukri continuing five-minute relay-driven source runs without a source error in the latest window
+- no recent Telegram delivery/error log entries after the successful fresh-alert sample
+
+Historical LinkedIn rate-limit pressure remains a known risk; polling should be optimized from measured 429/failure rate rather than increased blindly.
+
+### Observation 18 — Oracle host Python is not the project test environment
+
+The host Ubuntu Python does not have the V2 dependencies such as `bs4` installed, and `python3 -m pip` is unavailable.
+
+The canonical test path is therefore the project Docker environment:
+
+```
+docker compose ... run --rm --no-deps radar python3 -m unittest discover -s v2 -p 'test_*.py' -v
+```
+
+Do not install ad-hoc host Python dependencies just to run the suite.
+
+### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
+
+Agent-Reach may reduce the amount of bespoke web-access code for some future sources, particularly LinkedIn or generic web/ATS discovery.
+
+It is deliberately parked until:
+
+- current ingestion/matching/alerting is stable
+- alert latency and dedupe are measured
+- resource impact on the tiny Oracle VM is understood
+
+Do not introduce it into production source flow merely because it supports more platforms on paper.
+
 ---
 
 ## 15. WHAT NOT TO DO
@@ -989,6 +973,8 @@ Oracle Always Free VM + Docker + SQLite.
 
 LINKEDIN:
 Direct ingestion from Oracle. Proven.
+Current polling is approximately every 60 seconds with a bounded fast/deep scan strategy.
+Historical 429/rate-limit pressure exists and must be measured, not solved by blindly increasing request volume.
 
 NAUKRI:
 Do NOT scrape from Oracle.
@@ -996,45 +982,50 @@ Oracle systemd timer → GitHub workflow → Naukri → relay branch → V2.
 Proven and running every 5 minutes.
 
 INSTAHYRE:
-Experimental; current probe returns HTTP 400.
-Disabled by default.
-Config-schema v3 migration makes it opt-in for legacy runtime configs.
+Experimental and disabled by default.
+Do not depend on it.
 
 V2:
 Running on port 8000.
 No Chromium.
 
 MATCHER:
-Initial false positives were fixed.
-Current code uses phrase-aware matching and stricter experience handling.
-Still being hardened for real alert quality.
+Deterministic and phrase-aware.
+Supports Software Engineer / Software Development Engineer / SDE variants.
+Supports skill + generic developer/engineer title matching such as Javascript Developer.
+Unknown experience is neutral for matching.
+Configured maximum experience remains strict.
+39 regression tests are green in Docker.
 
 CONFIG:
-Current defaults are in v2/config.json.
-Final requirement: preferences must be editable from frontend and persist on VM.
-Preferred storage: /data/config.json.
+Defaults in v2/config.json.
+Runtime preferences persist under /data/config.json through the protected V2 configuration API.
 
 TELEGRAM:
-Not yet production-ready.
-Must alert only on new + relevant + eligible + deduplicated jobs.
+Working.
+Alerts require match + alertable state and recent discovery for queued items.
+The real-time queued-alert window is 10 minutes.
+Fresh production validation showed 20 matching rows, 20 alertable rows and 17 rows linked to sent canonical notification state; distinct canonical alert count still needs verification.
 
 DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
-Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened. The diagnostic now compares only shared normalized company/title families, avoiding expensive broad pair scans. The latest real examples confirmed that many same-title cross-source records differ only by explicit experience range and should remain separate.
+Ambiguous cross-source overlap stays separate.
+Do not count source rows as distinct alerts.
 
 FRONTEND:
-Repository dashboard now uses V2 local APIs.
-Needs live browser/deployment verification.
+Dashboard uses V2 APIs and can target the deployed Oracle API during local development.
+Friend's frontend work remains in progress; browser/product verification is still required.
 
 V1:
-Keep until V2 Telegram is proven; then disable duplicate V1 alerts.
+Legacy job-watch Telegram workflow is inactive/disabled.
+
+AGENT-REACH:
+Parked as a future optimisation.
+Do not make it a runtime dependency yet.
 
 NEXT:
-Build V2 persistent configuration → configurable matcher/alertability → dedupe/newness → Telegram → frontend → disable V1.
+Verify canonical-level dedupe → measure end-to-end alert latency → commit/reconcile latest matcher changes → validate config persistence/recovery → finish frontend verification → implement changed-opportunity detection → MVP sign-off → expand sources.
 ```
-
----
-
 ## 18. SOURCE OF TRUTH HIERARCHY
 
 When information conflicts, use this order:
@@ -1107,6 +1098,12 @@ V1 could add a rejected job to `seen.json`. This means a later configuration cha
 
 **Conclusion:** V2 must maintain separate observation/evaluation/alert state.
 
+### Oracle host Python dependency note
+
+The V2 suite should be executed inside the Docker image. The host Ubuntu Python may not have V2 dependencies such as `bs4`, and pip may not be installed.
+
+Use the Docker test command documented in Observation 18 rather than modifying the host Python environment.
+
 ### GitHub CLI compatibility
 
 The Ubuntu VM had an older GitHub CLI where `gh auth login --git-protocol ...` was unsupported. The working authentication path was:
@@ -1126,6 +1123,12 @@ Do not assume newer flags such as `--compact` exist.
 ---
 
 ## 30. DOCUMENTATION MAINTENANCE RULE
+
+
+### Proactive documentation rule
+
+This handover is not a passive artifact. Any significant code, runtime, architecture, source, alerting, matching, configuration, frontend or operational change must be reflected here during the same milestone. The active agent should inspect the current repository/runtime and update this file proactively; the user should not need to remind the agent.
+
 
 After every significant milestone, update:
 
