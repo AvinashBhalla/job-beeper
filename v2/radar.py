@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import hashlib
+import html as html_lib
 import json
 import logging
 import os
@@ -1143,30 +1144,115 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
 
 
 
-def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
-    raw = str(text or "").strip()
+def _clean_experience_text(text: str) -> str:
+    raw = html_lib.unescape(str(text or "")).replace("\xa0", " ")
+    raw = re.sub(r"[‐‑‒–—−]", "-", raw)
+    raw = re.sub(r"\s+", " ", raw).strip().lower()
+    return raw
+
+
+def extract_experience(text: str) -> tuple[float | None, float | None]:
+    raw = _clean_experience_text(text)
     if not raw:
         return None, None
 
-    # Prefer lines/sentences that explicitly mention experience. LinkedIn job
-    # pages can contain several unrelated numeric values, so avoid aggregating
-    # every number across the whole page.
+    # Prefer explicit experience ranges before generic single-number matches.
+    ranges = re.findall(
+        r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
+        raw,
+    )
+    if ranges:
+        lows = [float(a) for a, _ in ranges]
+        highs = [float(b) for _, b in ranges]
+        return min(lows), max(highs)
+
+    plus = re.search(
+        r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)\b",
+        raw,
+    )
+    if plus:
+        years = float(plus.group(1))
+        return years, None
+
+    single = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
+        raw,
+    )
+    if single:
+        years = float(single.group(1))
+        return years, years
+
+    # A few JDs write the requirement in reverse order.
+    reverse_range = re.search(
+        r"experience(?:\s+of|\s*[:\-])\s*"
+        r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
+        raw,
+    )
+    if reverse_range:
+        return float(reverse_range.group(1)), float(reverse_range.group(2))
+
+    return None, None
+
+
+def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
+    raw = _clean_experience_text(text)
+    if not raw:
+        return None, None
+
+    # Prefer explicit "overall/total experience" statements. This avoids
+    # accidentally selecting unrelated numeric requirements elsewhere in a JD.
+    priority_patterns = (
+        r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*"
+        r"(?:years?|yrs?)\s+of\s+(?:overall|total)\b[^.!?]{0,160}\bexperience\b",
+        r"(?:overall|total)\s+(?:software\s+engineering|professional|work\s+)?"
+        r"experience\b[^.!?]{0,120}?(\d+(?:\.\d+)?)\s*(?:-|to)\s*"
+        r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
+        r"(?:minimum|at\s+least|requires?|required)\s+(?:of\s+)?"
+        r"(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b"
+        r"[^.!?]{0,120}\bexperience\b",
+        r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)\s+"
+        r"(?:of\s+)?[^.!?]{0,120}\bexperience\b",
+    )
+
+    for pattern in priority_patterns:
+        match = re.search(pattern, raw, re.I)
+        if not match:
+            continue
+        values = [float(value) for value in match.groups() if value is not None]
+        if len(values) >= 2:
+            return values[0], values[1]
+        if values:
+            return values[0], None
+
+    # Fall back to the normal experience parser, but inspect focused
+    # experience-bearing chunks first.
     chunks = [
         chunk.strip()
         for chunk in re.split(r"(?<=[.!?])\s+|\n+|•", raw)
         if chunk.strip()
     ]
-    priority = [chunk for chunk in chunks if re.search(r"\bexperience\b", chunk, re.I)]
+    priority = [
+        chunk
+        for chunk in chunks
+        if re.search(r"\bexperience\b", chunk, re.I)
+    ]
     for chunk in priority + chunks:
         result = extract_experience(chunk)
         if result != (None, None):
             return result
+
     return None, None
 
 
 def _linkedin_job_id(url: str) -> str | None:
     match = re.search(r"(?:-|/)(\d{8,})(?:[/?#]|$)", url or "")
     return match.group(1) if match else None
+
+
+def _clean_detail_text(value: str) -> str:
+    soup = BeautifulSoup(value or "", "html.parser")
+    text = soup.get_text(" ", strip=True)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _linkedin_job_description(url: str) -> str:
@@ -1190,23 +1276,80 @@ def _linkedin_job_description(url: str) -> str:
             continue
 
         soup = BeautifulSoup(response.text, "html.parser")
+        candidates: list[str] = []
+
+        # Prefer JSON-LD JobPosting descriptions when available. This is
+        # independent of LinkedIn's frequently changing CSS classes.
+        for script in soup.select('script[type="application/ld+json"]'):
+            raw_json = script.string or script.get_text()
+            if not raw_json:
+                continue
+            try:
+                payload = json.loads(raw_json)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+            stack = payload if isinstance(payload, list) else [payload]
+            while stack:
+                item = stack.pop()
+                if isinstance(item, list):
+                    stack.extend(item)
+                    continue
+                if not isinstance(item, dict):
+                    continue
+
+                item_type = item.get("@type")
+                is_job_posting = (
+                    item_type == "JobPosting"
+                    or (
+                        isinstance(item_type, list)
+                        and "JobPosting" in item_type
+                    )
+                )
+                if is_job_posting and item.get("description"):
+                    candidates.append(
+                        _clean_detail_text(str(item["description"]))
+                    )
+
+                for value in item.values():
+                    if isinstance(value, (dict, list)):
+                        stack.append(value)
+
         selectors = (
             "div.show-more-less-html__markup",
             "div.description__text",
             "section.show-more-less-html",
             "div.decorated-job-posting__details",
             "main",
+            "[class*='description']",
         )
         for selector in selectors:
-            nodes = soup.select(selector)
-            if not nodes:
-                continue
-            text = " ".join(node.get_text(" ", strip=True) for node in nodes)
-            text = re.sub(r"\s+", " ", text).strip()
-            if text:
-                return text[:20000]
+            for node in soup.select(selector):
+                text = _clean_detail_text(str(node))
+                if text:
+                    candidates.append(text)
+
+        # Meta fallbacks help when LinkedIn changes its rendered description
+        # markup but still publishes a description summary.
+        for selector in (
+            'meta[name="description"]',
+            'meta[property="og:description"]',
+        ):
+            node = soup.select_one(selector)
+            if node and node.get("content"):
+                candidates.append(_clean_detail_text(node.get("content", "")))
+
+        unique = list(dict.fromkeys(text for text in candidates if text))
+        if unique:
+            with_experience = [
+                text for text in unique
+                if re.search(r"\bexperience\b", text, re.I)
+            ]
+            pool = with_experience or unique
+            return max(pool, key=len)[:20000]
 
     return ""
+
 
 def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
     if job.get("source") != "linkedin":
@@ -1221,47 +1364,18 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
         job.pop("needs_jd_enrichment", None)
         return job
 
-    detail_experience = extract_jd_experience(detail)
-    if detail_experience == (None, None):
-        return job
-
     existing_description = job.get("description") or ""
     job["description"] = (
         f"{existing_description} JD: {detail}".strip()
     )[:30000]
-    job["jd_experience_min_years"] = detail_experience[0]
-    job["jd_experience_max_years"] = detail_experience[1]
+
+    detail_experience = extract_jd_experience(detail)
+    if detail_experience != (None, None):
+        job["jd_experience_min_years"] = detail_experience[0]
+        job["jd_experience_max_years"] = detail_experience[1]
+
     job.pop("needs_jd_enrichment", None)
     return job
-
-
-def extract_experience(text: str) -> tuple[float | None, float | None]:
-    raw = str(text or "").lower().replace("–", "-").replace("—", "-")
-    raw = re.sub(r"\s+", " ", raw).strip()
-
-    ranges = re.findall(
-        r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)",
-        raw,
-    )
-    if ranges:
-        lows = [float(a) for a, _ in ranges]
-        highs = [float(b) for _, b in ranges]
-        return min(lows), max(highs)
-
-    plus = re.search(r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)", raw)
-    if plus:
-        years = float(plus.group(1))
-        return years, None
-
-    normalized = normalize_phrase(raw)
-    singles = re.findall(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", normalized)
-    if singles:
-        years = [float(x) for x in singles]
-        return min(years), max(years)
-
-    return None, None
-
-
 def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
     config = config or get_config()
     title = job.get("title") or ""
