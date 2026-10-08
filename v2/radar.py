@@ -45,6 +45,8 @@ UA = {
 LINKEDIN_SEARCH_WORKERS = 6
 LINKEDIN_DETAIL_WORKERS = 6
 LINKEDIN_DEEP_SCAN_SECONDS = 300
+LINKEDIN_FAST_TPR = "r3600"
+LINKEDIN_DEEP_TPR = "r21600"
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 db_lock = threading.Lock()
@@ -1248,15 +1250,18 @@ def _linkedin_parse_page(response: requests.Response) -> list[dict[str, Any]]:
 
     return jobs
 
-def _linkedin_search_page(query: str, location: str, start: int) -> list[dict[str, Any]]:
+def _linkedin_search_page(query: str, location: str, start: int, fast: bool = True) -> list[dict[str, Any]]:
     endpoint = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-    response = _linkedin_request(endpoint, {
+    params = {
         "keywords": query,
         "location": location,
-        "f_TPR": "r21600",
+        "f_TPR": LINKEDIN_FAST_TPR if fast else LINKEDIN_DEEP_TPR,
         "sortBy": "DD",
         "start": start,
-    })
+    }
+    if fast:
+        params["f_EA"] = "true"
+    response = _linkedin_request(endpoint, params)
     return _linkedin_parse_page(response)
 
 
@@ -1271,7 +1276,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     targets = [
-        (query, location, start)
+        (query, location, start, start != 10)
         for query in config.get("linkedin_queries", [])
         for location in config.get("locations", [])
         for start in ((0, 10) if do_deep else (0,))
@@ -1279,8 +1284,8 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
 
     with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
         futures = [
-            executor.submit(_linkedin_search_page, query, location, start)
-            for query, location, start in targets
+            executor.submit(_linkedin_search_page, query, location, start, fast)
+            for query, location, start, fast in targets
         ]
         for future in as_completed(futures):
             try:
