@@ -1044,60 +1044,55 @@ def dedupe_candidates(limit: int = 100):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
-            SELECT
-                a.id AS job_a_id, a.source AS source_a, a.source_job_id AS source_job_id_a,
-                a.company AS company_a, a.title AS title_a, a.location AS location_a,
-                a.url AS url_a, a.description AS description_a,
-                b.id AS job_b_id, b.source AS source_b, b.source_job_id AS source_job_id_b,
-                b.company AS company_b, b.title AS title_b, b.location AS location_b,
-                b.url AS url_b, b.description AS description_b
-            FROM jobs a
-            JOIN jobs b
-              ON a.id < b.id
-             AND a.source != b.source
-             AND lower(trim(a.company)) = lower(trim(b.company))
+            SELECT id, source, source_job_id, company, title, location, url, description
+            FROM jobs
+            WHERE source IN ('linkedin', 'naukri', 'instahyre')
+            ORDER BY id ASC
         """).fetchall()
 
-    candidates = []
+    by_company: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        left = dict(row)
-        left_job = {
-            "company": left["company_a"],
-            "title": left["title_a"],
-            "location": left["location_a"],
-            "url": left["url_a"],
-            "description": left["description_a"],
-        }
-        right_job = {
-            "company": left["company_b"],
-            "title": left["title_b"],
-            "location": left["location_b"],
-            "url": left["url_b"],
-            "description": left["description_b"],
-        }
-        score, method = canonical_match_score(left_job, right_job)
-        if score <= 0:
+        item = dict(row)
+        key = canonical_identity(item)["company_norm"]
+        if key:
+            by_company.setdefault(key, []).append(item)
+
+    candidates = []
+    for group in by_company.values():
+        sources = {item["source"] for item in group}
+        if len(sources) < 2:
             continue
-        candidates.append({
-            "job_a_id": left["job_a_id"],
-            "source_a": left["source_a"],
-            "source_job_id_a": left["source_job_id_a"],
-            "title_a": left["title_a"],
-            "company_a": left["company_a"],
-            "location_a": left["location_a"],
-            "job_b_id": left["job_b_id"],
-            "source_b": left["source_b"],
-            "source_job_id_b": left["source_job_id_b"],
-            "title_b": left["title_b"],
-            "company_b": left["company_b"],
-            "location_b": left["location_b"],
-            "score": score,
-            "method": method,
-            "auto_link": auto_link_allowed(score, method),
-        })
+        for i, left in enumerate(group):
+            for right in group[i + 1:]:
+                if left["source"] == right["source"]:
+                    continue
+                score, method = canonical_match_score(left, right)
+                if score <= 0:
+                    continue
+                candidates.append({
+                    "job_a_id": left["id"],
+                    "source_a": left["source"],
+                    "source_job_id_a": left["source_job_id"],
+                    "title_a": left["title"],
+                    "company_a": left["company"],
+                    "location_a": left["location"],
+                    "job_b_id": right["id"],
+                    "source_b": right["source"],
+                    "source_job_id_b": right["source_job_id"],
+                    "title_b": right["title"],
+                    "company_b": right["company"],
+                    "location_b": right["location"],
+                    "score": score,
+                    "method": method,
+                    "auto_link": auto_link_allowed(score, method),
+                })
 
     candidates.sort(key=lambda item: (-item["score"], item["job_a_id"], item["job_b_id"]))
-    return {"candidates": candidates[:limit]}
+    return {
+        "candidates": candidates[:limit],
+        "jobs_considered": len(rows),
+        "company_groups": len(by_company),
+    }
 
 
 @app.get("/api/opportunities")
