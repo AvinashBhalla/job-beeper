@@ -99,6 +99,7 @@ function loadForm(){
   $("cfgMinExperience").value=c.min_experience_years ?? "";
   $("cfgExperience").value=c.max_experience_years ?? 3;
   $("cfgThreshold").value=c.match_threshold ?? 55;
+  $("cfgAge").value=c.max_age_hours ?? 72;
   $("cfgRemoteOnly").checked=!!c.remote_only;
   $("cfgRequireExperience").checked=!!c.require_explicit_experience_for_alerts;
   $("cfgTelegram").checked=c.notifications_enabled!==false;
@@ -120,6 +121,7 @@ function collectConfig(){
   next.min_experience_years=minimum==="" ? null : Number(minimum);
   next.max_experience_years=Number($("cfgExperience").value);
   next.match_threshold=Number($("cfgThreshold").value);
+  next.max_age_hours=Number($("cfgAge").value);
   next.remote_only=$("cfgRemoteOnly").checked;
   next.require_explicit_experience_for_alerts=$("cfgRequireExperience").checked;
   next.notifications_enabled=$("cfgTelegram").checked;
