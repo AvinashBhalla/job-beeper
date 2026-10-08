@@ -547,13 +547,15 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
 ✅ Conservative dedupe rule: auto-link only strong evidence; ambiguous metadata stays separate
+✅ Cross-source dedupe diagnostic endpoint added for real LinkedIn/Naukri overlap validation
+✅ SQLite row-factory regression fixed in canonical assignment path
 ```
 
 ### Currently in progress
 
 ```
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
-⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps
+⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates`
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
 
@@ -658,7 +660,7 @@ Unknown experience should remain configurable rather than silently becoming an a
 
 ### Step D — Canonical identity and cross-source deduplication
 
-The same job may appear on LinkedIn, Naukri and a company ATS. V2 now stores source observations separately and assigns them to canonical opportunities when identity evidence is strong enough.
+The same job may appear on LinkedIn, Naukri and a company ATS. V2 now stores source observations separately and assigns them to canonical opportunities when identity evidence is strong enough. The current diagnostic endpoint exposes non-zero cross-source candidate pairs so merge policy can be validated on real data before lowering thresholds.
 
 Current canonical implementation uses normalized company/location/title metadata, canonical URL normalization, experience corroboration, and description similarity. Strong matches are auto-linked; ambiguous company/title/location matches are intentionally kept separate.
 
@@ -931,7 +933,7 @@ Must alert only on new + relevant + eligible + deduplicated jobs.
 
 DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
-Real LinkedIn/Naukri validation and further reconciliation of probable duplicates remain.
+Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened.
 
 FRONTEND:
 Repository dashboard now uses V2 local APIs.
