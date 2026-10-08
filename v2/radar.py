@@ -114,6 +114,14 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="match_threshold must be between 0 and 100.")
     config["match_threshold"] = threshold
 
+    try:
+        max_age_hours = int(config.get("max_age_hours", 72))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="max_age_hours must be an integer.")
+    if not 1 <= max_age_hours <= 720:
+        raise HTTPException(status_code=422, detail="max_age_hours must be between 1 and 720 hours.")
+    config["max_age_hours"] = max_age_hours
+
     for key in ("remote_only", "notifications_enabled", "require_explicit_experience_for_alerts"):
         config[key] = bool(config.get(key, False))
 
