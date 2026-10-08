@@ -551,6 +551,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Dedupe diagnostic optimized to group by normalized company/title identity before pair comparison
 ✅ Same-source canonical auto-linking disabled except exact canonical URL evidence
 ✅ Fixed canonical rebuild startup import regression after identity-version hardening
+✅ Fixed canonical group creation/source-isolation regressions before persistent database rebuild
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
