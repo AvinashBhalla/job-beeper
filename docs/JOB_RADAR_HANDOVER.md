@@ -559,6 +559,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Persistent notification decision queue added with reconsideration of fresh non-alertable opportunities
 ✅ V2 Telegram delivery worker added with persistent claim/sent/failed state, safe retry handling, and interrupted-claim recovery
 ✅ Telegram message formatting and delivery error behavior regression-tested
+✅ New LinkedIn jobs with missing card-level experience now fetch the public job detail page and extract explicit JD experience requirements before matching
 ✅ Runtime configuration changes now recalculate persisted job evaluations before notification decisions
 ✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Telegram credential connectivity verified against the configured bot/chat
@@ -581,6 +582,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Build Telegram delivery/claim/retry on top of the queued notification state
 ✅ First real V2 job alerts delivered to Telegram: 3 opportunities sent successfully
 ✅ Configure Telegram credentials on Oracle and send one real Telegram integration test
+⏳ Validate the new LinkedIn JD experience enrichment on Oracle against a newly discovered job
 ⏳ Validate real job alert delivery after enabling unknown-experience alerts
 ```
 
@@ -835,11 +837,15 @@ The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source can
 
 Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state. A fresh opportunity that is currently non-alertable remains pending so later preference changes can reconsider it. Configuration changes recompute persisted evaluations before reconsidering the notification queue.
 
-### Observation 4 — Telegram is now the next external integration
+### Observation 4 — LinkedIn card data is not sufficient for experience
+
+LinkedIn search cards do not reliably expose the experience requirement even when the full job page does. New LinkedIn jobs without a parsed card-level experience now receive one public JD fetch before matching. Explicit requirements such as "5+ years of full-time software development experience" are extracted into the stored description, allowing the normal experience eligibility rules to reject unsuitable roles before Telegram.
+
+### Observation 11 — Telegram is now the next external integration
 
 The V2 Telegram layer consumes only queued canonical opportunities, atomically claims delivery work, formats an explainable direct-apply alert, records sent or failed, retries only explicitly retryable failures, and recovers interrupted claims after restart. Credentials are supplied through container environment variables and are never stored in the repository. The first real credentialed run successfully delivered three job alerts.
 
-### Observation 5 — Matcher quality matters more than raw job count
+### Observation 11 — Matcher quality matters more than raw job count
 
 The objective is not to maximize jobs stored.
 
@@ -851,25 +857,25 @@ worthwhile alerts / total alerts
 
 Noise is a product failure.
 
-### Observation 6 — Unknown data must remain unknown
+### Observation 11 — Unknown data must remain unknown
 
 If LinkedIn does not expose experience, do not manufacture one.
 
 The system should represent uncertainty and make policy decisions from that explicit state.
 
-### Observation 7 — Frontend configuration must be real
+### Observation 11 — Frontend configuration must be real
 
 A UI control that only changes an old V1 config is not a V2 feature.
 
-### Observation 8 — Same-source isolation must be enforced at candidate retrieval time
+### Observation 11 — Same-source isolation must be enforced at candidate retrieval time
 
 The canonical layer now carries the representative source through metadata candidate queries, so same-source listings cannot be merged merely from company/title/location similarity. Exact canonical URL evidence remains eligible for linking.
 
-### Observation 9 — Experience ranges reveal real requisition variants
+### Observation 11 — Experience ranges reveal real requisition variants
 
 Real IBM examples showed identical company/title/location across LinkedIn and Naukri with different explicit Naukri ranges such as 5–7, 6–7, and 6–8 years, and IBM Cloud FullStack variants at 15–20, 14–20, and 18–20 years. These are not safe duplicate merges. Canonical matching now treats incompatible explicit experience ranges as distinct opportunities.
 
-### Observation 10 — The current source roadmap is broader than the first three sources
+### Observation 11 — The current source roadmap is broader than the first three sources
 
 The long-term goal includes useful ATS/career sources.
 
