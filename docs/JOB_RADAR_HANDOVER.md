@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (43-test suite green in Docker; V2 container recreated on Oracle)
+**Last updated: 2026-10-08 (43-test suite green; hardened deployment verified against BlueOptima JD parsing)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -891,11 +891,20 @@ A real BlueOptima LinkedIn posting exposed a correctness gap:
 Browser JD:
 5 to 7 years of overall software engineering experience.
 
-Telegram:
+Telegram from the pre-hardening runtime:
 Experience: Not stated
 ```
 
-The important distinction is that the source posting can contain an explicit experience requirement even when the search-card payload does not. The V2 detail acquisition or parsing layer can therefore be the failure point.
+The subsequent live DB inspection after the hardened deployment confirms the parser now captures the requirement correctly:
+
+```
+experience_min_years = 5
+experience_max_years = 7
+match = 0
+alertable = 0
+```
+
+The historical notification ledger for this same posting is still `sent`, but that send occurred at 11:19 UTC, before the hardened container was deployed/recreated at approximately 13:16 UTC. Therefore this row is evidence of the old-runtime incident, not a post-deployment regression.
 
 Corrective rule:
 
@@ -916,6 +925,8 @@ re-evaluate before notification
 Supported JD wording must include phrases such as `5 to 7 years of overall software engineering experience`, common Unicode dash variants, HTML entities/non-breaking spaces and common minimum/at-least experience wording.
 
 A known experience requirement must not be hidden merely because the search card omitted it.
+
+For future production validation, use a posting first discovered after the hardened deployment when verifying the end-to-end notification gate.
 
 During direct GitHub maintenance, a second test-file corruption was discovered after an earlier repair: the branch contained only a truncated 2,943-character tail of `v2/test_radar.py`, causing `IndentationError` at file line 1 on Oracle. The safe recovery procedure is now to restore the last known-good complete test file and reapply new tests, rather than attempting line-range reconstruction from a potentially truncated current file.
 
