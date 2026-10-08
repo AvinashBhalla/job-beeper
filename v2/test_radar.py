@@ -1,7 +1,11 @@
 import unittest
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import v2.radar as radar
 from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
-from v2.radar import _merge_config, alertability_details, extract_experience, match_details
+from v2.radar import _merge_config, alertability_details, extract_experience, match_details, normalize_job, upsert_jobs
 
 
 BASE_CONFIG = {
@@ -29,6 +33,66 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 
 class MatcherTests(unittest.TestCase):
+    def test_database_links_strong_cross_source_duplicate(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                common = {
+                    "company": "Acme Technologies Pvt Ltd",
+                    "title": "Software Engineer - AI",
+                    "location": "Bengaluru, Karnataka",
+                    "url": "https://example.com/apply/123",
+                    "description": "Build Python services. 0-2 years experience.",
+                }
+                first = normalize_job(
+                    "linkedin", "li-1", common["company"], common["title"],
+                    common["location"], common["url"], None, "unknown", common["description"],
+                )
+                second = normalize_job(
+                    "naukri", "nk-1", "Acme Technologies", "Software Engineer AI",
+                    "Bangalore", common["url"], None, "unknown",
+                    "Build Python services. Experience: 0 to 2 years.",
+                )
+                self.assertEqual(upsert_jobs([first]), 1)
+                self.assertEqual(upsert_jobs([second]), 1)
+                with __import__("sqlite3").connect(radar.DB_PATH) as conn:
+                    rows = conn.execute("""
+                        SELECT source, canonical_opportunity_id
+                        FROM jobs
+                        ORDER BY id
+                    """).fetchall()
+                self.assertEqual(len(rows), 2)
+                self.assertEqual(rows[0][1], rows[1][1])
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_database_keeps_ambiguous_duplicate_separate(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                first = normalize_job(
+                    "linkedin", "li-1", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/1", None,
+                    "unknown", "Be an early applicant",
+                )
+                second = normalize_job(
+                    "naukri", "nk-1", "Acme", "Software Engineer",
+                    "Bangalore", "https://naukri.com/job-listings/2", None,
+                    "unknown", "Experience with distributed systems and APIs.",
+                )
+                self.assertEqual(upsert_jobs([first, second]), 2)
+                with __import__("sqlite3").connect(radar.DB_PATH) as conn:
+                    ids = [row[0] for row in conn.execute(
+                        "SELECT canonical_opportunity_id FROM jobs ORDER BY id"
+                    ).fetchall()]
+                self.assertNotEqual(ids[0], ids[1])
+            finally:
+                radar.DB_PATH = original_db
+
     def test_canonical_url_normalization_removes_tracking(self):
         self.assertEqual(
             canonicalize_url("https://WWW.example.com/jobs/123/?utm_source=x&ref=abc&b=2&a=1"),
