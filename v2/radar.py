@@ -426,7 +426,23 @@ def canonical_schema_needs_rebuild(conn: sqlite3.Connection) -> bool:
 
 def rebuild_canonical_opportunities(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE jobs SET canonical_opportunity_id=NULL, canonical_match_method=NULL, canonical_match_confidence=NULL")
+    conn.execute("DELETE FROM notification_ledger")
     conn.execute("DELETE FROM canonical_opportunities")
+
+
+def backfill_notification_ledger() -> None:
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            INSERT INTO notification_ledger (
+                canonical_opportunity_id, status, created_at, updated_at
+            )
+            SELECT co.id, 'suppressed', co.first_seen_at, co.last_seen_at
+            FROM canonical_opportunities co
+            LEFT JOIN notification_ledger nl
+                ON nl.canonical_opportunity_id = co.id
+            WHERE nl.canonical_opportunity_id IS NULL
+        """)
+        conn.commit()
 
 
 def backfill_canonical_opportunities() -> None:
@@ -528,6 +544,7 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
     backfill_canonical_opportunities()
+    backfill_notification_ledger()
 
 
 def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
