@@ -903,7 +903,9 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(merged["config_version"], 5)
         self.assertEqual(merged["linkedin_queries"], defaults["linkedin_queries"])
         self.assertEqual(merged["naukri_queries"], defaults["naukri_queries"])
-        self.assertFalse(merged["source_enabled"]["instahyre"])
+        # V5 repairs source-query drift only; the V4 migration is responsible
+        # for forcing legacy Instahyre enablement back to disabled.
+        self.assertTrue(merged["source_enabled"]["instahyre"])
 
     def test_linkedin_fast_scan_uses_broader_recency_window(self):
         params = []
