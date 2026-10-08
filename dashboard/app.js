@@ -1427,23 +1427,8 @@
       state.config = data.config;
       populatePreferencesForm();
     } catch (e) {
-      state.config = {
-        target_roles: ['Software Engineer', 'Full Stack Developer', 'React Developer', 'Python Developer'],
-        locations: ['Bengaluru', 'Gurugram', 'Delhi', 'Remote India'],
-        skills: ['React', 'Python', 'FastAPI', 'Node.js', 'TypeScript'],
-        title_exclude: ['Senior', 'Staff', 'Principal', 'Lead', 'Manager'],
-        excluded_role_terms: ['QA', 'Tester'],
-        candidate_experience_years: 2,
-        min_experience_years: null,
-        max_experience_years: 3,
-        match_threshold: 55,
-        max_age_hours: 72,
-        remote_only: false,
-        require_explicit_experience_for_alerts: false,
-        notifications_enabled: true,
-        source_enabled: { linkedin: true, naukri: true, instahyre: false },
-      };
-      populatePreferencesForm();
+      state.config = null;
+      showToast('Live backend configuration unavailable. Check the dashboard API URL.', 'error', 5000);
     }
   }
 
@@ -1475,21 +1460,13 @@
       populateSourceFilterOptions(state.jobs);
       renderFeed();
     } catch (err) {
-      try {
-        const staticRes = await fetch('data/jobs.json', { cache: 'no-store' });
-        if (staticRes.ok) {
-          const staticData = await staticRes.json();
-          state.jobs = (staticData.jobs || []).map(normalizeJob).filter(Boolean);
-          state.isStaticFallback = true;
-          updateTelemetry(state.jobs.length, state.jobs.filter(j => j.match_score >= 55).length, staticData.new_alerts ?? 0, 'Static Feed Fallback');
-          populateSourceFilterOptions(state.jobs);
-          renderFeed();
-        } else {
-          throw new Error('Static jobs.json also unavailable');
-        }
-      } catch (staticErr) {
-        updateTelemetry(0, 0, 0, 'Feed Offline');
-      }
+      state.jobs = [];
+      state.summary = null;
+      state.isStaticFallback = false;
+      updateTelemetry(0, 0, 0, 'Feed Offline');
+      populateSourceFilterOptions([]);
+      renderFeed();
+      showToast('Live jobs API unavailable. Dashboard is offline; no fallback feed is shown.', 'error', 5000);
     } finally {
       if (refreshBtn) refreshBtn.classList.remove('is-loading');
     }
@@ -1506,9 +1483,9 @@
       }
     } catch (e) {
       state.sourceStatus = [
-        { source: 'LinkedIn', runtime: { running: false, error: null, last_success: new Date().toISOString() }, jobs_seen: state.jobs.filter(j => j.source.toLowerCase() === 'linkedin').length, new_jobs: 0 },
-        { source: 'Naukri (Relay)', runtime: { running: false, error: null, last_success: new Date().toISOString() }, jobs_seen: state.jobs.filter(j => j.source.toLowerCase() === 'naukri').length, new_jobs: 0 },
-        { source: 'Instahyre', runtime: { running: false, error: null, last_success: new Date().toISOString() }, jobs_seen: state.jobs.filter(j => j.source.toLowerCase() === 'instahyre').length, new_jobs: 0 },
+        { source: 'LinkedIn', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'Naukri (Relay)', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'Instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
       ];
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
@@ -1528,14 +1505,17 @@
     }
   }
 
-  function populateSourceFilterOptions(jobs) {
-    const sources = [...new Set(jobs.map(j => j.source).filter(Boolean))].sort();
+  function populateSourceFilterOptions(_jobs) {
     const opts = [
       { value: '', label: 'All Sources' },
-      ...sources.map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })),
+      { value: 'linkedin', label: 'LinkedIn' },
+      { value: 'naukri', label: 'Naukri' },
+      { value: 'instahyre', label: 'Instahyre' },
     ];
     if (dropdowns.source) {
-      dropdowns.source.setOptions(opts, state.filters.source);
+      const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';
+      state.filters.source = selected;
+      dropdowns.source.setOptions(opts, selected);
     }
   }
 
