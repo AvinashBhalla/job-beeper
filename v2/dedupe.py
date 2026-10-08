@@ -143,6 +143,22 @@ def canonical_match_score(job: dict, candidate: dict) -> tuple[int, str]:
     if not (company_match and location_match) or title_sim < 0.88:
         return 0, "none"
 
+    job_experience = extract_experience_signature(
+        f"{job.get('title', '')} {job.get('description', '')}"
+    )
+    candidate_experience = extract_experience_signature(
+        f"{candidate.get('title', '')} {candidate.get('description', '')}"
+    )
+
+    # Different explicit experience ranges are strong evidence that these are
+    # distinct requisitions, even when company/title/location are identical.
+    if (
+        job_experience != (None, None)
+        and candidate_experience != (None, None)
+        and job_experience != candidate_experience
+    ):
+        return 0, "none"
+
     if experience_equal(
         f"{job.get('title', '')} {job.get('description', '')}",
         f"{candidate.get('title', '')} {candidate.get('description', '')}",
