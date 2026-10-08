@@ -398,22 +398,25 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
 
 
 def extract_experience(text: str) -> tuple[float | None, float | None]:
-    value = normalize_phrase(text)
+    raw = str(text or "").lower().replace("–", "-").replace("—", "-")
+    raw = re.sub(r"\s+", " ", raw).strip()
+
     ranges = re.findall(
         r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)",
-        value,
+        raw,
     )
     if ranges:
         lows = [float(a) for a, _ in ranges]
         highs = [float(b) for _, b in ranges]
         return min(lows), max(highs)
 
-    plus = re.search(r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)", value)
+    plus = re.search(r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)", raw)
     if plus:
         years = float(plus.group(1))
         return years, None
 
-    singles = re.findall(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", value)
+    normalized = normalize_phrase(raw)
+    singles = re.findall(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", normalized)
     if singles:
         years = [float(x) for x in singles]
         return min(years), max(years)
