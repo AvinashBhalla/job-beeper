@@ -958,38 +958,49 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
     return None, None
 
 
+def _linkedin_job_id(url: str) -> str | None:
+    match = re.search(r"(?:-|/)(\d{8,})(?:[/?#]|$)", url or "")
+    return match.group(1) if match else None
+
+
 def _linkedin_job_description(url: str) -> str:
-    try:
-        response = requests.get(
-            url,
-            headers={**UA, "Accept": "text/html,application/xhtml+xml"},
-            timeout=15,
-        )
-        if response.status_code != 200:
-            return ""
-    except requests.RequestException:
-        return ""
+    job_id = _linkedin_job_id(url)
+    endpoints = []
+    if job_id:
+        endpoints.append(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}")
+    if url:
+        endpoints.append(url)
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    selectors = (
-        "div.show-more-less-html__markup",
-        "div.description__text",
-        "section.show-more-less-html",
-        "div.decorated-job-posting__details",
-        "main",
-    )
-
-    for selector in selectors:
-        nodes = soup.select(selector)
-        if not nodes:
+    for endpoint in endpoints:
+        try:
+            response = requests.get(
+                endpoint,
+                headers={**UA, "Accept": "text/html,application/xhtml+xml"},
+                timeout=10,
+            )
+            if response.status_code != 200:
+                continue
+        except requests.RequestException:
             continue
-        text = " ".join(node.get_text(" ", strip=True) for node in nodes)
-        text = re.sub(r"\s+", " ", text).strip()
-        if text:
-            return text[:20000]
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        selectors = (
+            "div.show-more-less-html__markup",
+            "div.description__text",
+            "section.show-more-less-html",
+            "div.decorated-job-posting__details",
+            "main",
+        )
+        for selector in selectors:
+            nodes = soup.select(selector)
+            if not nodes:
+                continue
+            text = " ".join(node.get_text(" ", strip=True) for node in nodes)
+            text = re.sub(r"\s+", " ", text).strip()
+            if text:
+                return text[:20000]
 
     return ""
-
 
 def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
     if job.get("source") != "linkedin":
@@ -1191,21 +1202,30 @@ def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Respons
 def _linkedin_parse_page(response: requests.Response) -> list[dict[str, Any]]:
     jobs: list[dict[str, Any]] = []
     soup = BeautifulSoup(response.text, "html.parser")
-    cards = soup.select("li")
 
-    for card in cards:
-        link = card.select_one("a.base-card__full-link") or card.select_one(
-            "a[href*='/jobs/view/']"
-        )
+    links = soup.select("a.base-card__full-link")
+    if not links:
+        links = soup.select("a[href*="/jobs/view/"]")
+
+    seen_ids: set[str] = set()
+    for link in links:
+        card = link.find_parent("div", class_="base-card")
+        if card is None:
+            card = link.find_parent("li") or link
+
         title = card.select_one("h3.base-search-card__title")
         company = card.select_one("h4.base-search-card__subtitle")
         loc = card.select_one("span.job-search-card__location")
         posted = card.select_one("time")
-        if not link or not title:
+        if not title:
             continue
+
         url = (link.get("href") or "").split("?")[0]
-        match = re.search(r"(?:-|/)(\d{8,})$", url)
-        source_id = match.group(1) if match else hashlib.sha1(url.encode()).hexdigest()[:20]
+        source_id = _linkedin_job_id(url) or hashlib.sha1(url.encode()).hexdigest()[:20]
+        if source_id in seen_ids:
+            continue
+        seen_ids.add(source_id)
+
         visible = posted.get_text(" ", strip=True) if posted else ""
         posted_at = parse_relative(visible)
         precision = "minute" if re.search(
@@ -1213,6 +1233,7 @@ def _linkedin_parse_page(response: requests.Response) -> list[dict[str, Any]]:
         ) else "date"
         if not posted_at and posted and posted.get("datetime"):
             posted_at = parse_relative(posted.get("datetime"))
+
         jobs.append({
             **normalize_job(
                 "linkedin", source_id,
@@ -1226,7 +1247,6 @@ def _linkedin_parse_page(response: requests.Response) -> list[dict[str, Any]]:
         })
 
     return jobs
-
 
 def _linkedin_search_page(query: str, location: str, start: int) -> list[dict[str, Any]]:
     endpoint = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
