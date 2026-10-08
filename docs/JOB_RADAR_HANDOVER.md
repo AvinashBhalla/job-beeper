@@ -4,11 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (today-only regression test corrected; 43-test suite pending final Oracle re-run)
+**Last updated: 2026-10-08 (43-test suite green; hardened deployment verified against BlueOptima JD parsing)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by a 39-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
+> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by the current 43-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
 
 ---
 
@@ -364,7 +364,7 @@ That is intentional and configurable.
 The full V2 Docker regression suite now has:
 
 ```
-39 tests — ALL GREEN
+43 tests — ALL GREEN
 ```
 
 Important regression cases now include:
@@ -467,7 +467,7 @@ Current repository direction:
 - source health reads from /api/source-status
 - V2 runtime serves the dashboard directly
 
-Deployment/browser verification is still pending.
+Oracle deployment is now complete; browser/product verification remains pending.
 
 ---
 
@@ -497,15 +497,7 @@ V2 container is running:
 - port: `8000`
 - database: `/data/jobs.db`
 
-Health endpoint currently returns:
-
-```json
-{
-  "status": "ok",
-  "version": "2.0.0",
-  "db": "/data/jobs.db"
-}
-```
+The deployed service is verified through its root redirect and V2 APIs. There is no `/api/health` endpoint in the current implementation; `/` redirects to `/dashboard/`.
 
 ### Naukri systemd scheduler
 
@@ -600,8 +592,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher role-family aliases added for Software Engineer / Software Development Engineer / SDE variants
 ✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
 ✅ Unknown experience made neutral for matching while alertability remains a separate policy
-✅ Regression suite baseline expanded to 39 tests; Docker execution was green before the latest JD-hardening change
-⏳ Updated suite is now restored to the expected 43 tests (39 baseline + 3 JD-hardening tests + 1 today-only feed test); must be re-run in Docker before declaring the latest milestone green
+✅ V2 regression suite expanded to 43 tests; Docker execution is now green after JD-hardening and today-only feed coverage
+✅ Updated 43-test suite passes in Docker (39 baseline + 3 JD-hardening tests + 1 today-only feed test)
 ✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
 ✅ Repository .gitignore now ignores Python __pycache__ artifacts
 ✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
@@ -616,27 +608,30 @@ The system is therefore **ingesting real jobs continuously**.
 
 ### Currently in progress
 
+> **MVP implementation status:** Core V2 MVP development is complete. Remaining work is acceptance validation and bug fixing only; new feature development should wait for MVP sign-off.
+
 ```
-⏳ Pull the latest GitHub commits onto Oracle, run the restored updated suite (expected 43 tests), then deploy the hardened LinkedIn JD extraction/retrieval and today-only feed fixes
+✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
 ⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
-⏳ Verify the BlueOptima-style 5–7-year JD case end-to-end: browser-visible JD → fetched detail → parsed experience_min/max → rejection because max > 3
-⏳ Measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Verify canonical-level alert deduplication using distinct canonical opportunities rather than raw job rows
-⏳ Validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
-⏳ Validate restart/recovery behavior with persisted config, evaluations and notification ledger
-⏳ Finish browser verification of the live dashboard against real V2 API data
-⏳ Complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
-⏳ Validate source-health UI and remaining convenience features
-⏳ Final V2 MVP sign-off after latency, dedupe, config persistence/recovery and frontend verification
+✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
+⏳ MVP blocker: make LinkedIn experience acquisition reliable for poster-added requirements, or enforce explicit-experience-only Telegram alerts until a reliable source-access path exists
+⏳ Manual acceptance test: measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
+⏳ Manual acceptance test: classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
+⏳ Manual acceptance test: validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
+⏳ Manual acceptance test: validate restart/recovery behavior with persisted config, evaluations and notification ledger
+⏳ Manual acceptance test: finish browser verification of the live dashboard against real V2 API data
+⏳ Post-MVP enhancement: complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
+⏳ Manual acceptance test: validate source-health UI and remaining convenience features
+⏳ Final V2 MVP sign-off after manual acceptance checks pass
 ```
 ### V1 status
 
 The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
 
-### Step A — Deploy and verify hardened LinkedIn JD extraction
+### Step A — Hardened LinkedIn JD extraction end-to-end — VERIFIED
 
-Pull the latest v2-live-radar commits onto Oracle, rebuild/recreate the V2 container and verify a real LinkedIn posting whose browser JD explicitly states:
+With the latest container running, verify a real LinkedIn posting whose browser JD explicitly states:
 
 ```
 5 to 7 years of overall software engineering experience
@@ -651,9 +646,9 @@ experience_max_years = 7
 
 and reject the posting for the current 3-year maximum before Telegram delivery.
 
-### Step B — Verify canonical-level alert deduplication
+### Step B — Verify canonical-level alert deduplication and non-sent classification
 
-On a fresh production window, count fresh matching rows, distinct canonical opportunities, distinct sent canonical opportunities and duplicate observations per canonical opportunity.
+On a fresh production window, count fresh matching rows, distinct canonical opportunities, distinct sent canonical opportunities and duplicate observations per canonical opportunity. The latest one-hour sample has 3/3 distinct canonical opportunities and 0 duplicate observations; the two non-sent opportunities still need decision-state classification.
 
 Do not interpret source-row count as alert count.
 
@@ -691,7 +686,7 @@ Only after the core V2 path is stable, benchmark Agent-Reach against the current
 
 ### Step H — MVP sign-off
 
-Only after the above checks pass should the current architecture be treated as the stable V2 MVP baseline.
+Core implementation is complete. The current architecture becomes the stable V2 MVP baseline after manual acceptance checks pass for alert correctness, latency, canonical dedupe, configuration persistence/recovery and frontend behavior.
 
 ## 13. ENGINEERING RULES FOR FUTURE AGENTS
 
@@ -891,11 +886,20 @@ A real BlueOptima LinkedIn posting exposed a correctness gap:
 Browser JD:
 5 to 7 years of overall software engineering experience.
 
-Telegram:
+Telegram from the pre-hardening runtime:
 Experience: Not stated
 ```
 
-The important distinction is that the source posting can contain an explicit experience requirement even when the search-card payload does not. The V2 detail acquisition or parsing layer can therefore be the failure point.
+The subsequent live DB inspection after the hardened deployment confirms the parser now captures the requirement correctly:
+
+```
+experience_min_years = 5
+experience_max_years = 7
+match = 0
+alertable = 0
+```
+
+The historical notification ledger for this same posting is still `sent`, but that send occurred at 11:19 UTC, before the hardened container was deployed/recreated at approximately 13:16 UTC. Therefore this row is evidence of the old-runtime incident, not a post-deployment regression.
 
 Corrective rule:
 
@@ -916,6 +920,8 @@ re-evaluate before notification
 Supported JD wording must include phrases such as `5 to 7 years of overall software engineering experience`, common Unicode dash variants, HTML entities/non-breaking spaces and common minimum/at-least experience wording.
 
 A known experience requirement must not be hidden merely because the search card omitted it.
+
+For future production validation, use a posting first discovered after the hardened deployment when verifying the end-to-end notification gate.
 
 During direct GitHub maintenance, a second test-file corruption was discovered after an earlier repair: the branch contained only a truncated 2,943-character tail of `v2/test_radar.py`, causing `IndentationError` at file line 1 on Oracle. The safe recovery procedure is now to restore the last known-good complete test file and reapply new tests, rather than attempting line-range reconstruction from a potentially truncated current file.
 
@@ -943,9 +949,65 @@ Corrective rule:
 
 The fix is now on `v2-live-radar`; the regression test now correctly models the product lifecycle by moving discovery timestamps across IST midnight and verifies both `/api/jobs` and `/api/opportunities`. Future agents must treat frontend query parameters as backend contracts and verify that every advertised parameter changes behavior as intended.
 
-### Observation 21 — The latest production alert diagnostic showed canonical duplication is controlled but not yet fully audited
 
-The latest 10-minute diagnostic showed 29 fresh matching rows, 25 distinct canonical opportunities and 13 distinct canonical opportunities with sent notification state. One canonical opportunity contained five fresh LinkedIn observations of the same Accenture AI/ML Engineer listing. This confirms why canonical-level counts must be used for alert analysis.
+### Observation 24 — LinkedIn authenticated page can expose poster-added requirements that the public guest detail fetch does not expose
+
+A second real LinkedIn production check used an Ampstek posting whose logged-in browser page visibly showed:
+
+```
+8+ years of work experience with Core Java
+8+ years of work experience with Python
+```
+
+The same posting's current production database record originally had no captured experience and the pre-fix Telegram alert therefore showed `Experience: Not stated`.
+
+After deploying the hardened JD parser, a read-only re-fetch of the live LinkedIn URL was performed from the Oracle container. The public guest/detail acquisition returned a short description without the poster-added `8+ years` requirements:
+
+```
+contains "8+ years": False
+extract_jd_experience = (None, None)
+extract_experience = (None, None)
+```
+
+The non-persisting simulation then remained:
+
+```
+match = True
+alertable = True
+experience = unknown
+```
+
+This proves an important limitation: the parser can only extract requirements that the production source-access layer actually retrieves. The current public logged-out LinkedIn fetch does not reliably expose every requirement visible in an authenticated browser session, especially LinkedIn's "Requirements added by the job poster" section.
+
+Corrective implication:
+
+- Do not claim the JD hardening solves all LinkedIn experience extraction.
+- Treat the current parser as correct for the text it receives, but the acquisition layer remains incomplete.
+- Before calling experience-based Telegram filtering fully trustworthy, either obtain a reliable production-access path to those poster-added requirements or require explicit captured experience for Telegram alerts.
+- Keep unknown experience available for matching/dashboard review unless product policy is deliberately changed.
+- A safer interim alert policy is `require_explicit_experience_for_alerts=true`, which prevents unknown-experience LinkedIn jobs from reaching Telegram while preserving them for dashboard review.
+
+This is now an MVP acceptance blocker for **Telegram precision**, not a reason to discard the overall V2 architecture.
+### Observation 21 — Canonical duplication has no duplicates in the latest one-hour matching window
+
+A post-deployment one-hour audit found:
+
+- 3 fresh matching source rows
+- 3 distinct canonical opportunities
+- 3 alertable source rows
+- 1 distinct sent canonical opportunity
+- 0 canonical opportunities with multiple observations in that window
+
+This is a positive small-sample result for canonical deduplication, but it is not sufficient to declare dedupe fully proven. The two matching opportunities that were not sent still need classification (for example, already-sent/suppressed/not-new state) before evaluating alert completeness.
+
+The daily notification ledger currently contains 785 rows for the day:
+
+- 43 sent
+- 742 suppressed
+- 0 queued
+
+The daily summary reports 1,070 jobs discovered, 52 matched, 52 alertable and 43 alerts sent. These are different layers and must not be conflated: source jobs, evaluations and canonical notification records represent different units of measurement.
+
 
 ### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
 
