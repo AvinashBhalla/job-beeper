@@ -542,7 +542,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher regression tests added
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs now disable unverified Instahyre
-✅ Thirteen matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, and SQLite persistence
+✅ Fifteen matcher/dedupe/config regression tests are defined, covering experience parsing, alertability, config migration, canonical URL normalization, alias normalization, strong/ambiguous cross-source matching, incompatible experience-requisition separation, same-source isolation, and SQLite persistence
 ✅ Canonical opportunity schema and conservative cross-source linking implemented
 ✅ Canonical opportunity API added
 ✅ Canonical persistence/backfill regression tests added
@@ -553,6 +553,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Fixed canonical rebuild startup import regression after identity-version hardening
 ✅ Fixed canonical group creation/source-isolation regressions before persistent database rebuild
 ✅ Fixed canonical metadata candidate source propagation so same-source distinct listings remain separate while exact canonical URLs may still merge
+✅ Fixed canonical matching to reject cross-source candidates with incompatible explicit experience ranges
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
@@ -563,7 +564,7 @@ The system is therefore **ingesting real jobs continuously**.
 ⏳ Validate the direct on-disk runtime config after API-triggered migration and test a real frontend config update
 ⏳ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
 ✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
-⏳ Validate rebuilt canonical groups and identify safe high-confidence cross-source merge signals
+⏳ Validate that real cross-source candidates with compatible evidence are auto-linked while incompatible experience variants remain separate
 ⏳ Separate observation/newness/eligibility/alert state before Telegram
 ```
 
@@ -838,7 +839,11 @@ A UI control that only changes an old V1 config is not a V2 feature.
 
 The canonical layer now carries the representative source through metadata candidate queries, so same-source listings cannot be merged merely from company/title/location similarity. Exact canonical URL evidence remains eligible for linking.
 
-### Observation 6 — The current source roadmap is broader than the first three sources
+### Observation 6 — Experience ranges reveal real requisition variants
+
+Real IBM examples showed identical company/title/location across LinkedIn and Naukri with different explicit Naukri ranges such as 5–7, 6–7, and 6–8 years, and IBM Cloud FullStack variants at 15–20, 14–20, and 18–20 years. These are not safe duplicate merges. Canonical matching now treats incompatible explicit experience ranges as distinct opportunities.
+
+### Observation 7 — The current source roadmap is broader than the first three sources
 
 The long-term goal includes useful ATS/career sources.
 
@@ -945,7 +950,7 @@ Must alert only on new + relevant + eligible + deduplicated jobs.
 
 DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
-Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened. The diagnostic now compares only shared normalized company/title families, avoiding expensive broad pair scans.
+Real LinkedIn/Naukri candidate validation remains before auto-link policy is broadened. The diagnostic now compares only shared normalized company/title families, avoiding expensive broad pair scans. The latest real examples confirmed that many same-title cross-source records differ only by explicit experience range and should remain separate.
 
 FRONTEND:
 Repository dashboard now uses V2 local APIs.
