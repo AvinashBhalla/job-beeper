@@ -1,5 +1,6 @@
 import unittest
 
+from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
 from v2.radar import _merge_config, alertability_details, extract_experience, match_details
 
 
@@ -28,6 +29,58 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 
 class MatcherTests(unittest.TestCase):
+    def test_canonical_url_normalization_removes_tracking(self):
+        self.assertEqual(
+            canonicalize_url("https://WWW.example.com/jobs/123/?utm_source=x&ref=abc&b=2&a=1"),
+            "https://example.com/jobs/123?a=1&b=2",
+        )
+
+    def test_company_and_location_aliases_normalize(self):
+        self.assertEqual(normalize_company("Acme Technologies Pvt. Ltd."), "acme technologies")
+        self.assertEqual(normalize_location("Bengaluru, Karnataka"), "bangalore")
+        self.assertEqual(normalize_location("Gurugram, Haryana"), "gurgaon")
+
+    def test_cross_source_exact_experience_match_is_auto_linked(self):
+        left = {
+            "company": "Acme Technologies Pvt Ltd",
+            "title": "Software Engineer - AI",
+            "location": "Bengaluru, Karnataka",
+            "url": "https://linkedin.com/jobs/view/123",
+            "description": "Build Python services. 0-2 years experience.",
+        }
+        right = {
+            "company": "Acme Technologies",
+            "title": "Software Engineer AI",
+            "location": "Bangalore",
+            "url": "https://naukri.com/job-listings/456",
+            "description": "Build Python services. Experience: 0 to 2 years.",
+            "canonical_url": "",
+        }
+        score, method = canonical_match_score(left, right)
+        self.assertGreaterEqual(score, 95)
+        self.assertEqual(method, "metadata_experience")
+        self.assertTrue(auto_link_allowed(score, method))
+
+    def test_same_company_title_location_without_corroboration_is_not_auto_linked(self):
+        left = {
+            "company": "Acme Technologies",
+            "title": "Software Engineer",
+            "location": "Bengaluru",
+            "url": "https://linkedin.com/jobs/view/123",
+            "description": "Be an early applicant",
+        }
+        right = {
+            "company": "Acme Technologies",
+            "title": "Software Engineer",
+            "location": "Bangalore",
+            "url": "https://naukri.com/job-listings/456",
+            "description": "Experience with distributed systems and APIs.",
+            "canonical_url": "",
+        }
+        score, method = canonical_match_score(left, right)
+        self.assertEqual(score, 88)
+        self.assertFalse(auto_link_allowed(score, method))
+
     def test_legacy_config_migrates_instahyre_to_opt_in(self):
         defaults = {
             "config_version": 3,
