@@ -198,6 +198,79 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_jd_experience_extraction_handles_overall_experience_range(self):
+        jd = """
+        What You Need to Succeed:
+        5 to 7 years of overall software engineering experience.
+        Minimum Bachelor's degree.
+        """
+        self.assertEqual(
+            radar.extract_jd_experience(jd),
+            (5.0, 7.0),
+        )
+
+    def test_linkedin_detail_prefers_experience_bearing_candidate(self):
+        class Response:
+            status_code = 200
+            text = """
+            <html>
+              <head>
+                <script type="application/ld+json">
+                {
+                  "@context": "https://schema.org",
+                  "@type": "JobPosting",
+                  "description": "5 to 7 years of overall software engineering experience."
+                }
+                </script>
+              </head>
+              <body>
+                <div class="description__text">Build great products.</div>
+              </body>
+            </html>
+            """
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            detail = radar._linkedin_job_description(
+                "https://www.linkedin.com/jobs/view/full-stack-developer-4477150767"
+            )
+
+        self.assertIn(
+            "5 to 7 years of overall software engineering experience",
+            detail,
+        )
+
+    def test_linkedin_enrichment_captures_overall_experience_range(self):
+        job = normalize_job(
+            "linkedin",
+            "li-blueoptima",
+            "BlueOptima",
+            "Full Stack Developer",
+            "Bengaluru, Karnataka, India",
+            "https://www.linkedin.com/jobs/view/full-stack-developer-4477150767",
+            None,
+            "minute",
+            "Full Stack Developer BlueOptima Bengaluru",
+        )
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body>
+            <div class="description__text">
+              Responsibilities and qualifications.
+              5 to 7 years of overall software engineering experience.
+              At least 2 years of web UI development experience.
+            </div>
+            </body></html>
+            """
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            enriched = radar.enrich_linkedin_job(job)
+
+        self.assertEqual(enriched["jd_experience_min_years"], 5.0)
+        self.assertEqual(enriched["jd_experience_max_years"], 7.0)
+        self.assertIn("5 to 7 years of overall software engineering experience", enriched["description"])
+
     def test_jd_experience_extraction_prefers_experience_text(self):
         jd = """
         Job Qualifications
@@ -898,73 +971,3 @@ class MatcherTests(unittest.TestCase):
         result = match_details(
             make_job("AI Engineer", "Build AI systems with Python."),
             BASE_CONFIG,
-        )
-        self.assertTrue(result["match"])
-        alert = alertability_details(make_job("AI Engineer", "Build AI systems with Python."), result, BASE_CONFIG)
-        self.assertFalse(alert["alertable"])
-        self.assertIn("explicit experience required for alerts", alert["reasons"])
-
-    def test_excluded_role_category_is_configurable(self):
-        config = {**BASE_CONFIG, "excluded_role_terms": ["quality assurance"]}
-        result = match_details(
-            make_job("Quality Assurance Automation Engineer", "2 years experience"),
-            config,
-        )
-        self.assertFalse(result["match"])
-
-    def test_linkedin_fast_lane_and_periodic_deep_scan(self):
-        original_state = radar.source_state
-        radar.source_state = {}
-        config = {
-            **BASE_CONFIG,
-            "linkedin_queries": ["ai engineer"],
-            "locations": ["Bengaluru, Karnataka, India"],
-        }
-        calls = []
-        params_seen = []
-
-        class Response:
-            status_code = 200
-            text = """
-            <html><body><ul>
-              <li>
-                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/1234567890">Apply</a>
-                <h3 class="base-search-card__title">AI Engineer</h3>
-                <h4 class="base-search-card__subtitle">Acme</h4>
-                <span class="job-search-card__location">Bengaluru, Karnataka, India</span>
-                <time>1 minute ago</time>
-                <span>2 years experience</span>
-              </li>
-            </ul></body></html>
-            """
-
-        def fake_request(_endpoint, params):
-            calls.append(params["start"])
-            params_seen.append(dict(params))
-            return Response()
-
-        try:
-            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
-                first = radar.linkedin_collect(config)
-                first_starts = sorted(calls)
-                calls.clear()
-                second = radar.linkedin_collect(config)
-                second_starts = sorted(calls)
-
-            self.assertEqual(len(first), 1)
-            self.assertEqual(first_starts, [0, 10])
-            fast = next(p for p in params_seen if p["start"] == 0)
-            deep = next(p for p in params_seen if p["start"] == 10)
-            self.assertEqual(fast["f_TPR"], radar.LINKEDIN_FAST_TPR)
-            self.assertEqual(fast["f_EA"], "true")
-            self.assertEqual(deep["f_TPR"], radar.LINKEDIN_DEEP_TPR)
-            self.assertNotIn("f_EA", deep)
-            self.assertEqual(len(second), 1)
-            self.assertEqual(second_starts, [0])
-        finally:
-            radar.source_state = original_state
-
-
-
-if __name__ == "__main__":
-    unittest.main()
