@@ -1407,3 +1407,13 @@ The repository and this file should be kept in sync deliberately.
 - Existing fast-lane Easy Apply restriction was already removed. Search concurrency is bounded to reduce 429 pressure.
 - CI on the latest `main` head is green after correcting the V5 migration test semantics.
 - The next production validation must rebuild Oracle from latest `main`, confirm the live runtime query list contains the full repository vocabulary, then measure fresh LinkedIn discovery latency and 429 frequency over multiple cycles.
+
+## Runtime Validation — 2026-10-08
+
+- Oracle was rebuilt successfully and the persisted runtime configuration is now version 5 with the intended expanded LinkedIn/Naukri query sets and Instahyre disabled.
+- The 24-hour latency sample is not a current-SLA measurement: LinkedIn p50 is 44 minutes and p90/max are 6 hours, while Naukri p50 is about 33 hours. These values include historical first-discovery samples gathered before the latest query/config fixes and therefore should not be treated as the post-fix latency baseline.
+- Current runtime logs after the rebuild showed LinkedIn succeeding without a 429 in the sampled window, including a cycle with 131 jobs seen and 13 new jobs; Telegram delivered 4 alerts.
+- Naukri had a transient relay-branch HTTP 404 even though the GitHub relay workflow itself succeeded. The branch currently contains the relay file. V2 now retries transient Naukri relay 404/429/5xx responses with bounded backoff before failing the source run.
+- CI is green for the Naukri retry change.
+- Next validation should use `/api/latency-summary?hours=1` after several fresh LinkedIn cycles and compare new Telegram alerts against dashboard jobs. Do not use the 24-hour aggregate as the post-fix SLA baseline.
+- Platform expansion remains blocked until this short-window freshness check and LinkedIn experience acquisition are validated.
