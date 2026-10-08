@@ -436,18 +436,6 @@ def backfill_canonical_opportunities() -> None:
         conn.commit()
 
 
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
-            SELECT id FROM jobs
-            WHERE canonical_opportunity_id IS NULL
-            ORDER BY first_seen_at ASC, id ASC
-        """).fetchall()
-        for row in rows:
-            _assign_canonical(conn, int(row["id"]))
-        conn.commit()
-
-
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
