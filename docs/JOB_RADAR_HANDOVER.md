@@ -556,6 +556,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Fixed canonical matching to reject cross-source candidates with incompatible explicit experience ranges
 ✅ Persistent job evaluation state added with configuration fingerprint, match score/reasons, experience data, and alertability
 ✅ Persistent notification ledger added per canonical opportunity with historical suppression and new-opportunity pending state
+✅ Startup backfill for missing persistent job evaluations implemented
 ✅ Canonical identity version 2 triggers a clean rebuild of prior canonical assignments
 ✅ SQLite row-factory regression fixed in canonical assignment path
 ```
@@ -567,7 +568,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Deploy and validate canonical grouping against real LinkedIn + Naukri overlaps using `/api/dedupe-candidates` (company/title-bucketed path)
 ✅ v2 identity-version rebuild completed on the persistent Oracle database; all canonical groups are currently identity_version 2
 ✅ Real overlap validation completed: 1,206 jobs, 855 identity groups, 38 cross-source candidates, 0 auto-link candidates; observed overlaps remain safely separate
-⏳ Validate persistent job evaluations and notification-ledger state on the upgraded Oracle database
+⏳ Validate persistent job-evaluation backfill and notification-ledger state on the upgraded Oracle database
 ⏳ Complete newness/eligibility/notification decision flow using the persisted evaluation and notification ledger
 ```
 
@@ -626,7 +627,7 @@ The application should use the effective runtime configuration rather than immut
 
 ### Step B — Configurable matching
 
-**Partially implemented and regression-tested. The matcher/dedupe suite currently contains thirteen tests; Oracle deployment validation is pending for the new dedupe tests.**
+**Partially implemented and regression-tested. The matcher/dedupe suite currently contains eighteen tests, and the latest Oracle deployment run passed all of them.**
 
 The matcher now reads runtime configuration rather than fixed module-level preferences. Regression coverage exists for experience and phrase-aware skill/category matching.
 
@@ -818,13 +819,13 @@ Preserve canonical application links.
 
 The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source candidates, with 0 auto-link candidates. The observed same-title/company/location examples include materially different explicit experience ranges, so the system correctly keeps them separate.
 
-### Observation 9 — Persistent state is now the foundation for new-only alerting
+### Observation 3 — Persistent state is now the foundation for new-only alerting
 
 Job-level evaluation state is persisted separately from source observations, while notification state is persisted once per canonical opportunity. Historical opportunities are suppressed during ledger backfill; newly created canonical opportunities enter a pending state.
 
 LinkedIn and Naukri ingestion are working well enough to move into product-quality matching/notification work.
 
-### Observation 2 — Matcher quality matters more than raw job count
+### Observation 4 — Matcher quality matters more than raw job count
 
 The objective is not to maximize jobs stored.
 
@@ -836,21 +837,21 @@ worthwhile alerts / total alerts
 
 Noise is a product failure.
 
-### Observation 9 — Unknown data must remain unknown
+### Observation 5 — Unknown data must remain unknown
 
 If LinkedIn does not expose experience, do not manufacture one.
 
 The system should represent uncertainty and make policy decisions from that explicit state.
 
-### Observation 9 — Frontend configuration must be real
+### Observation 6 — Frontend configuration must be real
 
 A UI control that only changes an old V1 config is not a V2 feature.
 
-### Observation 9 — Same-source isolation must be enforced at candidate retrieval time
+### Observation 7 — Same-source isolation must be enforced at candidate retrieval time
 
 The canonical layer now carries the representative source through metadata candidate queries, so same-source listings cannot be merged merely from company/title/location similarity. Exact canonical URL evidence remains eligible for linking.
 
-### Observation 9 — Experience ranges reveal real requisition variants
+### Observation 8 — Experience ranges reveal real requisition variants
 
 Real IBM examples showed identical company/title/location across LinkedIn and Naukri with different explicit Naukri ranges such as 5–7, 6–7, and 6–8 years, and IBM Cloud FullStack variants at 15–20, 14–20, and 18–20 years. These are not safe duplicate merges. Canonical matching now treats incompatible explicit experience ranges as distinct opportunities.
 
