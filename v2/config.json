@@ -92,5 +92,16 @@
     "vp",
     "vice president"
   ],
-  "max_experience_years": 3
+  "max_experience_years": 3,
+  "remote_only": false,
+  "min_experience_years": null,
+  "max_age_hours": 72,
+  "require_explicit_experience_for_alerts": true,
+  "excluded_role_terms": [],
+  "notifications_enabled": true,
+  "source_enabled": {
+    "linkedin": true,
+    "naukri": true,
+    "instahyre": true
+  }
 }
