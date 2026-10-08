@@ -1374,3 +1374,13 @@ The repository and this file should be kept in sync deliberately.
 - The production Naukri relay workflow was present on `main` but absent from `v2-live-radar`. It has now been carried into V2 so promotion to `main` does not accidentally remove the relay scheduler contract.
 - The Naukri relay still publishes its data to the dedicated `naukri-relay` branch and V2 reads that relay; generated relay data on `main` is not part of the V2 runtime source of truth.
 - These changes are part of the pre-main cleanup. V2 CI must be green on the final branch head before promotion.
+
+## Main Promotion — 2026-10-08
+
+- Job Radar V2 has now been promoted to `main`.
+- Main is now the production development/source-of-truth branch for V2. The `v2-live-radar` branch remains as the pre-promotion implementation checkpoint.
+- Promotion was performed as an explicit merge commit so the V2 tree became the main tree while preserving the Naukri relay workflow contract.
+- The legacy V1 scheduled `job-watch` workflow is disabled; only its manual recovery path remains.
+- The Naukri relay workflow is present on main and continues to publish the relay to the dedicated `naukri-relay` branch.
+- The premium dashboard, live-feed mismatch fix, three-source UI restriction, Source Health correction, LinkedIn fast-lane freshness fix, and related regression coverage are included in main.
+- Next operational step: update the Oracle Docker deployment from the old runtime to this main revision, then measure LinkedIn discovery latency on real fresh postings. Development after this point should branch from/main-track `main`.
