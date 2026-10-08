@@ -687,6 +687,7 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ 43-test V2 Docker regression suite is green on the hardened branch
 ✅ BlueOptima-style 5–7-year JD extraction is hardened and verified at the parser/evaluation layer
 ✅ Agent-Reach/authenticated LinkedIn experiment completed to a decision point and deliberately parked
+✅ LinkedIn fast-lane burst reduction restored: with 4 configured locations, fast cycles now cover 2 rotating locations per minute (8 search requests/minute across 4 query families), while the 5-minute deep scan still covers all locations; CI run 37844340637 is green
 ⏳ Re-test LinkedIn freshness using a short post-fix window and measure discovery-age distribution plus 429/failure rate
 ⏳ Verify Naukri relay reliability across several normal five-minute cycles after the transient-404 retry change
 ⏳ Manual acceptance: measure true end-to-end alert latency from source discovery through evaluation/JD enrichment/queue/Telegram
