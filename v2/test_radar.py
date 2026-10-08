@@ -69,6 +69,31 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_same_source_distinct_listings_stay_separate(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                first = normalize_job(
+                    "linkedin", "li-1", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/1", None,
+                    "unknown", "same listing metadata",
+                )
+                second = normalize_job(
+                    "linkedin", "li-2", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/2", None,
+                    "unknown", "same listing metadata",
+                )
+                self.assertEqual(upsert_jobs([first, second]), 2)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    ids = [row[0] for row in conn.execute(
+                        "SELECT canonical_opportunity_id FROM jobs ORDER BY id"
+                    ).fetchall()]
+                self.assertNotEqual(ids[0], ids[1])
+            finally:
+                radar.DB_PATH = original_db
+
     def test_database_keeps_ambiguous_duplicate_separate(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
