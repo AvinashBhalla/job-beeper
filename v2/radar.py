@@ -327,6 +327,7 @@ def _create_canonical_group(
     job: dict[str, Any],
     method: str,
     confidence: int,
+    notification_state: str = "pending",
 ) -> int:
     identity = canonical_identity(job)
     canonical_url = identity["url_norm"] or None
@@ -352,10 +353,15 @@ def _create_canonical_group(
             canonical_match_confidence=?
         WHERE id=?
     """, (canonical_id, method, confidence, job_id))
+    _ensure_notification_state(conn, canonical_id, notification_state)
     return canonical_id
 
 
-def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, int]:
+def _assign_canonical(
+    conn: sqlite3.Connection,
+    job_id: int,
+    notification_state: str = "pending",
+) -> tuple[int, str, int]:
     job = _job_for_canonical(conn, job_id)
     if not job:
         raise ValueError(f"Job {job_id} does not exist")
@@ -400,7 +406,9 @@ def _assign_canonical(conn: sqlite3.Connection, job_id: int) -> tuple[int, str, 
         )
         return best_id, best_method, best_score
 
-    new_id = _create_canonical_group(conn, job_id, job, "new", 0)
+    new_id = _create_canonical_group(
+        conn, job_id, job, "new", 0, notification_state
+    )
     return new_id, "new", 0
 
 
@@ -432,7 +440,7 @@ def backfill_canonical_opportunities() -> None:
             ORDER BY first_seen_at ASC, id ASC
         """).fetchall()
         for row in rows:
-            _assign_canonical(conn, int(row["id"]))
+            _assign_canonical(conn, int(row["id"]), notification_state="suppressed")
         conn.commit()
 
 
@@ -459,6 +467,33 @@ def init_db() -> None:
             canonical_match_method TEXT,
             canonical_match_confidence INTEGER,
             UNIQUE(source, source_job_id)
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS job_evaluations (
+            job_id INTEGER PRIMARY KEY,
+            evaluated_at TEXT NOT NULL,
+            config_fingerprint TEXT NOT NULL,
+            match INTEGER NOT NULL,
+            score INTEGER NOT NULL,
+            reasons_json TEXT NOT NULL,
+            experience_min_years REAL,
+            experience_max_years REAL,
+            alertable INTEGER NOT NULL,
+            alertability_reasons_json TEXT NOT NULL,
+            FOREIGN KEY(job_id) REFERENCES jobs(id)
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS notification_ledger (
+            canonical_opportunity_id INTEGER PRIMARY KEY,
+            status TEXT NOT NULL,
+            candidate_job_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            sent_at TEXT,
+            last_error TEXT,
+            FOREIGN KEY(canonical_opportunity_id) REFERENCES canonical_opportunities(id)
         )
         """)
         conn.execute("""
@@ -495,8 +530,9 @@ def init_db() -> None:
     backfill_canonical_opportunities()
 
 
-def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
+def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
     new_count = 0
+    config = config or get_config()
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         for j in jobs:
             existing = conn.execute(
@@ -518,6 +554,7 @@ def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
                 ))
                 if not existing[1]:
                     _assign_canonical(conn, int(existing[0]))
+                _persist_job_evaluation(conn, int(existing[0]), config)
             else:
                 cur = conn.execute("""
                     INSERT INTO jobs (
@@ -533,11 +570,86 @@ def upsert_jobs(jobs: list[dict[str, Any]]) -> int:
                     j["discovered_at"], j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
+                _persist_job_evaluation(conn, int(cur.lastrowid), config)
                 new_count += 1
         conn.commit()
     return new_count
 
-def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
+def _config_fingerprint(config: dict[str, Any]) -> str:
+    payload = json.dumps(config, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _persist_job_evaluation(
+    conn: sqlite3.Connection,
+    job_id: int,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    job = _job_for_canonical(conn, job_id)
+    if not job:
+        raise ValueError(f"Job {job_id} does not exist")
+
+    details = match_details(job, config)
+    alertability = alertability_details(job, details, config)
+    evaluated_at = iso(now())
+    fingerprint = _config_fingerprint(config)
+
+    conn.execute("""
+        INSERT INTO job_evaluations (
+            job_id, evaluated_at, config_fingerprint, match, score,
+            reasons_json, experience_min_years, experience_max_years,
+            alertable, alertability_reasons_json
+        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(job_id) DO UPDATE SET
+            evaluated_at=excluded.evaluated_at,
+            config_fingerprint=excluded.config_fingerprint,
+            match=excluded.match,
+            score=excluded.score,
+            reasons_json=excluded.reasons_json,
+            experience_min_years=excluded.experience_min_years,
+            experience_max_years=excluded.experience_max_years,
+            alertable=excluded.alertable,
+            alertability_reasons_json=excluded.alertability_reasons_json
+    """, (
+        job_id,
+        evaluated_at,
+        fingerprint,
+        int(details["match"]),
+        int(details["score"]),
+        json.dumps(details["reasons"], ensure_ascii=False),
+        details["experience_min_years"],
+        details["experience_max_years"],
+        int(alertability["alertable"]),
+        json.dumps(alertability["reasons"], ensure_ascii=False),
+    ))
+    return {
+        "match": details["match"],
+        "score": details["score"],
+        "reasons": details["reasons"],
+        "experience_min_years": details["experience_min_years"],
+        "experience_max_years": details["experience_max_years"],
+        "alertable": alertability["alertable"],
+        "alertability_reasons": alertability["reasons"],
+        "evaluated_at": evaluated_at,
+        "config_fingerprint": fingerprint,
+    }
+
+
+def _ensure_notification_state(
+    conn: sqlite3.Connection,
+    canonical_opportunity_id: int,
+    initial_status: str = "pending",
+) -> None:
+    timestamp = iso(now())
+    conn.execute("""
+        INSERT INTO notification_ledger (
+            canonical_opportunity_id, status, created_at, updated_at
+        ) VALUES (?,?,?,?)
+        ON CONFLICT(canonical_opportunity_id) DO NOTHING
+    """, (canonical_opportunity_id, initial_status, timestamp, timestamp))
+
+
+def def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
                jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.execute(
@@ -952,7 +1064,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
     source_state.setdefault(source, {})["running"] = True
     try:
         jobs = COLLECTORS[source](config)
-        new_jobs = upsert_jobs(jobs)
+        new_jobs = upsert_jobs(jobs, config)
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
         source_state[source] = {
