@@ -69,7 +69,6 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
-linkedin_fast_location_cursor = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
