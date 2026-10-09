@@ -4,11 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (LinkedIn conservative-polling release deployed and verified; CI run #281 passed 53 tests; post-deploy observation recorded)**
+**Last updated: 2026-10-09 (public Naukri relay cutover completed; cache-busting fix deployed and verified; post-deploy Naukri count reconciled at 359; CI runs #283 and #284 passed)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Current-state reconciliation (2026-10-09):** The `v2-live-radar` branch is deployed on `job-radar` at commit `3e5b51bce9e471dc839daa3842e4a5e8e1cc1e35`. V2 CI run [37921218421](https://github.com/AvinashBhalla/job-beeper/actions/runs/37921218421) passed; the full suite ran 53 tests. The deployed container and `/health` endpoint were checked successfully. In the supplied post-deploy 30-minute log window, nine LinkedIn scan entries reported `failed_requests=0`; the observed fast scans used 4 requests, and the deep scan used 8 requests total. Latest source-status sample reported Naukri `seen=347, new=10` and no source error. This is a successful initial observation, not proof that throttling or freshness is permanently solved. Telegram delivery is active; the Naukri relay remains the Oracle-safe acquisition path; Agent-Reach remains parked and is not a production dependency.
+> **Current-state reconciliation (2026-10-09):** The `v2-live-radar` branch is deployed on `job-radar` at commit `f91f047ca6e71c69492a03f0bafaf7b18362f613` (`Bust cache when polling public Naukri relay`). The cache-busting change was reviewed in [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5); PR CI [run #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682) passed before merge, and post-merge CI [run #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) passed. The Oracle container was rebuilt and `/health` returned `status=ok`, version `2.0.0`. The public relay [run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) succeeded and published a valid feed with 359 jobs; the next radar scan reported `jobs_seen=359`, `new_jobs=0`, and `error=null`. This verifies that the previous 345-versus-359 mismatch was corrected after adding a timestamp cache-busting query parameter; stale caching was the plausible cause, not proven in isolation. The old VM user-crontab entry that dispatched the private repository relay every five minutes was removed after backing up the crontab. Its untracked `logs/` and `scripts/` were moved to `/home/ubuntu/job-beeper-local-backup-20261009`. The public relay continues on its own five-minute GitHub Actions schedule. Telegram delivery is active; Agent-Reach remains parked and is not a production dependency.
 
 ---
 
@@ -1773,3 +1773,30 @@ References:
 ### Definition of progress
 
 A goal is complete only when there is a reproducible code change or an observed operational result, regression tests pass, the deployment is confirmed when relevant, and the evidence is recorded here. Architecture ideas from external product descriptions are not treated as facts until independently verified.
+
+## 44. Public Naukri relay cutover completed; cache-busting fix verified — 2026-10-09
+
+### Change and validation
+- Added `params={"t": int(time.time())}` to the public relay request in `v2/radar.py`. The timestamp query parameter reduces the chance of GitHub's raw-content CDN returning an older feed after the relay branch advances.
+- Updated `test_naukri_relay_reads_public_feed_without_a_token` in `v2/test_radar.py` to assert that the cache-busting `t` parameter is present and retain the no-Authorization-header assertion.
+- Merged as commit `f91f047ca6e71c69492a03f0bafaf7b18362f613`. [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5), [pre-merge CI #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682), and [post-merge CI #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) all passed.
+- Oracle VM fast-forwarded `v2-live-radar` from `3e5b51b` to `f91f047` and rebuilt the `radar` Docker service. An initial health curl immediately after the restart received a connection reset as the container was starting; after reconnecting and rechecking, the container was running normally and `/health` returned `status=ok`.
+
+### Observed end state
+- Public relay repository: `AvinashBhalla/job-beeper-naukri-relay`; its scheduled workflow runs every five minutes independently of the private app repository.
+- [Public relay workflow run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) completed successfully and published `updated_at=2026-10-09T11:37:11.483292+00:00`, `count=359`, with 359 records in `jobs`.
+- The rebuilt Oracle radar consumed the refreshed feed. Naukri status reported `jobs_seen=359`, `new_jobs=0`, `error=null`; the `0` means no new database rows were inserted by that poll, not that collection failed.
+- At the same health check, LinkedIn also reported a successful recent scan with `new_jobs=1` and no error.
+- Removed the Ubuntu user's old `*/5 * * * * /home/ubuntu/job-beeper/scripts/trigger-naukri-relay.sh` crontab entry to stop dispatching the private repository's relay workflow. The previous crontab was saved as `/home/ubuntu/crontab.backup.20261009-113638`.
+- Preserved the old local operational files outside the Git working tree at `/home/ubuntu/job-beeper-local-backup-20261009/` (`logs/` and `scripts/`) instead of deleting them. No local backups or operational files were committed.
+- The old `job-radar-naukri-relay.service` is a static oneshot service and was inactive/dead at inspection time; no matching system timer was found. The removed user cron entry was the active five-minute trigger found during inspection.
+
+### Supersession note
+This section and the current-state reconciliation above supersede earlier historical checklist statements that the isolated public relay had not yet been deployed, that the old private-repository trigger still needed removal, or that the consumer lacked cache busting. Those earlier notes are retained as historical context, not current instructions.
+
+### Next priorities
+1. Continue observing consecutive public relay refreshes and Oracle consumption without reintroducing a private-repo polling trigger.
+2. Track source freshness honestly, including LinkedIn 429/failure rates and date-only Naukri timestamp precision.
+3. Keep the application repository private and keep the public relay repository limited to its workflow/setup documentation and intentionally public generated job feed.
+4. Proceed next with an independent structured ATS adapter (Greenhouse, Lever, or Ashby) once normal relay stability is confirmed.
+
