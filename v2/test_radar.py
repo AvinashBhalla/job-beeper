@@ -1094,13 +1094,11 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertFalse(result["match"])
 
-    def test_linkedin_fast_lane_rotates_locations(self):
+    def test_linkedin_fast_lane_scans_all_locations_each_cycle(self):
         original_state = radar.source_state
         original_deep = radar.linkedin_last_deep_scan_at
-        original_cursor = radar.linkedin_fast_location_cursor
         radar.source_state = {}
         radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
-        radar.linkedin_fast_location_cursor = 0
         config = {
             **BASE_CONFIG,
             "linkedin_queries": ["ai engineer"],
@@ -1132,6 +1130,12 @@ class MatcherTests(unittest.TestCase):
             calls.append((params["location"], params["start"]))
             return Response()
 
+        expected = sorted([
+            ("Bengaluru, Karnataka, India", 0),
+            ("Gurugram, Haryana, India", 0),
+            ("Delhi, India", 0),
+            ("Remote, India", 0),
+        ])
         try:
             with patch.object(radar, "_linkedin_request", side_effect=fake_request):
                 radar.linkedin_collect(config)
@@ -1140,18 +1144,11 @@ class MatcherTests(unittest.TestCase):
                 radar.linkedin_collect(config)
                 second_cycle = sorted(calls)
 
-            self.assertEqual(first_cycle, [
-                ("Bengaluru, Karnataka, India", 0),
-                ("Gurugram, Haryana, India", 0),
-            ])
-            self.assertEqual(second_cycle, [
-                ("Delhi, India", 0),
-                ("Remote, India", 0),
-            ])
+            self.assertEqual(first_cycle, expected)
+            self.assertEqual(second_cycle, expected)
         finally:
             radar.source_state = original_state
             radar.linkedin_last_deep_scan_at = original_deep
-            radar.linkedin_fast_location_cursor = original_cursor
 
 
     def test_linkedin_fast_lane_and_periodic_deep_scan(self):
