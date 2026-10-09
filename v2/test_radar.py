@@ -1009,7 +1009,7 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(kwargs["timeout"], 20)
 
 
-    def test_greenhouse_collector_normalizes_public_job_and_does_not_invent_post_time(self):
+    def test_greenhouse_collector_uses_first_published_and_does_not_use_updated_at(self):
         class Response:
             status_code = 200
 
@@ -1023,6 +1023,7 @@ class MatcherTests(unittest.TestCase):
                         "title": "Software Engineer",
                         "absolute_url": "https://boards.greenhouse.io/example/jobs/123",
                         "location": {"name": "Bengaluru, India"},
+                        "first_published": "2026-10-08T10:00:00Z",
                         "updated_at": "2026-10-09T10:00:00Z",
                         "content": "<p>Build Python APIs.</p><p>2+ years experience.</p>",
                         "departments": [{"name": "Engineering"}],
@@ -1044,9 +1045,10 @@ class MatcherTests(unittest.TestCase):
         self.assertIn("Build Python APIs.", job["description"])
         self.assertIn("Department: Engineering", job["description"])
         self.assertNotIn("<p>", job["description"])
-        self.assertIsNone(job["source_posted_at"])
-        self.assertEqual(job["posted_precision"], "unknown")
-        self.assertIsNone(job["discovery_latency_seconds"])
+        self.assertEqual(job["source_posted_at"], "2026-10-08T10:00:00+00:00")
+        self.assertEqual(job["posted_precision"], "minute")
+        self.assertIsNotNone(job["discovery_latency_seconds"])
+        self.assertGreaterEqual(job["discovery_latency_seconds"], 0)
 
         args, kwargs = request.call_args
         self.assertEqual(args[0], "https://boards-api.greenhouse.io/v1/boards/example/jobs")
@@ -1054,6 +1056,35 @@ class MatcherTests(unittest.TestCase):
         self.assertNotIn("Authorization", kwargs["headers"])
         self.assertEqual(kwargs["timeout"], 20)
 
+    def test_greenhouse_collector_keeps_posting_time_unknown_if_first_published_missing(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 789,
+                        "title": "Backend Engineer",
+                        "absolute_url": "https://boards.greenhouse.io/example/jobs/789",
+                        "location": {"name": "Remote - India"},
+                        "updated_at": "2026-10-09T10:00:00Z",
+                        "content": "<p>Build services.</p>",
+                    }]
+                }
+
+        config = {
+            "greenhouse_boards": [{"token": "example", "company": "Example Labs"}]
+        }
+        with patch.object(radar.requests, "get", return_value=Response()):
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        self.assertIsNone(jobs[0]["source_posted_at"])
+        self.assertEqual(jobs[0]["posted_precision"], "unknown")
+        self.assertIsNone(jobs[0]["discovery_latency_seconds"])
     def test_greenhouse_collector_keeps_successful_board_when_another_board_fails(self):
         class Response:
             status_code = 200
