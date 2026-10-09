@@ -1850,3 +1850,16 @@ This section and the current-state reconciliation above supersede earlier histor
 - Fix `location_allowed` so a configured `Remote, India` location requires both a remote location and the configured country qualifier, while a deliberately plain `Remote` entry retains global-remote behavior.
 - Add tests for India remote acceptance, US/Cyprus remote rejection, and the explicit unqualified-Remote case.
 - The matching fix is being proposed separately in PR; do not deploy or enable Greenhouse until CI passes and the VM receives that fix.
+
+## 48. Greenhouse first-published timestamp support — 2026-10-09
+
+### Evidence from Oracle VM
+- The corrected location dry run fetched 298 jobs from the three validated Greenhouse boards with no board failures. The location fix rejected 190 remote postings outside the configured India targets; one job matched the profile and zero passed the current explicit-experience alert policy.
+- Read-only checks of the public list responses found `first_published` on Coinbase 220/220, Graviton Research Capital 20/21, and Zocdoc 57/57. The separate `updated_at` field existed on all 298 listings.
+- Official Greenhouse Job Board API documentation shows `first_published` as a job post's first publication timestamp in the retrieve-job response; `updated_at` is a separate value. The live list response exposes `first_published`, so the adapter can use it without extra per-job requests.
+
+### Implementation
+- Collector parses `first_published` when present and stores it as `source_posted_at`; timestamps with hour/minute use `posted_precision=minute`, while date-only values use `date`. Missing or invalid values remain `unknown`.
+- Never fall back to `updated_at`: later edits must not make an old posting look newly posted.
+- Regression tests cover valid first-publication timestamps and a fallback guard (missing `first_published` plus present `updated_at` remains unknown).
+- Greenhouse remains disabled. After CI and deployment, repeat the dry run and inspect source-posted timestamps. Keep the explicit-experience alert policy unchanged until source descriptions demonstrate that requirements are captured accurately.
