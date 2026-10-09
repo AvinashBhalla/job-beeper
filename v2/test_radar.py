@@ -1107,6 +1107,7 @@ class MatcherTests(unittest.TestCase):
                 "linkedin": True,
                 "naukri": True,
                 "instahyre": False,
+                "greenhouse": True,
             },
             "poll_seconds": {
                 "linkedin": 60,
@@ -1126,7 +1127,7 @@ class MatcherTests(unittest.TestCase):
             **BASE_CONFIG,
             "greenhouse_boards": [{"token": "../private", "company": "Example"}],
         }
-        with self.assertRaises(Exception):
+        with self.assertRaises(radar.HTTPException):
             radar.validate_config(config)
 
     def test_naukri_date_precision_does_not_claim_exact_discovery_latency(self):
