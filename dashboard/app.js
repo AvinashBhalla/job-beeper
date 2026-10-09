@@ -1288,8 +1288,18 @@
       const runtime = src.runtime || {};
       const isError = Boolean(runtime.error);
       const isRunning = Boolean(runtime.running);
+      const isDisabled = src.enabled === false;
+      const sourceLabels = {
+        linkedin: 'LinkedIn',
+        naukri: 'Naukri (Relay)',
+        instahyre: 'Instahyre',
+        greenhouse: 'Greenhouse',
+      };
+      const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
-      if (isError) {
+      if (isDisabled) {
+        statusBadge = `<span class="signal-pill" style="background:var(--surface-muted);color:var(--text-muted);border-color:var(--border-default);">DISABLED</span>`;
+      } else if (isError) {
         statusBadge = `<span class="signal-pill" style="background:var(--status-error-subtle);color:var(--status-error);border-color:var(--status-error-border);">${SVG_ICONS.x} ERROR</span>`;
       } else if (isRunning) {
         statusBadge = `<span class="signal-pill signal-warning">${SVG_ICONS.rotateCw} RUNNING</span>`;
@@ -1297,7 +1307,7 @@
 
       return `
         <tr>
-          <td><b style="color:var(--text-primary);">${esc(src.source)}</b></td>
+          <td><b style="color:var(--text-primary);">${esc(sourceName)}</b></td>
           <td>${statusBadge}</td>
           <td class="meta-mono">${esc(src.jobs_seen ?? 0)}</td>
           <td class="meta-mono">${esc(src.new_jobs ?? 0)}</td>
@@ -1483,9 +1493,10 @@
       }
     } catch (e) {
       state.sourceStatus = [
-        { source: 'LinkedIn', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'Naukri (Relay)', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'Instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'linkedin', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'naukri', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'greenhouse', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
       ];
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
@@ -1510,6 +1521,7 @@
       { value: '', label: 'All Sources' },
       { value: 'linkedin', label: 'LinkedIn' },
       { value: 'naukri', label: 'Naukri' },
+      { value: 'greenhouse', label: 'Greenhouse' },
       { value: 'instahyre', label: 'Instahyre' },
     ];
     if (dropdowns.source) {
