@@ -1368,16 +1368,23 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
     if job.get("source") != "linkedin":
         return job
 
-    combined = f"{job.get('title', '')} {job.get('description', '')}"
-    if extract_experience(combined) != (None, None):
-        return job
-
+    # Always inspect the actual LinkedIn JD when available. Search-result
+    # snippets can contain unrelated numbers (or omit requirements entirely),
+    # so a generic experience hit must not short-circuit JD enrichment.
+    existing_description = job.get("description") or ""
     detail = _linkedin_job_description(job.get("url", ""))
     if not detail:
         job.pop("needs_jd_enrichment", None)
         return job
 
-    existing_description = job.get("description") or ""
+    # Replace the previous captured JD section rather than appending a new
+    # copy on every poll; keep the source metadata and latest detail text.
+    existing_description = re.sub(
+        r"\s*JD:\s*.*$",
+        "",
+        existing_description,
+        flags=re.I,
+    ).strip()
     job["description"] = (
         f"{existing_description} JD: {detail}".strip()
     )[:30000]
@@ -1502,7 +1509,16 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
         score += min(30, 6 * len(skill_hits))
         reasons.append("skills: " + ", ".join(skill_hits[:5]))
 
-    exp_min, exp_max = extract_experience(combined)
+    # Prefer structured JD extraction, then a JD-focused parse of the
+    # description. Only fall back to generic text parsing when the JD has no
+    # explicit requirement; never let a generic title/snippet override JD data.
+    exp_min = job.get("jd_experience_min_years")
+    exp_max = job.get("jd_experience_max_years")
+    if exp_min is None and exp_max is None:
+        exp_min, exp_max = extract_jd_experience(description)
+    if exp_min is None and exp_max is None:
+        exp_min, exp_max = extract_experience(combined)
+
     candidate_years = config.get("candidate_experience_years")
     max_years = float(config.get("max_experience_years", 3))
     minimum_job_years = config.get("min_experience_years")
