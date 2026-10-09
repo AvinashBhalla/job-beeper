@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (relay bootstrap files staged; V2 CI passed)**
+**Last updated: 2026-10-09 (public relay repository and workflow created; secret/feed validation pending)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -1585,11 +1585,11 @@ Decision remains: repair relay delivery and validate existing sources before add
 ## 34. Approved isolated Naukri relay decision — 2026-10-09
 
 - **Private app repo remains private:** `AvinashBhalla/job-beeper`, active branch `v2-live-radar`. Never change its visibility.
-- **New public relay repo:** `AvinashBhalla/job-beeper-naukri-relay`. The new repo does not exist yet because repository creation is unavailable through the connected GitHub file-management actions. Create it manually as a public repository with an initial README (so the default `main` branch exists); do not add a license or `.gitignore`, then return to populate it.
+- **New public relay repo:** `AvinashBhalla/job-beeper-naukri-relay` exists and is public. Its default branch is `main`; the scheduled workflow and setup README are committed.
 - **Purpose of public repo:** run the JobSpy Naukri collection workflow on a scheduled public GitHub-hosted runner and publish only `dashboard/data/naukri_relay.json` to its orphan `naukri-relay` branch. The default branch should contain only relay workflow/setup documentation. Do not copy the private app repository into this repository.
-- **Private source access:** add a fine-grained PAT as repository secret `PRIVATE_APP_READ_TOKEN` in the new public repo. Scope it to only `AvinashBhalla/job-beeper` with Contents: read permission. Do not paste the token into chat or commit it. The workflow checks out only the private repo's `main` branch into a temporary runner directory and reads `config.json`; all workflow execution stays in the public repo for its public-runner budget.
+- **Private source access:** add a fine-grained PAT as repository secret `PRIVATE_APP_READ_TOKEN` in the new public repo. Scope it to only `AvinashBhalla/job-beeper` with Contents: read permission. Do not paste the token into chat or commit it. The workflow checks out only `v2/config.json` from the private repo's `v2-live-radar` branch into a temporary runner directory; all workflow execution stays in the public repo for its public-runner budget.
 - **Consumer code committed, not yet deployed:** `v2/radar.py` now reads `https://raw.githubusercontent.com/AvinashBhalla/job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json` anonymously, and the GitHub read-token environment variable was removed from `v2/docker-compose.yml`. Public feed URL will 404 until the new repository's first successful relay run; do not deploy/force-recreate the production container before verifying that URL returns a valid JSON payload with `updated_at` and `jobs`.
-- **After creation:** add the workflow and README, run it once manually, check feed timestamp/count and public raw URL, then update/verify the private app consumer and only then disable the old VM systemd timer that dispatches the private repo's relay workflow. Identify the exact timer name using `systemctl list-timers --all --no-pager | grep -i naukri`; disable only the matching relay timer. After cutover, retire the old private relay workflow to prevent duplicate runs.
+- **Remaining cutover steps:** configure the `PRIVATE_APP_READ_TOKEN` repository Actions secret with read-only access to the private app; run the public workflow manually; check feed timestamp/count and public raw URL; then deploy/verify the private app consumer and only then disable the old VM systemd timer that dispatches the private repo's relay workflow. Identify the exact timer name using `systemctl list-timers --all --no-pager | grep -i naukri`; disable only the matching relay timer. After cutover, retire the old private relay workflow to prevent duplicate runs.
 - **Cost goal:** retain the roughly five-minute relay freshness on GitHub's public runner without making the main app repository public or spending private-repository runner minutes for recurring Naukri collection. Public feed visibility is intentional; credentials, user preference files, SQLite DB and the rest of the app must remain private.
 
 
@@ -1609,4 +1609,12 @@ The private relay workflow now fails rather than publishing a zero-job feed. Thi
 
 ## 37. Relay bootstrap staged — 2026-10-09
 
-Prepared the isolated public relay workflow and setup README under `docs/relay-bootstrap/` on `v2-live-radar`. The workflow runs every five minutes on a public runner, checks out only `v2/config.json` from the private app using `PRIVATE_APP_READ_TOKEN`, publishes only the generated Naukri feed to the relay branch, and refuses to replace the last-good feed with an empty result. V2 CI passed after the empty-feed guard commit. **Remaining blocker:** `AvinashBhalla/job-beeper-naukri-relay` does not exist, and the connected GitHub actions do not provide repository creation. Create that repository as public with an initial README, then copy `docs/relay-bootstrap/naukri-relay.yml` to `.github/workflows/naukri-relay.yml`, add the staged README, configure the secret, and manually run/verify the feed before changing production timers. No production deployment or timer change has been made.
+Prepared the isolated public relay workflow and setup README under `docs/relay-bootstrap/` on `v2-live-radar`. The workflow runs every five minutes on a public runner, checks out only `v2/config.json` from the private app using `PRIVATE_APP_READ_TOKEN`, publishes only the generated Naukri feed to the relay branch, and refuses to replace the last-good feed with an empty result. V2 CI passed after the empty-feed guard commit. The public repository now exists, and `.github/workflows/naukri-relay.yml` plus its README are committed. The workflow reads only the private config file from `v2-live-radar`, uses the configured Naukri queries and locations, and publishes only the generated feed. The repository currently has no workflow runs, so configure `PRIVATE_APP_READ_TOKEN`, run the workflow manually, and verify fresh JSON at the raw feed URL before changing production timers. No production deployment or timer change has been made.
+
+
+## 38. Public relay repository created — 2026-10-09
+
+- Repository: `AvinashBhalla/job-beeper-naukri-relay` (public), default branch `main`.
+- Added `.github/workflows/naukri-relay.yml`: five-minute schedule and manual dispatch; sparse-checks out only `v2/config.json` from private branch `v2-live-radar`; collects configured Naukri queries across configured locations; fails on empty results; publishes only `dashboard/data/naukri_relay.json` to branch `naukri-relay` without force-pushing.
+- Added README with setup and validation instructions. GitHub API currently reports zero workflow runs, so the feed has not yet been generated/validated.
+- **Still required:** add repository Actions secret `PRIVATE_APP_READ_TOKEN` with read-only access to the private app, run workflow manually, validate raw JSON and freshness, deploy/recreate the V2 app on the Oracle VM and verify `/api/source-status`, then disable the old private-repo relay timer only after the new path is confirmed working. The Oracle VM and its timer have not been changed from this chat.
