@@ -1874,6 +1874,6 @@ Important current-state corrections to older historical sections above:
 - Remote-country matching and Greenhouse first-published timestamp parsing are implemented, merged and deployed.
 - Greenhouse remains disabled. The current blocker is ingestion/dashboard freshness semantics: the collector returns all public listings while the dashboard's existing "today" lifecycle is discovery-based, so old board listings may look newly discovered. Resolve this before activation.
 - `main` is still the GitHub default but is 59 commits behind the active V2 branch. Keep it until there is an explicit promotion/default-branch decision.
-- Five topic branches for merged PRs #5–#9 are stale and safe to prune. The private repo's `naukri-relay` branch is a legacy one-file snapshot; the active relay is the separate `AvinashBhalla/job-beeper-naukri-relay` repository.
+- Five topic branches for merged PRs #5–#9 are stale and safe to prune. The private repo's `naukri-relay` branch is a legacy one-file snapshot still referenced by the older `main` code and its manual `naukri-relay.yml` workflow. Keep it until that legacy path is retired or redirected; the active V2 relay remains the separate `AvinashBhalla/job-beeper-naukri-relay` repository.
 
 Use the knowledge-transfer document for the next work session; this file remains the detailed chronological record.
