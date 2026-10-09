@@ -1835,6 +1835,9 @@ def naukri_collect() -> list[dict[str, Any]]:
         try:
             candidate = requests.get(
                 NAUKRI_RELAY_URL,
+                # GitHub's raw-content CDN can briefly serve the previous feed
+                # after the relay branch advances. Bust that cache on each poll.
+                params={"t": int(time.time())},
                 headers=relay_headers,
                 timeout=20,
             )

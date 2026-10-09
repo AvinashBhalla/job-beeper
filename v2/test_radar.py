@@ -993,7 +993,7 @@ class MatcherTests(unittest.TestCase):
         request.assert_called_once()
         args, kwargs = request.call_args
         self.assertEqual(args[0], radar.NAUKRI_RELAY_URL)
-        self.assertNotIn("params", kwargs)
+        self.assertIsInstance(kwargs["params"]["t"], int)
         self.assertNotIn("Authorization", kwargs["headers"])
         self.assertEqual(kwargs["headers"]["Accept"], "application/json")
         self.assertEqual(kwargs["timeout"], 20)
