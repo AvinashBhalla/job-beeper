@@ -1664,3 +1664,13 @@ The user supplied live logs from `sudo docker compose -f v2/docker-compose.yml l
 - Compare `elapsed`, `requests`, `failed_requests`, `unique_jobs`, and `new` across fast/deep scans. Confirm the deep scan no longer causes a long request burst and whether 429 frequency decreases.
 - If 429s persist, reduce request frequency or use a compliant, permitted source/API rather than increasing parallelism. Respect LinkedIn's applicable terms and access controls.
 - Stay focused on discovery until this is stable; do not start dashboard or Telegram feature work unless the user explicitly changes priority.
+
+
+
+## 41. Follow-up: production still throttled; deep-page test mismatch — 2026-10-09
+
+- New VM logs after the previous rollout still show widespread HTTP 429 responses across first-page searches and deep pages. The deep scan reported `requests=32 deep=True unique_jobs=75 failed_requests=15 elapsed=6.6s`, adding 2 new jobs. A fast scan later reported `requests=16 deep=False unique_jobs=82 failed_requests=0 elapsed=4.7s`, adding 4 new jobs; another fast scan had 6 failed requests. This indicates throttling remains intermittent and is not solved solely by reducing concurrency.
+- The user may not have deployed the latest commit when sharing logs; always verify the running container's code/commit before attributing logs to a specific mitigation.
+- CI for throttling mitigation commit `60b14ba` failed because `test_linkedin_fast_lane_and_periodic_deep_scan` still expected deep starts `[0, 10, 20, 30, 40]`, but the intended one-extra-page cap produces `[0, 10]`. Fixed assertion in commit `07973594927c7867d4ca4a4e0228556683871ecb`; check the latest CI run before deployment.
+- Important lesson: when changing `LINKEDIN_DEEP_PAGE_BATCH`, update test expectations to reflect the cap. Do not leave a test expecting the previous four-page setting.
+- Continue prioritizing fast scan coverage and measure 429s after deployment. If throttling persists, reduce how often all query/location pairs are hit (e.g. spread them across staggered cycles while keeping the most valuable/newest queries first) rather than increasing concurrency. Avoid evasion techniques; prefer a permitted API/source if LinkedIn continues rejecting automated requests.
