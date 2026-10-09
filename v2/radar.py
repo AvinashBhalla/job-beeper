@@ -44,10 +44,11 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 2
+# Keep search request pressure conservative while the guest endpoint is returning 429s.
+LINKEDIN_SEARCH_WORKERS = 1
 LINKEDIN_DETAIL_WORKERS = 4
-LINKEDIN_FAST_TARGETS_PER_SCAN = 8
-LINKEDIN_DEEP_SCAN_SECONDS = 300
+LINKEDIN_FAST_TARGETS_PER_SCAN = 4
+LINKEDIN_DEEP_SCAN_SECONDS = 900
 LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
@@ -1744,9 +1745,10 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     # Deep pagination is limited to the same small batch of pairs as the fast
     # lane, rather than creating a full-size burst on top of it.
     failed_pages = 0
+    rate_limited = False
 
     def run_batch(targets: list[tuple[str, str, int, bool]]) -> None:
-        nonlocal failed_pages
+        nonlocal failed_pages, rate_limited
         with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
             futures = [
                 executor.submit(_linkedin_search_page, query, location, start, fast)
@@ -1757,12 +1759,17 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     jobs.extend(future.result())
                 except Exception as exc:
                     failed_pages += 1
+                    response = getattr(exc, "response", None)
+                    if getattr(response, "status_code", None) == 429:
+                        rate_limited = True
                     log.warning("linkedin page request failed: %r", exc)
 
     run_batch(fast_targets)
     deep_targets: list[tuple[str, str, int, bool]] = []
 
-    if do_deep:
+    # A 429 on the fast lane is a strong signal to reduce pressure. Do not
+    # compound it with deep pagination in this same scan.
+    if do_deep and not rate_limited:
         deep_targets = [
             (query, location, start, False)
             for query, location, _, _ in fast_targets
@@ -1900,10 +1907,10 @@ def naukri_collect() -> list[dict[str, Any]]:
         # Preserve that timestamp rather than pretending the Oracle VM fetched
         # the job at the same moment.
         job["discovered_at"] = iso(collected_at) or job["discovered_at"]
-        if posted_at and posted_at.tzinfo:
-            job["discovery_latency_seconds"] = max(
-                0, int((collected_at - posted_at).total_seconds())
-            )
+        # Relay currently supplies date-level posting precision. Midnight
+        # parsed from a date is not an exact posting time, so do not report a
+        # misleading discovery-latency metric from it.
+        job["discovery_latency_seconds"] = None
         jobs.append(job)
 
     return jobs
