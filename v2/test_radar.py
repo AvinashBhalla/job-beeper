@@ -46,6 +46,16 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 class MatcherTests(unittest.TestCase):
 
+    def test_remote_india_location_does_not_match_remote_jobs_in_other_countries(self):
+        self.assertTrue(radar.location_allowed("Remote - India", BASE_CONFIG))
+        self.assertTrue(radar.location_allowed("Remote, Bengaluru, Karnataka, India", BASE_CONFIG))
+        self.assertFalse(radar.location_allowed("Remote - USA", BASE_CONFIG))
+        self.assertFalse(radar.location_allowed("Remote - Cyprus", BASE_CONFIG))
+
+    def test_unqualified_remote_location_remains_global(self):
+        config = {**BASE_CONFIG, "locations": ["Bengaluru, India", "Remote"]}
+        self.assertTrue(radar.location_allowed("Remote - USA", config))
+
     def test_linkedin_fast_scan_staggers_all_query_location_pairs(self):
         config = {
             "locations": ["Bengaluru, India", "Gurugram, India", "Delhi, India", "Remote, India"],
