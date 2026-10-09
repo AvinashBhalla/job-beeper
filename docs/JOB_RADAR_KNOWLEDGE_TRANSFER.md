@@ -63,29 +63,24 @@ Latest read-only VM dry run:
 - [Private app repository](https://github.com/AvinashBhalla/job-beeper): current V2 deployment work is in `v2-live-radar`.
 - [Separate Naukri relay repository](https://github.com/AvinashBhalla/job-beeper-naukri-relay): active scheduled relay/public feed. It is not the `naukri-relay` branch of the private app repository.
 
-### Branches in the private app repository
+### Branches remaining in the private app repository
 
 | Branch | Purpose and status | Action |
 |---|---|---|
-| `v2-live-radar` | Active V2 release/deployment branch; latest code merge was `c2f2ce65`. | **Keep.** Branch all V2 work from here and merge tested changes back here. |
-| `main` | GitHub default branch, 59 commits behind `v2-live-radar` at this snapshot; its README still describes the older GitHub Actions/static-dashboard design. | **Keep for now; do not deploy V2 from it.** Decide separately whether to promote V2 to main or change the default branch. |
-| `feat/greenhouse-first-published-timestamps` | PR #9 merged by squash into `v2-live-radar`. | Stale topic branch; safe to delete. |
-| `feat/greenhouse-public-board-source` | PR #6 merged. | Stale topic branch; safe to delete. |
-| `fix/naukri-relay-cache-busting` | PR #5 merged. | Stale topic branch; safe to delete. |
-| `fix/remote-location-country-qualification` | PR #8 merged. | Stale topic branch; safe to delete. |
-| `fix/validate-greenhouse-board-registry` | PR #7 merged. | Stale topic branch; safe to delete. |
-| `docs/current-job-radar-knowledge-transfer` | Temporary branch for this knowledge-transfer/README/handover PR #10. | Delete after PR #10 merges. |
-| `docs/keep-legacy-relay-branch-safe` | Temporary docs correction branch for PR #11, documenting legacy relay dependency. | Delete after PR #11 merges. |
-| `naukri-relay` | Legacy orphan branch in this private repo containing only `dashboard/data/naukri_relay.json`; the older `main` collector still reads this path and `.github/workflows/naukri-relay.yml` can manually republish it. It is not the active V2 relay. | **Keep until the legacy `main` path/workflow is retired or redirected.** Do not delete now. |
+| `v2-live-radar` | Active V2 release/deployment branch. Current branch HEAD is `0327c746` (merged documentation/legacy-relay guidance). Latest application-code merge is `c2f2ce65`; the subsequent commit changes docs only. | **Keep.** All V2 work branches from here and merges back here. |
+| `main` | GitHub default branch; 59 commits behind `v2-live-radar` at the branch inventory snapshot. It retains the older GitHub Actions/static-dashboard implementation. | **Keep for now.** Do not deploy V2 from it. Decide separately whether to promote/sync V2 or change the default branch. |
+| `naukri-relay` | Legacy orphan feed branch in this private app repo, containing `dashboard/data/naukri_relay.json`. The old `main` collector reads it and `.github/workflows/naukri-relay.yml` can manually republish it. | **Keep for now.** Retire or redirect old `main` consumers/workflow before deleting it. It is not the current V2 relay. |
 
-### Merged implementation PRs
+The separate active relay is [`AvinashBhalla/job-beeper-naukri-relay`](https://github.com/AvinashBhalla/job-beeper-naukri-relay). The private repo's `origin/HEAD` still points to `origin/main`.
+
+### Merged implementation PRs### Merged implementation PRs
 - [#5 Naukri relay cache busting](https://github.com/AvinashBhalla/job-beeper/pull/5) — `f91f047c`.
 - [#6 Greenhouse public board source](https://github.com/AvinashBhalla/job-beeper/pull/6) — `1cfd55b2`.
 - [#7 Validated Greenhouse board registry](https://github.com/AvinashBhalla/job-beeper/pull/7) — `b42193c6`.
 - [#8 Country-aware remote matching](https://github.com/AvinashBhalla/job-beeper/pull/8) — `2074bdab`.
 - [#9 Greenhouse publication timestamps and ISO parser fix](https://github.com/AvinashBhalla/job-beeper/pull/9) — `c2f2ce65`.
 
-No open PRs were present in the last inventory. The topic branches remain because squash merges do not delete their source branch refs. The current GitHub integration cannot delete refs directly; prune the five merged feature refs and temporary documentation refs (`docs/current-job-radar-knowledge-transfer`, `docs/keep-legacy-relay-branch-safe`) using authenticated Git after their PRs merge. Keep `main`, `v2-live-radar`, and `naukri-relay` until the legacy path is retired.
+**Verified branch cleanup completed on 2026-10-09 from the Oracle VM.** After fast-forwarding to `0327c746`, the user successfully deleted these seven remote refs: `feat/greenhouse-first-published-timestamps`, `feat/greenhouse-public-board-source`, `fix/naukri-relay-cache-busting`, `fix/remote-location-country-qualification`, `fix/validate-greenhouse-board-registry`, `docs/current-job-radar-knowledge-transfer`, and `docs/keep-legacy-relay-branch-safe`. `git fetch --prune` then showed only `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar` (plus `origin/HEAD -> origin/main`). Do not repeat deletion of those refs; they are already gone. Keep `main` and the legacy `naukri-relay` dependency until the main/relay transition is deliberately completed.
 
 ## 5. Blockers and next pipeline tasks
 
@@ -101,7 +96,7 @@ No open PRs were present in the last inventory. The topic branches remain becaus
 3. Test Telegram end-to-end on a genuinely fresh and eligible posting; confirm one alert per canonical opportunity.
 
 ### P2 — Branch/release hygiene
-1. Remove the five merged feature branches and the temporary documentation branch listed above. Do not remove the private `naukri-relay` branch yet: the legacy `main` code reads it and its manual relay workflow can overwrite it. Retire or redirect that path first.
+1. **Completed 2026-10-09:** removed the five merged feature branches and two temporary documentation branches; remaining remote refs confirmed as `main`, `naukri-relay`, and `v2-live-radar`. Do not remove the private `naukri-relay` branch yet: the legacy `main` code reads it and its manual relay workflow can overwrite it. Retire or redirect that path first.
 2. Decide deliberately what to do with `main` and its legacy relay workflow. It still references the private `naukri-relay` branch, so either retire/disable the legacy workflow and redirect the old consumer before deleting the branch, or keep the branch. Until the repository transition is complete, production work and deployments must explicitly target `v2-live-radar`.
 3. After each release, record the merge SHA, deployed SHA, HTTP health result, runtime config and source-status evidence here.
 
