@@ -74,6 +74,7 @@ Latest read-only VM dry run:
 | `fix/naukri-relay-cache-busting` | PR #5 merged. | Stale topic branch; safe to delete. |
 | `fix/remote-location-country-qualification` | PR #8 merged. | Stale topic branch; safe to delete. |
 | `fix/validate-greenhouse-board-registry` | PR #7 merged. | Stale topic branch; safe to delete. |
+| `docs/current-job-radar-knowledge-transfer` | Temporary branch for this knowledge-transfer/README/handover PR #10. | Delete after PR #10 merges. |
 | `naukri-relay` | Legacy orphan branch in this private repo containing only `dashboard/data/naukri_relay.json`; no common ancestry with V2. Not the active separate relay repository. | Candidate for deletion after confirming no external automation references this private branch. |
 
 ### Merged implementation PRs
@@ -99,7 +100,7 @@ No open PRs were present in the last inventory. The topic branches remain becaus
 3. Test Telegram end-to-end on a genuinely fresh and eligible posting; confirm one alert per canonical opportunity.
 
 ### P2 — Branch/release hygiene
-1. Remove the five merged topic branches listed above. Remove the private `naukri-relay` branch only after confirming there are no consumers.
+1. Remove the five merged feature branches and the temporary documentation branch listed above. Remove the private `naukri-relay` branch only after confirming there are no consumers.
 2. Decide deliberately what to do with `main`. Until then, production work and deployments must explicitly target `v2-live-radar`.
 3. After each release, record the merge SHA, deployed SHA, HTTP health result, runtime config and source-status evidence here.
 
