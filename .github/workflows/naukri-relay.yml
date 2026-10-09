@@ -121,6 +121,13 @@ jobs:
 
           jobs.sort(key=posted_sort_key, reverse=True)
 
+          # A zero-result run may indicate source blocking or collection failure.
+          # Never replace the last-good feed with an empty payload; fail visibly.
+          if not jobs:
+              raise SystemExit(
+                  "No Naukri jobs collected; refusing to publish an empty relay feed"
+              )
+
           payload = {
               "updated_at": now.isoformat(),
               "count": len(jobs),
