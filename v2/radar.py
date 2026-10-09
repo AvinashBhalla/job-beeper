@@ -325,7 +325,8 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
             return dt.datetime.fromtimestamp(timestamp, tz=UTC)
         except (OverflowError, OSError, ValueError):
             return None
-    text = str(value).strip().lower()
+    raw_text = str(value).strip()
+    text = raw_text.lower()
     if text in {"just now", "now", "today"}:
         return base
     if text == "yesterday":
@@ -333,7 +334,12 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
     m = re.search(r"(\d+)\s*(minute|min|hour|hr|day|week)s?\s*(?:ago)?", text)
     if not m:
         try:
-            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+            iso_text = (
+                raw_text[:-1] + "+00:00"
+                if raw_text.endswith(("Z", "z"))
+                else raw_text
+            )
+            parsed = dt.datetime.fromisoformat(iso_text)
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
         except ValueError:
             return None
