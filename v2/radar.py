@@ -325,7 +325,8 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
             return dt.datetime.fromtimestamp(timestamp, tz=UTC)
         except (OverflowError, OSError, ValueError):
             return None
-    text = str(value).strip().lower()
+    raw_text = str(value).strip()
+    text = raw_text.lower()
     if text in {"just now", "now", "today"}:
         return base
     if text == "yesterday":
@@ -333,7 +334,12 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
     m = re.search(r"(\d+)\s*(minute|min|hour|hr|day|week)s?\s*(?:ago)?", text)
     if not m:
         try:
-            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+            iso_text = (
+                raw_text[:-1] + "+00:00"
+                if raw_text.endswith(("Z", "z"))
+                else raw_text
+            )
+            parsed = dt.datetime.fromisoformat(iso_text)
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
         except ValueError:
             return None
@@ -2105,9 +2111,23 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             if department_names:
                 description = f"{description} Department: {', '.join(department_names)}".strip()
 
-            # The public board API exposes updated_at, which is not guaranteed
-            # to be the original post time. Keep posting time unknown rather than
-            # manufacture freshness from a modification timestamp.
+            # first_published records when the job post first went live.
+            # Never substitute updated_at, which may reflect a later edit.
+            published_raw = item.get("first_published")
+            published_at = (
+                parse_relative(str(published_raw))
+                if published_raw not in (None, "")
+                else None
+            )
+            if published_at is None:
+                posted_precision = "unknown"
+            elif isinstance(published_raw, str) and re.search(
+                r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", published_raw
+            ):
+                posted_precision = "minute"
+            else:
+                posted_precision = "date"
+
             jobs.append(normalize_job(
                 "greenhouse",
                 source_id,
@@ -2115,8 +2135,8 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 title,
                 location,
                 url,
-                None,
-                "unknown",
+                published_at,
+                posted_precision,
                 description,
             ))
 
