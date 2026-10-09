@@ -75,6 +75,7 @@ Latest read-only VM dry run:
 | `fix/remote-location-country-qualification` | PR #8 merged. | Stale topic branch; safe to delete. |
 | `fix/validate-greenhouse-board-registry` | PR #7 merged. | Stale topic branch; safe to delete. |
 | `docs/current-job-radar-knowledge-transfer` | Temporary branch for this knowledge-transfer/README/handover PR #10. | Delete after PR #10 merges. |
+| `docs/keep-legacy-relay-branch-safe` | Temporary docs correction branch for PR #11, documenting legacy relay dependency. | Delete after PR #11 merges. |
 | `naukri-relay` | Legacy orphan branch in this private repo containing only `dashboard/data/naukri_relay.json`; the older `main` collector still reads this path and `.github/workflows/naukri-relay.yml` can manually republish it. It is not the active V2 relay. | **Keep until the legacy `main` path/workflow is retired or redirected.** Do not delete now. |
 
 ### Merged implementation PRs
@@ -84,7 +85,7 @@ Latest read-only VM dry run:
 - [#8 Country-aware remote matching](https://github.com/AvinashBhalla/job-beeper/pull/8) — `2074bdab`.
 - [#9 Greenhouse publication timestamps and ISO parser fix](https://github.com/AvinashBhalla/job-beeper/pull/9) — `c2f2ce65`.
 
-No open PRs were present in the last inventory. The topic branches remain because squash merges do not delete their source branch refs. The current GitHub integration cannot delete refs directly; prune the merged topic/documentation refs using authenticated Git after this documentation change is merged. Keep `main`, `v2-live-radar`, and `naukri-relay` until the legacy path is retired.
+No open PRs were present in the last inventory. The topic branches remain because squash merges do not delete their source branch refs. The current GitHub integration cannot delete refs directly; prune the five merged feature refs and temporary documentation refs (`docs/current-job-radar-knowledge-transfer`, `docs/keep-legacy-relay-branch-safe`) using authenticated Git after their PRs merge. Keep `main`, `v2-live-radar`, and `naukri-relay` until the legacy path is retired.
 
 ## 5. Blockers and next pipeline tasks
 
