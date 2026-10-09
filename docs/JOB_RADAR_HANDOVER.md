@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (43-test suite green; Agent-Reach experiment completed to decision point; authenticated bridge proven but real LinkedIn MCP tools still hang on Oracle)
+**Last updated: 2026-10-09 (private Naukri relay read failure diagnosed; authenticated Contents API fix and regression tests added; LinkedIn freshness and source strategy under acceptance review)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -683,7 +683,7 @@ The system is therefore **ingesting real jobs continuously**.
 ```
 ✅ Latest V2 code path uses a 60-second LinkedIn fast poll, six-hour fast/deep recency, full query/location coverage, 2 bounded search workers and 4 JD-detail workers
 ✅ Persistent runtime config is version 5 with expanded LinkedIn/Naukri query families and Instahyre disabled
-✅ Naukri relay fetch has bounded retries for transient 404/429/5xx conditions
+✅ Naukri relay artifact verified on the private `naukri-relay` branch (150 jobs, updated 2026-10-09 05:04 UTC); production 404 traced to unauthenticated raw URL access after repo privatization; collector now uses authenticated Contents API with `JOB_RADAR_GITHUB_READ_TOKEN` and fails fast on 401/403/404
 ✅ 43-test V2 Docker regression suite is green on the hardened branch
 ✅ BlueOptima-style 5–7-year JD extraction is hardened and verified at the parser/evaluation layer
 ✅ Agent-Reach/authenticated LinkedIn experiment completed to a decision point and deliberately parked
@@ -1476,7 +1476,9 @@ The repository and this file should be kept in sync deliberately.
 - Oracle was rebuilt successfully and the persisted runtime configuration is now version 5 with the intended expanded LinkedIn/Naukri query sets and Instahyre disabled.
 - The 24-hour latency sample is not a current-SLA measurement: LinkedIn p50 is 44 minutes and p90/max are 6 hours, while Naukri p50 is about 33 hours. These values include historical first-discovery samples gathered before the latest query/config fixes and therefore should not be treated as the post-fix latency baseline.
 - Current runtime logs after the rebuild showed LinkedIn succeeding without a 429 in the sampled window, including a cycle with 131 jobs seen and 13 new jobs; Telegram delivered 4 alerts.
-- Naukri had a transient relay-branch HTTP 404 even though the GitHub relay workflow itself succeeded. The branch currently contains the relay file. V2 now retries transient Naukri relay 404/429/5xx responses with bounded backoff before failing the source run.
+- Naukri returned HTTP 404 from an unauthenticated `raw.githubusercontent.com` URL after the repository was made private. The relay artifact itself exists on `naukri-relay`: the authenticated GitHub connection verified `dashboard/data/naukri_relay.json`, with 150 jobs and `updated_at=2026-10-09T05:04:08Z`. This makes private-content access the high-confidence root cause, not a missing workflow output path.
+- The Naukri collector was changed to fetch through GitHub's authenticated Contents API (`Accept: application/vnd.github.raw+json`) using a fine-grained `JOB_RADAR_GITHUB_READ_TOKEN` restricted to this repository and Contents:read. The Docker Compose service passes that environment variable from the ignored VM `.env`. HTTP 401/403/404 are configuration/permission failures and are not retried; 429/5xx/network failures retain bounded retries.
+- Deployment remains pending until the VM creates a least-privilege token, adds it to `.env`, pulls the branch, and rebuilds the container.
 - CI is green for the Naukri retry change.
 - Next validation should use `/api/latency-summary?hours=1` after several fresh LinkedIn cycles and compare new Telegram alerts against dashboard jobs. Do not use the 24-hour aggregate as the post-fix SLA baseline.
 - Platform expansion remains blocked until this short-window freshness check and LinkedIn experience acquisition are validated.
@@ -1534,4 +1536,29 @@ A future benchmark should compare the two paths over the same controlled time wi
 - number of source requests per useful job
 
 Only a measured win should justify replacing or augmenting the production collector.
+
+
+
+## 32. Live acceptance checkpoint and scraper strategy — 2026-10-09
+
+### Live evidence
+
+The latest Oracle health response reports V2 healthy, config version 5, LinkedIn enabled, Naukri enabled but failing its relay fetch, and Instahyre disabled. The failing request was the anonymous raw URL; the relay branch artifact exists and contains 150 records. The private-repo 404 is addressed in code with the authenticated GitHub Contents API, but production is not considered fixed until the VM has a read-only token configured and the next source run succeeds.
+
+The latest `/api/latency-summary?hours=1` observed LinkedIn `p50=2040s` (34 minutes), `p90=3600s` (60 minutes), `max=21600s` (6 hours), and only 7 samples under five minutes out of 43. In code this field is the difference between source-posted time and first discovery when the source posting precision supports it; it is not merely the collector's internal processing duration. Treat it as an estimated posted-to-discovery metric and keep its source timestamp precision in mind.
+
+### Correct order of work
+
+1. Restore authenticated Naukri relay access without making the repository public. Add a fine-grained token with only this repository's Contents:read permission to the VM's ignored `.env` as `JOB_RADAR_GITHUB_READ_TOKEN`; never put it in git or chat. Rebuild and verify `/api/source-status`, relay update time, and Naukri rows ingested.
+2. Review the latest GitHub Actions relay run duration. The private GitHub Free allowance is 2,000 Actions minutes/month. Triggering a 2-minute workflow every five minutes could consume far above that budget. Do not assume the five-minute relay cadence is free; compare observed runtime, included minutes, and the required freshness SLA before locking its cadence.
+3. Improve LinkedIn freshness without increasing request volume blindly. There are observed HTTP 429s on deep `start=10` scans. Keep the location rotation, measure the next 1–2 hours, and tune deep-page frequency/rotation only with source-run and latency measurements. Do not use the authenticated MCP browser experiment in production: its login bridge worked, but real tool calls still hung.
+4. Test one alternative source adapter in isolation, not all sources at once. JobSpy is a plausible low-cost benchmark and already powers the Naukri relay, but upstream docs note LinkedIn rate-limit sensitivity and issue reports include incomplete descriptions. Compare actual jobs found, complete-JD rate, freshness, 429s, run duration and cost before enabling Telegram alerts from a new adapter.
+5. Make ATS job feeds the first expansion candidate. Greenhouse, Lever and Ashby publish structured job-board endpoints, and SmartRecruiters has a public postings API. This is a better fit for the tiny Oracle VM than running a browser farm; the trade-off is curated company coverage rather than whole-market discovery.
+6. Do not put Firecrawl or Crawl4AI in the critical collector path yet. Firecrawl's current hosted free tier is 1,000 credits/month and a normal page scrape uses one credit; self-hosting loses the managed anti-bot/proxy layer and adds infrastructure. Crawl4AI is an open-source browser crawler but consumes the same constrained VM resources. Keep these as limited evaluation tools for awkward ATS pages, not a fix for LinkedIn/Naukri blocking.
+7. Acceptance criteria before adding more production sources: Naukri succeeds on consecutive relay cycles; source errors are visible and do not wipe last-good data; Telegram matches the canonical ledger; experience extraction is verified against full descriptions; p50/p90/max freshness and 429 rates improve over a measured window; restart/config persistence is verified.
+
+### Platform and budget cautions
+
+- LinkedIn's own help documentation says third-party scraping/automation is not permitted and can risk account restrictions. Agent-Reach/MCP remains parked; do not reattempt CAPTCHA workarounds or use the authenticated account browser as a production crawler.
+- GitHub's standard runner usage is free for public repositories; private repositories have plan-specific included minutes and may incur usage over the free allowance. Keep the repository private and do not move the entire application public merely to save runner minutes. If an isolated public relay is ever considered, document exactly which workflow/source code and generated job data would become public before changing anything.
 

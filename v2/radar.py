@@ -1763,27 +1763,43 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
 
     return jobs
 
-NAUKRI_RELAY_URL = (
-    "https://raw.githubusercontent.com/AvinashBhalla/job-beeper/naukri-relay/"
-    "dashboard/data/naukri_relay.json"
+NAUKRI_RELAY_API_URL = (
+    "https://api.github.com/repos/AvinashBhalla/job-beeper/"
+    "contents/dashboard/data/naukri_relay.json"
 )
+NAUKRI_RELAY_REF = "naukri-relay"
 
 
 def naukri_collect() -> list[dict[str, Any]]:
+    # The repository is private. Unauthenticated raw.githubusercontent.com
+    # requests return 404 even when the relay file exists. Use the authenticated
+    # GitHub Contents API with a fine-grained Contents:read token instead.
+    github_token = os.getenv("JOB_RADAR_GITHUB_READ_TOKEN", "").strip()
+    if not github_token:
+        raise RuntimeError(
+            "Naukri relay requires JOB_RADAR_GITHUB_READ_TOKEN "
+            "(fine-grained token with Contents:read on AvinashBhalla/job-beeper)"
+        )
+
+    relay_headers = {
+        **UA,
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.raw+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
     response: requests.Response | None = None
-    retryable_statuses = {404, 429, 500, 502, 503, 504}
+    retryable_statuses = {429, 500, 502, 503, 504}
     for attempt in range(4):
         try:
             candidate = requests.get(
-                NAUKRI_RELAY_URL,
-                params={"t": int(time.time())},
-                headers=UA,
+                NAUKRI_RELAY_API_URL,
+                params={"ref": NAUKRI_RELAY_REF},
+                headers=relay_headers,
                 timeout=20,
             )
             if candidate.status_code in retryable_statuses:
-                response = candidate
                 if attempt == 3:
-                    response.raise_for_status()
+                    candidate.raise_for_status()
                 wait = min(8, 2 ** attempt)
                 log.warning(
                     "naukri relay fetch returned HTTP %s; retrying in %ss",
@@ -1792,14 +1808,18 @@ def naukri_collect() -> list[dict[str, Any]]:
                 )
                 time.sleep(wait)
                 continue
+            # Authentication, permission and path errors (401/403/404) are
+            # configuration faults, not transient network failures. Fail fast.
             candidate.raise_for_status()
             response = candidate
             break
+        except requests.HTTPError:
+            raise
         except requests.RequestException:
             if attempt == 3:
                 raise
             wait = min(8, 2 ** attempt)
-            log.warning("naukri relay fetch failed; retrying in %ss", wait)
+            log.warning("naukri relay network fetch failed; retrying in %ss", wait)
             time.sleep(wait)
 
     if response is None:

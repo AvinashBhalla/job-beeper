@@ -41,6 +41,10 @@ V2 now keeps source observations in `jobs` and canonical cross-source groupings 
 
 Runtime user preferences are persisted at `/data/config.json`. The configuration API is protected by a generated token stored at `/data/config_token`, unless `JOB_RADAR_CONFIG_TOKEN` is supplied to the container.
 
+### Private Naukri relay access
+
+The Naukri relay JSON is published to the private `naukri-relay` branch. Do not fetch it via unauthenticated `raw.githubusercontent.com`: GitHub returns 404 for anonymous access to private repository content. The container reads it through the GitHub Contents API using `JOB_RADAR_GITHUB_READ_TOKEN`, a fine-grained personal access token limited to this repository with **Contents: read** permission. Put the token only in the VM's ignored `.env` file; never commit it or paste it into chat. HTTP 401/403/404 are treated as configuration errors and are not retried; only rate-limit/server/network failures get bounded retries.
+
 The dashboard is packaged with V2 and is served at `/dashboard/` by the FastAPI process. It reads jobs and settings from the V2 API rather than the legacy V1 GitHub JSON feed.
 
 ## Run

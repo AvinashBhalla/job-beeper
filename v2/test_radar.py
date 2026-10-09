@@ -907,32 +907,48 @@ class MatcherTests(unittest.TestCase):
         # for forcing legacy Instahyre enablement back to disabled.
         self.assertTrue(merged["source_enabled"]["instahyre"])
 
-    def test_naukri_relay_retries_transient_404(self):
+    def test_naukri_relay_uses_authenticated_github_contents_api(self):
         class Response:
-            def __init__(self, status_code, payload=None):
-                self.status_code = status_code
-                self._payload = payload or {"jobs": []}
+            status_code = 200
 
             def raise_for_status(self):
-                if self.status_code >= 400:
-                    import requests
-                    raise requests.HTTPError(f"{self.status_code} error")
+                return None
 
             def json(self):
-                return self._payload
+                return {"updated_at": "2026-10-09T05:04:08+00:00", "jobs": []}
 
-        responses = [
-            Response(404),
-            Response(200, {"updated_at": "2026-10-08T18:00:00+00:00", "jobs": []}),
-        ]
-
-        with patch.object(radar.requests, "get", side_effect=responses):
-            with patch.object(radar.time, "sleep") as sleep:
+        with patch.dict(radar.os.environ, {"JOB_RADAR_GITHUB_READ_TOKEN": "test-read-token"}):
+            with patch.object(radar.requests, "get", return_value=Response()) as request:
                 jobs = radar.naukri_collect()
 
         self.assertEqual(jobs, [])
-        self.assertEqual(sleep.call_count, 1)
-        self.assertEqual(sleep.call_args.args[0], 1)
+        request.assert_called_once()
+        args, kwargs = request.call_args
+        self.assertEqual(args[0], radar.NAUKRI_RELAY_API_URL)
+        self.assertEqual(kwargs["params"], {"ref": "naukri-relay"})
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-read-token")
+        self.assertEqual(kwargs["headers"]["Accept"], "application/vnd.github.raw+json")
+
+    def test_naukri_relay_requires_read_token(self):
+        with patch.dict(radar.os.environ, {"JOB_RADAR_GITHUB_READ_TOKEN": ""}):
+            with patch.object(radar.requests, "get") as request:
+                with self.assertRaisesRegex(RuntimeError, "JOB_RADAR_GITHUB_READ_TOKEN"):
+                    radar.naukri_collect()
+                request.assert_not_called()
+
+    def test_naukri_relay_does_not_retry_private_repo_404(self):
+        class Response:
+            status_code = 404
+
+            def raise_for_status(self):
+                raise radar.requests.HTTPError("404 private repository not accessible")
+
+        with patch.dict(radar.os.environ, {"JOB_RADAR_GITHUB_READ_TOKEN": "test-read-token"}):
+            with patch.object(radar.requests, "get", return_value=Response()) as request:
+                with self.assertRaises(radar.requests.HTTPError):
+                    radar.naukri_collect()
+
+        request.assert_called_once()
 
     def test_linkedin_fast_scan_uses_broader_recency_window(self):
         params = []
