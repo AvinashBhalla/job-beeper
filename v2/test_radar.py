@@ -907,7 +907,7 @@ class MatcherTests(unittest.TestCase):
         # for forcing legacy Instahyre enablement back to disabled.
         self.assertTrue(merged["source_enabled"]["instahyre"])
 
-    def test_naukri_relay_uses_authenticated_github_contents_api(self):
+    def test_naukri_relay_reads_public_feed_without_a_token(self):
         class Response:
             status_code = 200
 
@@ -917,36 +917,28 @@ class MatcherTests(unittest.TestCase):
             def json(self):
                 return {"updated_at": "2026-10-09T05:04:08+00:00", "jobs": []}
 
-        with patch.dict(radar.os.environ, {"JOB_RADAR_GITHUB_READ_TOKEN": "test-read-token"}):
-            with patch.object(radar.requests, "get", return_value=Response()) as request:
-                jobs = radar.naukri_collect()
+        with patch.object(radar.requests, "get", return_value=Response()) as request:
+            jobs = radar.naukri_collect()
 
         self.assertEqual(jobs, [])
         request.assert_called_once()
         args, kwargs = request.call_args
-        self.assertEqual(args[0], radar.NAUKRI_RELAY_API_URL)
-        self.assertEqual(kwargs["params"], {"ref": "naukri-relay"})
-        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-read-token")
-        self.assertEqual(kwargs["headers"]["Accept"], "application/vnd.github.raw+json")
+        self.assertEqual(args[0], radar.NAUKRI_RELAY_URL)
+        self.assertNotIn("params", kwargs)
+        self.assertNotIn("Authorization", kwargs["headers"])
+        self.assertEqual(kwargs["headers"]["Accept"], "application/json")
+        self.assertEqual(kwargs["timeout"], 20)
 
-    def test_naukri_relay_requires_read_token(self):
-        with patch.dict(radar.os.environ, {"JOB_RADAR_GITHUB_READ_TOKEN": ""}):
-            with patch.object(radar.requests, "get") as request:
-                with self.assertRaisesRegex(RuntimeError, "JOB_RADAR_GITHUB_READ_TOKEN"):
-                    radar.naukri_collect()
-                request.assert_not_called()
-
-    def test_naukri_relay_does_not_retry_private_repo_404(self):
+    def test_naukri_relay_does_not_retry_public_feed_404(self):
         class Response:
             status_code = 404
 
             def raise_for_status(self):
-                raise radar.requests.HTTPError("404 private repository not accessible")
+                raise radar.requests.HTTPError("404 public relay feed not found")
 
-        with patch.dict(radar.os.environ, {"JOB_RADAR_GITHUB_READ_TOKEN": "test-read-token"}):
-            with patch.object(radar.requests, "get", return_value=Response()) as request:
-                with self.assertRaises(radar.requests.HTTPError):
-                    radar.naukri_collect()
+        with patch.object(radar.requests, "get", return_value=Response()) as request:
+            with self.assertRaises(radar.requests.HTTPError):
+                radar.naukri_collect()
 
         request.assert_called_once()
 
