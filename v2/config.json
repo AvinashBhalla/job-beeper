@@ -96,7 +96,7 @@
   "remote_only": false,
   "min_experience_years": null,
   "max_age_hours": 72,
-  "require_explicit_experience_for_alerts": false,
+  "require_explicit_experience_for_alerts": true,
   "excluded_role_terms": [],
   "notifications_enabled": true,
   "source_enabled": {
@@ -104,5 +104,5 @@
     "naukri": true,
     "instahyre": false
   },
-  "config_version": 5
+  "config_version": 6
 }
