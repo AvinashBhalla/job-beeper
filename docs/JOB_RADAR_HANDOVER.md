@@ -1562,3 +1562,21 @@ The latest `/api/latency-summary?hours=1` observed LinkedIn `p50=2040s` (34 minu
 - LinkedIn's own help documentation says third-party scraping/automation is not permitted and can risk account restrictions. Agent-Reach/MCP remains parked; do not reattempt CAPTCHA workarounds or use the authenticated account browser as a production crawler.
 - GitHub's standard runner usage is free for public repositories; private repositories have plan-specific included minutes and may incur usage over the free allowance. Keep the repository private and do not move the entire application public merely to save runner minutes. If an isolated public relay is ever considered, document exactly which workflow/source code and generated job data would become public before changing anything.
 
+
+
+## 33. External references reviewed for source strategy — 2026-10-09
+
+- JobSpy supported sources and upstream limitations: https://github.com/speedyapply/JobSpy
+- JobSpy reports LinkedIn as its most restrictive source and notes rate limiting around deeper pages; treat this as project guidance, not an independent benchmark.
+- Firecrawl current billing/free-tier information: https://github.com/firecrawl/firecrawl-docs/blob/main/billing.mdx
+- Firecrawl current rate-limit information: https://github.com/firecrawl/firecrawl-docs/blob/main/rate-limits.mdx
+- Firecrawl open-source versus hosted service limitations: https://www.firecrawl.dev/crawl
+- Crawl4AI self-hosted options and license: https://github.com/unclecode/crawl4ai
+- Greenhouse public Job Board API: https://docs.greenhouse.io/job-board.html
+- Lever public Postings API: https://github.com/lever/postings-api
+- Ashby public Job Posting API: https://developers.ashbyhq.com/docs/public-job-posting-api
+- LinkedIn official policy on prohibited scraping/automation: https://www.linkedin.com/help/linkedin/answer/a1341387/prohibition-of-scraping-software
+- GitHub Actions limits and included minutes: https://docs.github.com/en/actions/reference/limits
+- GitHub Actions billing/public versus private repo guidance: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+
+Decision remains: repair relay delivery and validate existing sources before adding another production dependency. Firecrawl/Crawl4AI are not proposed as the primary LinkedIn/Naukri ingestion path; ATS public APIs and a controlled JobSpy alternative-source POC are the preferred next experiments.
