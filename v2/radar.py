@@ -113,6 +113,11 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     if current_version < 6 <= default_version:
         merged["require_explicit_experience_for_alerts"] = True
 
+    # Version 7 adds Greenhouse as an opt-in structured ATS source. Existing
+    # runtimes must not start querying/alerting from it without an explicit opt-in.
+    if current_version < 7 <= default_version:
+        merged.setdefault("source_enabled", {})["greenhouse"] = False
+
     if isinstance(defaults.get("poll_seconds"), dict):
         merged["poll_seconds"] = {
             **defaults.get("poll_seconds", {}),
@@ -128,6 +133,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         # repository default during migration.
         if current_version < 4 <= default_version:
             merged["source_enabled"]["instahyre"] = False
+        if current_version < 7 <= default_version:
+            merged["source_enabled"]["greenhouse"] = False
     return merged
 
 
@@ -187,6 +194,29 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
     for key in ("remote_only", "notifications_enabled", "require_explicit_experience_for_alerts"):
         config[key] = bool(config.get(key, False))
 
+    greenhouse_boards = config.get("greenhouse_boards", [])
+    if not isinstance(greenhouse_boards, list):
+        raise HTTPException(status_code=422, detail="greenhouse_boards must be a list.")
+    if len(greenhouse_boards) > 50:
+        raise HTTPException(status_code=422, detail="greenhouse_boards cannot contain more than 50 boards.")
+    normalized_boards: list[dict[str, str]] = []
+    seen_board_tokens: set[str] = set()
+    for board in greenhouse_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each greenhouse board must be an object.")
+        token = board.get("token")
+        company = board.get("company")
+        if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", token.strip()):
+            raise HTTPException(status_code=422, detail="Each greenhouse board requires a valid public board token.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each greenhouse board requires a company label of at most 120 characters.")
+        token = token.strip()
+        if token.lower() in seen_board_tokens:
+            raise HTTPException(status_code=422, detail=f"Duplicate Greenhouse board token: {token}.")
+        seen_board_tokens.add(token.lower())
+        normalized_boards.append({"token": token, "company": company.strip()})
+    config["greenhouse_boards"] = normalized_boards
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -194,6 +224,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "linkedin": bool(source_enabled.get("linkedin", True)),
         "naukri": bool(source_enabled.get("naukri", True)),
         "instahyre": bool(source_enabled.get("instahyre", True)),
+        "greenhouse": bool(source_enabled.get("greenhouse", False)),
     }
 
     poll_seconds = config.get("poll_seconds", {})
@@ -205,6 +236,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "linkedin": 60,
             "naukri": 300,
             "instahyre": 600,
+            "greenhouse": 900,
         }.items()
     }
 
@@ -293,7 +325,8 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
             return dt.datetime.fromtimestamp(timestamp, tz=UTC)
         except (OverflowError, OSError, ValueError):
             return None
-    text = str(value).strip().lower()
+    raw_text = str(value).strip()
+    text = raw_text.lower()
     if text in {"just now", "now", "today"}:
         return base
     if text == "yesterday":
@@ -301,7 +334,12 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
     m = re.search(r"(\d+)\s*(minute|min|hour|hr|day|week)s?\s*(?:ago)?", text)
     if not m:
         try:
-            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+            iso_text = (
+                raw_text[:-1] + "+00:00"
+                if raw_text.endswith(("Z", "z"))
+                else raw_text
+            )
+            parsed = dt.datetime.fromisoformat(iso_text)
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
         except ValueError:
             return None
@@ -1152,9 +1190,27 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
     value = normalize_phrase(location)
     if not value:
         return False
-    if config.get("remote_only") and not phrase_hits(["remote"], value):
+    is_remote = bool(phrase_hits(["remote"], value))
+    if config.get("remote_only") and not is_remote:
         return False
-    terms = location_terms(config)
+
+    # A configured region such as "Remote, India" is not a wildcard for
+    # every remote job worldwide. Match its qualifier as well as "remote".
+    # A plain "Remote" entry intentionally remains a global remote filter.
+    configured_locations = config.get("locations", [])
+    for raw in configured_locations:
+        parts = str(raw).split(",", 1)
+        primary = normalize_phrase(parts[0])
+        if primary != "remote" or not is_remote:
+            continue
+        qualifier = normalize_phrase(parts[1]) if len(parts) > 1 else ""
+        if not qualifier or phrase_hits([qualifier], value):
+            return True
+
+    terms = [
+        term for term in location_terms(config)
+        if term != "remote"
+    ]
     return any(phrase_hits([term], value) for term in terms)
 
 
@@ -1966,10 +2022,149 @@ def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+
+def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect public Greenhouse job-board postings for configured employers.
+
+    Greenhouse's public Job Board GET endpoint does not require authentication.
+    The documented updated_at field describes an update time, not necessarily
+    the original posting time, so it is intentionally not mapped to source_posted_at.
+    """
+    boards = config.get("greenhouse_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Greenhouse is enabled but no public greenhouse_boards are configured")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+
+    for board in boards:
+        token = str(board.get("token") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not token or not company:
+            failures.append(f"{token or '<missing-token>'}: invalid board configuration")
+            continue
+
+        endpoint = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
+        try:
+            response = requests.get(
+                endpoint,
+                params={"content": "true"},
+                headers={**UA, "Accept": "application/json"},
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
+                raise ValueError("Greenhouse response did not contain a jobs list")
+            successful_boards += 1
+        except Exception as exc:
+            failures.append(f"{token}: {exc!r}")
+            log.warning("greenhouse: board=%s failed: %r", token, exc)
+            continue
+
+        for item in payload["jobs"]:
+            if not isinstance(item, dict):
+                continue
+            raw_id = item.get("id")
+            title = str(item.get("title") or "").strip()
+            url = str(item.get("absolute_url") or "").strip()
+            if raw_id is None or not title or not url:
+                continue
+
+            source_id = f"gh-{token}-{raw_id}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            raw_location = item.get("location")
+            if isinstance(raw_location, dict):
+                location = str(raw_location.get("name") or "").strip()
+            elif isinstance(raw_location, str):
+                location = raw_location.strip()
+            else:
+                location = ""
+
+            if not location:
+                offices = item.get("offices") or []
+                office_names = []
+                if isinstance(offices, list):
+                    for office in offices:
+                        if not isinstance(office, dict):
+                            continue
+                        label = str(office.get("location") or office.get("name") or "").strip()
+                        if label and label not in office_names:
+                            office_names.append(label)
+                location = ", ".join(office_names)
+
+            description_html = html_lib.unescape(str(item.get("content") or ""))
+            description = BeautifulSoup(
+                description_html, "html.parser"
+            ).get_text(" ", strip=True)
+            departments = item.get("departments") or []
+            department_names = [
+                str(dept.get("name")).strip()
+                for dept in departments
+                if isinstance(dept, dict) and str(dept.get("name") or "").strip()
+            ] if isinstance(departments, list) else []
+            if department_names:
+                description = f"{description} Department: {', '.join(department_names)}".strip()
+
+            # first_published records when the job post first went live.
+            # Never substitute updated_at, which may reflect a later edit.
+            published_raw = item.get("first_published")
+            published_at = (
+                parse_relative(str(published_raw))
+                if published_raw not in (None, "")
+                else None
+            )
+            if published_at is None:
+                posted_precision = "unknown"
+            elif isinstance(published_raw, str) and re.search(
+                r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", published_raw
+            ):
+                posted_precision = "minute"
+            else:
+                posted_precision = "date"
+
+            jobs.append(normalize_job(
+                "greenhouse",
+                source_id,
+                company,
+                title,
+                location,
+                url,
+                published_at,
+                posted_precision,
+                description,
+            ))
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Greenhouse boards failed: {details}")
+
+    if failures:
+        log.warning(
+            "greenhouse: partial board failures=%s successful_boards=%s",
+            len(failures),
+            successful_boards,
+        )
+    log.info(
+        "greenhouse: boards=%s successful=%s failed=%s jobs=%s",
+        len(boards),
+        successful_boards,
+        len(failures),
+        len(jobs),
+    )
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
     "instahyre": instahyre_collect,
+    "greenhouse": greenhouse_collect,
 }
 
 
@@ -2132,7 +2327,7 @@ def latency_summary(hours: int = 24):
             WHERE discovered_at >= ?
               AND discovery_latency_seconds IS NOT NULL
               AND discovery_latency_seconds >= 0
-              AND source IN ('linkedin', 'naukri', 'instahyre')
+              AND source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
             ORDER BY source, discovery_latency_seconds ASC
         """, (cutoff,)).fetchall()
 
@@ -2147,7 +2342,7 @@ def latency_summary(hours: int = 24):
         return values[index]
 
     summary = {}
-    for source in ("linkedin", "naukri", "instahyre"):
+    for source in ("linkedin", "naukri", "instahyre", "greenhouse"):
         values = by_source.get(source, [])
         under_60 = sum(1 for value in values if value <= 60)
         under_120 = sum(1 for value in values if value <= 120)
@@ -2192,7 +2387,7 @@ def source_status():
     }
 
     sources = []
-    for source in ("linkedin", "naukri", "instahyre"):
+    for source in ("linkedin", "naukri", "instahyre", "greenhouse"):
         item = history.get(source, {})
         sources.append({
             "source": source,
@@ -2214,7 +2409,7 @@ def dedupe_candidates(limit: int = 100):
         rows = conn.execute("""
             SELECT id, source, source_job_id, company, title, location, url, description
             FROM jobs
-            WHERE source IN ('linkedin', 'naukri', 'instahyre')
+            WHERE source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
             ORDER BY id ASC
         """).fetchall()
 

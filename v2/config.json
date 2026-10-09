@@ -2,7 +2,8 @@
   "poll_seconds": {
     "linkedin": 60,
     "naukri": 300,
-    "instahyre": 600
+    "instahyre": 600,
+    "greenhouse": 900
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -102,7 +103,22 @@
   "source_enabled": {
     "linkedin": true,
     "naukri": true,
-    "instahyre": false
+    "instahyre": false,
+    "greenhouse": false
   },
-  "config_version": 6
+  "config_version": 7,
+  "greenhouse_boards": [
+    {
+      "token": "coinbase",
+      "company": "Coinbase"
+    },
+    {
+      "token": "gravitonresearchcapital",
+      "company": "Graviton Research Capital"
+    },
+    {
+      "token": "zocdoc",
+      "company": "Zocdoc"
+    }
+  ]
 }

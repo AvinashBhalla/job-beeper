@@ -46,6 +46,16 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 class MatcherTests(unittest.TestCase):
 
+    def test_remote_india_location_does_not_match_remote_jobs_in_other_countries(self):
+        self.assertTrue(radar.location_allowed("Remote - India", BASE_CONFIG))
+        self.assertTrue(radar.location_allowed("Remote, Bengaluru, Karnataka, India", BASE_CONFIG))
+        self.assertFalse(radar.location_allowed("Remote - USA", BASE_CONFIG))
+        self.assertFalse(radar.location_allowed("Remote - Cyprus", BASE_CONFIG))
+
+    def test_unqualified_remote_location_remains_global(self):
+        config = {**BASE_CONFIG, "locations": ["Bengaluru, India", "Remote"]}
+        self.assertTrue(radar.location_allowed("Remote - USA", config))
+
     def test_linkedin_fast_scan_staggers_all_query_location_pairs(self):
         config = {
             "locations": ["Bengaluru, India", "Gurugram, India", "Delhi, India", "Remote, India"],
@@ -997,6 +1007,178 @@ class MatcherTests(unittest.TestCase):
         self.assertNotIn("Authorization", kwargs["headers"])
         self.assertEqual(kwargs["headers"]["Accept"], "application/json")
         self.assertEqual(kwargs["timeout"], 20)
+
+
+    def test_parse_relative_accepts_utc_z_suffix_without_lowercasing_iso_text(self):
+        for value in (
+            "2026-10-08T10:00:00Z",
+            "2026-10-08T10:00:00z",
+        ):
+            with self.subTest(value=value):
+                parsed = radar.parse_relative(value)
+                self.assertEqual(radar.iso(parsed), "2026-10-08T10:00:00+00:00")
+
+    def test_greenhouse_collector_uses_first_published_and_does_not_use_updated_at(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 123,
+                        "title": "Software Engineer",
+                        "absolute_url": "https://boards.greenhouse.io/example/jobs/123",
+                        "location": {"name": "Bengaluru, India"},
+                        "first_published": "2026-10-08T10:00:00Z",
+                        "updated_at": "2026-10-09T10:00:00Z",
+                        "content": "<p>Build Python APIs.</p><p>2+ years experience.</p>",
+                        "departments": [{"name": "Engineering"}],
+                    }]
+                }
+
+        config = {
+            "greenhouse_boards": [{"token": "example", "company": "Example Labs"}]
+        }
+        with patch.object(radar.requests, "get", return_value=Response()) as request:
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        self.assertEqual(job["source"], "greenhouse")
+        self.assertEqual(job["source_job_id"], "gh-example-123")
+        self.assertEqual(job["company"], "Example Labs")
+        self.assertEqual(job["location"], "Bengaluru, India")
+        self.assertIn("Build Python APIs.", job["description"])
+        self.assertIn("Department: Engineering", job["description"])
+        self.assertNotIn("<p>", job["description"])
+        self.assertEqual(job["source_posted_at"], "2026-10-08T10:00:00+00:00")
+        self.assertEqual(job["posted_precision"], "minute")
+        self.assertIsNotNone(job["discovery_latency_seconds"])
+        self.assertGreaterEqual(job["discovery_latency_seconds"], 0)
+
+        args, kwargs = request.call_args
+        self.assertEqual(args[0], "https://boards-api.greenhouse.io/v1/boards/example/jobs")
+        self.assertEqual(kwargs["params"], {"content": "true"})
+        self.assertNotIn("Authorization", kwargs["headers"])
+        self.assertEqual(kwargs["timeout"], 20)
+
+    def test_greenhouse_collector_keeps_posting_time_unknown_if_first_published_missing(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 789,
+                        "title": "Backend Engineer",
+                        "absolute_url": "https://boards.greenhouse.io/example/jobs/789",
+                        "location": {"name": "Remote - India"},
+                        "updated_at": "2026-10-09T10:00:00Z",
+                        "content": "<p>Build services.</p>",
+                    }]
+                }
+
+        config = {
+            "greenhouse_boards": [{"token": "example", "company": "Example Labs"}]
+        }
+        with patch.object(radar.requests, "get", return_value=Response()):
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        self.assertIsNone(jobs[0]["source_posted_at"])
+        self.assertEqual(jobs[0]["posted_precision"], "unknown")
+        self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+    def test_greenhouse_collector_keeps_successful_board_when_another_board_fails(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 456,
+                        "title": "Python Developer",
+                        "absolute_url": "https://boards.greenhouse.io/good/jobs/456",
+                        "location": {"name": "Remote - India"},
+                        "content": "<p>Build automation.</p>",
+                        "departments": [{"name": "Engineering"}],
+                    }]
+                }
+
+        def fake_get(url, **kwargs):
+            if "/bad/" in url:
+                raise radar.requests.HTTPError("404 board not found")
+            return Response()
+
+        config = {
+            "greenhouse_boards": [
+                {"token": "bad", "company": "Bad Board"},
+                {"token": "good", "company": "Good Board"},
+            ]
+        }
+        with patch.object(radar.requests, "get", side_effect=fake_get):
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["company"], "Good Board")
+        self.assertEqual(jobs[0]["source_job_id"], "gh-good-456")
+
+    def test_greenhouse_collector_fails_when_no_boards_are_configured(self):
+        with self.assertRaises(RuntimeError):
+            radar.greenhouse_collect({"greenhouse_boards": []})
+
+    def test_config_v7_keeps_greenhouse_source_opt_in_for_existing_runtime(self):
+        defaults = {
+            "config_version": 7,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+                "greenhouse": False,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+                "greenhouse": 900,
+            },
+        }
+        prior_runtime = {
+            "config_version": 6,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+                "greenhouse": True,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+            },
+        }
+
+        merged = _merge_config(defaults, prior_runtime)
+
+        self.assertEqual(merged["config_version"], 7)
+        self.assertFalse(merged["source_enabled"]["greenhouse"])
+        self.assertEqual(merged["poll_seconds"]["greenhouse"], 900)
+
+    def test_config_validation_rejects_unsafe_greenhouse_board_tokens(self):
+        config = {
+            **BASE_CONFIG,
+            "greenhouse_boards": [{"token": "../private", "company": "Example"}],
+        }
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config(config)
 
     def test_naukri_date_precision_does_not_claim_exact_discovery_latency(self):
         class Response:

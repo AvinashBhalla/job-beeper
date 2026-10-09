@@ -4,11 +4,11 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (public Naukri relay cutover completed; cache-busting fix deployed and verified; post-deploy Naukri count reconciled at 359; CI runs #283 and #284 passed)**
+**Last updated: 2026-10-09 (Greenhouse public-board source merged as opt-in; PR CI #286 passed; Oracle deployment still at the verified Naukri cache-busting release)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Current-state reconciliation (2026-10-09):** The `v2-live-radar` branch is deployed on `job-radar` at commit `f91f047ca6e71c69492a03f0bafaf7b18362f613` (`Bust cache when polling public Naukri relay`). The cache-busting change was reviewed in [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5); PR CI [run #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682) passed before merge, and post-merge CI [run #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) passed. The Oracle container was rebuilt and `/health` returned `status=ok`, version `2.0.0`. The public relay [run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) succeeded and published a valid feed with 359 jobs; the next radar scan reported `jobs_seen=359`, `new_jobs=0`, and `error=null`. This verifies that the previous 345-versus-359 mismatch was corrected after adding a timestamp cache-busting query parameter; stale caching was the plausible cause, not proven in isolation. The old VM user-crontab entry that dispatched the private repository relay every five minutes was removed after backing up the crontab. Its untracked `logs/` and `scripts/` were moved to `/home/ubuntu/job-beeper-local-backup-20261009`. The public relay continues on its own five-minute GitHub Actions schedule. Telegram delivery is active; Agent-Reach remains parked and is not a production dependency.
+> **Current-state reconciliation (2026-10-09):** The latest confirmed Oracle deployment is still commit `f91f047ca6e71c69492a03f0bafaf7b18362f613` (`Bust cache when polling public Naukri relay`). The cache-busting change was reviewed in [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5); PR CI [run #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682) and post-merge CI [run #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) passed. The Oracle container was rebuilt and `/health` returned `status=ok`, version `2.0.0`. The public relay [run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) published a valid feed with 359 jobs; the next radar scan reported `jobs_seen=359`, `new_jobs=0`, and `error=null`. The cache-busting change reconciled the prior 345-versus-359 mismatch; stale caching was the plausible cause, not proven in isolation. The old VM user-crontab entry that dispatched the private repository relay every five minutes was removed after backing up the crontab. Its untracked `logs/` and `scripts/` were moved to `/home/ubuntu/job-beeper-local-backup-20261009`. The public relay continues on its own five-minute GitHub Actions schedule. PR #6 added the Greenhouse collector and dashboard integration in repository commit `1cfd55b28b4409d71aee3ca3fe1db314d9aa766f`, with pre-merge CI [run #286](https://github.com/AvinashBhalla/job-beeper/actions/runs/37927758499) passing. **That Greenhouse change is not yet deployed on Oracle and remains disabled by default.** Telegram delivery is active; Agent-Reach remains parked and is not a production dependency.
 
 ---
 
@@ -1800,3 +1800,80 @@ This section and the current-state reconciliation above supersede earlier histor
 3. Keep the application repository private and keep the public relay repository limited to its workflow/setup documentation and intentionally public generated job feed.
 4. Proceed next with an independent structured ATS adapter (Greenhouse, Lever, or Ashby) once normal relay stability is confirmed.
 
+## 45. Greenhouse public ATS source implemented, opt-in, pending Oracle deployment — 2026-10-09
+
+### Implementation and validation
+- Merged [PR #6](https://github.com/AvinashBhalla/job-beeper/pull/6) as code commit `1cfd55b28b4409d71aee3ca3fe1db314d9aa766f`. V2 CI [run #286](https://github.com/AvinashBhalla/job-beeper/actions/runs/37927758499) passed: Python compilation and the full unit-test suite completed successfully.
+- Added `greenhouse_collect(config)` to the V2 collector registry. It fetches each configured public board through `GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true`; the official [Greenhouse Job Board API documentation](https://developers.greenhouse.io/job-board.html) says public GET data does not require authentication and `content=true` includes the full description, department, and office.
+- Five starting board tokens are configured in `v2/config.json`: `coinbase`, `clarifai`, `gravitonresearchcapital`, `as` (Veradigm Asia), and `zocdoc`. These are seed candidates based on publicly indexed Greenhouse job-board pages, not a guarantee that each endpoint is currently reachable; validate the live API on activation. The board registry is capped at 50 entries and tokens are validated before being interpolated into the fixed Greenhouse API host URL.
+- Each job uses a board-scoped stable ID (`gh-{token}-{id}`), retains the published application URL and location, converts HTML description into text, and appends public department metadata. Source IDs avoid collisions when different companies reuse the same numeric job ID.
+- Posting freshness is deliberately conservative: Greenhouse's documented `updated_at` field may be a modification timestamp, not the original posting time. The adapter leaves `source_posted_at=null`, `posted_precision=unknown`, and discovery latency null unless a true posting timestamp is available. Discovery time remains recorded normally by the common normalizer.
+- Board failures are isolated. A failed board logs a warning while successful boards continue to contribute jobs. If every configured board fails (or none is configured while the source is enabled), the collector raises an error so source health shows the failure; the common ingestion path does not insert an empty feed to replace saved jobs.
+- Added `greenhouse` to the configured source flags, source polling settings (900-second target), source-health API, latency-summary/dedupe source filters, dashboard settings checkbox, source filter, and source-health label. Disabled sources now show a DISABLED badge rather than looking ACTIVE.
+- Added regression tests for normalization and HTML parsing, no invented posting time, per-board failure isolation, empty-board configuration, unsafe token rejection, and V6-to-V7 opt-in migration.
+
+### Activation and deployment boundary
+- Source is **disabled by default** in repository defaults. Config schema version 7 explicitly forces `source_enabled.greenhouse=false` while migrating older runtime config; user must turn it on explicitly after deployment.
+- The source implementation has not been deployed to Oracle yet. The VM remains at the last confirmed healthy commit `f91f047`; no Greenhouse requests or Greenhouse Telegram alerts should be expected before the code is deployed and the feature is enabled.
+- After deployment, first verify health and the `greenhouse` row in `/api/source-status`. Enable Greenhouse through the V2 preferences UI only when ready, then inspect `greenhouse: boards=...` and any per-board warnings in Docker logs. If all boards fail, leave it disabled until the registry is corrected. Do not infer success solely from a successful CI run; live endpoint availability still needs runtime proof.
+- Keep the current LinkedIn and Naukri sources untouched while validating this independent source. Compare the resulting relevant-new-job yield, description completeness, deduplication, and age precision before treating the adapter as a valuable ongoing source.
+
+
+
+## 46. Greenhouse live endpoint validation and seed registry cleanup — 2026-10-09
+
+### Oracle VM result
+- The deployed V2 app is healthy at commit `39847b8`; `/health` returned HTTP 200 and the runtime configuration reports schema version 7, Greenhouse disabled, and a 900-second poll target.
+- The user tested all five seed URLs from the VM using the exact public Job Board API collector endpoint:
+  - `coinbase`: HTTP 200, 220 jobs returned.
+  - `gravitonresearchcapital`: HTTP 200, 21 jobs returned; sample included an Application Reliability Engineer in Gurugram.
+  - `zocdoc`: HTTP 200, 57 jobs returned; sample included an Analyst, Quality Assurance in Pune.
+  - `clarifai`: HTTP 404. Indexed legacy job pages exist, but the tested public jobs endpoint is not currently usable; do not treat this as a validated board token.
+  - `as` (Veradigm Asia): HTTP 404. Veradigm's current official careers page now sends job seekers to its Workday job site, so remove it from the Greenhouse registry rather than assuming the old Greenhouse board is active.
+- The failed board URLs do not affect LinkedIn/Naukri. The collector's per-board isolation is intended to preserve jobs from successful boards even when a configured board fails, but failed tokens should not remain in the starter registry.
+
+### Follow-up and activation boundary
+- Repository defaults are being narrowed to the three VM-validated boards: `coinbase`, `gravitonresearchcapital`, and `zocdoc`.
+- Runtime config is persisted separately at `/data/config.json` in the Docker named volume. Updating `v2/config.json` alone does not replace the persisted board list on an existing VM; update the runtime config via the protected API or preferences UI as a separate step.
+- Greenhouse remains disabled until the runtime registry is cleaned and the operator explicitly enables it. After activation, inspect source status and logs for one full 15-minute poll cycle and confirm jobs are inserted and evaluated. Do not assume freshness latency for these jobs: the adapter intentionally leaves posting time unknown.
+- Clarifai may be re-added only after its current public listing endpoint and board token are verified from the VM. Do not replace it with guessed API URLs. Consider a separate Workday adapter for Veradigm later; do not mix Workday URLs into the Greenhouse collector.
+
+
+## 47. Greenhouse dry run exposed and fixed remote-country matching — 2026-10-09
+
+### Live preview result
+- On the Oracle VM, the actual Greenhouse collector fetched 298 jobs from the three validated boards (Coinbase 220, Graviton Research Capital 21, Zocdoc 57), with no failed boards.
+- The current matcher returned five profile matches. Four were Coinbase jobs labelled `Remote - USA` and passed the alert policy; one Graviton Research Capital role was in Gurugram and not alertable under the explicit-experience safeguard.
+- The saved location config is Bengaluru, Gurugram, Delhi, and `Remote, India`. These US-remote results exposed a location-filter bug: the matcher split `Remote, India` at the comma and treated `remote` as a global wildcard. The dry-run script itself performed no database writes or Telegram sends; Greenhouse stayed disabled.
+
+### Corrective change
+- Implemented and merged as [PR #8](https://github.com/AvinashBhalla/job-beeper/pull/8), commit `2074bdab`. The matcher now requires the configured country qualifier for `Remote, India`, while deliberately plain `Remote` remains global.
+- Tests cover India remote acceptance, US/Cyprus remote rejection, and unqualified global remote behavior. CI passed and the fix is deployed to the Oracle VM.
+- The subsequent live preview rejected 190 remote postings outside configured location targets. Greenhouse remains disabled pending the separate ingestion/dashboard freshness safety gate.
+
+## 48. Greenhouse first-published timestamp support — 2026-10-09
+
+### Evidence from Oracle VM
+- The corrected location dry run fetched 298 jobs from the three validated Greenhouse boards with no board failures. The location fix rejected 190 remote postings outside the configured India targets; one job matched the profile and zero passed the current explicit-experience alert policy.
+- Read-only checks of the public list responses found `first_published` on Coinbase 220/220, Graviton Research Capital 20/21, and Zocdoc 57/57. The separate `updated_at` field existed on all 298 listings.
+- Official Greenhouse Job Board API documentation shows `first_published` as a job post's first publication timestamp in the retrieve-job response; `updated_at` is a separate value. The live list response exposes `first_published`, so the adapter can use it without extra per-job requests.
+
+### Implementation
+- Collector parses `first_published` when present and stores it as `source_posted_at`; timestamps with hour/minute use `posted_precision=minute`, while date-only values use `date`. Missing or invalid values remain `unknown`.
+- Never fall back to `updated_at`: later edits must not make an old posting look newly posted.
+- Regression tests cover valid first-publication timestamps and a fallback guard (missing `first_published` plus present `updated_at` remains unknown).
+- PR #9 is merged and the first-published timestamp implementation is deployed to the Oracle VM; post-merge CI passed. The latest dry run reported 298 jobs, 297 with minute-precision timestamps and 1 unknown; 10 were posted within 72 hours, 287 were older, and none had future timestamps. The only profile match was the September 1 Gurugram graduate role, which is stale and not alertable. Greenhouse remains disabled pending the ingestion/dashboard freshness fix; keep the explicit-experience policy unchanged.
+
+
+## 49. Current employee knowledge transfer — 2026-10-09
+
+The maintained, current operating summary is [`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`](JOB_RADAR_KNOWLEDGE_TRANSFER.md). It records deployment evidence, source status, architecture, merged PRs, repository/branch purposes, cleanup notes, blockers, next tasks and the release checklist.
+
+Important current-state corrections to older historical sections above:
+- Active release branch is `v2-live-radar`; latest code merge at this snapshot is `c2f2ce65`. Post-merge CI passed, and the VM health/dry-run output reflects the updated timestamp parser.
+- Remote-country matching and Greenhouse first-published timestamp parsing are implemented, merged and deployed.
+- Greenhouse remains disabled. The current blocker is ingestion/dashboard freshness semantics: the collector returns all public listings while the dashboard's existing "today" lifecycle is discovery-based, so old board listings may look newly discovered. Resolve this before activation.
+- `main` is still the GitHub default but is 59 commits behind the active V2 branch. Keep it until there is an explicit promotion/default-branch decision.
+- Five topic branches for merged PRs #5–#9 are stale and safe to prune. The private repo's `naukri-relay` branch is a legacy one-file snapshot still referenced by the older `main` code and its manual `naukri-relay.yml` workflow. Keep it until that legacy path is retired or redirected; the active V2 relay remains the separate `AvinashBhalla/job-beeper-naukri-relay` repository.
+
+Use the knowledge-transfer document for the next work session; this file remains the detailed chronological record.
