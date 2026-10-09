@@ -133,6 +133,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         # repository default during migration.
         if current_version < 4 <= default_version:
             merged["source_enabled"]["instahyre"] = False
+        if current_version < 7 <= default_version:
+            merged["source_enabled"]["greenhouse"] = False
     return merged
 
 
