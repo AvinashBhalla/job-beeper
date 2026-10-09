@@ -989,6 +989,33 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(kwargs["headers"]["Accept"], "application/json")
         self.assertEqual(kwargs["timeout"], 20)
 
+    def test_naukri_date_precision_does_not_claim_exact_discovery_latency(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "updated_at": "2026-10-09T05:04:08+00:00",
+                    "jobs": [{
+                        "id": "naukri-1",
+                        "url": "https://www.naukri.com/job-listings-example",
+                        "company": "Example Co",
+                        "title": "Software Engineer",
+                        "location": "Bengaluru",
+                        "posted": "2026-10-08",
+                    }],
+                }
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            jobs = radar.naukri_collect()
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["posted_precision"], "date")
+        self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+
     def test_naukri_relay_does_not_retry_public_feed_404(self):
         class Response:
             status_code = 404
@@ -1001,6 +1028,35 @@ class MatcherTests(unittest.TestCase):
                 radar.naukri_collect()
 
         request.assert_called_once()
+
+    def test_linkedin_skips_deep_scan_after_fast_lane_rate_limit(self):
+        config = {
+            "locations": ["Bengaluru, India", "Remote, India"],
+            "linkedin_queries": ["software engineer", "automation engineer"],
+        }
+        original_deep_scan = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_target_cursor
+        calls = []
+
+        def fake_search(query, location, start, fast):
+            calls.append((query, location, start, fast))
+            if len(calls) == 1:
+                response = type("Response", (), {"status_code": 429})()
+                error = radar.requests.HTTPError("429 Too Many Requests")
+                error.response = response
+                raise error
+            return []
+
+        try:
+            radar.linkedin_last_deep_scan_at = None
+            radar.linkedin_fast_target_cursor = 0
+            with patch.object(radar, "_linkedin_search_page", side_effect=fake_search):
+                radar.linkedin_collect(config)
+            self.assertTrue(calls)
+            self.assertTrue(all(start == 0 and fast for _, _, start, fast in calls))
+        finally:
+            radar.linkedin_last_deep_scan_at = original_deep_scan
+            radar.linkedin_fast_target_cursor = original_cursor
 
     def test_linkedin_fast_scan_uses_broader_recency_window(self):
         params = []
