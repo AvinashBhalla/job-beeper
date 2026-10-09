@@ -64,19 +64,28 @@ class MatcherTests(unittest.TestCase):
                     calls.append((query, location, start, fast)) or []
                 ),
             ):
-                radar.linkedin_collect(config)
-                first_cycle = list(calls)
-                calls.clear()
-                radar.linkedin_collect(config)
+                first_cycle = []
+                cycles = []
+                for cycle_index in range(4):
+                    calls.clear()
+                    radar.linkedin_collect(config)
+                    cycle = list(calls)
+                    cycles.append(cycle)
+                    if cycle_index == 0:
+                        first_cycle = cycle
             expected = {
                 (query, location, 0, True)
                 for query in config["linkedin_queries"]
                 for location in config["locations"]
             }
             self.assertEqual(len(first_cycle), radar.LINKEDIN_FAST_TARGETS_PER_SCAN)
-            self.assertLessEqual(len(first_cycle), len(expected))
-            self.assertEqual(set(first_cycle) | set(calls), expected)
-            self.assertTrue(set(first_cycle).isdisjoint(set(calls)))
+            for cycle in cycles:
+                self.assertEqual(len(cycle), radar.LINKEDIN_FAST_TARGETS_PER_SCAN)
+            observed = [target for cycle in cycles for target in cycle]
+            self.assertEqual(set(observed), expected)
+            self.assertEqual(len(observed), len(expected))
+            for previous, current in zip(cycles, cycles[1:]):
+                self.assertTrue(set(previous).isdisjoint(set(current)))
         finally:
             radar.linkedin_last_deep_scan_at = original_deep_scan
             radar.linkedin_fast_target_cursor = original_cursor
