@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (V6 alert-safety migration committed; CI validation pending)**
+**Last updated: 2026-10-09 (V6 alert-safety migration CI passed; relay empty-feed guard added)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -1600,3 +1600,8 @@ Decision remains: repair relay delivery and validate existing sources before add
 - **Implementation:** v2/config.json now uses config version 6 and sets require_explicit_experience_for_alerts=true. The V6 runtime-config migration forcibly applies this safeguard to persisted configurations from V5 or earlier, rather than leaving the live VM's saved false value in place. A unit test covers this migration.
 - **Operational note:** this changes the live effective preference on next application startup/config reload. It does not delete stored jobs or historical notification records. Existing queued notifications are revalidated against current alertability before delivery.
 - **Acceptance gate:** keep this safeguard until production tests demonstrate reliable capture of explicit experience from the actual source acquisition path. Do not claim the acquisition limitation is solved by parser-only changes.
+
+
+## 36. Naukri relay last-good-feed guard — 2026-10-09
+
+The private relay workflow now fails rather than publishing a zero-job feed. This protects the existing public relay artifact from being replaced by an empty result when Naukri blocks the runner or collection silently fails. Validate the workflow run after relay isolation is completed; this guard is not deployed to the public relay because that repository still needs to be created.
