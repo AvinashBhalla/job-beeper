@@ -46,6 +46,33 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 class MatcherTests(unittest.TestCase):
 
+    def test_linkedin_fast_scan_covers_every_query_and_location_each_cycle(self):
+        config = {
+            "locations": ["Bengaluru, India", "Gurugram, India", "Delhi, India", "Remote, India"],
+            "linkedin_queries": ["software engineer", "automation engineer"],
+        }
+        original_deep_scan = radar.linkedin_last_deep_scan_at
+        calls = []
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            with patch.object(
+                radar,
+                "_linkedin_search_page",
+                side_effect=lambda query, location, start, fast: (
+                    calls.append((query, location, start, fast)) or []
+                ),
+            ):
+                radar.linkedin_collect(config)
+            expected = {
+                (query, location, 0, True)
+                for query in config["linkedin_queries"]
+                for location in config["locations"]
+            }
+            self.assertEqual(set(calls), expected)
+            self.assertEqual(len(calls), len(expected))
+        finally:
+            radar.linkedin_last_deep_scan_at = original_deep_scan
+
     def test_software_development_engineer_variant_matches(self):
         config = {
             **BASE_CONFIG,
