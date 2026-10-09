@@ -1191,7 +1191,7 @@ class MatcherTests(unittest.TestCase):
                 second_starts = sorted(calls)
 
             self.assertEqual(len(first), 1)
-            self.assertEqual(first_starts, [0, 10])
+            self.assertEqual(first_starts, [0, 10, 20, 30, 40])
             fast = next(p for p in params_seen if p["start"] == 0)
             deep = next(p for p in params_seen if p["start"] == 10)
             self.assertEqual(fast["f_TPR"], radar.LINKEDIN_FAST_TPR)
