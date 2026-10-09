@@ -189,10 +189,7 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
         WHERE e.match=1
           AND e.alertable=1
           AND (
-                (
-                    nl.status='queued'
-                    AND j.discovered_at >= ?
-                )
+                nl.status='queued'
                 OR (
                     nl.status='failed'
                     AND nl.next_attempt_at IS NOT NULL
@@ -202,7 +199,6 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
         ORDER BY nl.created_at DESC
         LIMIT 1
     """, (
-        iso(now() - dt.timedelta(minutes=10)),
         timestamp,
     )).fetchone()
 
