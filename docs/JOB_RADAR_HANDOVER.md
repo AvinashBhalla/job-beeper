@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (V6 alert-safety migration CI passed; relay empty-feed guard added)**
+**Last updated: 2026-10-09 (relay bootstrap files staged; V2 CI passed)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -1605,3 +1605,8 @@ Decision remains: repair relay delivery and validate existing sources before add
 ## 36. Naukri relay last-good-feed guard — 2026-10-09
 
 The private relay workflow now fails rather than publishing a zero-job feed. This protects the existing public relay artifact from being replaced by an empty result when Naukri blocks the runner or collection silently fails. Validate the workflow run after relay isolation is completed; this guard is not deployed to the public relay because that repository still needs to be created.
+
+
+## 37. Relay bootstrap staged — 2026-10-09
+
+Prepared the isolated public relay workflow and setup README under `docs/relay-bootstrap/` on `v2-live-radar`. The workflow runs every five minutes on a public runner, checks out only `v2/config.json` from the private app using `PRIVATE_APP_READ_TOKEN`, publishes only the generated Naukri feed to the relay branch, and refuses to replace the last-good feed with an empty result. V2 CI passed after the empty-feed guard commit. **Remaining blocker:** `AvinashBhalla/job-beeper-naukri-relay` does not exist, and the connected GitHub actions do not provide repository creation. Create that repository as public with an initial README, then copy `docs/relay-bootstrap/naukri-relay.yml` to `.github/workflows/naukri-relay.yml`, add the staged README, configure the secret, and manually run/verify the feed before changing production timers. No production deployment or timer change has been made.
