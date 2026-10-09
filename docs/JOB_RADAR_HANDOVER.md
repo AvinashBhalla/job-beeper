@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (private Naukri relay read failure diagnosed; authenticated Contents API fix and regression tests added; LinkedIn freshness and source strategy under acceptance review)
+**Last updated: 2026-10-09 (private Naukri relay authenticated-read fix committed; CI green with 50 tests; relay Actions budget trade-off recorded)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -1543,14 +1543,14 @@ Only a measured win should justify replacing or augmenting the production collec
 
 ### Live evidence
 
-The latest Oracle health response reports V2 healthy, config version 5, LinkedIn enabled, Naukri enabled but failing its relay fetch, and Instahyre disabled. The failing request was the anonymous raw URL; the relay branch artifact exists and contains 150 records. The private-repo 404 is addressed in code with the authenticated GitHub Contents API, but production is not considered fixed until the VM has a read-only token configured and the next source run succeeds.
+The latest Oracle health response reports V2 healthy, config version 5, LinkedIn enabled, Naukri enabled but failing its relay fetch, and Instahyre disabled. The failing request was the anonymous raw URL; the relay branch artifact exists and contains 150 records. The private-repo 404 is addressed in code with the authenticated GitHub Contents API, but production is not considered fixed until the VM has a read-only token configured and the next source run succeeds. Commit `66145ba49696981201500c3184d9ae94c7ee386d` has passed V2 CI with 50 tests; deployment still needs the VM token and rebuild.
 
 The latest `/api/latency-summary?hours=1` observed LinkedIn `p50=2040s` (34 minutes), `p90=3600s` (60 minutes), `max=21600s` (6 hours), and only 7 samples under five minutes out of 43. In code this field is the difference between source-posted time and first discovery when the source posting precision supports it; it is not merely the collector's internal processing duration. Treat it as an estimated posted-to-discovery metric and keep its source timestamp precision in mind.
 
 ### Correct order of work
 
 1. Restore authenticated Naukri relay access without making the repository public. Add a fine-grained token with only this repository's Contents:read permission to the VM's ignored `.env` as `JOB_RADAR_GITHUB_READ_TOKEN`; never put it in git or chat. Rebuild and verify `/api/source-status`, relay update time, and Naukri rows ingested.
-2. Review the latest GitHub Actions relay run duration. The private GitHub Free allowance is 2,000 Actions minutes/month. Triggering a 2-minute workflow every five minutes could consume far above that budget. Do not assume the five-minute relay cadence is free; compare observed runtime, included minutes, and the required freshness SLA before locking its cadence.
+2. Resolve the GitHub Actions budget before accepting the relay schedule. Recent relay runs trigger about every five minutes and take ~1m45s–2m33s. At ~8,640 runs per 30-day month, that is roughly 15,000–22,000 runner-minutes if the cadence continues. GitHub Free includes 2,000 minutes/month for private-repository GitHub-hosted runners. Do not leave the five-minute private-repo cadence running indefinitely without checking usage/billing. Options: (a) keep the whole app private and reduce relay frequency to fit the available minutes, at the cost of freshness; or (b) consider a separate public relay-only repo/workflow using GitHub's free public runners while keeping the main application repo private. That would expose the small relay orchestrator and generated public job feed, not the main application source; keep the actual scraper logic in the private repo and fetch it with a narrowly scoped secret if this option is chosen. Do not create the public relay repo until Avinash approves that disclosure trade-off.
 3. Improve LinkedIn freshness without increasing request volume blindly. There are observed HTTP 429s on deep `start=10` scans. Keep the location rotation, measure the next 1–2 hours, and tune deep-page frequency/rotation only with source-run and latency measurements. Do not use the authenticated MCP browser experiment in production: its login bridge worked, but real tool calls still hung.
 4. Test one alternative source adapter in isolation, not all sources at once. JobSpy is a plausible low-cost benchmark and already powers the Naukri relay, but upstream docs note LinkedIn rate-limit sensitivity and issue reports include incomplete descriptions. Compare actual jobs found, complete-JD rate, freshness, 429s, run duration and cost before enabling Telegram alerts from a new adapter.
 5. Make ATS job feeds the first expansion candidate. Greenhouse, Lever and Ashby publish structured job-board endpoints, and SmartRecruiters has a public postings API. This is a better fit for the tiny Oracle VM than running a browser farm; the trade-off is curated company coverage rather than whole-market discovery.
