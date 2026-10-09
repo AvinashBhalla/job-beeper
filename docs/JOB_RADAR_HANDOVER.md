@@ -1627,3 +1627,40 @@ Prepared the isolated public relay workflow and setup README under `docs/relay-b
 - **Feed validation:** JSON returned successfully with `updated_at=2026-10-09T08:03:27.351028+00:00` and `count=226`; `jobs` is populated. Private config checkout succeeded and the workflow used the configured Naukri query/location keys.
 - **Remaining production cutover:** the public feed is confirmed, but the Oracle VM consumer deployment and old private-repo timer have not been changed or verified from this chat. On the VM, update the working tree to the intended `v2-live-radar` commit, recreate the V2 container, and verify `/api/source-status` shows Naukri healthy/fresh. Only after this check, identify the exact old relay timer with `systemctl list-timers --all --no-pager | grep -i naukri` and disable that timer. Do not disable unrelated timers. Then confirm a subsequent public relay run updates the feed and confirm the app still reads it.
 - **Security note:** public feed data intentionally contains job listings and descriptions. The private application repo remains private; no application source was copied into the public relay repo.
+
+
+
+## 40. LinkedIn discovery CI fixes and throttling lessons — 2026-10-09
+
+### Current branch and commits
+- Active implementation branch for this work: `v2-live-radar`.
+- Fixed stale location-rotation tests in `v2/test_radar.py`: commit `06a6179429d077042578a8dc54975bbde04b7128`. The production code no longer uses `linkedin_fast_location_cursor`; tests must verify every configured query/location is scanned each fast cycle, not expect rotation.
+- Bounded deep-scan request bursts: commit `092a07187b8dca9ad33ad5f1cc7ed4967cffe285`.
+- Updated deep-pagination test: commit `ac22c8845426184bfb84c06d5723edbf94502fe6`.
+- Fixed telemetry after scan batching: commit `4c13835fcd98db3bd21d354d65f1dadb6ad1d000`. CI run [37913344863](https://github.com/AvinashBhalla/job-beeper/actions/runs/37913344863) passed, including Python compilation and the full V2 unit-test suite.
+- Latest throttling mitigation commit: `60b14ba197772e5b0c569d99056458d44fb3e210` — reduce `LINKEDIN_SEARCH_WORKERS` from 3 to 2, reduce `LINKEDIN_DEEP_PAGE_BATCH` from 4 to 1, and stop retrying HTTP 429 inside the same scan. **At the time this handover note was written, its CI run was still in progress; verify CI before deploying.**
+
+### Production observations from Oracle VM logs
+The user supplied live logs from `sudo docker compose -f v2/docker-compose.yml logs --since=10m radar`:
+- Deep scan: `queries=4 locations=4 requests=80 deep=True unique_jobs=217 failed_requests=5 elapsed=61.3s`; it added 47 new jobs.
+- Fast scans: typically `requests=16`, `unique_jobs=83–84`, and `elapsed=2.8–3.2s` when successful.
+- HTTP 429s occurred on several query/location/page combinations. One fast scan took 15.3s with one 429.
+- Naukri log showed `seen=226 new=0`; this alone does not prove the feed is fresh or stale. Inspect the public relay JSON `updated_at` to verify freshness.
+
+### Decisions and lessons — read before changing discovery
+1. **Do not increase LinkedIn concurrency as the default response to slow discovery.** The 429 evidence shows the source is already throttling. More parallel requests can increase failures and reduce successful coverage.
+2. **Protect the fast lane.** It searches the first/newest page for all configured query/location combinations. It is the reliable low-latency path; deep pagination should be bounded and must not delay every fast cycle.
+3. **Keep deep scans small and separate.** The observed deep scan issued 80 requests and took 61.3 seconds, versus 16 requests and around 3 seconds for successful fast scans. The latest mitigation limits deep pagination to one additional page per query/location and uses two workers.
+4. **Do not retry HTTP 429 immediately inside the same scan.** That multiplies traffic while the source is rejecting requests. Let a future scheduled scan retry; continue to honor sensible retry handling for transient 5xx errors. Revisit only with measured evidence and a rate-limit-aware design.
+5. **Do not claim a one-minute scan interval guarantees one-minute discovery.** Search endpoint visibility, request duration, source throttling, and scheduling affect real discovery lag. Measure actual logs and job timestamps.
+6. **Keep scan telemetry aligned with implementation.** When replacing a `targets` list with separate `fast_targets` and `deep_targets`, update request counts and tests in the same commit. A previous CI failure was caused by telemetry referencing the deleted `targets` variable.
+7. **Update tests alongside behavior changes.** Old tests that asserted location rotation failed after rotation was intentionally removed. Update tests to assert full query/location coverage and bounded deep-page starts; do not restore obsolete production state just to satisfy stale tests.
+8. **Historical red GitHub Actions runs remain red.** Judge current health from the latest commit's run, not whether the Actions history page contains old failed runs.
+9. **No deployment should be claimed from a GitHub commit or green CI alone.** The Oracle VM must pull the intended commit and rebuild the Docker container. Confirm deployed commit and live logs separately.
+
+### Next steps
+- Check CI for commit `60b14ba197772e5b0c569d99056458d44fb3e210`. If red, fetch the job logs and fix the exact failing test/code before deployment.
+- After CI passes, on `ubuntu@job-radar` in `~/job-beeper`, pull `v2-live-radar`, rebuild/recreate with `sudo docker compose -f v2/docker-compose.yml up -d --build`, then inspect the next 10 minutes of logs.
+- Compare `elapsed`, `requests`, `failed_requests`, `unique_jobs`, and `new` across fast/deep scans. Confirm the deep scan no longer causes a long request burst and whether 429 frequency decreases.
+- If 429s persist, reduce request frequency or use a compliant, permitted source/API rather than increasing parallelism. Respect LinkedIn's applicable terms and access controls.
+- Stay focused on discovery until this is stable; do not start dashboard or Telegram feature work unless the user explicitly changes priority.
