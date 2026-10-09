@@ -44,10 +44,10 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 3
+LINKEDIN_SEARCH_WORKERS = 2
 LINKEDIN_DETAIL_WORKERS = 4
 LINKEDIN_DEEP_SCAN_SECONDS = 300
-LINKEDIN_DEEP_PAGE_BATCH = 4
+LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
 
@@ -1623,7 +1623,13 @@ def likely_match(job: dict[str, Any]) -> bool:
 def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
     for attempt in range(3):
         response = requests.get(endpoint, params=params, headers=UA, timeout=25)
-        if response.status_code not in {429, 500, 502, 503, 504}:
+        if response.status_code == 429:
+            # Do not retry a rate-limited request inside the same scan. Retrying
+            # multiplies traffic while LinkedIn is already refusing requests;
+            # let the next scheduled scan try again instead.
+            response.raise_for_status()
+            return response
+        if response.status_code not in {500, 502, 503, 504}:
             response.raise_for_status()
             return response
         wait = min(30, 2 ** attempt * 2)
