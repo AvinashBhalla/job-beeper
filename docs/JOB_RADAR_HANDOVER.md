@@ -1674,3 +1674,13 @@ The user supplied live logs from `sudo docker compose -f v2/docker-compose.yml l
 - CI for throttling mitigation commit `60b14ba` failed because `test_linkedin_fast_lane_and_periodic_deep_scan` still expected deep starts `[0, 10, 20, 30, 40]`, but the intended one-extra-page cap produces `[0, 10]`. Fixed assertion in commit `07973594927c7867d4ca4a4e0228556683871ecb`; check the latest CI run before deployment.
 - Important lesson: when changing `LINKEDIN_DEEP_PAGE_BATCH`, update test expectations to reflect the cap. Do not leave a test expecting the previous four-page setting.
 - Continue prioritizing fast scan coverage and measure 429s after deployment. If throttling persists, reduce how often all query/location pairs are hit (e.g. spread them across staggered cycles while keeping the most valuable/newest queries first) rather than increasing concurrency. Avoid evasion techniques; prefer a permitted API/source if LinkedIn continues rejecting automated requests.
+
+
+## 42. Stagger LinkedIn discovery requests to reduce 429s — 2026-10-09
+
+- Implemented commit `f3be91d`: LinkedIn no longer fires all 16 configured query/location first-page requests in every 60-second cycle. It rotates through an 8-target batch per cycle, so the default 16 pairs are covered across roughly two cycles.
+- Deep pagination now applies only to the current small fast batch instead of every query/location pair. With the default 8-target batch and one extra page, a deep cycle targets at most 16 requests rather than 32, before any request retries for transient 5xx errors.
+- Kept two search workers and the no-immediate-retry behavior for HTTP 429. This is a reduction in request pressure, not a guarantee that LinkedIn will stop throttling.
+- Added a unit test in commit `962f09d` to assert that two consecutive fast cycles cover all configured query/location pairs without duplicate first-page targets in that two-cycle window.
+- Next: verify CI for the latest branch commit. If green, deploy on the Oracle VM with `git pull origin v2-live-radar` followed by `sudo docker compose -f v2/docker-compose.yml up -d --build`. Confirm the container's behavior from logs: each fast scan should report 8 requests by default; a deep scan should report 16 total requests; check whether 429s decrease over at least 10 minutes.
+- Caveat: the round-robin cursor is process-local and resets on container restart. This only affects which batch is scanned first after a restart; all pairs should still be covered across two cycles.
