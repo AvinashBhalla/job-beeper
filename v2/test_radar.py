@@ -49,7 +49,7 @@ class MatcherTests(unittest.TestCase):
     def test_linkedin_fast_scan_staggers_all_query_location_pairs(self):
         config = {
             "locations": ["Bengaluru, India", "Gurugram, India", "Delhi, India", "Remote, India"],
-            "linkedin_queries": ["software engineer", "automation engineer"],
+            "linkedin_queries": ["software engineer", "automation engineer", "ai engineer", "react developer"],
         }
         original_deep_scan = radar.linkedin_last_deep_scan_at
         original_cursor = radar.linkedin_fast_target_cursor
