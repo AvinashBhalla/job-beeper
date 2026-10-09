@@ -867,6 +867,31 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(merged["config_version"], 4)
         self.assertFalse(merged["source_enabled"]["instahyre"])
 
+    def test_config_v6_requires_explicit_experience_for_legacy_runtime(self):
+        defaults = {
+            "config_version": 6,
+            "require_explicit_experience_for_alerts": True,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+            },
+        }
+        prior_runtime = {
+            "config_version": 5,
+            "require_explicit_experience_for_alerts": False,
+        }
+
+        merged = _merge_config(defaults, prior_runtime)
+
+        self.assertEqual(merged["config_version"], 6)
+        self.assertTrue(merged["require_explicit_experience_for_alerts"])
+
     def test_config_v5_repairs_persisted_source_queries(self):
         defaults = {
             "config_version": 5,
