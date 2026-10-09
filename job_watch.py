@@ -6,7 +6,7 @@ import json, os, re, pathlib, datetime as dt, requests
 from concurrent.futures import ThreadPoolExecutor
 from job_sources_extra import linkedin_guest, naukri_public, instahyre_public
 from apify_sources import linkedin as apify_linkedin, naukri as apify_naukri, instahyre as apify_instahyre
-from jd_extract import enrich_job
+from jd_extract import enrich_job, UA
 from web_job_discovery import discover as discover_web
 
 ROOT = pathlib.Path(__file__).parent
@@ -15,7 +15,6 @@ SEEN_FILE = ROOT / "seen.json"
 SOURCE_STATE_FILE = ROOT / "source_state.json"
 JD_CACHE_FILE = ROOT / "jd_cache.json"
 DASH_FILE = ROOT / "dashboard" / "data" / "jobs.json"
-UA = {"User-Agent": "Mozilla/5.0 (personal-job-watcher)"}
 NOW = dt.datetime.now(dt.timezone.utc)
 SOURCE_GENERATION = 3
 strip = lambda h: re.sub("<[^>]+>", " ", h or "")
@@ -261,7 +260,7 @@ def passes(j, f):
         return False
     if f["max_age_hours"] and posted and (NOW - posted).total_seconds() > f["max_age_hours"] * 3600:
         return False
-    if any(c.lower() in j["company"].lower() for c in f["company_exclude"]):
+    if any(c.strip().lower() in j["company"].lower() for c in f["company_exclude"] if c.strip()):
         return False
     if f["description_include_any"] and d and not any(text_matches(d, k) for k in f["description_include_any"]):
         return False
@@ -334,29 +333,17 @@ def load_state():
         return True, set(raw), set()
     return True, set(raw["jobs"]), set(raw["sources"])
 
-def load_source_state():
-    if not SOURCE_STATE_FILE.exists():
-        return {}
+def _read_json(path):
+    if not path.exists(): return {}
     try:
-        raw = json.loads(SOURCE_STATE_FILE.read_text())
+        raw = json.loads(path.read_text())
         return raw if isinstance(raw, dict) else {}
-    except Exception:
-        return {}
+    except Exception: return {}
 
-def save_source_state(state):
-    SOURCE_STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True))
-
-def load_jd_cache():
-    if not JD_CACHE_FILE.exists():
-        return {}
-    try:
-        raw = json.loads(JD_CACHE_FILE.read_text())
-        return raw if isinstance(raw, dict) else {}
-    except Exception:
-        return {}
-
-def save_jd_cache(cache):
-    JD_CACHE_FILE.write_text(json.dumps(cache, indent=2, sort_keys=True))
+load_source_state = lambda: _read_json(SOURCE_STATE_FILE)
+save_source_state = lambda s: SOURCE_STATE_FILE.write_text(json.dumps(s, indent=2, sort_keys=True))
+load_jd_cache = lambda: _read_json(JD_CACHE_FILE)
+save_jd_cache = lambda c: JD_CACHE_FILE.write_text(json.dumps(c, indent=2, sort_keys=True))
 
 def source_key(name, arg):
     return f"{name}:{json.dumps(arg, sort_keys=True) if arg else ''}"
@@ -450,28 +437,19 @@ def main():
     if s.get("adzuna", {}).get("enabled"):
         all_tasks.append(("adzuna", adzuna, s["adzuna"]))
 
-    tasks = []
-    board_tasks = []
-    source_status = {}
-    for task in all_tasks:
-        key = source_key(task[0], task[2])
-        if should_poll(source_state, key, force_refresh):
-            tasks.append(task)
-        else:
-            source_status[key] = {
-                "ok": False, "skipped": True, "count": 0, "error": "cooldown",
-                "retry_at": source_state[key].get("skip_until"), "provider": "direct",
-            }
-    for task in all_board_tasks:
-        key = source_key(task[0], task[2])
-        if should_poll(source_state, key, force_refresh):
-            board_tasks.append(task)
-        else:
-            source_status[key] = {
-                "ok": False, "skipped": True, "count": 0, "error": "cooldown",
-                "retry_at": source_state[key].get("skip_until"),
-                "provider": "apify" if use_apify else "direct",
-            }
+    tasks, board_tasks, source_status = [], [], {}
+    def queue_tasks(src_list, target_list, provider):
+        for task in src_list:
+            key = source_key(task[0], task[2])
+            if should_poll(source_state, key, force_refresh):
+                target_list.append(task)
+            else:
+                source_status[key] = {
+                    "ok": False, "skipped": True, "count": 0, "error": "cooldown",
+                    "retry_at": source_state[key].get("skip_until"), "provider": provider,
+                }
+    queue_tasks(all_tasks, tasks, "direct")
+    queue_tasks(all_board_tasks, board_tasks, "apify" if use_apify else "direct")
 
     with ThreadPoolExecutor(max_workers=min(16, max(1, len(tasks) + len(board_tasks)))) as pool:
         # Overlap broad web discovery with direct source polling so DDGS latency
@@ -594,11 +572,10 @@ def main():
             notify(j, score, reasons)
             alerts.append(j["id"])
 
-    dashboard_jobs.sort(key=lambda x: (x["score"] or 0, x["posted"] or ""), reverse=True)
     unique = {}
     for item in dashboard_jobs:
         unique[item["id"]] = item
-    dashboard_jobs = sorted(unique.values(), key=lambda x: (x["posted"] or ""), reverse=True)
+    dashboard_jobs = sorted(unique.values(), key=lambda x: (x.get("score") or 0, x.get("posted") or ""), reverse=True)
     write_dashboard(dashboard_jobs, source_status, len(alerts))
     save_source_state(source_state)
     save_jd_cache(jd_cache)

@@ -25,11 +25,7 @@ def _text(value):
     return str(value).strip()
 
 def _first(item, *keys):
-    for key in keys:
-        value = item.get(key)
-        if value not in (None, "", [], {}):
-            return value
-    return None
+    return next((item[k] for k in keys if item.get(k) not in (None, "", [], {})), None)
 
 def _parse_posted(value):
     if value in (None, ""):

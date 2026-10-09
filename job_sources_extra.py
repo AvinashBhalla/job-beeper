@@ -11,17 +11,9 @@ import time
 import datetime as dt
 import requests
 from bs4 import BeautifulSoup
-
-try:
-    from jobspy import scrape_jobs
-except ImportError:
-    scrape_jobs = None
-
-UA = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36",
-    "Accept-Language": "en-IN,en;q=0.9",
-    "Referer": "https://www.instahyre.com/",
-}
+try: from jobspy import scrape_jobs
+except ImportError: scrape_jobs = None
+from jd_extract import UA
 
 def _text(node):
     return " ".join(node.stripped_strings) if node else ""
@@ -150,31 +142,22 @@ def naukri_public(keyword):
         )
 
 def _instahyre_items(payload):
-    if isinstance(payload, list):
-        return payload
-    if not isinstance(payload, dict):
-        return []
+    if isinstance(payload, list): return payload
+    if not isinstance(payload, dict): return []
     for key in ("jobs", "jobDetails", "results", "data", "job_details"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return value
-        if isinstance(value, dict):
-            for nested in ("jobs", "results", "data"):
-                if isinstance(value.get(nested), list):
-                    return value[nested]
+        val = payload.get(key)
+        if isinstance(val, list): return val
+        if isinstance(val, dict):
+            for n in ("jobs", "results", "data"):
+                if isinstance(val.get(n), list): return val[n]
     return []
 
 def _instahyre_location(item):
-    value = item.get("locations") or item.get("location") or item.get("locationsRaw")
-    if isinstance(value, list):
-        return ", ".join(str(x.get("name") if isinstance(x, dict) else x) for x in value)
-    return str(value or "")
+    val = item.get("locations") or item.get("location") or item.get("locationsRaw")
+    return ", ".join(str(x.get("name") if isinstance(x, dict) else x) for x in val) if isinstance(val, list) else str(val or "")
 
 def _instahyre_url(item, job_id):
-    value = item.get("url") or item.get("publicUrl") or item.get("jobUrl")
-    if value:
-        return str(value)
-    return f"https://www.instahyre.com/job-{job_id}-"
+    return str(item.get("url") or item.get("publicUrl") or item.get("jobUrl") or f"https://www.instahyre.com/job-{job_id}-")
 
 def instahyre_public(_keyword=None):
     """Fetch the public JSON feed once; keyword matching happens downstream.

@@ -17,7 +17,10 @@ from urllib.parse import urlparse
 try:
     from ddgs import DDGS
 except ImportError:
-    DDGS = None
+    try:
+        from duckduckgo_search import DDGS
+    except ImportError:
+        DDGS = None
 
 PLATFORMS = {
     "Ashby": ["jobs.ashbyhq.com"],
@@ -76,7 +79,7 @@ def _posted(value):
     text=(value or '').lower()
     if 'today' in text or 'just now' in text:
         return dt.datetime.now(dt.timezone.utc)
-    m=re.search(r'(\\d+)\\s*(minute|min|hour|hr|day|week)s?\\s*ago', text)
+    m=re.search(r'(\d+)\s*(minute|min|hour|hr|day|week)s?\s*ago', text)
     if not m:
         return None
     n=int(m.group(1)); unit=m.group(2)
@@ -137,7 +140,7 @@ def discover(filters, max_results=8):
     timelimit="d" if age <= 24 else "w"
     tasks=[(p,d,filters,max_results,timelimit) for p,d in PLATFORMS.items()]
     results=[]
-    workers=min(8,len(tasks))
+    workers=min(3, len(tasks))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for platform,jobs,error in pool.map(discover_platform,tasks):
             results.append((platform,jobs,error))
