@@ -1618,3 +1618,12 @@ Prepared the isolated public relay workflow and setup README under `docs/relay-b
 - Added `.github/workflows/naukri-relay.yml`: five-minute schedule and manual dispatch; sparse-checks out only `v2/config.json` from private branch `v2-live-radar`; collects configured Naukri queries across configured locations; fails on empty results; publishes only `dashboard/data/naukri_relay.json` to branch `naukri-relay` without force-pushing.
 - Added README with setup and validation instructions. GitHub API currently reports zero workflow runs, so the feed has not yet been generated/validated.
 - **Still required:** add repository Actions secret `PRIVATE_APP_READ_TOKEN` with read-only access to the private app, run workflow manually, validate raw JSON and freshness, deploy/recreate the V2 app on the Oracle VM and verify `/api/source-status`, then disable the old private-repo relay timer only after the new path is confirmed working. The Oracle VM and its timer have not been changed from this chat.
+
+
+## 39. Public Naukri relay first-run verified — 2026-10-09
+
+- **Successful manual run:** [public-naukri-relay run 37902413775](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37902413775), completed successfully on 2026-10-09 at 08:03 UTC. All collection and publish steps succeeded.
+- **Published feed:** https://raw.githubusercontent.com/AvinashBhalla/job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json
+- **Feed validation:** JSON returned successfully with `updated_at=2026-10-09T08:03:27.351028+00:00` and `count=226`; `jobs` is populated. Private config checkout succeeded and the workflow used the configured Naukri query/location keys.
+- **Remaining production cutover:** the public feed is confirmed, but the Oracle VM consumer deployment and old private-repo timer have not been changed or verified from this chat. On the VM, update the working tree to the intended `v2-live-radar` commit, recreate the V2 container, and verify `/api/source-status` shows Naukri healthy/fresh. Only after this check, identify the exact old relay timer with `systemctl list-timers --all --no-pager | grep -i naukri` and disable that timer. Do not disable unrelated timers. Then confirm a subsequent public relay run updates the feed and confirm the app still reads it.
+- **Security note:** public feed data intentionally contains job listings and descriptions. The private application repo remains private; no application source was copied into the public relay repo.
