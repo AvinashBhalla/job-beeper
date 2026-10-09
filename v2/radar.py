@@ -1184,9 +1184,27 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
     value = normalize_phrase(location)
     if not value:
         return False
-    if config.get("remote_only") and not phrase_hits(["remote"], value):
+    is_remote = bool(phrase_hits(["remote"], value))
+    if config.get("remote_only") and not is_remote:
         return False
-    terms = location_terms(config)
+
+    # A configured region such as "Remote, India" is not a wildcard for
+    # every remote job worldwide. Match its qualifier as well as "remote".
+    # A plain "Remote" entry intentionally remains a global remote filter.
+    configured_locations = config.get("locations", [])
+    for raw in configured_locations:
+        parts = str(raw).split(",", 1)
+        primary = normalize_phrase(parts[0])
+        if primary != "remote" or not is_remote:
+            continue
+        qualifier = normalize_phrase(parts[1]) if len(parts) > 1 else ""
+        if not qualifier or phrase_hits([qualifier], value):
+            return True
+
+    terms = [
+        term for term in location_terms(config)
+        if term != "remote"
+    ]
     return any(phrase_hits([term], value) for term in terms)
 
 
