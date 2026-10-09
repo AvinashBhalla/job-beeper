@@ -1684,3 +1684,8 @@ The user supplied live logs from `sudo docker compose -f v2/docker-compose.yml l
 - Added a unit test in commit `962f09d` to assert that two consecutive fast cycles cover all configured query/location pairs without duplicate first-page targets in that two-cycle window.
 - Next: verify CI for the latest branch commit. If green, deploy on the Oracle VM with `git pull origin v2-live-radar` followed by `sudo docker compose -f v2/docker-compose.yml up -d --build`. Confirm the container's behavior from logs: each fast scan should report 8 requests by default; a deep scan should report 16 total requests; check whether 429s decrease over at least 10 minutes.
 - Caveat: the round-robin cursor is process-local and resets on container restart. This only affects which batch is scanned first after a restart; all pairs should still be covered across two cycles.
+
+
+### CI follow-up for section 42
+- The first staggered-scan test failed because its fixture contained only 8 query/location pairs, equal to the configured batch size, so two cycles correctly repeated the same full set. The test fixture now uses 4 queries × 4 locations (16 pairs) to model the default setup and verify two disjoint 8-pair cycles. Fix commit: `fb9945d0ef30b85907945912bfaa9432729bf3ce`.
+- Do not deploy until the latest CI run for this fix completes successfully.
