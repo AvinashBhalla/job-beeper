@@ -1877,3 +1877,13 @@ Important current-state corrections to older historical sections above:
 - Five topic branches for merged PRs #5–#9 are stale and safe to prune. The private repo's `naukri-relay` branch is a legacy one-file snapshot still referenced by the older `main` code and its manual `naukri-relay.yml` workflow. Keep it until that legacy path is retired or redirected; the active V2 relay remains the separate `AvinashBhalla/job-beeper-naukri-relay` repository.
 
 Use the knowledge-transfer document for the next work session; this file remains the detailed chronological record.
+
+
+## 50. Remote topic branch cleanup verified — 2026-10-09
+
+- The user fast-forwarded the VM working tree from `c2f2ce6` to `0327c74` (`Keep legacy Naukri snapshot until main is retired`). The commit contained documentation changes, so the running container did not need a rebuild for that documentation-only sync.
+- The user then successfully deleted seven remote branches: the five merged topic branches for PRs #5–#9 plus `docs/current-job-radar-knowledge-transfer` and `docs/keep-legacy-relay-branch-safe`.
+- After `git fetch --prune`, the confirmed remote refs were `origin/HEAD -> origin/main`, `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar`.
+- `main` and `naukri-relay` were intentionally retained. The old `main` collector reads the private orphan feed branch, and its manual workflow can republish it; removing it before a planned migration would break the legacy path.
+- Current release branch HEAD is `0327c746`; latest application-code merge is `c2f2ce65`. The VM's latest supplied health response was HTTP 200, LinkedIn and Naukri scans succeeded, and Greenhouse remains disabled.
+- Next release work is not branch cleanup: fix the dashboard/ingestion semantics for old Greenhouse board imports before enabling the source.
