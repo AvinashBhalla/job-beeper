@@ -46,15 +46,17 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 class MatcherTests(unittest.TestCase):
 
-    def test_linkedin_fast_scan_covers_every_query_and_location_each_cycle(self):
+    def test_linkedin_fast_scan_staggers_all_query_location_pairs(self):
         config = {
             "locations": ["Bengaluru, India", "Gurugram, India", "Delhi, India", "Remote, India"],
             "linkedin_queries": ["software engineer", "automation engineer"],
         }
         original_deep_scan = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_target_cursor
         calls = []
         try:
             radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
             with patch.object(
                 radar,
                 "_linkedin_search_page",
@@ -63,15 +65,21 @@ class MatcherTests(unittest.TestCase):
                 ),
             ):
                 radar.linkedin_collect(config)
+                first_cycle = list(calls)
+                calls.clear()
+                radar.linkedin_collect(config)
             expected = {
                 (query, location, 0, True)
                 for query in config["linkedin_queries"]
                 for location in config["locations"]
             }
-            self.assertEqual(set(calls), expected)
-            self.assertEqual(len(calls), len(expected))
+            self.assertEqual(len(first_cycle), radar.LINKEDIN_FAST_TARGETS_PER_SCAN)
+            self.assertLessEqual(len(first_cycle), len(expected))
+            self.assertEqual(set(first_cycle) | set(calls), expected)
+            self.assertTrue(set(first_cycle).isdisjoint(set(calls)))
         finally:
             radar.linkedin_last_deep_scan_at = original_deep_scan
+            radar.linkedin_fast_target_cursor = original_cursor
 
     def test_software_development_engineer_variant_matches(self):
         config = {
