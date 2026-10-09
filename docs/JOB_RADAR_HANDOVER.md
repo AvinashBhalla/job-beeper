@@ -1837,3 +1837,16 @@ This section and the current-state reconciliation above supersede earlier histor
 - Runtime config is persisted separately at `/data/config.json` in the Docker named volume. Updating `v2/config.json` alone does not replace the persisted board list on an existing VM; update the runtime config via the protected API or preferences UI as a separate step.
 - Greenhouse remains disabled until the runtime registry is cleaned and the operator explicitly enables it. After activation, inspect source status and logs for one full 15-minute poll cycle and confirm jobs are inserted and evaluated. Do not assume freshness latency for these jobs: the adapter intentionally leaves posting time unknown.
 - Clarifai may be re-added only after its current public listing endpoint and board token are verified from the VM. Do not replace it with guessed API URLs. Consider a separate Workday adapter for Veradigm later; do not mix Workday URLs into the Greenhouse collector.
+
+
+## 47. Greenhouse dry run exposed and fixed remote-country matching — 2026-10-09
+
+### Live preview result
+- On the Oracle VM, the actual Greenhouse collector fetched 298 jobs from the three validated boards (Coinbase 220, Graviton Research Capital 21, Zocdoc 57), with no failed boards.
+- The current matcher returned five profile matches. Four were Coinbase jobs labelled `Remote - USA` and passed the alert policy; one Graviton Research Capital role was in Gurugram and not alertable under the explicit-experience safeguard.
+- The saved location config is Bengaluru, Gurugram, Delhi, and `Remote, India`. These US-remote results exposed a location-filter bug: the matcher split `Remote, India` at the comma and treated `remote` as a global wildcard. The dry-run script itself performed no database writes or Telegram sends; Greenhouse stayed disabled.
+
+### Corrective change
+- Fix `location_allowed` so a configured `Remote, India` location requires both a remote location and the configured country qualifier, while a deliberately plain `Remote` entry retains global-remote behavior.
+- Add tests for India remote acceptance, US/Cyprus remote rejection, and the explicit unqualified-Remote case.
+- The matching fix is being proposed separately in PR; do not deploy or enable Greenhouse until CI passes and the VM receives that fix.
