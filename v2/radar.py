@@ -44,7 +44,7 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 2
+LINKEDIN_SEARCH_WORKERS = 4
 LINKEDIN_DETAIL_WORKERS = 4
 LINKEDIN_DEEP_SCAN_SECONDS = 300
 LINKEDIN_FAST_TPR = "r21600"
@@ -1701,7 +1701,8 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    global linkedin_last_deep_scan_at, linkedin_fast_location_cursor
+    global linkedin_last_deep_scan_at
+    scan_started = time.monotonic()
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1710,28 +1711,19 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         or (now() - last_deep_at).total_seconds() >= LINKEDIN_DEEP_SCAN_SECONDS
     )
 
-    configured_locations = list(config.get("locations", []))
-    if do_deep or len(configured_locations) <= 2:
-        scan_locations = configured_locations
-    else:
-        # Keep the fast lane bounded: cover two locations per minute and
-        # rotate so every configured location is visited within two cycles.
-        start_index = linkedin_fast_location_cursor % len(configured_locations)
-        scan_locations = [
-            configured_locations[(start_index + offset) % len(configured_locations)]
-            for offset in range(min(2, len(configured_locations)))
-        ]
-        linkedin_fast_location_cursor = (
-            start_index + len(scan_locations)
-        ) % len(configured_locations)
-
+    # Every fast cycle covers every configured location and query. Rotating
+    # only a subset of locations creates a predictable blind spot for newly
+    # posted jobs in locations not selected during that cycle.
+    scan_locations = list(config.get("locations", []))
+    scan_queries = list(config.get("linkedin_queries", []))
     scan_starts = (0, 10) if do_deep else (0,)
     targets = [
         (query, location, start, start != 10)
-        for query in config.get("linkedin_queries", [])
+        for query in scan_queries
         for location in scan_locations
         for start in scan_starts
     ]
+    failed_pages = 0
 
     with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
         futures = [
@@ -1742,6 +1734,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             try:
                 jobs.extend(future.result())
             except Exception as exc:
+                failed_pages += 1
                 log.warning("linkedin page request failed: %r", exc)
 
     if do_deep:
@@ -1751,9 +1744,20 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         job["source_job_id"]: job for job in jobs
     }
     jobs = list(unique_jobs.values())
+    log.info(
+        "linkedin discovery scan: queries=%s locations=%s requests=%s "
+        "deep=%s unique_jobs=%s failed_requests=%s elapsed=%.1fs",
+        len(scan_queries),
+        len(scan_locations),
+        len(targets),
+        do_deep,
+        len(jobs),
+        failed_pages,
+        time.monotonic() - scan_started,
+    )
 
-    # Only enrich jobs that can plausibly alert. This keeps the fast lane
-    # focused on new/relevant postings instead of serially fetching every JD.
+    # Keep enrichment bounded so it cannot consume the search worker pool.
+    # Discovery results are returned even when a detail request fails.
     candidates = []
     for job in jobs:
         combined = f"{job.get('title', '')} {job.get('description', '')}"
