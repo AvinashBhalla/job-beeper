@@ -1847,9 +1847,9 @@ This section and the current-state reconciliation above supersede earlier histor
 - The saved location config is Bengaluru, Gurugram, Delhi, and `Remote, India`. These US-remote results exposed a location-filter bug: the matcher split `Remote, India` at the comma and treated `remote` as a global wildcard. The dry-run script itself performed no database writes or Telegram sends; Greenhouse stayed disabled.
 
 ### Corrective change
-- Fix `location_allowed` so a configured `Remote, India` location requires both a remote location and the configured country qualifier, while a deliberately plain `Remote` entry retains global-remote behavior.
-- Add tests for India remote acceptance, US/Cyprus remote rejection, and the explicit unqualified-Remote case.
-- The matching fix is being proposed separately in PR; do not deploy or enable Greenhouse until CI passes and the VM receives that fix.
+- Implemented and merged as [PR #8](https://github.com/AvinashBhalla/job-beeper/pull/8), commit `2074bdab`. The matcher now requires the configured country qualifier for `Remote, India`, while deliberately plain `Remote` remains global.
+- Tests cover India remote acceptance, US/Cyprus remote rejection, and unqualified global remote behavior. CI passed and the fix is deployed to the Oracle VM.
+- The subsequent live preview rejected 190 remote postings outside configured location targets. Greenhouse remains disabled pending the separate ingestion/dashboard freshness safety gate.
 
 ## 48. Greenhouse first-published timestamp support — 2026-10-09
 
@@ -1862,4 +1862,18 @@ This section and the current-state reconciliation above supersede earlier histor
 - Collector parses `first_published` when present and stores it as `source_posted_at`; timestamps with hour/minute use `posted_precision=minute`, while date-only values use `date`. Missing or invalid values remain `unknown`.
 - Never fall back to `updated_at`: later edits must not make an old posting look newly posted.
 - Regression tests cover valid first-publication timestamps and a fallback guard (missing `first_published` plus present `updated_at` remains unknown).
-- Greenhouse remains disabled. After CI and deployment, repeat the dry run and inspect source-posted timestamps. Keep the explicit-experience alert policy unchanged until source descriptions demonstrate that requirements are captured accurately.
+- PR #9 is merged and the first-published timestamp implementation is deployed to the Oracle VM; post-merge CI passed. The latest dry run reported 298 jobs, 297 with minute-precision timestamps and 1 unknown; 10 were posted within 72 hours, 287 were older, and none had future timestamps. The only profile match was the September 1 Gurugram graduate role, which is stale and not alertable. Greenhouse remains disabled pending the ingestion/dashboard freshness fix; keep the explicit-experience policy unchanged.
+
+
+## 49. Current employee knowledge transfer — 2026-10-09
+
+The maintained, current operating summary is [`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`](JOB_RADAR_KNOWLEDGE_TRANSFER.md). It records deployment evidence, source status, architecture, merged PRs, repository/branch purposes, cleanup notes, blockers, next tasks and the release checklist.
+
+Important current-state corrections to older historical sections above:
+- Active release branch is `v2-live-radar`; latest code merge at this snapshot is `c2f2ce65`. Post-merge CI passed, and the VM health/dry-run output reflects the updated timestamp parser.
+- Remote-country matching and Greenhouse first-published timestamp parsing are implemented, merged and deployed.
+- Greenhouse remains disabled. The current blocker is ingestion/dashboard freshness semantics: the collector returns all public listings while the dashboard's existing "today" lifecycle is discovery-based, so old board listings may look newly discovered. Resolve this before activation.
+- `main` is still the GitHub default but is 59 commits behind the active V2 branch. Keep it until there is an explicit promotion/default-branch decision.
+- Five topic branches for merged PRs #5–#9 are stale and safe to prune. The private repo's `naukri-relay` branch is a legacy one-file snapshot; the active relay is the separate `AvinashBhalla/job-beeper-naukri-relay` repository.
+
+Use the knowledge-transfer document for the next work session; this file remains the detailed chronological record.
