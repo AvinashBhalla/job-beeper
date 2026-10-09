@@ -786,6 +786,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     now_value = now()
     max_age = int(config.get("max_age_hours", 72))
+    rediscovery_cutoff = iso(now_value - dt.timedelta(minutes=10))
     changed = 0
 
     with db_lock, sqlite3.connect(DB_PATH) as conn:
@@ -796,9 +797,19 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
             SELECT canonical_opportunity_id, status
             FROM notification_ledger
             WHERE status IN ('pending', 'queued')
-               OR status='suppressed'
+               OR (
+                    status='suppressed'
+                    AND EXISTS (
+                        SELECT 1
+                        FROM jobs j
+                        WHERE j.canonical_opportunity_id =
+                              notification_ledger.canonical_opportunity_id
+                          AND j.discovered_at >= ?
+                    )
+               )
             ORDER BY created_at ASC
-            """
+            """,
+            (rediscovery_cutoff,),
         ).fetchall()
 
         for row in candidates:
