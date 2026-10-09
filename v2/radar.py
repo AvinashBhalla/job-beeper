@@ -1763,37 +1763,24 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
 
     return jobs
 
-NAUKRI_RELAY_API_URL = (
-    "https://api.github.com/repos/AvinashBhalla/job-beeper/"
-    "contents/dashboard/data/naukri_relay.json"
+# The public relay repository contains only the Naukri feed and its small
+# scheduled collector workflow. The main application repository stays private.
+NAUKRI_RELAY_URL = (
+    "https://raw.githubusercontent.com/AvinashBhalla/"
+    "job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json"
 )
-NAUKRI_RELAY_REF = "naukri-relay"
 
 
 def naukri_collect() -> list[dict[str, Any]]:
-    # The repository is private. Unauthenticated raw.githubusercontent.com
-    # requests return 404 even when the relay file exists. Use the authenticated
-    # GitHub Contents API with a fine-grained Contents:read token instead.
-    github_token = os.getenv("JOB_RADAR_GITHUB_READ_TOKEN", "").strip()
-    if not github_token:
-        raise RuntimeError(
-            "Naukri relay requires JOB_RADAR_GITHUB_READ_TOKEN "
-            "(fine-grained token with Contents:read on AvinashBhalla/job-beeper)"
-        )
-
-    relay_headers = {
-        **UA,
-        "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github.raw+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
+    # The separate public relay exposes only a generated feed, not the private
+    # application source. No GitHub token is required to read public JSON.
+    relay_headers = {**UA, "Accept": "application/json"}
     response: requests.Response | None = None
     retryable_statuses = {429, 500, 502, 503, 504}
     for attempt in range(4):
         try:
             candidate = requests.get(
-                NAUKRI_RELAY_API_URL,
-                params={"ref": NAUKRI_RELAY_REF},
+                NAUKRI_RELAY_URL,
                 headers=relay_headers,
                 timeout=20,
             )
@@ -1808,8 +1795,8 @@ def naukri_collect() -> list[dict[str, Any]]:
                 )
                 time.sleep(wait)
                 continue
-            # Authentication, permission and path errors (401/403/404) are
-            # configuration faults, not transient network failures. Fail fast.
+            # A missing feed or wrong public URL is a setup fault, not a
+            # transient server error. Fail quickly without retrying a 404.
             candidate.raise_for_status()
             response = candidate
             break
@@ -1872,7 +1859,6 @@ def naukri_collect() -> list[dict[str, Any]]:
         jobs.append(job)
 
     return jobs
-
 
 def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
