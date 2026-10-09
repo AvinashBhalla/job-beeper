@@ -44,9 +44,10 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 4
+LINKEDIN_SEARCH_WORKERS = 3
 LINKEDIN_DETAIL_WORKERS = 4
 LINKEDIN_DEEP_SCAN_SECONDS = 300
+LINKEDIN_DEEP_PAGE_BATCH = 4
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
 
@@ -1715,28 +1716,40 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     # posted jobs in locations not selected during that cycle.
     scan_locations = list(config.get("locations", []))
     scan_queries = list(config.get("linkedin_queries", []))
-    scan_starts = (0, 10) if do_deep else (0,)
-    targets = [
-        (query, location, start, start != 10)
+    # Every fast cycle searches the first (newest) page for every query/location.
+    # Deep pagination is deliberately a separate bounded batch so it cannot flood
+    # LinkedIn with a 2x request burst every few minutes.
+    fast_targets = [
+        (query, location, 0, True)
         for query in scan_queries
         for location in scan_locations
-        for start in scan_starts
     ]
     failed_pages = 0
 
-    with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
-        futures = [
-            executor.submit(_linkedin_search_page, query, location, start, fast)
-            for query, location, start, fast in targets
-        ]
-        for future in as_completed(futures):
-            try:
-                jobs.extend(future.result())
-            except Exception as exc:
-                failed_pages += 1
-                log.warning("linkedin page request failed: %r", exc)
+    def run_batch(targets: list[tuple[str, str, int, bool]]) -> None:
+        nonlocal failed_pages
+        with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
+            futures = [
+                executor.submit(_linkedin_search_page, query, location, start, fast)
+                for query, location, start, fast in targets
+            ]
+            for future in as_completed(futures):
+                try:
+                    jobs.extend(future.result())
+                except Exception as exc:
+                    failed_pages += 1
+                    log.warning("linkedin page request failed: %r", exc)
+
+    run_batch(fast_targets)
 
     if do_deep:
+        deep_targets = [
+            (query, location, start, False)
+            for query in scan_queries
+            for location in scan_locations
+            for start in range(10, 10 + LINKEDIN_DEEP_PAGE_BATCH * 10, 10)
+        ]
+        run_batch(deep_targets)
         linkedin_last_deep_scan_at = iso(now())
 
     unique_jobs: dict[str, dict[str, Any]] = {
