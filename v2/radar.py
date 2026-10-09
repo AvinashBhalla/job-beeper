@@ -46,6 +46,7 @@ UA = {
 
 LINKEDIN_SEARCH_WORKERS = 2
 LINKEDIN_DETAIL_WORKERS = 4
+LINKEDIN_FAST_TARGETS_PER_SCAN = 8
 LINKEDIN_DEEP_SCAN_SECONDS = 300
 LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
@@ -70,6 +71,7 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
+linkedin_fast_target_cursor = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -1707,7 +1709,7 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    global linkedin_last_deep_scan_at
+    global linkedin_last_deep_scan_at, linkedin_fast_target_cursor
     scan_started = time.monotonic()
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
@@ -1717,19 +1719,30 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         or (now() - last_deep_at).total_seconds() >= LINKEDIN_DEEP_SCAN_SECONDS
     )
 
-    # Every fast cycle covers every configured location and query. Rotating
-    # only a subset of locations creates a predictable blind spot for newly
-    # posted jobs in locations not selected during that cycle.
+    # Spread first-page searches over consecutive cycles. Sending every
+    # query/location pair each minute caused sustained HTTP 429s. With the
+    # default 16 pairs and an 8-target batch, every pair is revisited within
+    # roughly two fast cycles while each cycle emits half as many requests.
     scan_locations = list(config.get("locations", []))
     scan_queries = list(config.get("linkedin_queries", []))
-    # Every fast cycle searches the first (newest) page for every query/location.
-    # Deep pagination is deliberately a separate bounded batch so it cannot flood
-    # LinkedIn with a 2x request burst every few minutes.
-    fast_targets = [
+    all_fast_targets = [
         (query, location, 0, True)
         for query in scan_queries
         for location in scan_locations
     ]
+    if all_fast_targets:
+        batch_size = min(LINKEDIN_FAST_TARGETS_PER_SCAN, len(all_fast_targets))
+        start_index = linkedin_fast_target_cursor % len(all_fast_targets)
+        end_index = start_index + batch_size
+        if end_index <= len(all_fast_targets):
+            fast_targets = all_fast_targets[start_index:end_index]
+        else:
+            fast_targets = all_fast_targets[start_index:] + all_fast_targets[:end_index % len(all_fast_targets)]
+        linkedin_fast_target_cursor = end_index % len(all_fast_targets)
+    else:
+        fast_targets = []
+    # Deep pagination is limited to the same small batch of pairs as the fast
+    # lane, rather than creating a full-size burst on top of it.
     failed_pages = 0
 
     def run_batch(targets: list[tuple[str, str, int, bool]]) -> None:
@@ -1752,8 +1765,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     if do_deep:
         deep_targets = [
             (query, location, start, False)
-            for query in scan_queries
-            for location in scan_locations
+            for query, location, _, _ in fast_targets
             for start in range(10, 10 + LINKEDIN_DEEP_PAGE_BATCH * 10, 10)
         ]
         run_batch(deep_targets)
