@@ -786,10 +786,6 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     now_value = now()
     max_age = int(config.get("max_age_hours", 72))
-    alert_window_minutes = 10
-    alert_cutoff = iso(
-        now_value - dt.timedelta(minutes=alert_window_minutes)
-    )
     changed = 0
 
     with db_lock, sqlite3.connect(DB_PATH) as conn:
@@ -800,19 +796,9 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
             SELECT canonical_opportunity_id, status
             FROM notification_ledger
             WHERE status IN ('pending', 'queued')
-               OR (
-                    status='suppressed'
-                    AND EXISTS (
-                        SELECT 1
-                        FROM jobs j
-                        WHERE j.canonical_opportunity_id =
-                              notification_ledger.canonical_opportunity_id
-                          AND j.discovered_at >= ?
-                    )
-               )
+               OR status='suppressed'
             ORDER BY created_at ASC
-            """,
-            (alert_cutoff,),
+            """
         ).fetchall()
 
         for row in candidates:
@@ -868,20 +854,14 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
 
                 fresh_matches.append(item)
 
-                discovery_timestamp = parse_relative(
-                    item.get("discovered_at")
-                )
-                is_recently_discovered = (
-                    discovery_timestamp is not None
-                    and discovery_timestamp >=
-                    now_value - dt.timedelta(minutes=alert_window_minutes)
-                )
+                # Discovery is the alert trigger. Do not expire a valid
+                # opportunity just because evaluation or queue processing took
+                # longer than expected. max_age above remains the historical
+                # relevance guard.
+                recent_matches.append(item)
 
-                if is_recently_discovered:
-                    recent_matches.append(item)
-
-                    if item["alertable"]:
-                        fresh_alertable.append(item)
+                if item["alertable"]:
+                    fresh_alertable.append(item)
 
             timestamp = iso(now_value)
 
@@ -894,7 +874,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                     reasons = [
                         "revalidated queued opportunity",
                         "passes current match and alert policy",
-                        f"detected within the last {alert_window_minutes} minutes",
+                        "eligible opportunity queued for prompt delivery",
                     ]
 
                     conn.execute(
@@ -972,7 +952,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                         else "new source observation for previously suppressed opportunity"
                     ),
                     "passes match and alert policy",
-                    f"detected within the last {alert_window_minutes} minutes",
+                    "eligible opportunity queued for prompt delivery",
                     f"within {max_age} hour age window",
                 ]
 
@@ -1934,6 +1914,19 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         new_jobs = upsert_jobs(jobs, config)
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
+
+        # Deliver immediately after a discovery cycle queues eligible jobs.
+        # The background worker remains as a fallback/retry path.
+        try:
+            from v2.telegram import credentials_available, deliver_queued_notifications
+
+            if credentials_available():
+                delivered = deliver_queued_notifications(50)
+                if delivered:
+                    log.info("telegram: delivered=%s source=%s", delivered, source)
+        except Exception:
+            log.exception("telegram immediate delivery failed source=%s", source)
+
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
         source_state[source] = {
