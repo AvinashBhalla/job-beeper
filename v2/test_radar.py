@@ -1009,6 +1009,15 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(kwargs["timeout"], 20)
 
 
+    def test_parse_relative_accepts_utc_z_suffix_without_lowercasing_iso_text(self):
+        for value in (
+            "2026-10-08T10:00:00Z",
+            "2026-10-08T10:00:00z",
+        ):
+            with self.subTest(value=value):
+                parsed = radar.parse_relative(value)
+                self.assertEqual(radar.iso(parsed), "2026-10-08T10:00:00+00:00")
+
     def test_greenhouse_collector_uses_first_published_and_does_not_use_updated_at(self):
         class Response:
             status_code = 200
