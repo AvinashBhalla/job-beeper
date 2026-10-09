@@ -37,8 +37,9 @@ Feed URL:
 https://raw.githubusercontent.com/AvinashBhalla/job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json
 
 Latest feed inspection shared by user:
-- `updated_at=2026-10-09T10:22:22.590629+00:00`
-- `jobs=348`
+- `updated_at=2026-10-09T10:31:15.131604+00:00`
+- `jobs=350`
+- This feed state was observed after relay run `37917912264` completed successfully (created `2026-10-09T10:29:27Z`, event `workflow_dispatch`). This confirms that the VM-triggered run completed and published a newer feed.
 
 Earlier inspection:
 - `updated_at=2026-10-09T08:03:27.351028+00:00`
@@ -79,9 +80,11 @@ Observed log:
 2026-10-09T10:29:28+00:00 OK: relay workflow trigger accepted
 ```
 
-GitHub showed a corresponding `workflow_dispatch` run in progress. This confirms that the VM fallback successfully submitted a trigger. It does **not** yet prove the run completed or that this specific run published a new feed.
+**Updated verification from user output:** run `37917912264`, created `2026-10-09T10:29:27Z`, completed with `conclusion=success`. The published feed advanced from `updated_at=2026-10-09T10:22:22.590629+00:00` / 348 jobs to `updated_at=2026-10-09T10:31:15.131604+00:00` / 350 jobs. This is end-to-end evidence that the VM fallback-triggered workflow ran and published a refreshed feed.
 
-Important: the latest status query still showed run #3 (created at 10:29:27 UTC) as `in_progress`, while the feed timestamp remained 10:22:22 UTC and count 348. The run ID #3 is the third relay run; query its exact ID from CLI rather than guessing. A previous command output showed scientific notation for IDs when using Go templates; prefer:
+A later run `37918494970`, created `2026-10-09T10:35:04Z`, was `in_progress` at the latest check. Monitor its conclusion and the next feed update. The fallback is working for at least one successful cycle, but multiple consecutive cycles and ingestion by the main app still need validation.
+
+For exact numeric run IDs, prefer:
 ```bash
 gh run list --repo AvinashBhalla/job-beeper-naukri-relay --limit 5 \
   --json databaseId,event,status,conclusion,createdAt --jq '.[]'
@@ -90,18 +93,18 @@ The specific numeric ID for the latest run was not confirmed in the latest user 
 
 ## Immediate next steps for the next agent
 
-1. **Inspect the currently running relay workflow before changing anything.** Run:
+1. **Inspect the latest relay workflow run** (latest known run `37918494970`, created `2026-10-09T10:35:04Z`, was still in progress at last check) before changing anything. Run:
    ```bash
    gh run list --repo AvinashBhalla/job-beeper-naukri-relay --limit 5 \
      --json databaseId,event,status,conclusion,createdAt --jq '.[]'
    ```
-   Identify the run created at `2026-10-09T10:29:27Z`, then:
+   Identify the latest run by timestamp/status, then:
    ```bash
    gh run view <ACTUAL_NUMERIC_RUN_ID> --repo AvinashBhalla/job-beeper-naukri-relay --json status,conclusion,jobs,url
    gh run view <ACTUAL_NUMERIC_RUN_ID> --repo AvinashBhalla/job-beeper-naukri-relay --log
    ```
    If it is still running, find the slow step (collection, dependencies, or publishing). Don't alter the cron interval before identifying the bottleneck.
-2. Once complete, check feed `updated_at` and `jobs`. Success requires the relay run to finish successfully **and** the feed timestamp to advance. A successful trigger alone is not success.
+2. Run `37917912264` is confirmed successful and published the feed update noted above. For the next run, check feed `updated_at` and `jobs` again. Continued success requires consecutive relay runs to finish successfully and the feed timestamp to advance. A successful trigger alone is not success.
 3. Check subsequent cron cycles in `~/job-beeper/logs/naukri-relay-trigger.log`. Ensure the fallback doesn't repeatedly trigger while a run is in progress and doesn't accumulate runs.
 4. Verify the main app's Naukri source status after feed advancement; inspect `/api/source-status` and the container logs. Do not assume feed update means app ingestion succeeded.
 5. Update this document with actual results, workflow run ID, feed timestamp/count, and source status. Do not mark success until these are observed.
