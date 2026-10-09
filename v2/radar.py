@@ -104,6 +104,12 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             json.dumps(defaults.get("naukri_queries", []))
         )
 
+    # Version 6 temporarily requires explicit captured experience for Telegram
+    # alerts. LinkedIn public guest pages can omit poster-added requirements,
+    # so unknown-experience jobs stay visible in the dashboard but do not alert.
+    if current_version < 6 <= default_version:
+        merged["require_explicit_experience_for_alerts"] = True
+
     if isinstance(defaults.get("poll_seconds"), dict):
         merged["poll_seconds"] = {
             **defaults.get("poll_seconds", {}),
