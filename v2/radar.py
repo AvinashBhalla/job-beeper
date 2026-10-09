@@ -2105,9 +2105,23 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             if department_names:
                 description = f"{description} Department: {', '.join(department_names)}".strip()
 
-            # The public board API exposes updated_at, which is not guaranteed
-            # to be the original post time. Keep posting time unknown rather than
-            # manufacture freshness from a modification timestamp.
+            # first_published records when the job post first went live.
+            # Never substitute updated_at, which may reflect a later edit.
+            published_raw = item.get("first_published")
+            published_at = (
+                parse_relative(str(published_raw))
+                if published_raw not in (None, "")
+                else None
+            )
+            if published_at is None:
+                posted_precision = "unknown"
+            elif isinstance(published_raw, str) and re.search(
+                r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", published_raw
+            ):
+                posted_precision = "minute"
+            else:
+                posted_precision = "date"
+
             jobs.append(normalize_job(
                 "greenhouse",
                 source_id,
@@ -2115,8 +2129,8 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 title,
                 location,
                 url,
-                None,
-                "unknown",
+                published_at,
+                posted_precision,
                 description,
             ))
 
