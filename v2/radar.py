@@ -1720,10 +1720,9 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         or (now() - last_deep_at).total_seconds() >= LINKEDIN_DEEP_SCAN_SECONDS
     )
 
-    # Spread first-page searches over consecutive cycles. Sending every
-    # query/location pair each minute caused sustained HTTP 429s. With the
-    # default 16 pairs and an 8-target batch, every pair is revisited within
-    # roughly two fast cycles while each cycle emits half as many requests.
+    # Spread first-page searches over consecutive cycles to reduce HTTP 429s.
+    # The cursor advances through every query/location pair, even when a scan
+    # is rate-limited; a full pass takes ceil(pair_count / batch_size) cycles.
     scan_locations = list(config.get("locations", []))
     scan_queries = list(config.get("linkedin_queries", []))
     all_fast_targets = [
