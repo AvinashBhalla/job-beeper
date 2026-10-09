@@ -1741,6 +1741,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     log.warning("linkedin page request failed: %r", exc)
 
     run_batch(fast_targets)
+    deep_targets: list[tuple[str, str, int, bool]] = []
 
     if do_deep:
         deep_targets = [
@@ -1761,7 +1762,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         "deep=%s unique_jobs=%s failed_requests=%s elapsed=%.1fs",
         len(scan_queries),
         len(scan_locations),
-        len(targets),
+        len(fast_targets) + len(deep_targets),
         do_deep,
         len(jobs),
         failed_pages,
