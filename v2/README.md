@@ -41,9 +41,13 @@ V2 now keeps source observations in `jobs` and canonical cross-source groupings 
 
 Runtime user preferences are persisted at `/data/config.json`. The configuration API is protected by a generated token stored at `/data/config_token`, unless `JOB_RADAR_CONFIG_TOKEN` is supplied to the container.
 
-### Private Naukri relay access
+### Isolated Naukri relay
 
-The Naukri relay JSON is published to the private `naukri-relay` branch. Do not fetch it via unauthenticated `raw.githubusercontent.com`: GitHub returns 404 for anonymous access to private repository content. The container reads it through the GitHub Contents API using `JOB_RADAR_GITHUB_READ_TOKEN`, a fine-grained personal access token limited to this repository with **Contents: read** permission. Put the token only in the VM's ignored `.env` file; never commit it or paste it into chat. HTTP 401/403/404 are treated as configuration errors and are not retried; only rate-limit/server/network failures get bounded retries.
+The main `AvinashBhalla/job-beeper` repository and application remain private. Naukri acquisition runs from a separate public relay-only repository, `AvinashBhalla/job-beeper-naukri-relay`. That repository should contain only the scheduled relay workflow, setup documentation and the generated feed on its `naukri-relay` branch; it must not contain or mirror the application source.
+
+The public relay workflow checks out only the private application's `config.json` using a fine-grained `PRIVATE_APP_READ_TOKEN` secret with **Contents: read** permission limited to `AvinashBhalla/job-beeper`. Never paste the token into chat or commit it. The FastAPI container reads the generated JSON from the public raw URL, so the VM no longer needs a GitHub token. The public feed intentionally contains job postings and source URLs; do not publish credentials, runtime preferences or application configuration in the feed.
+
+Do not deploy this consumer change until the public relay repository and its first successful feed publication have been verified. Once the public feed is live, stop the old VM timer that dispatches the private repository's relay workflow to avoid duplicate runs and private Actions-minute usage.
 
 The dashboard is packaged with V2 and is served at `/dashboard/` by the FastAPI process. It reads jobs and settings from the V2 API rather than the legacy V1 GitHub JSON feed.
 
