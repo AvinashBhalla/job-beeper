@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-11 — PR #19 merged, 74 tests green; Oracle deployment pending  
+**Snapshot:** 2026-10-11 — v9 deployment confirmed; PR #21 free-first LinkedIn request budget under development  
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -33,7 +33,7 @@ The old relay cadence investigation is in `docs/JOB_RADAR_HANDOVER.md`. The rela
 
 ## 1. Current state
 
-Latest merged V2 code: `097131797ddfbdec40c8d9911c6d5bc5b7b8a3bb` — [PR #17](https://github.com/AvinashBhalla/job-beeper/pull/17) LinkedIn lower-pressure/backoff update. CI [run #38156008065](https://github.com/AvinashBhalla/job-beeper/actions/runs/38156008065) passed the syntax check and 71 unit tests. Earlier Greenhouse timestamp/parser work is historical; Greenhouse remains disabled.
+Latest merged V2 code includes PR #19, merge `05e1a19374b7cca830cb0cd442743b5f3d0468be`; CI [run #38159529440](https://github.com/AvinashBhalla/job-beeper/actions/runs/38159529440) passed 74 tests. User supplied a healthy config-v9 deployment at `/health`, threshold 55, explicit experience alert gate false, and 454 jobs / 26 qualifying matches. Several old candidates are intentionally suppressed to avoid a migration-time notification flood. Current free-first LinkedIn rate-budget proposal is PR #21; see current top handoff in `docs/JOB_RADAR_HANDOVER.md` for expected request output and safe deployment steps.
 
 Latest VM output supplied 2026-10-09:
 - `/health` returned `status=ok`.
@@ -142,3 +142,18 @@ After deployment: verify branch/SHA when available; Docker service up; `/health`
 
 ## Latest continuation prompt — 2026-10-11
 “You are continuing Job Radar V2. Read both handover documents and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handovers after every user prompt. PR #19 merged as `05e1a19374b7cca830cb0cd442743b5f3d0468be`; latest CI [#38159529440](https://github.com/AvinashBhalla/job-beeper/actions/runs/38159529440) passed 74 tests, but production deployment is not confirmed. Ask the user to pull `v2-live-radar`, rebuild using `--env-file .env`, and send health/config/schema-9/qualifying-job status output from the current handoff. Verify a current match at ≥55% gets queued/sent and the dashboard badge agrees with persisted notification ledger and Telegram. No historical alert burst; retain incompatible-experience rejection, freshness, canonical dedupe, notifications-disabled policy, and keep Greenhouse disabled.”
+
+
+## Free-first LinkedIn access and request policy
+User asked to prioritize free/self-built improvements and defer paid plans. LinkedIn's official [User Agreement](https://www.linkedin.com/legal/user-agreement) and [scraping-software policy](https://www.linkedin.com/help/linkedin/answer/a1341387/prohibition-of-scraping-software) prohibit scraping/crawlers and bypassing usage limits, so don't rotate residential proxies, evade CAPTCHAs, or disguise traffic. Direct public guest-endpoint access is best-effort and can still be blocked; no free or paid solution is guaranteed to reproduce exactly the same LinkedIn results.
+- [PR #21](https://github.com/AvinashBhalla/job-beeper/pull/21) code/test commit `644180cba5a8ccfc17399d7bc0070d319e7c41bf` passed [CI run #38161564620](https://github.com/AvinashBhalla/job-beeper/actions/runs/38161564620), compile plus 76 tests. Initial CI exposed a stale test assumption about four targets per scan; it was corrected to verify full rotation across eight two-target scans. This doc update moves the PR head, so check latest CI before merge. Request policy: spacing 4s, one detail worker, two targets per scan, deep pagination every 30m and config v10 polling at 180s; preserve global cooldown/backoff and `Retry-After`.
+- Free coverage should come next from authorized public company career / ATS board sources (one at a time), not by circumventing LinkedIn controls. Greenhouse remains disabled until old board listing freshness is safe. Paid actors/proxies remain deferred and require terms/budget review if revisited.
+
+## Workflow and branch cleanup / promotion to main
+The workflow inventory was inspected on both `main` and `v2-live-radar`: keep `.github/workflows/v2-ci.yml`; `pages.yml` deploys a static dashboard to Pages on `main` even though V2 dashboard calls relative `/api`; `job-watch.yml`, `naukri-relay.yml`, and `check-sources.yml` are manual-only V1 workflows operating on legacy root config/JSON. Live Naukri schedule is now the separate relay repo dispatched by the VM's systemd timer. These workflows should be removed/retired in a focused PR on the V2 branch after making sure no manual recovery path is still required, and must not be allowed to overwrite the V2 feed after promotion.
+- Known remote branch names include active `v2-live-radar`, default `main`, legacy `naukri-relay`, merged-topic candidates `fix/dashboard-telegram-alert-consistency`, `fix/linkedin-lower-pressure-cooldown`, `fix/linkedin-rate-limit-backoff`, `fix/prevent-posted-after-discovered`, `docs/current-handover-rule-20261011`, `docs/record-alert-consistency-merge-20261011`, and current PR #21 topic branch. Check merged PR metadata before deleting any. Keep `main`, `v2-live-radar`, and legacy `naukri-relay` until the main promotion.
+- Promotion decision: once PR #21 is deployed and the fresh-match dashboard/notification/Telegram path is verified, make a dedicated reviewed PR from `v2-live-radar` into `main` that includes V2 source, removes V1-only workflows/root artifacts as intended, retains V2 CI, and removes/adjusts static Pages publishing. Check CI on `main`; do not switch the VM deploy ref or GitHub default branch until deliberate cutover proof.
+
+
+### Copyable next-session prompt
+“You are continuing Job Radar V2. Read both handover files and `docs/JOBBEEPER_REFERENCE.md`. Mandatory rule: update both handovers after every user prompt. Latest production v9 output confirms healthy V2, threshold 55 / explicit-experience gate false and 26 qualifying matches, with older migration candidates intentionally suppressed. PR #21 is the free-first LinkedIn request-volume reduction. Check CI; if green merge and ask the user to deploy, verify config v10 / 180s poll, then observe request attempts/429s/cooldowns/new jobs for 20–30 minutes. Do not use proxies/CAPTCHA bypass to evade LinkedIn terms. After that, remove only audited V1 manual/static workflows in a separate PR (retain V2 CI), clean only verified merged topic branches, and then prepare a dedicated v2-live-radar→main promotion PR after end-to-end fresh alert verification. Keep Oracle deployment ref unchanged during main promotion.”

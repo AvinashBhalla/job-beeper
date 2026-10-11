@@ -46,12 +46,12 @@ UA = {
 }
 
 # Keep LinkedIn requests paced and honor HTTP 429 with an escalating global cooldown.
-LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 3.0
+LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 4.0
 LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS = 300
 LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 1800
-LINKEDIN_DETAIL_WORKERS = 4
-LINKEDIN_FAST_TARGETS_PER_SCAN = 4
-LINKEDIN_DEEP_SCAN_SECONDS = 900
+LINKEDIN_DETAIL_WORKERS = 1
+LINKEDIN_FAST_TARGETS_PER_SCAN = 2
+LINKEDIN_DEEP_SCAN_SECONDS = 1800
 LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
@@ -144,6 +144,13 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     # not a separate reason to withhold Telegram alerts.
     if current_version < 9 <= default_version:
         merged["require_explicit_experience_for_alerts"] = False
+
+    # Version 10 applies the free-first LinkedIn low-pressure request budget:
+    # 180-second poll cadence. Do not keep a prior 120-second setting.
+    if current_version < 10 <= default_version:
+        merged.setdefault("poll_seconds", {})["linkedin"] = max(
+            180, int(defaults.get("poll_seconds", {}).get("linkedin", 180) or 180)
+        )
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -2539,7 +2546,7 @@ async def scheduler() -> None:
                 continue
             interval = max(60, int(intervals.get(name, 600)))
             if name == "linkedin":
-                interval = max(120, interval)
+                interval = max(180, interval)
             if current >= next_run[name]:
                 next_run[name] = current + interval
                 asyncio.create_task(asyncio.to_thread(run_source, name, config))
