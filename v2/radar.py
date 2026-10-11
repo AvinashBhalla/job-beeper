@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+from email.utils import parsedate_to_datetime
 import hashlib
 import html as html_lib
 import json
@@ -44,8 +45,10 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-# Keep search request pressure conservative while the guest endpoint is returning 429s.
-LINKEDIN_SEARCH_WORKERS = 1
+# Keep LinkedIn requests paced and honor HTTP 429 with an escalating global cooldown.
+LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 1.5
+LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS = 300
+LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 1800
 LINKEDIN_DETAIL_WORKERS = 4
 LINKEDIN_FAST_TARGETS_PER_SCAN = 4
 LINKEDIN_DEEP_SCAN_SECONDS = 900
@@ -73,6 +76,11 @@ started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
 linkedin_fast_target_cursor = 0
+linkedin_http_lock = threading.Lock()
+linkedin_last_http_request_monotonic = 0.0
+linkedin_rate_limited_until_monotonic = 0.0
+linkedin_rate_limit_streak = 0
+linkedin_rate_limit_generation = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -1380,14 +1388,19 @@ def _linkedin_job_description(url: str) -> str:
 
     for endpoint in endpoints:
         try:
-            response = requests.get(
+            response = _linkedin_http_get(
                 endpoint,
                 headers={**UA, "Accept": "text/html,application/xhtml+xml"},
                 timeout=10,
             )
             if response.status_code != 200:
                 continue
-        except requests.RequestException:
+        except LinkedInRateLimitCooldown:
+            return ""
+        except requests.RequestException as exc:
+            if getattr(getattr(exc, "response", None), "status_code", None) == 429:
+                log.warning("linkedin JD enrichment stopped after HTTP 429")
+                return ""
             continue
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -1722,15 +1735,112 @@ def likely_match(job: dict[str, Any]) -> bool:
     return bool(match_details(job)["match"])
 
 
+class LinkedInRateLimitCooldown(RuntimeError):
+    """Raised when a previous LinkedIn HTTP 429 is still in its cooldown window."""
+
+
+def _linkedin_cooldown_remaining() -> float:
+    return max(0.0, linkedin_rate_limited_until_monotonic - time.monotonic())
+
+
+def _retry_after_seconds(response: requests.Response) -> float | None:
+    raw = str(getattr(response, "headers", {}).get("Retry-After", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        try:
+            parsed = parsedate_to_datetime(raw)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return max(0.0, (parsed.astimezone(UTC) - now()).total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+
+def _activate_linkedin_rate_limit(response: requests.Response) -> float:
+    """Back off globally when any LinkedIn endpoint returns HTTP 429."""
+    global linkedin_rate_limited_until_monotonic
+    global linkedin_rate_limit_streak, linkedin_rate_limit_generation
+
+    remaining = _linkedin_cooldown_remaining()
+    if remaining > 0:
+        return remaining
+
+    linkedin_rate_limit_streak += 1
+    multiplier = 2 ** min(linkedin_rate_limit_streak - 1, 3)
+    fallback = min(
+        LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS,
+        LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS * multiplier,
+    )
+    retry_after = _retry_after_seconds(response)
+    cooldown = max(fallback, retry_after or 0.0)
+    linkedin_rate_limited_until_monotonic = time.monotonic() + cooldown
+    linkedin_rate_limit_generation += 1
+
+    until_utc = now() + dt.timedelta(seconds=cooldown)
+    source_runtime = source_state.setdefault("linkedin", {})
+    source_runtime["rate_limited_until"] = iso(until_utc)
+    source_runtime["rate_limit_cooldown_seconds"] = int(cooldown)
+    log.warning(
+        "linkedin: HTTP 429; pausing all LinkedIn HTTP requests for %ss "
+        "(streak=%s, retry_after=%s)",
+        int(cooldown),
+        linkedin_rate_limit_streak,
+        int(retry_after) if retry_after is not None else "not-provided",
+    )
+    return cooldown
+
+
+def _linkedin_http_get(
+    endpoint: str,
+    *,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 25,
+) -> requests.Response:
+    """Serialize and pace all LinkedIn HTTP calls, including JD enrichment."""
+    global linkedin_last_http_request_monotonic
+
+    with linkedin_http_lock:
+        remaining = _linkedin_cooldown_remaining()
+        if remaining > 0:
+            raise LinkedInRateLimitCooldown(
+                f"LinkedIn HTTP cooldown active for {int(remaining)}s"
+            )
+
+        spacing = LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS - (
+            time.monotonic() - linkedin_last_http_request_monotonic
+        )
+        if spacing > 0:
+            time.sleep(spacing)
+
+        # Re-check after waiting in case another worker received a 429.
+        remaining = _linkedin_cooldown_remaining()
+        if remaining > 0:
+            raise LinkedInRateLimitCooldown(
+                f"LinkedIn HTTP cooldown active for {int(remaining)}s"
+            )
+
+        linkedin_last_http_request_monotonic = time.monotonic()
+        response = requests.get(
+            endpoint,
+            params=params,
+            headers=headers or UA,
+            timeout=timeout,
+        )
+        if response.status_code == 429:
+            _activate_linkedin_rate_limit(response)
+            response.raise_for_status()
+        return response
+
+
 def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
     for attempt in range(3):
-        response = requests.get(endpoint, params=params, headers=UA, timeout=25)
-        if response.status_code == 429:
-            # Do not retry a rate-limited request inside the same scan. Retrying
-            # multiplies traffic while LinkedIn is already refusing requests;
-            # let the next scheduled scan try again instead.
-            response.raise_for_status()
-            return response
+        response = _linkedin_http_get(
+            endpoint, params=params, headers=UA, timeout=25
+        )
         if response.status_code not in {500, 502, 503, 504}:
             response.raise_for_status()
             return response
@@ -1810,7 +1920,13 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     global linkedin_last_deep_scan_at, linkedin_fast_target_cursor
+    global linkedin_rate_limit_streak
     scan_started = time.monotonic()
+    if _linkedin_cooldown_remaining() > 0:
+        remaining = int(_linkedin_cooldown_remaining())
+        log.info("linkedin scan skipped; rate-limit cooldown has %ss remaining", remaining)
+        return []
+    rate_limit_generation_at_start = linkedin_rate_limit_generation
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1820,8 +1936,8 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     # Spread first-page searches over consecutive cycles to reduce HTTP 429s.
-    # The cursor advances through every query/location pair, even when a scan
-    # is rate-limited; a full pass takes ceil(pair_count / batch_size) cycles.
+    # If a target is rate-limited, keep the cursor on that target for the first
+    # retry after cooldown instead of skipping the unattempted targets in its batch.
     scan_locations = list(config.get("locations", []))
     scan_queries = list(config.get("linkedin_queries", []))
     all_fast_targets = [
@@ -1845,24 +1961,44 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     failed_pages = 0
     rate_limited = False
 
-    def run_batch(targets: list[tuple[str, str, int, bool]]) -> None:
+    def run_batch(
+        targets: list[tuple[str, str, int, bool]],
+        *,
+        retry_rate_limited_fast_target: bool = False,
+    ) -> None:
+        global linkedin_fast_target_cursor
         nonlocal failed_pages, rate_limited
-        with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
-            futures = [
-                executor.submit(_linkedin_search_page, query, location, start, fast)
-                for query, location, start, fast in targets
-            ]
-            for future in as_completed(futures):
-                try:
-                    jobs.extend(future.result())
-                except Exception as exc:
-                    failed_pages += 1
-                    response = getattr(exc, "response", None)
-                    if getattr(response, "status_code", None) == 429:
-                        rate_limited = True
-                    log.warning("linkedin page request failed: %r", exc)
+        # Run in paced order. Do not queue more search requests once a 429 occurs.
+        for attempted, (query, location, start, fast) in enumerate(targets, start=1):
+            try:
+                jobs.extend(_linkedin_search_page(query, location, start, fast))
+            except Exception as exc:
+                failed_pages += 1
+                response = getattr(exc, "response", None)
+                status_code = getattr(response, "status_code", None)
+                if status_code == 429:
+                    if _linkedin_cooldown_remaining() <= 0:
+                        _activate_linkedin_rate_limit(response)
+                    rate_limited = True
+                    if retry_rate_limited_fast_target and all_fast_targets:
+                        rewind = len(targets) - attempted + 1
+                        linkedin_fast_target_cursor = (
+                            linkedin_fast_target_cursor - rewind
+                        ) % len(all_fast_targets)
+                    log.warning("linkedin search batch stopped after HTTP 429")
+                    break
+                if isinstance(exc, LinkedInRateLimitCooldown):
+                    rate_limited = True
+                    if retry_rate_limited_fast_target and all_fast_targets:
+                        rewind = len(targets) - attempted + 1
+                        linkedin_fast_target_cursor = (
+                            linkedin_fast_target_cursor - rewind
+                        ) % len(all_fast_targets)
+                    log.info("linkedin search batch stopped; rate-limit cooldown is active")
+                    break
+                log.warning("linkedin page request failed: %r", exc)
 
-    run_batch(fast_targets)
+    run_batch(fast_targets, retry_rate_limited_fast_target=True)
     deep_targets: list[tuple[str, str, int, bool]] = []
 
     # A 429 on the fast lane is a strong signal to reduce pressure. Do not
@@ -1911,8 +2047,14 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         for future in as_completed(futures):
             try:
                 future.result()
+            except LinkedInRateLimitCooldown:
+                log.info("linkedin JD enrichment skipped; rate-limit cooldown is active")
             except Exception as exc:
                 log.warning("linkedin JD enrichment failed: %r", exc)
+
+    if linkedin_rate_limit_generation == rate_limit_generation_at_start:
+        # A complete request cycle without a new 429 resets the escalation streak.
+        linkedin_rate_limit_streak = 0
 
     return jobs
 
@@ -2238,13 +2380,22 @@ def run_source(source: str, config: dict[str, Any]) -> None:
 
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
-        source_state[source] = {
+        runtime = {
             "running": False,
             "last_success": iso(finished),
             "jobs_seen": len(jobs),
             "new_jobs": new_jobs,
             "error": None,
         }
+        cooldown_remaining = (
+            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
+        )
+        if cooldown_remaining > 0:
+            runtime["rate_limited_until"] = iso(
+                now() + dt.timedelta(seconds=cooldown_remaining)
+            )
+            runtime["rate_limit_cooldown_seconds"] = int(cooldown_remaining)
+        source_state[source] = runtime
         log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
     except Exception as exc:
         finished = now()
@@ -2293,6 +2444,8 @@ async def scheduler() -> None:
 
         for name in COLLECTORS:
             if not enabled.get(name, True):
+                continue
+            if name == "linkedin" and _linkedin_cooldown_remaining() > 0:
                 continue
             if source_state.get(name, {}).get("running"):
                 continue
