@@ -138,6 +138,12 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         merged.setdefault("poll_seconds", {})["linkedin"] = max(
             120, int(defaults.get("poll_seconds", {}).get("linkedin", 120) or 120)
         )
+
+    # Version 9 makes the configured match threshold the only relevance
+    # threshold for an otherwise-valid match. Unknown experience is neutral,
+    # not a separate reason to withhold Telegram alerts.
+    if current_version < 9 <= default_version:
+        merged["require_explicit_experience_for_alerts"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -258,6 +264,59 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
+def suppress_preexisting_unknown_experience_pending_notifications(
+    cutoff_minutes: int = 10,
+) -> int:
+    """Avoid replaying old pending matches when migrating away from the hidden experience gate.
+
+    Only pending, never-attempted opportunities that were specifically blocked by
+    the old explicit-experience policy and are older than the short live window
+    are suppressed. New pending matches stay eligible under the updated policy.
+    """
+    if not DB_PATH.exists():
+        return 0
+    cutoff = iso(now() - dt.timedelta(minutes=max(1, cutoff_minutes)))
+    timestamp = iso(now())
+    reasons = json.dumps([
+        "suppressed during alert-policy migration",
+        "not replayed to avoid a historical Telegram alert burst",
+        "future fresh source observations will use the updated threshold policy",
+    ], ensure_ascii=False)
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"notification_ledger", "jobs", "job_evaluations"}.issubset(tables):
+            return 0
+        cursor = conn.execute("""
+            UPDATE notification_ledger
+            SET status='suppressed',
+                candidate_job_id=NULL,
+                updated_at=?,
+                next_attempt_at=NULL,
+                decision_reason_json=?
+            WHERE status='pending'
+              AND candidate_job_id IS NULL
+              AND attempt_count=0
+              AND sent_at IS NULL
+              AND created_at < ?
+              AND canonical_opportunity_id IN (
+                  SELECT DISTINCT j.canonical_opportunity_id
+                  FROM jobs j
+                  JOIN job_evaluations e ON e.job_id=j.id
+                  WHERE j.canonical_opportunity_id IS NOT NULL
+                    AND e.match=1
+                    AND e.alertable=0
+                    AND e.alertability_reasons_json LIKE
+                        '%explicit experience required for alerts%'
+              )
+        """, (timestamp, reasons, cutoff))
+        conn.commit()
+        return cursor.rowcount
+
+
 def ensure_runtime_config() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     defaults = _default_config()
@@ -268,12 +327,28 @@ def ensure_runtime_config() -> None:
             current = {}
     else:
         current = {}
+
+    current_version = int(current.get("config_version", 1) or 1)
+    default_version = int(defaults.get("config_version", 1) or 1)
+    migrate_alert_policy = current_version < 9 <= default_version
+
     merged = validate_config(_merge_config(defaults, current))
     serialized = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
     if not RUNTIME_CONFIG_PATH.exists() or RUNTIME_CONFIG_PATH.read_text(encoding="utf-8") != serialized:
         tmp = RUNTIME_CONFIG_PATH.with_suffix(".tmp")
         tmp.write_text(serialized, encoding="utf-8")
         os.replace(tmp, RUNTIME_CONFIG_PATH)
+
+    # init_db runs before startup config migration. Preserve recently discovered
+    # pending matches, but suppress older entries that were held only by the
+    # retired experience gate so the new policy does not replay historical alerts.
+    if migrate_alert_policy:
+        suppressed = suppress_preexisting_unknown_experience_pending_notifications()
+        if suppressed:
+            log.warning(
+                "alert policy migration suppressed %s historical pending notifications",
+                suppressed,
+            )
 
 
 def get_config() -> dict[str, Any]:
@@ -1729,11 +1804,10 @@ def alertability_details(job: dict[str, Any], details: dict[str, Any], config: d
     if not config.get("notifications_enabled", True):
         return {"alertable": False, "reasons": ["Telegram notifications disabled"]}
 
-    if config.get("require_explicit_experience_for_alerts"):
-        if details.get("experience_min_years") is None and details.get("experience_max_years") is None:
-            return {"alertable": False, "reasons": ["explicit experience required for alerts"]}
-
-    return {"alertable": True, "reasons": ["passes current alert policy"]}
+    # Unknown experience is neutral for profile matching. Explicit incompatible
+    # experience is already rejected by match_details(); do not add a hidden
+    # second gate after the configured match threshold has passed.
+    return {"alertable": True, "reasons": ["passes match threshold and notification policy"]}
 
 
 
@@ -2708,7 +2782,6 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
 
 @app.get("/api/jobs")
 def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
-    config = get_config()
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = (
@@ -2719,26 +2792,64 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
-            SELECT * FROM jobs
-            WHERE discovered_at >= ?
-            ORDER BY COALESCE(source_posted_at, discovered_at) DESC, discovered_at DESC
+            SELECT
+                j.*,
+                e.match AS evaluation_match,
+                e.score AS evaluation_score,
+                e.reasons_json AS evaluation_reasons_json,
+                e.experience_min_years AS evaluation_experience_min_years,
+                e.experience_max_years AS evaluation_experience_max_years,
+                e.alertable AS evaluation_alertable,
+                e.alertability_reasons_json AS evaluation_alertability_reasons_json,
+                nl.status AS notification_status,
+                nl.decision_reason_json AS notification_decision_reasons_json,
+                nl.sent_at AS notification_sent_at,
+                nl.last_error AS notification_last_error,
+                nl.candidate_job_id AS notification_candidate_job_id
+            FROM jobs j
+            LEFT JOIN job_evaluations e ON e.job_id=j.id
+            LEFT JOIN notification_ledger nl
+              ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+            WHERE j.discovered_at >= ?
+            ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
+                     j.discovered_at DESC
             LIMIT ?
         """, (cutoff, limit)).fetchall()
+
+    def parse_json_list(value: Any) -> list[Any]:
+        try:
+            parsed = json.loads(value or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return parsed if isinstance(parsed, list) else []
+
     result = []
     for row in rows:
         item = dict(row)
-        details = match_details(item, config)
-        alertability = alertability_details(item, details, config)
-        item["likely_match"] = details["match"]
-        item["match_score"] = details["score"]
-        item["match_reasons"] = details["reasons"]
-        item["experience_min_years"] = details["experience_min_years"]
-        item["experience_max_years"] = details["experience_max_years"]
-        item["alertable"] = alertability["alertable"]
-        item["alertability_reasons"] = alertability["reasons"]
-        item["canonical_opportunity_id"] = item.get("canonical_opportunity_id")
-        item["canonical_match_method"] = item.get("canonical_match_method")
-        item["canonical_match_confidence"] = item.get("canonical_match_confidence")
+        # Telegram reads job_evaluations and notification_ledger directly.
+        # The dashboard deliberately returns those same decisions rather than
+        # independently re-running the matcher at request time.
+        item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
+        score = item.pop("evaluation_score", None)
+        item["match_score"] = int(score or 0)
+        item["match_reasons"] = parse_json_list(
+            item.pop("evaluation_reasons_json", None)
+        )
+        exp_min = item.pop("evaluation_experience_min_years", None)
+        exp_max = item.pop("evaluation_experience_max_years", None)
+        item["experience_min_years"] = exp_min
+        item["experience_max_years"] = exp_max
+        item["alertable"] = bool(item.pop("evaluation_alertable", 0) or 0)
+        item["alertability_reasons"] = parse_json_list(
+            item.pop("evaluation_alertability_reasons_json", None)
+        )
+        item["notification_status"] = item.get("notification_status") or "not_eligible"
+        item["notification_decision_reasons"] = parse_json_list(
+            item.pop("notification_decision_reasons_json", None)
+        )
+        item["notification_sent_at"] = item.get("notification_sent_at")
+        item["notification_last_error"] = item.get("notification_last_error")
+        item["notification_candidate_job_id"] = item.get("notification_candidate_job_id")
         result.append(item)
     return {"jobs": result}
 
