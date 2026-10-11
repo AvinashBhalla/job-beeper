@@ -104,6 +104,7 @@ class MatcherTests(unittest.TestCase):
         original_state = {
             "last_request": radar.linkedin_last_http_request_monotonic,
             "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
             "streak": radar.linkedin_rate_limit_streak,
             "generation": radar.linkedin_rate_limit_generation,
             "linkedin_source": dict(radar.source_state.get("linkedin", {})),
@@ -111,6 +112,7 @@ class MatcherTests(unittest.TestCase):
         try:
             radar.linkedin_last_http_request_monotonic = 0.0
             radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = 0.0
             radar.linkedin_rate_limit_streak = 0
             radar.linkedin_rate_limit_generation = 0
 
@@ -140,6 +142,83 @@ class MatcherTests(unittest.TestCase):
         finally:
             radar.linkedin_last_http_request_monotonic = original_state["last_request"]
             radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_rate_limit_streak_escalates_across_successful_scans(self):
+        original_state = {
+            "deep_scan": radar.linkedin_last_deep_scan_at,
+            "cursor": radar.linkedin_fast_target_cursor,
+            "last_request": radar.linkedin_last_http_request_monotonic,
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = radar.time.monotonic() - 300
+            radar.linkedin_rate_limit_streak = 1
+            radar.linkedin_rate_limit_generation = 0
+            config = {
+                "locations": ["Bengaluru", "Gurugram", "Delhi", "Remote, India"],
+                "linkedin_queries": ["software engineer", "python developer"],
+            }
+
+            with patch.object(radar, "_linkedin_search_page", return_value=[]):
+                radar.linkedin_collect(config)
+
+            # A successful scan must not erase a recent 429 streak.
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+            cooldown = radar._activate_linkedin_rate_limit(response)
+            self.assertEqual(radar.linkedin_rate_limit_streak, 2)
+            self.assertGreaterEqual(cooldown, 600)
+        finally:
+            radar.linkedin_last_deep_scan_at = original_state["deep_scan"]
+            radar.linkedin_fast_target_cursor = original_state["cursor"]
+            radar.linkedin_last_http_request_monotonic = original_state["last_request"]
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_rate_limit_streak_resets_after_one_clean_hour(self):
+        original_state = {
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = radar.time.monotonic() - 3601
+            radar.linkedin_rate_limit_streak = 3
+            radar.linkedin_rate_limit_generation = 0
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+
+            cooldown = radar._activate_linkedin_rate_limit(response)
+
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+            self.assertGreaterEqual(cooldown, 300)
+        finally:
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
             radar.linkedin_rate_limit_streak = original_state["streak"]
             radar.linkedin_rate_limit_generation = original_state["generation"]
             if original_state["linkedin_source"]:
@@ -1101,6 +1180,29 @@ class MatcherTests(unittest.TestCase):
         score, method = canonical_match_score(left, right)
         self.assertEqual(score, 88)
         self.assertFalse(auto_link_allowed(score, method))
+
+    def test_legacy_config_migrates_linkedin_poll_to_120_seconds(self):
+        defaults = {
+            "config_version": 8,
+            "poll_seconds": {"linkedin": 120, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+        prior_runtime = {
+            "config_version": 7,
+            "poll_seconds": {"linkedin": 60, "naukri": 420},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+
+        merged = _merge_config(defaults, prior_runtime)
+
+        self.assertEqual(merged["poll_seconds"]["linkedin"], 120)
+        self.assertEqual(merged["poll_seconds"]["naukri"], 420)
 
     def test_legacy_config_migrates_instahyre_to_opt_in(self):
         defaults = {
