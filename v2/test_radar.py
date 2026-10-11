@@ -1,4 +1,5 @@
 import unittest
+import json
 
 from unittest.mock import patch
 
@@ -815,6 +816,50 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_jobs_api_returns_persisted_match_and_notification_decisions(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-api-consistency", "Acme", "Software Engineer",
+                    "Bengaluru, India", "https://linkedin.com/jobs/view/api-consistency",
+                    None, "unknown", "Build Python services. Experience 1-2 years.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    persisted = conn.execute("""
+                        SELECT e.match, e.score, e.alertable, nl.status,
+                               nl.decision_reason_json
+                        FROM jobs j
+                        JOIN job_evaluations e ON e.job_id=j.id
+                        JOIN notification_ledger nl
+                          ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+                        WHERE j.source_job_id='li-api-consistency'
+                    """).fetchone()
+
+                with patch.object(radar, "get_config", return_value=BASE_CONFIG):
+                    response = radar.jobs(minutes=60, limit=100, today_only=True)
+                item = next(
+                    entry for entry in response["jobs"]
+                    if entry["source_job_id"] == "li-api-consistency"
+                )
+
+                self.assertEqual(item["likely_match"], bool(persisted[0]))
+                self.assertEqual(item["match_score"], persisted[1])
+                self.assertEqual(item["alertable"], bool(persisted[2]))
+                self.assertEqual(item["notification_status"], persisted[3])
+                self.assertEqual(
+                    item["notification_decision_reasons"],
+                    json.loads(persisted[4]),
+                )
+                self.assertEqual(item["notification_status"], "queued")
+            finally:
+                radar.DB_PATH = original_db
+
     def test_queued_opportunity_reverts_to_pending_when_alertability_is_lost(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
@@ -848,12 +893,16 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(row[0], "queued")
                 self.assertEqual(row[1], 1)
 
+                notifications_disabled = {
+                    **BASE_CONFIG,
+                    "notifications_enabled": False,
+                }
                 self.assertEqual(
-                    radar.refresh_job_evaluations(BASE_CONFIG),
+                    radar.refresh_job_evaluations(notifications_disabled),
                     1,
                 )
                 self.assertEqual(
-                    radar.refresh_notification_decisions(BASE_CONFIG),
+                    radar.refresh_notification_decisions(notifications_disabled),
                     1,
                 )
 
@@ -940,7 +989,7 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
-    def test_unknown_experience_new_opportunity_is_suppressed(self):
+    def test_unknown_experience_new_opportunity_is_queued_when_match_threshold_passes(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
             try:
@@ -955,19 +1004,6 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute(
-                        "SELECT status, decision_reason_json FROM notification_ledger"
-                    ).fetchone()
-                self.assertEqual(row[0], "pending")
-                self.assertIn("awaiting future re-evaluation", row[1])
-
-                relaxed = {
-                    **BASE_CONFIG,
-                    "require_explicit_experience_for_alerts": False,
-                }
-                self.assertEqual(radar.refresh_job_evaluations(relaxed), 1)
-                self.assertEqual(radar.refresh_notification_decisions(relaxed), 1)
-                with sqlite3.connect(radar.DB_PATH) as conn:
-                    row = conn.execute(
                         "SELECT status, candidate_job_id FROM notification_ledger"
                     ).fetchone()
                 self.assertEqual(row[0], "queued")
@@ -975,7 +1011,7 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
-    def test_config_change_re_evaluates_existing_jobs(self):
+    def test_deprecated_experience_alert_gate_does_not_change_eligibility(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
             try:
@@ -992,7 +1028,7 @@ class MatcherTests(unittest.TestCase):
                     row = conn.execute(
                         "SELECT alertable FROM job_evaluations WHERE job_id=1"
                     ).fetchone()
-                self.assertEqual(row[0], 0)
+                self.assertEqual(row[0], 1)
 
                 relaxed = {
                     **BASE_CONFIG,
@@ -1203,6 +1239,31 @@ class MatcherTests(unittest.TestCase):
 
         self.assertEqual(merged["poll_seconds"]["linkedin"], 120)
         self.assertEqual(merged["poll_seconds"]["naukri"], 420)
+
+    def test_v8_config_migrates_to_threshold_only_alert_policy(self):
+        defaults = {
+            "config_version": 9,
+            "require_explicit_experience_for_alerts": False,
+            "poll_seconds": {"linkedin": 120, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+        previous = {
+            "config_version": 8,
+            "require_explicit_experience_for_alerts": True,
+            "poll_seconds": {"linkedin": 120, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+
+        merged = _merge_config(defaults, previous)
+
+        self.assertEqual(merged["config_version"], 9)
+        self.assertFalse(merged["require_explicit_experience_for_alerts"])
 
     def test_legacy_config_migrates_instahyre_to_opt_in(self):
         defaults = {
@@ -1658,15 +1719,84 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertNotIn("skills: ai", result["reasons"])
 
-    def test_unknown_experience_can_match_but_is_not_alertable(self):
-        result = match_details(
-            make_job("AI Engineer", "Build AI systems with Python."),
-            BASE_CONFIG,
-        )
+    def test_unknown_experience_match_is_alertable_at_configured_threshold(self):
+        job = make_job("AI Engineer", "Build AI systems with Python.")
+        result = match_details(job, BASE_CONFIG)
         self.assertTrue(result["match"])
-        alert = alertability_details(make_job("AI Engineer", "Build AI systems with Python."), result, BASE_CONFIG)
-        self.assertFalse(alert["alertable"])
-        self.assertIn("explicit experience required for alerts", alert["reasons"])
+        self.assertGreaterEqual(result["score"], BASE_CONFIG["match_threshold"])
+        alert = alertability_details(job, result, BASE_CONFIG)
+        self.assertTrue(alert["alertable"])
+        self.assertIn("passes match threshold", alert["reasons"][0])
+
+    def test_policy_migration_suppresses_old_gate_backlog_but_keeps_recent_pending(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                old_job = normalize_job(
+                    "linkedin", "li-policy-old", "Acme", "AI Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/policy-old", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+                recent_job = normalize_job(
+                    "linkedin", "li-policy-recent", "Other Acme", "AI Engineer",
+                    "Bengaluru, Karnataka, India", "https://linkedin.com/jobs/view/policy-recent", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+                self.assertEqual(upsert_jobs([old_job, recent_job], BASE_CONFIG), 2)
+
+                old_time = radar.iso(radar.now() - timedelta(minutes=20))
+                recent_time = radar.iso(radar.now() - timedelta(minutes=5))
+                legacy_reason = json.dumps(["explicit experience required for alerts"])
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    old_id = conn.execute(
+                        "SELECT canonical_opportunity_id FROM jobs WHERE source_job_id='li-policy-old'"
+                    ).fetchone()[0]
+                    recent_id = conn.execute(
+                        "SELECT canonical_opportunity_id FROM jobs WHERE source_job_id='li-policy-recent'"
+                    ).fetchone()[0]
+                    conn.execute(
+                        "UPDATE job_evaluations SET alertable=0, alertability_reasons_json=? "
+                        "WHERE job_id=(SELECT id FROM jobs WHERE source_job_id='li-policy-old')",
+                        (legacy_reason,),
+                    )
+                    conn.execute(
+                        "UPDATE job_evaluations SET alertable=0, alertability_reasons_json=? "
+                        "WHERE job_id=(SELECT id FROM jobs WHERE source_job_id='li-policy-recent')",
+                        (legacy_reason,),
+                    )
+                    conn.execute(
+                        "UPDATE notification_ledger SET status='pending', created_at=?, "
+                        "candidate_job_id=NULL, attempt_count=0, sent_at=NULL WHERE canonical_opportunity_id=?",
+                        (old_time, old_id),
+                    )
+                    conn.execute(
+                        "UPDATE notification_ledger SET status='pending', created_at=?, "
+                        "candidate_job_id=NULL, attempt_count=0, sent_at=NULL WHERE canonical_opportunity_id=?",
+                        (recent_time, recent_id),
+                    )
+                    conn.commit()
+
+                self.assertEqual(
+                    radar.suppress_preexisting_unknown_experience_pending_notifications(),
+                    1,
+                )
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    rows = dict(conn.execute(
+                        "SELECT canonical_opportunity_id, status FROM notification_ledger"
+                    ).fetchall())
+                    reason = conn.execute(
+                        "SELECT decision_reason_json FROM notification_ledger WHERE canonical_opportunity_id=?",
+                        (old_id,),
+                    ).fetchone()[0]
+                self.assertEqual(rows[old_id], "suppressed")
+                self.assertEqual(rows[recent_id], "pending")
+                self.assertIn("avoid a historical Telegram alert burst", reason)
+            finally:
+                radar.DB_PATH = original_db
 
     def test_excluded_role_category_is_configurable(self):
         config = {**BASE_CONFIG, "excluded_role_terms": ["quality assurance"]}
