@@ -180,6 +180,7 @@ class MatcherTests(unittest.TestCase):
 
             self.assertEqual(jobs, [])
             search.assert_called_once()
+            self.assertEqual(radar.linkedin_fast_target_cursor, 0)
             self.assertGreater(radar._linkedin_cooldown_remaining(), 0)
             self.assertEqual(radar.linkedin_rate_limit_streak, 1)
         finally:
