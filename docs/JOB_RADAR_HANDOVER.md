@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-11 (PR #21 merged; low-pressure config v10 deployment pending; legacy workflow cleanup PR in progress)**
+**Last updated: 2026-10-11 (PR #21 and PR #22 merged; config v10 deployment pending)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -18,7 +18,7 @@
 > - **Latest production evidence from the user:** after PR #19 deployment, `/health` was status `ok`, version `2.0.0`, uptime 32s; config v9, match threshold 55, deprecated explicit-experience alert gate false, LinkedIn poll 120s / Naukri 300s. `/api/jobs?today_only=true&limit=500` returned 454 jobs, 26 qualifying profile matches. Older pending items (e.g. HGS AI Engineer, Five9 Software Engineer II, Duncit Software Engineer, FICO Customer Engineer/AI) were deliberately suppressed with “not replayed to avoid a historical Telegram alert burst”; other already-sent jobs showed `sent`. This is correct safe migration behavior. Verify a new post-deploy fresh match end-to-end next; do not bulk-replay old suppressed items.
 > - **Latest merged code:** PR #21 [Reduce LinkedIn request pressure with free-first pacing](https://github.com/AvinashBhalla/job-beeper/pull/21) merged as `6c93473844cd469493a0c61acf1477ba20252d69`. Latest-head CI [#38161863816](https://github.com/AvinashBhalla/job-beeper/actions/runs/38161863816) passed compile plus **76 tests**. Changes: global LinkedIn HTTP spacing 3s→4s; JD enrichment 4 workers→1; search targets per scan 4→2; deep pagination 15→30 minutes; config version 9→10 and runtime migration to LinkedIn polling 180s. Existing HTTP 429 cooldown remains global with 5/10/20/30-minute escalation and honoring `Retry-After`. This is a measured free-first attempt, not a claim that 429s are eliminated.
 > - **Free-first / compliance:** no proxy rotation, CAPTCHA bypass, fake identities, or traffic disguise. LinkedIn's [User Agreement](https://www.linkedin.com/legal/user-agreement) and [Prohibited software help page](https://www.linkedin.com/help/linkedin/answer/a1341387/prohibition-of-scraping-software) prohibit scraping software and bypassing limits. A free guest endpoint isn't a guaranteed complete mirror of paid services. Reduce load, respect cooldowns and improve free coverage with authorized public ATS/company career endpoints, one connector at a time. Paid providers are deferred until the free-first measurement is complete and their data-use terms are reviewed.
-> - **Current next PR:** workflow cleanup PR is being prepared on `chore/remove-legacy-v1-workflows`. It removes four legacy workflows from `v2-live-radar` only: `.github/workflows/pages.yml`, `job-watch.yml`, `naukri-relay.yml`, and `check-sources.yml`; retains `.github/workflows/v2-ci.yml`. The audited functions were: Pages static deploy targets relative `/api` at GitHub Pages rather than Oracle; job-watch is manual-only V1 and writes root JSON back to main; private Naukri relay is manual-only and superseded by separate `job-beeper-naukri-relay` repo + Oracle systemd timer; check-sources only edits legacy root `config.json`. These deletions do not alter `main` until a deliberate promotion PR is merged.
+> - **Workflow cleanup complete:** [PR #22](https://github.com/AvinashBhalla/job-beeper/pull/22) merged as `8eae61f2605c14903bccbc25c1a95d438e3a9f79`; CI [#38162375556](https://github.com/AvinashBhalla/job-beeper/actions/runs/38162375556) passed 76 tests. Four legacy workflows were removed from `v2-live-radar` only: `.github/workflows/pages.yml`, `job-watch.yml`, `naukri-relay.yml`, `check-sources.yml`; `.github/workflows/v2-ci.yml` remains. Pages used relative `/api` at GitHub Pages rather than Oracle; job-watch was manual-only V1 and wrote root JSON to main; private Naukri relay was manual-only and superseded by the separate relay repo plus Oracle systemd timer; check-sources edited only legacy root `config.json`. `main` remains untouched until a deliberate promotion PR.
 > - **Branch audit confirmed:** PRs #15–#21 are merged; heads: `fix/prevent-posted-after-discovered`, `fix/linkedin-rate-limit-backoff`, `fix/linkedin-lower-pressure-cooldown`, `docs/current-handover-rule-20261011`, `fix/dashboard-telegram-alert-consistency`, `docs/record-alert-consistency-merge-20261011`, and `fix/linkedin-free-first-request-budget`. All are topic branches whose PRs are merged; candidates to delete after verifying they do not contain any unmerged work. Keep `main`, `v2-live-radar`, and `naukri-relay` (legacy relay dependency) until main promotion is complete. The available GitHub connector has no branch-ref delete operation; use GitHub's merged-PR delete-branch button or verified `git push origin --delete <branch>` commands.
 > - **When to move V2 to `main`:** after PR #21 config v10 is deployed and its LinkedIn load/new-job trade-off is measured, the dashboard/ledger/Telegram path has delivered at least one fresh qualifying match consistently, and workflow cleanup is merged. Then create a dedicated reviewed promotion PR from `v2-live-radar` into `main` (include workflow deletions and updated docs), make sure V2 CI passes on `main`, and deliberately cut over the deployment ref/default branch only after a documented smoke test. Do not merge database, runtime JSON, tokens, or relay state.
 > - **Immediate user action:** pull/rebuild `v2-live-radar` with `--env-file .env`, then verify config v10 / LinkedIn 180s and collect 20–30 minutes of timestamped LinkedIn request/429/cooldown/new-job logs; also share one fresh qualifying job's API/ledger status when available. Commands are at the end of the current handover below. Do not claim PR #21 is deployed until that output confirms it.
@@ -2066,7 +2066,7 @@ These are candidates for a focused cleanup PR; check any remaining recovery need
 
 ---
 
-## Latest chronological handoff — 2026-10-11: PR #21 merged and legacy workflow cleanup proposed
+## Latest chronological handoff — 2026-10-11: PR #21 merged; PR #22 cleanup complete
 
 ### PR #21 merge and CI
 - Merged [PR #21](https://github.com/AvinashBhalla/job-beeper/pull/21) as `6c93473844cd469493a0c61acf1477ba20252d69`.
@@ -2074,13 +2074,13 @@ These are candidates for a focused cleanup PR; check any remaining recovery need
 - Free-first modifications: 4s global spacing, one-at-a-time detail enrichment, 2 search targets per scan, deep scan every 30m, config version 10 and migration from LinkedIn polling 120s→180s, while retaining the global 429 stop and escalating cooldown (5/10/20/30m / Retry-After). This reduces average query volume at the cost of slower target rotation. It is not yet deployed as of this handover.
 - User must run deployment command below, then verify config schema 10 and LinkedIn 180s. Log request attempts, 429, cooldown and useful `new_jobs` over 20–30m; compare the yield, not just success/error counts. If volume/freshness becomes unacceptable or 429 persists, next free-first lever is approved public ATS/career coverage, not proxy evasion.
 
-### Workflow cleanup PR in progress
-The audit inspected actual workflow YAML from `main` and `v2-live-radar`. Only `.github/workflows/v2-ci.yml` is required for V2 verification. A separate cleanup branch `chore/remove-legacy-v1-workflows` removes these from the V2 branch:
+### Workflow cleanup merged
+The audit inspected actual workflow YAML from `main` and `v2-live-radar`. [PR #22](https://github.com/AvinashBhalla/job-beeper/pull/22) merged as `8eae61f2605c14903bccbc25c1a95d438e3a9f79`; CI [#38162375556](https://github.com/AvinashBhalla/job-beeper/actions/runs/38162375556) passed all 76 tests. Only `.github/workflows/v2-ci.yml` remains on `v2-live-radar`; the four workflows below were removed from V2, but remain on `main` until the later promotion:
 - `.github/workflows/pages.yml`: static GitHub Pages deployment of `dashboard/`. Current V2 JS API base is relative `/api`, so this static page would query the Pages host, not the Oracle service. Remove to prevent broken static publish on V2 promotion.
 - `.github/workflows/job-watch.yml`: manual-only V1 recovery; root `job_watch.py`, uses old secrets, writes legacy root JSON state and the static dashboard feed to `main`.
 - `.github/workflows/naukri-relay.yml`: manual-only legacy relay in private repo; active relay is in separate `job-beeper-naukri-relay` repo, driven by Oracle systemd timer.
 - `.github/workflows/check-sources.yml`: manual-only V1 tool that edits root `config.json`, unrelated to V2's `v2/config.json` and protected runtime config.
-V2 CI remains. This PR's deletions apply to `v2-live-radar`; `main` remains untouched until the later promotion PR. Main currently retains the four workflows until that promotion.
+`main` was intentionally not changed by PR #22. It still contains the four legacy workflows, which should disappear when a deliberate V2 promotion PR is reviewed and merged.
 
 ### Branch cleanup and main release
 Verified merged PR metadata:
@@ -2091,7 +2091,7 @@ Verified merged PR metadata:
 - #19 → `fix/dashboard-telegram-alert-consistency`, merge `05e1a19374b7cca830cb0cd442743b5f3d0468be`
 - #20 → `docs/record-alert-consistency-merge-20261011`, merge `4654a01a38dc3384a3a730e13dcd88647ef39000`
 - #21 → `fix/linkedin-free-first-request-budget`, merge `6c93473844cd469493a0c61acf1477ba20252d69`
-These topic refs are safe deletion candidates only after validating PR head/base and checking current uncommitted/unmerged work. The connected GitHub tool cannot delete refs; use the PR UI's Delete branch button or run verified `git push origin --delete <topic-branch>` from an authenticated clone. Keep `main`, `v2-live-radar`, and legacy `naukri-relay` until main promotion is completed.
+These topic refs are merged and are deletion candidates after checking `git ls-remote --heads origin` and confirming no extra work was pushed. The connected GitHub tool cannot delete refs; use the merged PR's Delete branch button or an authenticated `git push origin --delete <topic-branch>`. Keep `main`, `v2-live-radar`, and legacy `naukri-relay` until main promotion is complete. The PR #22 head branch and current docs-only branch become candidates only after their respective PRs merge.
 - **Main promotion timing:** not immediately. Finish deployment/observability for PR #21 and prove fresh alert end-to-end on the v9→v10 alert-consistency release; merge the workflow cleanup PR; then create a separate reviewed `v2-live-radar`→`main` PR, ensure deletions/README/docs are included, verify CI on main, retire static Pages before merge, and keep Oracle deploy source explicitly on `v2-live-radar` until a documented cutover. This avoids an unreviewed all-at-once change to the default branch.
 
 ### Copyable deployment command and expected next output
@@ -2119,3 +2119,20 @@ Do not print secrets. Separately verify one *new, fresh* match in `/api/jobs` wi
 
 ### Next-session prompt
 “You are continuing Job Radar V2. Read the knowledge-transfer doc, this latest handover and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handovers after every user prompt. PR #21 merged as `6c93473844cd469493a0c61acf1477ba20252d69`; CI #38161863816 passed 76 tests; production v9 is healthy but PR #21’s config v10/LinkedIn 180s pacing is not yet deployed. Ask the user to pull/rebuild using the commands above and send health/config. Then observe 20–30m of timestamped request/429/cooldown/new-job yield. A separate branch `chore/remove-legacy-v1-workflows` removes four obsolete V1 workflows from v2-live-radar while retaining V2 CI; check its PR/CI and merge once green. Audit only verified merged topic branches for deletion; no delete-branch tool is available, so use the GitHub PR UI or safe authenticated git command. Promote V2 to main only after alert path is verified and cleanup merges; use a dedicated PR and keep Oracle deploy ref unchanged until cutover. Never use proxy/CAPTCHA evasion; expand free authorized ATS/company feeds first.”
+
+
+## Branch cleanup commands after verifying merged PR heads
+The connected GitHub tool cannot delete branch refs. After checking that the remote refs still exist and contain no extra work, the following PR heads (15–21) are confirmed merged:
+```bash
+git fetch --prune origin
+git ls-remote --heads origin
+git push origin --delete \
+  fix/prevent-posted-after-discovered \
+  fix/linkedin-rate-limit-backoff \
+  fix/linkedin-lower-pressure-cooldown \
+  docs/current-handover-rule-20261011 \
+  fix/dashboard-telegram-alert-consistency \
+  docs/record-alert-consistency-merge-20261011 \
+  fix/linkedin-free-first-request-budget
+```
+Do not delete `main`, `v2-live-radar`, or `naukri-relay`. Delete PR #22's branch and this docs-only branch only after their own PRs merge.
