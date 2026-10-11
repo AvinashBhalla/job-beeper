@@ -1,6 +1,6 @@
 {
   "poll_seconds": {
-    "linkedin": 120,
+    "linkedin": 180,
     "naukri": 300,
     "instahyre": 600,
     "greenhouse": 900
@@ -106,7 +106,7 @@
     "instahyre": false,
     "greenhouse": false
   },
-  "config_version": 9,
+  "config_version": 10,
   "greenhouse_boards": [
     {
       "token": "coinbase",
