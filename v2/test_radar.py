@@ -1240,6 +1240,39 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(merged["poll_seconds"]["linkedin"], 120)
         self.assertEqual(merged["poll_seconds"]["naukri"], 420)
 
+    def test_v9_config_migrates_linkedin_to_free_first_request_budget(self):
+        defaults = {
+            "config_version": 10,
+            "poll_seconds": {"linkedin": 180, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+            "require_explicit_experience_for_alerts": False,
+        }
+        previous = {
+            "config_version": 9,
+            "poll_seconds": {"linkedin": 120, "naukri": 420},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+            "require_explicit_experience_for_alerts": False,
+        }
+
+        merged = _merge_config(defaults, previous)
+
+        self.assertEqual(merged["config_version"], 10)
+        self.assertEqual(merged["poll_seconds"]["linkedin"], 180)
+        self.assertEqual(merged["poll_seconds"]["naukri"], 420)
+        self.assertEqual(merged["require_explicit_experience_for_alerts"], False)
+
+    def test_linkedin_request_budget_defaults_are_conservative(self):
+        self.assertEqual(radar.LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS, 4.0)
+        self.assertEqual(radar.LINKEDIN_FAST_TARGETS_PER_SCAN, 2)
+        self.assertEqual(radar.LINKEDIN_DEEP_SCAN_SECONDS, 1800)
+        self.assertEqual(radar.LINKEDIN_DETAIL_WORKERS, 1)
+
     def test_v8_config_migrates_to_threshold_only_alert_policy(self):
         defaults = {
             "config_version": 9,
@@ -1806,7 +1839,7 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertFalse(result["match"])
 
-    def test_linkedin_fast_lane_scans_all_locations_each_cycle(self):
+    def test_linkedin_fast_lane_rotates_two_targets_and_covers_all_locations(self):
         original_state = radar.source_state
         original_deep = radar.linkedin_last_deep_scan_at
         radar.source_state = {}
@@ -1856,8 +1889,13 @@ class MatcherTests(unittest.TestCase):
                 radar.linkedin_collect(config)
                 second_cycle = sorted(calls)
 
-            self.assertEqual(first_cycle, expected)
-            self.assertEqual(second_cycle, expected)
+            self.assertEqual(len(first_cycle), 2)
+            self.assertEqual(len(second_cycle), 2)
+            self.assertEqual(first_cycle, [("Bengaluru, Karnataka, India", 0), ("Gurugram, Haryana, India", 0)])
+            self.assertEqual(
+                set(first_cycle + second_cycle),
+                set(expected),
+            )
         finally:
             radar.source_state = original_state
             radar.linkedin_last_deep_scan_at = original_deep
