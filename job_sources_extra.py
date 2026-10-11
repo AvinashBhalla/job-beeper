@@ -159,22 +159,27 @@ def _instahyre_items(payload):
         if isinstance(value, list):
             return value
         if isinstance(value, dict):
-            for nested in ("jobs", "results", "data"):
-                if isinstance(value.get(nested), list):
-                    return value[nested]
+            nested_items = (
+                value.get(nested)
+                for nested in ("jobs", "results", "data")
+            )
+            for items in nested_items:
+                if isinstance(items, list):
+                    return items
     return []
 
 def _instahyre_location(item):
     value = item.get("locations") or item.get("location") or item.get("locationsRaw")
     if isinstance(value, list):
-        return ", ".join(str(x.get("name") if isinstance(x, dict) else x) for x in value)
+        return ", ".join(
+            str(item.get("name") if isinstance(item, dict) else item)
+            for item in value
+        )
     return str(value or "")
 
 def _instahyre_url(item, job_id):
     value = item.get("url") or item.get("publicUrl") or item.get("jobUrl")
-    if value:
-        return str(value)
-    return f"https://www.instahyre.com/job-{job_id}-"
+    return str(value) if value else f"https://www.instahyre.com/job-{job_id}-"
 
 def instahyre_public(_keyword=None):
     """Fetch the public JSON feed once; keyword matching happens downstream.
