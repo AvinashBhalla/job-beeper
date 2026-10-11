@@ -1966,6 +1966,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         *,
         retry_rate_limited_fast_target: bool = False,
     ) -> None:
+        global linkedin_fast_target_cursor
         nonlocal failed_pages, rate_limited
         # Run in paced order. Do not queue more search requests once a 429 occurs.
         for attempted, (query, location, start, fast) in enumerate(targets, start=1):
