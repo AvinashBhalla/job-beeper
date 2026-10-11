@@ -893,12 +893,16 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(row[0], "queued")
                 self.assertEqual(row[1], 1)
 
+                notifications_disabled = {
+                    **BASE_CONFIG,
+                    "notifications_enabled": False,
+                }
                 self.assertEqual(
-                    radar.refresh_job_evaluations(BASE_CONFIG),
+                    radar.refresh_job_evaluations(notifications_disabled),
                     1,
                 )
                 self.assertEqual(
-                    radar.refresh_notification_decisions(BASE_CONFIG),
+                    radar.refresh_notification_decisions(notifications_disabled),
                     1,
                 )
 
@@ -1007,7 +1011,7 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
-    def test_config_change_re_evaluates_existing_jobs(self):
+    def test_deprecated_experience_alert_gate_does_not_change_eligibility(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
             try:
@@ -1024,7 +1028,7 @@ class MatcherTests(unittest.TestCase):
                     row = conn.execute(
                         "SELECT alertable FROM job_evaluations WHERE job_id=1"
                     ).fetchone()
-                self.assertEqual(row[0], 0)
+                self.assertEqual(row[0], 1)
 
                 relaxed = {
                     **BASE_CONFIG,
