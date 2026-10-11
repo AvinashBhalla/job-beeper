@@ -59,6 +59,18 @@ def _format_timestamp(value: str | None, precision: str | None = None) -> str:
     return local.strftime("%d %b %Y, %I:%M %p IST").replace(" 0", " ")
 
 
+def _parse_timestamp(value: str | None) -> dt.datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def format_notification(item: dict[str, Any]) -> str:
     score = int(item.get("score") or 0)
     title = item.get("title") or "Untitled role"
@@ -70,6 +82,16 @@ def format_notification(item: dict[str, Any]) -> str:
     posted = item.get("source_posted_at")
     posted_precision = item.get("posted_precision")
     discovered = item.get("discovered_at")
+    posted_datetime = _parse_timestamp(posted)
+    discovered_datetime = _parse_timestamp(discovered)
+    if (
+        posted_datetime is not None
+        and discovered_datetime is not None
+        and posted_datetime > discovered_datetime
+    ):
+        # Defense in depth for any legacy row not yet cleaned by database startup.
+        posted = None
+        posted_precision = "unknown"
     experience_min = item.get("experience_min_years")
     experience_max = item.get("experience_max_years")
 

@@ -355,6 +355,15 @@ def normalize_job(source: str, source_id: str, company: str, title: str,
                   location: str, url: str, posted_at: dt.datetime | None,
                   posted_precision: str, description: str = "") -> dict[str, Any]:
     discovered = now()
+    if posted_at is not None:
+        comparable_posted_at = posted_at
+        if comparable_posted_at.tzinfo is None:
+            comparable_posted_at = comparable_posted_at.replace(tzinfo=UTC)
+        if comparable_posted_at.astimezone(UTC) > discovered:
+            # Some source "just now" labels can resolve later than first discovery.
+            # Keep the discovery time authoritative rather than showing a future post.
+            posted_at = None
+            posted_precision = "unknown"
     return {
         "source": source,
         "source_job_id": str(source_id),
@@ -646,6 +655,18 @@ def init_db() -> None:
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
         conn.execute("UPDATE jobs SET discovery_latency_seconds=NULL WHERE discovery_latency_seconds < 0")
+        # Repair records written by older builds where source metadata placed
+        # the posting after the first time this VM had already discovered it.
+        conn.execute("""
+            UPDATE jobs
+            SET source_posted_at=NULL,
+                posted_precision='unknown',
+                discovery_latency_seconds=NULL
+            WHERE source_posted_at IS NOT NULL
+              AND julianday(source_posted_at) IS NOT NULL
+              AND julianday(discovered_at) IS NOT NULL
+              AND julianday(source_posted_at) > julianday(discovered_at)
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
@@ -657,12 +678,34 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
     new_count = 0
     config = config or get_config()
     with db_lock, sqlite3.connect(DB_PATH) as conn:
-        for j in jobs:
+        for incoming in jobs:
+            j = dict(incoming)
+            observed_at = parse_relative(j.get("discovered_at"))
+            incoming_posted_at = parse_relative(j.get("source_posted_at"))
+            if observed_at and incoming_posted_at and incoming_posted_at > observed_at:
+                j["source_posted_at"] = None
+                j["posted_precision"] = "unknown"
+                j["discovery_latency_seconds"] = None
+
             existing = conn.execute(
-                "SELECT id, canonical_opportunity_id FROM jobs WHERE source=? AND source_job_id=?",
+                "SELECT id, canonical_opportunity_id, discovered_at FROM jobs WHERE source=? AND source_job_id=?",
                 (j["source"], j["source_job_id"])
             ).fetchone()
             if existing:
+                posted_at_for_update = j["source_posted_at"]
+                precision_for_update = j["posted_precision"]
+                first_discovered_at = parse_relative(existing[2])
+                incoming_posted_at = parse_relative(posted_at_for_update)
+                if (
+                    incoming_posted_at
+                    and first_discovered_at
+                    and incoming_posted_at > first_discovered_at
+                ):
+                    # Never backfill a moving relative label ("just now", "1 min ago")
+                    # with a timestamp that contradicts the job's original discovery.
+                    posted_at_for_update = None
+                    precision_for_update = "unknown"
+
                 conn.execute("""
                     UPDATE jobs SET last_seen_at=?, source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
@@ -670,8 +713,8 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     END
                     WHERE id=?
                 """, (
-                    j["discovered_at"], j["source_posted_at"], j["posted_precision"],
-                    j["posted_precision"],
+                    j["discovered_at"], posted_at_for_update, precision_for_update,
+                    precision_for_update,
                     j["description"], j["description"], existing[0]
                 ))
                 if not existing[1]:

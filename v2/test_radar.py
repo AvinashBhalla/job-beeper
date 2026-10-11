@@ -398,6 +398,96 @@ class MatcherTests(unittest.TestCase):
                 radar.DB_PATH = original_db
 
 
+    def test_normalize_job_rejects_posted_timestamp_after_discovery(self):
+        from datetime import timedelta
+
+        observed_at = radar.now()
+        with patch.object(radar, "now", return_value=observed_at):
+            job = normalize_job(
+                "linkedin", "li-future-post", "Acme", "Software Engineer",
+                "Bengaluru", "https://linkedin.com/jobs/view/future-post",
+                observed_at + timedelta(minutes=5), "minute", "2 years experience",
+            )
+
+        self.assertIsNone(job["source_posted_at"])
+        self.assertEqual(job["posted_precision"], "unknown")
+        self.assertIsNone(job["discovery_latency_seconds"])
+
+    def test_existing_job_does_not_backfill_post_time_after_first_discovery(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                first = normalize_job(
+                    "linkedin", "li-late-metadata", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/late-metadata",
+                    None, "unknown", "2 years experience",
+                )
+                self.assertEqual(upsert_jobs([first], BASE_CONFIG), 1)
+
+                original_discovery = radar.parse_relative(first["discovered_at"])
+                second = dict(first)
+                with patch.object(
+                    radar, "now",
+                    return_value=original_discovery + timedelta(minutes=10),
+                ):
+                    second["discovered_at"] = radar.iso(radar.now())
+                    second["source_posted_at"] = radar.iso(
+                        original_discovery + timedelta(minutes=5)
+                    )
+                    second["posted_precision"] = "minute"
+                    second["discovery_latency_seconds"] = 300
+                    self.assertEqual(upsert_jobs([second], BASE_CONFIG), 0)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT source_posted_at, posted_precision FROM jobs WHERE id=1"
+                    ).fetchone()
+                self.assertIsNone(row[0])
+                self.assertEqual(row[1], "unknown")
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_init_db_clears_legacy_post_times_after_discovery(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-legacy-future-post", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/legacy-future-post",
+                    radar.now() - timedelta(minutes=2), "minute", "2 years experience",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                invalid_posted_at = radar.iso(
+                    radar.parse_relative(job["discovered_at"]) + timedelta(minutes=5)
+                )
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute(
+                        "UPDATE jobs SET source_posted_at=?, posted_precision='minute', "
+                        "discovery_latency_seconds=0 WHERE id=1",
+                        (invalid_posted_at,),
+                    )
+                    conn.commit()
+
+                radar.init_db()
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT source_posted_at, posted_precision, discovery_latency_seconds "
+                        "FROM jobs WHERE id=1"
+                    ).fetchone()
+                self.assertIsNone(row[0])
+                self.assertEqual(row[1], "unknown")
+                self.assertIsNone(row[2])
+            finally:
+                radar.DB_PATH = original_db
+
     def test_daily_reset_uses_ist_midnight(self):
         start = current_day_start_utc()
         local = start.astimezone(radar.IST)
@@ -410,6 +500,28 @@ class MatcherTests(unittest.TestCase):
             _format_timestamp("2026-10-08T07:30:50.260596+00:00"),
             "08 Oct 2026, 1:00 PM IST",
         )
+
+    def test_telegram_hides_post_time_after_discovery(self):
+        item = {
+            "score": 100,
+            "title": "Full Stack Developer",
+            "company": "Vertigo Media",
+            "location": "Greater Bengaluru Area",
+            "source": "linkedin",
+            "source_posted_at": "2026-10-11T12:31:00+00:00",
+            "posted_precision": "minute",
+            "discovered_at": "2026-10-11T12:26:00+00:00",
+            "experience_min_years": 1,
+            "experience_max_years": 1,
+            "url": "https://example.com/job/123",
+            "match_reasons_json": "[]",
+        }
+
+        message = format_notification(item)
+
+        self.assertIn("🕐 Posted: Unknown", message)
+        self.assertIn("🔎 Discovered: 11 Oct 2026, 5:56 PM IST", message)
+        self.assertNotIn("6:01 PM IST", message)
 
     def test_telegram_message_format_contains_core_fields(self):
         item = {
