@@ -430,13 +430,17 @@ class MatcherTests(unittest.TestCase):
 
                 original_discovery = radar.parse_relative(first["discovered_at"])
                 second = dict(first)
-                second["discovered_at"] = radar.iso(radar.now())
-                second["source_posted_at"] = radar.iso(
-                    original_discovery + timedelta(minutes=5)
-                )
-                second["posted_precision"] = "minute"
-                second["discovery_latency_seconds"] = 0
-                self.assertEqual(upsert_jobs([second], BASE_CONFIG), 0)
+                with patch.object(
+                    radar, "now",
+                    return_value=original_discovery + timedelta(minutes=10),
+                ):
+                    second["discovered_at"] = radar.iso(radar.now())
+                    second["source_posted_at"] = radar.iso(
+                        original_discovery + timedelta(minutes=5)
+                    )
+                    second["posted_precision"] = "minute"
+                    second["discovery_latency_seconds"] = 300
+                    self.assertEqual(upsert_jobs([second], BASE_CONFIG), 0)
 
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute(
