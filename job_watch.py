@@ -334,26 +334,23 @@ def load_state():
         return True, set(raw), set()
     return True, set(raw["jobs"]), set(raw["sources"])
 
-def load_source_state():
-    if not SOURCE_STATE_FILE.exists():
+def _read_json(path):
+    if not path.exists():
         return {}
     try:
-        raw = json.loads(SOURCE_STATE_FILE.read_text())
+        raw = json.loads(path.read_text())
         return raw if isinstance(raw, dict) else {}
     except Exception:
         return {}
+
+def load_source_state():
+    return _read_json(SOURCE_STATE_FILE)
 
 def save_source_state(state):
     SOURCE_STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True))
 
 def load_jd_cache():
-    if not JD_CACHE_FILE.exists():
-        return {}
-    try:
-        raw = json.loads(JD_CACHE_FILE.read_text())
-        return raw if isinstance(raw, dict) else {}
-    except Exception:
-        return {}
+    return _read_json(JD_CACHE_FILE)
 
 def save_jd_cache(cache):
     JD_CACHE_FILE.write_text(json.dumps(cache, indent=2, sort_keys=True))
@@ -450,28 +447,22 @@ def main():
     if s.get("adzuna", {}).get("enabled"):
         all_tasks.append(("adzuna", adzuna, s["adzuna"]))
 
-    tasks = []
-    board_tasks = []
-    source_status = {}
-    for task in all_tasks:
-        key = source_key(task[0], task[2])
-        if should_poll(source_state, key, force_refresh):
-            tasks.append(task)
-        else:
-            source_status[key] = {
-                "ok": False, "skipped": True, "count": 0, "error": "cooldown",
-                "retry_at": source_state[key].get("skip_until"), "provider": "direct",
-            }
-    for task in all_board_tasks:
-        key = source_key(task[0], task[2])
-        if should_poll(source_state, key, force_refresh):
-            board_tasks.append(task)
-        else:
-            source_status[key] = {
-                "ok": False, "skipped": True, "count": 0, "error": "cooldown",
-                "retry_at": source_state[key].get("skip_until"),
-                "provider": "apify" if use_apify else "direct",
-            }
+    tasks, board_tasks, source_status = [], [], {}
+
+    def queue_tasks(src_list, target_list, provider):
+        for task in src_list:
+            key = source_key(task[0], task[2])
+            if should_poll(source_state, key, force_refresh):
+                target_list.append(task)
+            else:
+                source_status[key] = {
+                    "ok": False, "skipped": True, "count": 0, "error": "cooldown",
+                    "retry_at": source_state[key].get("skip_until"),
+                    "provider": provider,
+                }
+
+    queue_tasks(all_tasks, tasks, "direct")
+    queue_tasks(all_board_tasks, board_tasks, "apify" if use_apify else "direct")
 
     with ThreadPoolExecutor(max_workers=min(16, max(1, len(tasks) + len(board_tasks)))) as pool:
         # Overlap broad web discovery with direct source polling so DDGS latency
