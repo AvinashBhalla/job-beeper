@@ -77,7 +77,7 @@ class MatcherTests(unittest.TestCase):
             ):
                 first_cycle = []
                 cycles = []
-                for cycle_index in range(4):
+                for cycle_index in range(8):
                     calls.clear()
                     radar.linkedin_collect(config)
                     cycle = list(calls)
