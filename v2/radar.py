@@ -1936,8 +1936,8 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     # Spread first-page searches over consecutive cycles to reduce HTTP 429s.
-    # The cursor advances through every query/location pair, even when a scan
-    # is rate-limited; a full pass takes ceil(pair_count / batch_size) cycles.
+    # If a target is rate-limited, keep the cursor on that target for the first
+    # retry after cooldown instead of skipping the unattempted targets in its batch.
     scan_locations = list(config.get("locations", []))
     scan_queries = list(config.get("linkedin_queries", []))
     all_fast_targets = [
@@ -1961,11 +1961,14 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     failed_pages = 0
     rate_limited = False
 
-    def run_batch(targets: list[tuple[str, str, int, bool]]) -> None:
+    def run_batch(
+        targets: list[tuple[str, str, int, bool]],
+        *,
+        retry_rate_limited_fast_target: bool = False,
+    ) -> None:
         nonlocal failed_pages, rate_limited
-        # Run in paced order. Submitting every target to an executor allows
-        # queued requests to continue even after the first request is rate-limited.
-        for query, location, start, fast in targets:
+        # Run in paced order. Do not queue more search requests once a 429 occurs.
+        for attempted, (query, location, start, fast) in enumerate(targets, start=1):
             try:
                 jobs.extend(_linkedin_search_page(query, location, start, fast))
             except Exception as exc:
@@ -1976,15 +1979,25 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     if _linkedin_cooldown_remaining() <= 0:
                         _activate_linkedin_rate_limit(response)
                     rate_limited = True
+                    if retry_rate_limited_fast_target and all_fast_targets:
+                        rewind = len(targets) - attempted + 1
+                        linkedin_fast_target_cursor = (
+                            linkedin_fast_target_cursor - rewind
+                        ) % len(all_fast_targets)
                     log.warning("linkedin search batch stopped after HTTP 429")
                     break
                 if isinstance(exc, LinkedInRateLimitCooldown):
                     rate_limited = True
+                    if retry_rate_limited_fast_target and all_fast_targets:
+                        rewind = len(targets) - attempted + 1
+                        linkedin_fast_target_cursor = (
+                            linkedin_fast_target_cursor - rewind
+                        ) % len(all_fast_targets)
                     log.info("linkedin search batch stopped; rate-limit cooldown is active")
                     break
                 log.warning("linkedin page request failed: %r", exc)
 
-    run_batch(fast_targets)
+    run_batch(fast_targets, retry_rate_limited_fast_target=True)
     deep_targets: list[tuple[str, str, int, bool]] = []
 
     # A 429 on the fast lane is a strong signal to reduce pressure. Do not
@@ -2366,13 +2379,22 @@ def run_source(source: str, config: dict[str, Any]) -> None:
 
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
-        source_state[source] = {
+        runtime = {
             "running": False,
             "last_success": iso(finished),
             "jobs_seen": len(jobs),
             "new_jobs": new_jobs,
             "error": None,
         }
+        cooldown_remaining = (
+            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
+        )
+        if cooldown_remaining > 0:
+            runtime["rate_limited_until"] = iso(
+                now() + dt.timedelta(seconds=cooldown_remaining)
+            )
+            runtime["rate_limit_cooldown_seconds"] = int(cooldown_remaining)
+        source_state[source] = runtime
         log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
     except Exception as exc:
         finished = now()
