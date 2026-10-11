@@ -100,6 +100,100 @@ class MatcherTests(unittest.TestCase):
             radar.linkedin_last_deep_scan_at = original_deep_scan
             radar.linkedin_fast_target_cursor = original_cursor
 
+    def test_linkedin_http_429_honors_retry_after_and_blocks_followup_requests(self):
+        original_state = {
+            "last_request": radar.linkedin_last_http_request_monotonic,
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_rate_limit_streak = 0
+            radar.linkedin_rate_limit_generation = 0
+
+            class RateLimitedResponse:
+                status_code = 429
+                headers = {"Retry-After": "600"}
+
+                def raise_for_status(self):
+                    error = radar.requests.HTTPError("429 Client Error")
+                    error.response = self
+                    raise error
+
+            with patch.object(
+                radar.requests, "get", return_value=RateLimitedResponse()
+            ) as request:
+                with self.assertRaises(radar.requests.HTTPError):
+                    radar._linkedin_http_get("https://www.linkedin.com/jobs-guest/test")
+                with self.assertRaises(radar.LinkedInRateLimitCooldown):
+                    radar._linkedin_http_get("https://www.linkedin.com/jobs-guest/test")
+
+            self.assertEqual(request.call_count, 1)
+            self.assertGreaterEqual(
+                radar.linkedin_rate_limited_until_monotonic - radar.time.monotonic(),
+                599,
+            )
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+        finally:
+            radar.linkedin_last_http_request_monotonic = original_state["last_request"]
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_search_batch_stops_after_first_429(self):
+        original_state = {
+            "deep_scan": radar.linkedin_last_deep_scan_at,
+            "cursor": radar.linkedin_fast_target_cursor,
+            "last_request": radar.linkedin_last_http_request_monotonic,
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_rate_limit_streak = 0
+            radar.linkedin_rate_limit_generation = 0
+
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+            error = radar.requests.HTTPError("429 Client Error")
+            error.response = response
+            config = {
+                "locations": ["Bengaluru", "Gurugram", "Delhi", "Remote, India"],
+                "linkedin_queries": ["software engineer", "python developer"],
+            }
+
+            with patch.object(
+                radar, "_linkedin_search_page", side_effect=error
+            ) as search:
+                jobs = radar.linkedin_collect(config)
+
+            self.assertEqual(jobs, [])
+            search.assert_called_once()
+            self.assertGreater(radar._linkedin_cooldown_remaining(), 0)
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+        finally:
+            radar.linkedin_last_deep_scan_at = original_state["deep_scan"]
+            radar.linkedin_fast_target_cursor = original_state["cursor"]
+            radar.linkedin_last_http_request_monotonic = original_state["last_request"]
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
     def test_software_development_engineer_variant_matches(self):
         config = {
             **BASE_CONFIG,
