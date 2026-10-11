@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-09 (Greenhouse public-board source merged as opt-in; PR CI #286 passed; Oracle deployment still at the verified Naukri cache-busting release)**
+**Last updated: 2026-10-11 (Telegram delivery verified; active investigation is stale Naukri relay freshness, with LinkedIn HTTP 429s queued as the next separate task)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -1887,3 +1887,56 @@ Use the knowledge-transfer document for the next work session; this file remains
 - `main` and `naukri-relay` were intentionally retained. The old `main` collector reads the private orphan feed branch, and its manual workflow can republish it; removing it before a planned migration would break the legacy path.
 - Current release branch HEAD is `0327c746`; latest application-code merge is `c2f2ce65`. The VM's latest supplied health response was HTTP 200, LinkedIn and Naukri scans succeeded, and Greenhouse remains disabled.
 - Next release work is not branch cleanup: fix the dashboard/ingestion semantics for old Greenhouse board imports before enabling the source.
+
+
+## 51. Current operational handoff — 2026-10-11
+
+**Read first:** the newer operational summary is in [`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`](JOB_RADAR_KNOWLEDGE_TRANSFER.md), under **“Latest operating update — 2026-10-11”**. It includes the full next-agent instructions and a copyable prompt. This section records the detailed chronological evidence and prevents the older Greenhouse/branch-cleanup notes from being mistaken for today's active task.
+
+### Product/workflow goal right now
+
+Restore dependable job discovery without creating noisy or false alerts. Work on one failure at a time, inspect real evidence, make one small change, verify the result, and only then proceed. The immediate blocker is **Naukri relay freshness**. LinkedIn coverage/rate limits are the following separate task. Do not work on Greenhouse in this session and keep it disabled.
+
+### Telegram issue is resolved and verified
+
+- The Oracle VM is `job-radar`; repository path is `~/job-beeper`; the V2 Compose file is `v2/docker-compose.yml`; service/container is `radar` / `v2-radar-1`.
+- The repo-root `.env` contains both Telegram environment variables, but Compose resolved them as missing when invoked without explicitly naming the env file. Use the following pattern for Compose commands on this VM:
+  `sudo docker compose --env-file .env -f v2/docker-compose.yml ...`
+- The user recreated the service container with `--env-file .env`. The two variables were confirmed **SET** in the running container; `/health` returned `status=ok`, `version=2.0.0`.
+- The three intentionally retained recent LinkedIn notifications were verified in the ledger as `sent`, `last_error=None`: HealthEdge — Software Development Engineer in Test; Scoutit — Frontend Developer; GeeksGod — Python Developer Job Openings by Gramener | Jobs 2025.
+- At the later ledger check: `pending=26`, `sent=78`, `suppressed=3514`. The approved backlog action suppressed 37 older queued ledger entries and preserved the three recent ones; no job records were deleted. An additional older Scoutit ledger entry was already suppressed.
+- Do not repeat the backlog cleanup, weaken explicit-experience notification requirements, or print any token/chat ID.
+
+### Evidence: Naukri database is aligned with a stale upstream feed
+
+From the user's read-only checks around 2026-10-11 18:45–18:47 IST:
+- `/api/source-status` showed LinkedIn enabled and Naukri enabled, with recent scan runs completing without runtime errors. One latest sample: LinkedIn `jobs_seen=20, new_jobs=0`; Naukri `jobs_seen=328, new_jobs=0`.
+- The jobs table contained 2,668 LinkedIn records and 1,227 Naukri rows. In the past 24 hours, 372 LinkedIn records and 83 Naukri records had new `discovered_at` timestamps. In the past hour, LinkedIn had 25 and Naukri had 0. Latest LinkedIn discovery was `2026-10-11T13:11:56.042328Z`; latest Naukri discovery was `2026-10-11T07:05:55.267174Z`.
+- The direct request to the public Naukri relay JSON returned `updated_at=2026-10-11T07:05:55.267174Z`, declared count 328, actual entries 328, and 328 unique IDs/URLs. Every feed ID was already in the radar database; 0 IDs were missing. No Naukri rows had a `discovered_at` within six hours of that check. This indicates the private V2 ingestion can match the current feed; the immediately evidenced problem is that the public feed is old.
+- The feed's first sample jobs included Epam Systems listings, including some repeated titles with distinct source entries. Do not dedupe only on company/title without first confirming stable IDs and URLs.
+
+### User-supplied GitHub Actions run history to continue from
+
+The user ran a relay workflow listing and a last-12-runs JSON command in repository `AvinashBhalla/job-beeper-naukri-relay`. The user will send this same output to the next agent in the new session. Use it as input and do not ask them to rerun it by default.
+
+- Workflow list: `public-naukri-relay  active  379327541`.
+- All 12 returned history entries had `name=public-naukri-relay`, `conclusion=success`, `status=completed`, `event=schedule`, `headBranch=main`, and the same head SHA `9d564e016da2ec50c70ee8bde9f2726539167460`.
+- Latest shown run: ID `38120124080`; created `2026-10-11T07:04:06Z`, updated `2026-10-11T07:06:01Z`.
+- Earlier shown starts were `2026-10-11T01:01:47Z`, then `2026-10-10T22:13:33Z`, `18:54:55Z`, `14:44:49Z`, `08:39:36Z`, `02:17:55Z`, and earlier timestamps. Observed gaps span roughly 2h48 to 6h21—not a five-minute cadence.
+- Latest public JSON `updated_at` equaled the latest workflow's output time (`07:05:55Z)); by 18:47 IST it was more than six hours old. A successful workflow conclusion alone does not prove it fetched fresh jobs or published a new payload.
+- The run-history command initially failed only because the requested `gh run list --json` field `workflowName` is not supported by that installed `gh` version. The retry used supported fields such as `name`, `conclusion`, `createdAt`, `databaseId`, `event`, `headBranch`, `headSha`, `status`, `updatedAt`, and `url`. Avoid `workflowName` in future `gh run list --json` queries.
+
+### Exact next steps for the next agent
+
+1. Read the top of `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and this section. Consume the workflow-history JSON that the user pastes; continue from that evidence.
+2. Inspect the **separate public relay repository** `AvinashBhalla/job-beeper-naukri-relay` on `main`. Read its active workflow YAML (find the actual file rather than guessing its path), exact `schedule.cron`, any job/step `if` conditions, `concurrency`, triggers, collector code, and artifact/commit/publish code. Compare configured cadence with the timestamps above.
+3. Inspect all recent workflow runs—not only successful scheduled runs. Check the available CLI's supported `--json` fields first if needed. Examine the latest run logs to answer: did the source collector actually execute, did it fetch current results, did it write the output JSON, did the commit/publish step run, and did `updated_at` advance? Confirm whether other runs are hidden by query filters and whether the cron itself is actually five minutes.
+4. Do not assume the schedule is wrong until the YAML is checked. Identify whether this is a low-frequency cron, missing/delayed scheduled events, early job exits, source-side staleness, or a publish/write problem.
+5. Only after proving the cause, implement **one small relay-side fix**, ideally on a topic branch/PR with tests. Preserve the JSON contract, stable job IDs and timestamps. Do not patch the private app's ingestion code while all 328 feed IDs already match the database; do not broaden the feed by simply lowering identity thresholds.
+6. Validate a single manual dispatch if the workflow supports it and it is safe: wait for the run to finish, review its logs and conclusion, fetch the public JSON again, and verify that `updated_at` advanced and the job set is plausible. Then wait for/trigger the normal radar scan and verify the deployed app consumes the new relay timestamp with no inappropriate Telegram backlog.
+7. Only after Naukri freshness is verified, address LinkedIn coverage. Its guest endpoint is repeatedly returning HTTP 429. Current V2 code is conservative: `LINKEDIN_SEARCH_WORKERS=1`, four fast query/location targets per scan, deep scan every ~900 seconds, one deep page batch, no same-scan retry on 429, and deep pagination is skipped when the fast lane receives a 429. Measure 429 rate and useful new jobs before changing schedules or query coverage; increasing concurrency first is not recommended.
+8. Do not add/enable sources or redesign the architecture in the same patch. Keep Greenhouse disabled. Do not claim a deployment until the merge/rebuild/health/source-status evidence is actually provided. Avoid printing any secrets.
+
+### Copyable prompt to begin the next session
+
+> You are taking over Job Radar V2. Read `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and this handover first. Continue from the latest 2026-10-11 update, not from the older Greenhouse or branch-cleanup tasks. I will send you the output showing the active `public-naukri-relay` workflow and its last 12 runs. Use that output, inspect the actual workflow YAML and latest run logs in `AvinashBhalla/job-beeper-naukri-relay`, and establish why the public relay JSON remains at `updated_at=2026-10-11T07:05:55Z` despite successful scheduled runs. All 328 feed IDs already exist in the radar DB, so do not change private ingestion yet. Prove whether the cause is the cron, missing scheduled runs, the collector, or the publish step; then make one minimal relay-side fix and validate the JSON timestamp/count before moving to LinkedIn HTTP 429 coverage. One change at a time, verify before proceeding, keep Greenhouse disabled, and never print secrets.
