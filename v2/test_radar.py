@@ -1434,6 +1434,13 @@ class MatcherTests(unittest.TestCase):
         }
         original_deep_scan = radar.linkedin_last_deep_scan_at
         original_cursor = radar.linkedin_fast_target_cursor
+        original_rate_limit_state = (
+            radar.linkedin_last_http_request_monotonic,
+            radar.linkedin_rate_limited_until_monotonic,
+            radar.linkedin_rate_limit_streak,
+            radar.linkedin_rate_limit_generation,
+            dict(radar.source_state.get("linkedin", {})),
+        )
         calls = []
 
         def fake_search(query, location, start, fast):
@@ -1455,6 +1462,17 @@ class MatcherTests(unittest.TestCase):
         finally:
             radar.linkedin_last_deep_scan_at = original_deep_scan
             radar.linkedin_fast_target_cursor = original_cursor
+            (
+                radar.linkedin_last_http_request_monotonic,
+                radar.linkedin_rate_limited_until_monotonic,
+                radar.linkedin_rate_limit_streak,
+                radar.linkedin_rate_limit_generation,
+                original_linkedin_runtime,
+            ) = original_rate_limit_state
+            if original_linkedin_runtime:
+                radar.source_state["linkedin"] = original_linkedin_runtime
+            else:
+                radar.source_state.pop("linkedin", None)
 
     def test_linkedin_fast_scan_uses_broader_recency_window(self):
         params = []
