@@ -46,7 +46,7 @@ UA = {
 }
 
 # Keep LinkedIn requests paced and honor HTTP 429 with an escalating global cooldown.
-LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 1.5
+LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 3.0
 LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS = 300
 LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 1800
 LINKEDIN_DETAIL_WORKERS = 4
@@ -79,6 +79,7 @@ linkedin_fast_target_cursor = 0
 linkedin_http_lock = threading.Lock()
 linkedin_last_http_request_monotonic = 0.0
 linkedin_rate_limited_until_monotonic = 0.0
+linkedin_last_rate_limit_monotonic = 0.0
 linkedin_rate_limit_streak = 0
 linkedin_rate_limit_generation = 0
 stop_event = asyncio.Event()
@@ -131,6 +132,12 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             **defaults.get("poll_seconds", {}),
             **current.get("poll_seconds", {}),
         }
+    # Version 8 reduces LinkedIn request pressure. Older persisted configs may
+    # retain the previous 60-second poll interval, so migrate it explicitly.
+    if current_version < 8 <= default_version:
+        merged.setdefault("poll_seconds", {})["linkedin"] = max(
+            120, int(defaults.get("poll_seconds", {}).get("linkedin", 120) or 120)
+        )
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -1762,13 +1769,23 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
 def _activate_linkedin_rate_limit(response: requests.Response) -> float:
     """Back off globally when any LinkedIn endpoint returns HTTP 429."""
     global linkedin_rate_limited_until_monotonic
+    global linkedin_last_rate_limit_monotonic
     global linkedin_rate_limit_streak, linkedin_rate_limit_generation
 
     remaining = _linkedin_cooldown_remaining()
     if remaining > 0:
         return remaining
 
+    monotonic_now = time.monotonic()
+    # A single successful scan must not erase evidence of repeated 429s. Reset
+    # the escalation streak only after an hour without another rate-limit event.
+    if (
+        linkedin_last_rate_limit_monotonic
+        and monotonic_now - linkedin_last_rate_limit_monotonic >= 3600
+    ):
+        linkedin_rate_limit_streak = 0
     linkedin_rate_limit_streak += 1
+    linkedin_last_rate_limit_monotonic = monotonic_now
     multiplier = 2 ** min(linkedin_rate_limit_streak - 1, 3)
     fallback = min(
         LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS,
@@ -1776,7 +1793,7 @@ def _activate_linkedin_rate_limit(response: requests.Response) -> float:
     )
     retry_after = _retry_after_seconds(response)
     cooldown = max(fallback, retry_after or 0.0)
-    linkedin_rate_limited_until_monotonic = time.monotonic() + cooldown
+    linkedin_rate_limited_until_monotonic = monotonic_now + cooldown
     linkedin_rate_limit_generation += 1
 
     until_utc = now() + dt.timedelta(seconds=cooldown)
@@ -1926,7 +1943,6 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         remaining = int(_linkedin_cooldown_remaining())
         log.info("linkedin scan skipped; rate-limit cooldown has %ss remaining", remaining)
         return []
-    rate_limit_generation_at_start = linkedin_rate_limit_generation
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1960,6 +1976,7 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     # lane, rather than creating a full-size burst on top of it.
     failed_pages = 0
     rate_limited = False
+    search_requests_attempted = 0
 
     def run_batch(
         targets: list[tuple[str, str, int, bool]],
@@ -1967,9 +1984,10 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         retry_rate_limited_fast_target: bool = False,
     ) -> None:
         global linkedin_fast_target_cursor
-        nonlocal failed_pages, rate_limited
+        nonlocal failed_pages, rate_limited, search_requests_attempted
         # Run in paced order. Do not queue more search requests once a 429 occurs.
         for attempted, (query, location, start, fast) in enumerate(targets, start=1):
+            search_requests_attempted += 1
             try:
                 jobs.extend(_linkedin_search_page(query, location, start, fast))
             except Exception as exc:
@@ -2017,11 +2035,11 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     }
     jobs = list(unique_jobs.values())
     log.info(
-        "linkedin discovery scan: queries=%s locations=%s requests=%s "
+        "linkedin discovery scan: queries=%s locations=%s requests_attempted=%s "
         "deep=%s unique_jobs=%s failed_requests=%s elapsed=%.1fs",
         len(scan_queries),
         len(scan_locations),
-        len(fast_targets) + len(deep_targets),
+        search_requests_attempted,
         do_deep,
         len(jobs),
         failed_pages,
@@ -2051,10 +2069,6 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 log.info("linkedin JD enrichment skipped; rate-limit cooldown is active")
             except Exception as exc:
                 log.warning("linkedin JD enrichment failed: %r", exc)
-
-    if linkedin_rate_limit_generation == rate_limit_generation_at_start:
-        # A complete request cycle without a new 429 resets the escalation streak.
-        linkedin_rate_limit_streak = 0
 
     return jobs
 
@@ -2450,6 +2464,8 @@ async def scheduler() -> None:
             if source_state.get(name, {}).get("running"):
                 continue
             interval = max(60, int(intervals.get(name, 600)))
+            if name == "linkedin":
+                interval = max(120, interval)
             if current >= next_run[name]:
                 next_run[name] = current + interval
                 asyncio.create_task(asyncio.to_thread(run_source, name, config))
