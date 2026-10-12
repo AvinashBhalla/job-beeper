@@ -1933,7 +1933,13 @@ class MatcherTests(unittest.TestCase):
             return Response()
 
         try:
-            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+            with (
+                patch.object(radar, "_linkedin_request", side_effect=fake_request),
+                # This test covers search pagination, not JD enrichment. Keep it
+                # hermetic so the new enrichment policy cannot make live requests
+                # and leak a real LinkedIn 429 cooldown into later tests.
+                patch.object(radar, "enrich_linkedin_job", side_effect=lambda job: job),
+            ):
                 first = radar.linkedin_collect(config)
                 first_starts = sorted(calls)
                 calls.clear()
