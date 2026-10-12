@@ -2785,7 +2785,7 @@ def source_status():
     config = get_config()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
-            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs
+            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs, sr.error
             FROM source_runs sr
             JOIN (
                 SELECT source, MAX(finished_at) AS latest_finished_at
@@ -2802,6 +2802,7 @@ def source_status():
             "last_run": row[1],
             "jobs_seen": row[2] or 0,
             "new_jobs": row[3] or 0,
+            "last_error": row[4],
         }
         for row in rows
     }
@@ -2815,6 +2816,7 @@ def source_status():
             "last_run": item.get("last_run"),
             "jobs_seen": item.get("jobs_seen", 0),
             "new_jobs": item.get("new_jobs", 0),
+            "last_error": item.get("last_error"),
             "runtime": source_state.get(source, {}),
         })
 
