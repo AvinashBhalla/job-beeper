@@ -2562,12 +2562,20 @@ def run_source(source: str, config: dict[str, Any]) -> None:
                 return False
             return True
 
-        shadow_extract_jobs(
-            shadow_candidates,
-            DB_PATH,
-            experience_known=_experience_known_for_shadow,
-            configured_skills=config.get("skills", []),
-        )
+        try:
+            shadow_extract_jobs(
+                shadow_candidates,
+                DB_PATH,
+                experience_known=_experience_known_for_shadow,
+                configured_skills=config.get("skills", []),
+            )
+        except Exception as exc:
+            # AI enrichment must fail open; source ingestion continues unchanged.
+            log.warning(
+                "gemini shadow pass skipped source=%s error_type=%s",
+                source,
+                type(exc).__name__,
+            )
         new_jobs = upsert_jobs(jobs, config)
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
