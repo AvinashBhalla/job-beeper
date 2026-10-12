@@ -43,7 +43,7 @@ class GeminiValidationTests(unittest.TestCase):
         self.assertIsNone(result["experience_evidence"])
 
     def test_verbatim_evidence_survives_whitespace_line_wraps(self):
-        description = "Required experience: 4-6 years of professional\\n experience. Python and FastAPI are required."
+        description = "Required experience: 4-6 years of professional\n experience. Python and FastAPI are required."
         result = gemini._validate_result(self.payload, description)
         self.assertEqual(result["experience_evidence"], "4-6 years of professional experience")
 
