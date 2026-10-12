@@ -2568,3 +2568,30 @@ HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_conf
 
 ### Continuation prompt
 “Continue Job Radar V2. First read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every user prompt. Latest VM evidence: 84 tests pass in 54.614s; dev port 8001 healthy, Naukri-only, notifications off; production port 8000 healthy. Gemini shadow status is enabled for `gemini-3.5-flash-lite`, 6 calls today, 3 successful cached results, 3 errors; latest three errors are `gemini_http_401`. Earlier calls succeeded, so verify key validity/API enablement/restrictions using Google AI Studio and hidden-input key entry; never print or share the key. Test one synthetic request only, then recheck status. Do not increase budgets, merge PR #35, alter matcher/alerts, or deploy production until authentication and representative shadow quality pass.”
+
+
+## Latest handoff — 2026-10-12: Gemini requests succeeding again; shadow quality review remains
+
+### User-provided evidence
+- `/api/llm-shadow-status` now reports 12 calls today, 6 successful cached results and 6 cached errors; the newest three results are successful at 08:14 UTC using `gemini-3.5-flash-lite`.
+- Three older calls from 08:12 and three from 08:07 remain recorded as `gemini_http_401`. This is consistent with authentication now working for newer requests, but the exact cause of the earlier 401s is unconfirmed. Cached errors are historical and do not by themselves prove the current key is still failing.
+- Dev feature remains enabled in `shadow_only` mode. User did not provide fresh health/config output in this message; prior report had 84 tests passing and both dev/prod health healthy.
+- No code changes were made. Do not spend the remaining daily request budget just to clear historical error rows.
+
+### Shadow-output quality notes
+- The recent successful results demonstrate that structured extraction is working on varied descriptions, including a range (3–8 years), minimum-only experience (6+ years), and a .NET role with a 6–11-year range.
+- At least one output has `experience_evidence=null` despite a populated range, and scope classifications are semantic judgments (for example, QA/testing focus versus total professional experience). These results need a labelled manual review before any production integration.
+- Do not treat high model confidence as proof of correctness. Results remain isolated from job rows, matcher inputs, scores, eligibility, and Telegram notifications.
+
+### Next action
+1. Avoid triggering extra Naukri scans solely for Gemini tests; calls today are already 12/20.
+2. On the next naturally occurring permitted shadow calls, confirm new requests continue returning `status=ok` with no new 401s. If a fresh request fails, inspect only the redacted error category and verify key/API restrictions without printing the key.
+3. Manually compare a small sample against the original JD for exact ranges, required/preferred classification, evidence excerpt, and `experience_scope`. Flag missing evidence and ambiguous scope as review cases.
+4. Keep PR #35 unmerged, Gemini shadow-only, notifications disabled in dev, and production untouched until the representative evaluation is documented and accepted.
+
+### Current release gate
+- Full dev test suite: 84 passed (user-provided).
+- Latest Gemini requests: successful; six earlier authentication failures remain cached.
+- Extraction-quality evaluation: incomplete.
+- Production: no deployment or behavior change.
+- Continuation prompt: “Read both handovers and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`, and update both handovers after every prompt. Latest Gemini status: 12 calls today, 6 successes, 6 errors; the newest three requests at 08:14 UTC are successful, while earlier cached calls show `gemini_http_401`. Authentication appears to be working again for recent calls, but root cause is unconfirmed. Avoid burning the 20/day budget. Manually evaluate a small representative sample for exact experience range, required/preferred skills, evidence excerpts, and total-vs-skill-specific scope. Keep feature shadow-only, notifications off, PR #35 unmerged, and production unchanged.”
