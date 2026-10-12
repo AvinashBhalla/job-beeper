@@ -3085,3 +3085,12 @@ Latest VM output confirms both runtime images have only Docker Compose labels an
 ### Next safe step
 
 Inspect only the Compose build context, Dockerfile path/content, checkout HEADs and worktree status, and image history metadata. Do not pull, rebuild, recreate, restart, merge, deploy, reset, or modify database volumes until source provenance and backup/rollback details are understood. Never print `.env` contents or environment-variable values.
+
+
+## Running image identity and checkout check — 2026-10-12
+
+Latest read-only VM output confirms `job-radar-dev` is running image `sha256:13b233998d70787483762a563484aad8a38a6e21ecac49917f3ca913557f4c9f` and `v2-radar-1` is running `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`. The latter image ID is no longer inspectable as a local image (`No such image`), although the existing container still reports it as its runtime image. The current `v2-radar` image tag previously inspected points to a different image ID, `sha256:a0c38e435cbc64f13d028c040f25962586eb5050a83ac4b0d72673acd6a7a08d`; do not infer that the running production container has changed to that tag's image. Both Compose files use build context `..` and Dockerfile `v2/Dockerfile`. Dockerfiles exist in both checkouts. Production checkout HEAD is `61d8271480eaf48b0a6442b62b1b0bb9a032df34`; dev checkout HEAD is `54fc75cbfd6ad92b7b3a63fdc381473c34f459d2`. Their reported `behind 19` and `behind 69` counts are against local cached tracking refs and are not reliable indicators of current remote state. No runtime or repository state was changed.
+
+### Next safe step
+
+Read the two Dockerfiles and relevant Git history without exposing `.env` values, inspect `docker history` for the current dev and `v2-radar` tagged images, and inspect the running production container's mount/config metadata. The missing local production image object means image provenance is still unresolved; do not recreate or restart the running container, prune images, pull, rebuild, or deploy. Before any deployment, confirm the database backup and rollback strategy.
