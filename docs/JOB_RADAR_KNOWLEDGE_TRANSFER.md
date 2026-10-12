@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-11 — PR #21/#22 merged; free-first strategy and branch cleanup audited; v10 deployment pending  
+**Snapshot:** 2026-10-12 — v10 deployed; LinkedIn observation and fresh-alert validation pending  
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -8,31 +8,26 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 
 
-## Latest operating update — 2026-10-11 (read this first)
+## Current verified state — 2026-10-12
 
-### Production runtime vs latest code
-- User-supplied Oracle output after PR #19: health `ok`, app `2.0.0`, config version **9**, threshold `55`, `require_explicit_experience_for_alerts=false`, LinkedIn poll `120s`, Naukri `300s`. `/api/jobs?today_only=true&limit=500` returned 454 observations and 26 true profile matches ≥55.
-- Some older candidates were intentionally `suppressed` during the v9 policy migration to prevent a historical Telegram burst (e.g. HGS AI Engineer, Five9 Software Engineer II, Duncit Software Engineer, FICO Customer Engineer/AI); do not manually requeue those. Some qualifying jobs were already `sent`. This is not yet proof a fresh post-v10 match reaches Telegram end-to-end.
-- The repo is ahead of production. PR #21 merged as `6c93473844cd469493a0c61acf1477ba20252d69`; [CI #38161863816](https://github.com/AvinashBhalla/job-beeper/actions/runs/38161863816) passed 76 tests. It sets config v10, LinkedIn polling 180s, minimum global HTTP spacing 4s, one detail-enrichment worker, 2 first-page targets per scan and deep scans every 30m. PR #22 merged as `8eae61f2605c14903bccbc25c1a95d438e3a9f79`; [CI #38162375556](https://github.com/AvinashBhalla/job-beeper/actions/runs/38162375556) passed 76 tests and left only `.github/workflows/v2-ci.yml` on `v2-live-radar`. PR #23 recorded the merges and release gate.
-- **Production remains v9 until the user pulls and rebuilds.** Deploy v10, verify health and runtime config, then observe 20–30 minutes of request attempts/429/cooldown/scan/new-job yield. A clean run or an enforced cooldown does not mean LinkedIn will stop returning 429s.
+### Live deployment evidence
+- User confirmed `/health` status `ok`, app version `2.0.0`, uptime 26 seconds after rebuild, LinkedIn `running=true`, Naukri last success `2026-10-12T03:45:00.791518+00:00`, 296 jobs seen, 0 new, no error.
+- `/api/config` confirms config version 10, threshold 55, explicit-experience alert setting false, LinkedIn poll 180s, Naukri 300s, Instahyre 600s, Greenhouse 900s.
+- v10 is deployed. Still needs 20–30 minutes of timestamped logs, useful-job yield, 429/cooldown/escalation, and a fresh qualifying alert traced dashboard → ledger → Telegram. Do not call 429 fixed from health/config alone.
+- Prior v9 API showed 454 observations and 26 qualifying matches, with some old records intentionally suppressed to prevent a historical Telegram burst. Preserve those suppressions; validate a new opportunity instead.
 
-### LinkedIn 429: free-first policy
-- PR #17 already proved that its 120s scheduler cadence and cooldown were respected, but 429s recurred. PR #21 deliberately lowers request volume; it cannot promise zero 429s. Global stop-on-429, `Retry-After` honoring and escalating 5/10/20/30-minute cooldowns remain.
-- User prefers free and self-built methods before paid options. Do not use proxy/IP rotation, CAPTCHA bypass, fake identities or traffic disguise to evade access limits. LinkedIn's [User Agreement](https://www.linkedin.com/legal/user-agreement) and [prohibited scraping software page](https://www.linkedin.com/help/linkedin/answer/a1341387/prohibition-of-scraping-software) prohibit scraping software and limit evasion. A public guest endpoint is not guaranteed to match paid-scraper coverage.
-- Free-first expansion should emphasize permitted public ATS/company-career feeds, stable IDs, true posted timestamps, dedupe, per-source backoff and alert tests. [Lever's public postings API](https://github.com/lever/postings-api) offers published postings for a known site but not full-text search. The [Google Custom Search JSON API](https://developers.google.com/custom-search/v1/overview?hl=en) is unavailable to new customers and scheduled to discontinue on Jan 1, 2027; do not start a new integration on it. Paid scraping vendors stay deferred until free source coverage/yield is measured and their terms/data-use policies are reviewed.
+### Branch verification
+- `git rev-list --left-right --count origin/v2-live-radar...origin/optimize/behavior-preserving-pr12` returned `23 0` in the latest user command. This supersedes the previous `22 0` expectation because the release branch advanced. Zero ahead is the key safety condition; repeat refs/open-PR checks immediately before deletion.
+- Preserve `main`, `v2-live-radar`, and `naukri-relay`. Delete merged topic branches only after final remote-ref/open-PR audit; see the safe command at the end of `docs/JOB_RADAR_HANDOVER.md`.
 
-### Workflow, branch and main-promotion audit
-- PR #22 removed `.github/workflows/pages.yml`, `job-watch.yml`, `naukri-relay.yml`, and `check-sources.yml` from `v2-live-radar`; V2 CI remains. Those four legacy workflows are still in `main`; delete them through the later promotion PR, not direct commits now. Static Pages would call relative `/api` on the Pages host; V1 job-watch writes legacy JSON/state to main; the private Naukri workflow is superseded by the separate public relay repo and VM systemd timer; check-sources edits root V1 config.
-- Keep root `config.json` and root legacy modules for now: the separate Naukri relay checkout currently reads root `config.json`; don't remove that contract until the relay is deliberately migrated.
-- Keep only `main`, `v2-live-radar`, `naukri-relay` when branch cleanup finishes. PRs #15–#23 are merged. The stale `optimize/behavior-preserving-pr12` branch is 22 behind / 0 ahead; verify with `git rev-list --left-right --count origin/v2-live-radar...origin/optimize/behavior-preserving-pr12` before deleting. Safe deletion commands are at the end of `docs/JOB_RADAR_HANDOVER.md`. The connected GitHub tool cannot delete refs.
-- **Promote to main only after** v10 is deployed/observed and a fresh ≥55% match is verified end-to-end: dashboard status → canonical notification ledger → Telegram send, with no historical burst. Then make a dedicated, reviewed `v2-live-radar`→`main` PR that promotes V2, removes V1/static workflows, keeps V2 CI, verifies CI/smoke tests, and leaves Oracle on `v2-live-radar` until a documented cutover.
+### Next steps
+1. Collect 20–30 minutes of timestamped LinkedIn scan/429/cooldown/new-job logs and source status.
+2. Verify a fresh ≥55% match through dashboard → ledger → actual Telegram send; do not requeue v9 migration suppressions.
+3. Execute safe topic-branch cleanup after PR #25 has merged and remote refs/open PRs are rechecked.
+4. Promote `v2-live-radar` to `main` only after v10 monitoring and fresh-alert consistency pass, using a reviewed PR.
 
-### Exact next actions
-1. Pull/rebuild `v2-live-radar` using `--env-file .env`; expected config v10 / LinkedIn 180s / Naukri 300s.
-2. Send `git log -1`, health and runtime config output.
-3. After 20–30 minutes, send timestamped LinkedIn request/429/cooldown/new-job logs and source status.
-4. Validate a fresh qualifying match's notification status and actual Telegram send.
-5. Then perform the documented topic-branch cleanup. Main promotion follows the gate above.
+### Continuation prompt
+“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handovers after every user prompt. Oracle config v10 is deployed: health OK, threshold 55, experience gate false, LinkedIn 180s / Naukri 300s. Need 20–30 minutes of timestamped request/429/cooldown/new-job logs and source status, then fresh alert verification dashboard/ledger/Telegram. User's stale-branch comparison returned `23 0`; recheck refs/open PRs before deleting merged topics and preserve main/v2-live-radar/naukri-relay. Promote to main only after v10 and alert verification, in a reviewed PR. Prefer permitted free ATS/company-career sources; no LinkedIn limit evasion.”
 
 ## 1. Current state
 
@@ -122,7 +117,7 @@ The separate active relay is [`AvinashBhalla/job-beeper-naukri-relay`](https://g
 2. Do not requeue historical entries suppressed during the v9 migration. Preserve explicit incompatible-experience rejection, freshness, notification-off behavior, canonical dedupe and delivery-failure handling.
 
 ### P2 — Clean topic branches
-After verifying remote refs and no open/unique work, delete merged PR heads #15–#23 and the stale `optimize/behavior-preserving-pr12` branch (compare expected 22 behind / 0 ahead). Exact command is at the end of the detailed handover. Keep `main`, `v2-live-radar`, and `naukri-relay`.
+After verifying remote refs and no open/unique work, delete merged PR heads #15–#23 and the stale `optimize/behavior-preserving-pr12` branch (latest user check: 23 behind / 0 ahead; recheck before deletion). Exact command is at the end of the detailed handover. Keep `main`, `v2-live-radar`, and `naukri-relay`.
 
 ### P3 — Promote V2 to main
 Only after P0/P1 pass, create a dedicated reviewed `v2-live-radar`→`main` PR. Include V2 app/docs, removal of the four old V1 workflows, retain V2 CI, run CI/smoke tests, then schedule a deliberate cutover. No direct/force push; keep Oracle on `v2-live-radar` until verified.
@@ -165,3 +160,7 @@ The workflow inventory was inspected on both `main` and `v2-live-radar`. [PR #22
 - PR #22 merged as `8eae61f2605c14903bccbc25c1a95d438e3a9f79`; CI #38162375556 passed 76 tests. `v2-live-radar` now retains only V2 CI. `main` is intentionally unchanged and still has its legacy workflows pending promotion.
 - PR #15–#21 topic heads are merged candidates for deletion after checking remote refs/extra commits; keep `main`, `v2-live-radar` and `naukri-relay`. Commands are in the detailed handover.
 - Promote to main after PR #21 is deployed/observed, a fresh match proves dashboard/ledger/Telegram agreement, and branch/workflow cleanup is complete. Use a separate reviewed PR; do not switch the VM deployment ref/default branch until CI and smoke tests pass.
+
+
+## Latest user prompt — 2026-10-12
+No application-code changes. User confirms config v10 is live. Both handover files record the live config, `23 0` branch comparison, exact 20–30-minute observation command, safe cleanup, and the promotion gate. Update both docs again after the next prompt.
