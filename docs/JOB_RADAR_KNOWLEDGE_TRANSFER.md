@@ -954,3 +954,16 @@ Recommended next validation is a disposable one-off container from the dev image
 - Re-read `docs/JOBBEEPER_REFERENCE.md`: Greenhouse adapter already exists, is disabled, and next planned source step is a one-board development canary with notifications off; acceptance criteria include two polls, stable IDs/deduplication, first_published timestamp behavior, request/error isolation, and useful yield. Instahyre schema/freshness validation follows; Ashby, Lever, and SmartRecruiters are later one-at-a-time adapters.
 - Recommended next work: resume planned roadmap, starting with a concise Greenhouse one-board canary acceptance checklist and read-only verification that current dev runtime/config and authorized Docker visibility support a safe isolated test. Do not enable the source until runtime/config are verified and the user explicitly authorizes the canary. Keep notifications off, Gemini shadow-only/disabled until its quality gate is satisfied, and production untouched.
 - Production image/source provenance, named-volume identity, and verified backup/rollback remain unresolved gates. No production deployment, restart, source activation, or database modification occurred.
+
+
+## Implement read-only Greenhouse two-poll canary — 2026-10-13
+
+- Implemented directly on `v2-live-radar`:
+  - Added `v2/greenhouse_canary.py`, a read-only CLI that fetches one explicitly selected public Greenhouse board twice through the existing collector and reports total/unique IDs, stable/new/missing IDs, and second-poll first-published timestamp coverage.
+  - The default gap is 900 seconds; intervals under 60 seconds are rejected. It does not write the radar DB, run matching, change `source_enabled`, or send notifications.
+  - Added `v2/test_greenhouse_canary.py` with tests for report metrics, two-poll sequencing, input validation, and no collector call for an invalid interval.
+  - Added usage and safety/acceptance notes to `docs/JOBBEEPER_REFERENCE.md`. The existing dev config keeps Greenhouse disabled.
+- GitHub commits on `v2-live-radar`: script `14c74222751a4bb466bf4d05f2ffe39a370954c6`; tests `30b85ad1c494a452f464909b045da66d9892d09e`; reference docs `fea5b112492e85f071e211370d4eba7728610821`.
+- CI run #708 for the test commit was observed in progress at handover time; do not record it as passed until checked. No live Greenhouse poll has been run yet, so no canary yield/timestamp result is claimed.
+- Next: confirm CI #708 result; then pull the branch in the development checkout and build only the development Compose image. Run the CLI against one selected configured board with notifications still disabled, retain the JSON output, and evaluate two-poll acceptance before any scheduler activation.
+- Production was not changed. Do not build/deploy production or enable Greenhouse in production as part of this task.
