@@ -644,3 +644,8 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 ## Individual test command correction — 2026-10-12
 - The user-provided five-heading loop ran full `unittest discover` five times and only filtered the output with `grep`; it did not isolate the named tests. Each full-suite run passed all 78 tests.
 - Use `python -m unittest v2.test_radar.MatcherTests.<exact_test_method> -v` from `/app` to execute exactly one named method. Run each of the five CI-failing methods in a fresh invocation within the network-disabled Docker container, with source mounted read-only. Continue to compare environment/workflow only after obtaining true isolated results. No code changes, merge, or deployment authorized.
+
+## CI command/import-mode discrepancy — 2026-10-12
+- All five formerly failing tests now pass in true individual invocations (`python -m unittest v2.test_radar.MatcherTests.<method> -v`), and the full suite has repeatedly passed 78/78 using `discover -s v2 -t .`.
+- CI run #543 logs show Ubuntu 24.04 and CPython 3.12.15; workflow executed `python -m unittest discover -s v2 -p 'test_*.py' -v` without `-t .`, producing five failures in 20.472 seconds. The local command used a different unittest discovery/import mode (`v2.test_radar` vs CI's `test_radar`). This is a confirmed setup difference, but not yet confirmed as the cause.
+- Next: run the exact CI unittest command inside the network-disabled disposable container from `/app`, with source mounted read-only and omit `-t .`. Then compare environment/dependency versions if needed. Do not change application code based on assumptions. PR #36 stays open/unmerged; production/dev safety restrictions unchanged.
