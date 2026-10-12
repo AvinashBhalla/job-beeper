@@ -42,6 +42,16 @@ class GeminiValidationTests(unittest.TestCase):
         result = gemini._validate_result({**self.payload, "experience_evidence": "10 years guaranteed"}, self.description)
         self.assertIsNone(result["experience_evidence"])
 
+    def test_verbatim_evidence_survives_whitespace_line_wraps(self):
+        description = "Required experience: 4-6 years of professional\\n experience. Python and FastAPI are required."
+        result = gemini._validate_result(self.payload, description)
+        self.assertEqual(result["experience_evidence"], "4-6 years of professional experience")
+
+    def test_prompt_requires_verbatim_evidence_and_conservative_scope(self):
+        self.assertIn("exact, contiguous quote copied verbatim", gemini.PROMPT_PREFIX)
+        self.assertIn('focus on Salesforce', gemini.PROMPT_PREFIX)
+        self.assertIn("use unknown", gemini.PROMPT_PREFIX)
+
     def test_skips_when_feature_disabled_without_network(self):
         with TemporaryDirectory() as tmp:
             with patch.dict(os.environ, {"GEMINI_EXTRACTION_ENABLED": "false", "GEMINI_API_KEY": "not-used"}):
