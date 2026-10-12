@@ -289,3 +289,31 @@ User wants an LLM to extract JD skills and required experience because determini
 
 ### Continuation prompt
 “Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. User supplied successful dev verification: 78 tests pass in 53.339s; dev health OK at port 8001, config v10 is Naukri-only with notifications off, source status agrees, and production port 8000 remains healthy. The LinkedIn experience parser fix is ready for reviewed promotion to main; verify main CI, but do not switch the production VM checkout as part of promotion. User proposed an LLM to extract skills/experience from JDs. No LLM implementation/provider has been chosen. Design it as a separate disabled-by-default strict-schema extractor with local validation, deterministic/source-labelled metadata precedence, uncertainty on conflicts, prompt-injection isolation, cache by JD hash/schema, timeouts/backoff and hard spend caps. Shadow mode first with notifications off; evaluate required/preferred skills, year ranges, skill-specific vs total experience, missing/conflicting fields and malicious text. Select provider and secure budget/secrets before coding. No production change; then Greenhouse one-board dev canary and later Instahyre/ATS roadmap.” 
+
+
+## 2026-10-12 — Gemini JD extraction implemented in dev branch (not yet VM-verified)
+
+### User decision
+Use Gemini for job-description extraction; the user will enter the API key directly on the dev VM. Work stays on \`v2-live-radar\`; do not merge or deploy this feature to production.
+
+### Code changes
+- Added \`v2/gemini_extractor.py\`: bounded Gemini REST integration with strict structured JSON output and local semantic validation for overall experience range/type/evidence, required skills, preferred skills, and confidence.
+- Default model is \`gemini-3.5-flash-lite\` (configurable via \`GEMINI_MODEL\`). Google’s current pricing page lists a free tier for this model and a 1M-token context window; free-tier content may be used to improve Google products. Confirm current model quota/terms in AI Studio before enabling.
+- Wired extraction into \`run_source\` as shadow-only. Extracted values are stored separately in SQLite table \`gemini_shadow_cache\`; they do not modify jobs, matching, scores, notification decisions, or Telegram delivery.
+- Added \`GET /api/llm-shadow-status\`, returning enabled/key-configured booleans, model, usage caps, cache summary, and recent structured results. It never returns the key or raw JD.
+- Dev Compose accepts \`GEMINI_API_KEY\`, \`GEMINI_MODEL\`, \`GEMINI_EXTRACTION_ENABLED\`, \`GEMINI_MAX_CALLS_PER_RUN\`, and \`GEMINI_MAX_CALLS_PER_DAY\`. Defaults: disabled, 3 calls per source run, 20 calls/day. Output is capped and cached by source/job/JD hash; errors are briefly cached. API key is passed only through runtime environment, never committed.
+- Added \`v2/test_gemini_extractor.py\` for validation, evidence checks, cache behavior, disabled-by-default behavior, and no mutation of source job data.
+
+### Verification status
+- Code/config committed directly to \`v2-live-radar\`; latest known application patch commit: \`5a73bd041bbf5455b1fa9c0a0828ce21a39ecab3\` (later doc commits follow).
+- The new Gemini test suite and the full 78-test existing suite have **not yet been run on the dev VM**. Do not describe this as verified or production-ready until the dev rebuild, full test suite, API smoke test (with key kept hidden), status endpoint, and production health check pass.
+- Production must remain unchanged at port 8000. Dev remains loopback-only at port 8001, with notifications disabled and Naukri as the only enabled source.
+- No key, secret, raw JD, or full model request/response should be copied into GitHub, handover docs, logs, or chat. Avoid sending candidate PII; only public job-posting text is in scope.
+
+### Next steps
+1. On the VM, fetch \`v2-live-radar\`, enter the key through a hidden prompt, export the Gemini environment variables, rebuild only \`job-radar-dev\`, run the full unit suite, and verify \`/health\`, \`/api/config\`, \`/api/llm-shadow-status\`, and port 8000 health. Keep notifications off.
+2. Review the first shadow outputs for explicit overall experience vs skill-specific experience, required vs preferred skills, null handling, and confidence. Confirm no matcher/alert output changes.
+3. Fix any failures before further work. Keep Gemini shadow-only until accuracy is measured on representative fixtures. Do not promote or merge as part of this VM smoke test.
+
+### Continuation prompt
+“Continue Job Radar V2. First read \`docs/JOB_RADAR_HANDOVER.md\`, \`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md\`, and \`docs/JOBBEEPER_REFERENCE.md\` on \`v2-live-radar\`; update both handover docs after every prompt. Gemini extraction has now been implemented on \`v2-live-radar\` as a disabled-by-default, separately cached, shadow-only feature. Default model is \`gemini-3.5-flash-lite\`; runtime env key is \`GEMINI_API_KEY\`, feature toggle \`GEMINI_EXTRACTION_ENABLED=true\`, limits 3 calls/run and 20/day. New tests are not yet verified on the dev VM. Next: hidden-input API key, rebuild only dev port 8001, run all tests, check \`/api/llm-shadow-status\`, keep notifications off, and confirm production port 8000 remains healthy. Do not merge or deploy. Never log or commit secrets.”
