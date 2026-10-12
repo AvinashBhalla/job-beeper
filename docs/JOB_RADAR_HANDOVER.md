@@ -2741,3 +2741,11 @@ HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_conf
 - Next run the full project test suite inside dev, including Gemini extractor tests. Do not run live scans or Gemini API calls. If green, review CI and parser patch before any promotion decision.
 - LinkedIn remains disabled; notifications off; Gemini disabled; production port 8000 untouched; PR #35 unmerged.
 - Continuation: Read both handovers and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`, update both handovers after every prompt. Dev radar module passed 80 tests in 53.200s. Run full suite in container including Gemini tests, no scans/API calls, then review CI. Keep LinkedIn disabled, notifications off, Gemini disabled, production untouched, PR #35 unmerged.
+
+
+## 2026-10-12 — Release diff blocked by missing local base ref
+- User reports dev checkout status clean and aligned: `## v2-live-radar...origin/v2-live-radar`; HEAD `54fc75c` (`docs: record source status CI success`). Recent log shows documentation commits only in the last five entries.
+- `git diff origin/main...HEAD -- v2/radar.py v2/test_radar.py` failed with `fatal: bad revision 'origin/main...HEAD'`. This indicates the local clone cannot resolve `origin/main`; it does not prove anything about the parser patch itself.
+- Next: run read-only `git remote -v`, `git branch -a`, `git show --stat --oneline HEAD`, and `git log --oneline --all -- v2/radar.py v2/test_radar.py | head -20`. Then fetch the intended remote main ref if appropriate and compare the exact parser/test diff. Do not merge/deploy until reviewed.
+- Test evidence: user reported full dev-container suite passed, 88 tests in 53.229s. This is not production validation. Keep LinkedIn disabled, notifications off, Gemini disabled, production port 8000 untouched, PR #35 unmerged.
+- Continuation: Read both handovers and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`, update both handovers after every prompt. Current release review is blocked because `origin/main` is not resolvable in the dev clone. Collect the read-only remote/branch/history output, then fetch/compare safely and review parser/test changes. No production promotion yet.
