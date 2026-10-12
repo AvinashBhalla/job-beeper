@@ -29,8 +29,8 @@ EXTRACTION_VERSION = "gemini-shadow-v1"
 RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
     "properties": {
-        "experience_min_years": {"type": ["NUMBER", "NULL"]},
-        "experience_max_years": {"type": ["NUMBER", "NULL"]},
+        "experience_min_years": {"type": "NUMBER", "nullable": True},
+        "experience_max_years": {"type": "NUMBER", "nullable": True},
         "experience_type": {
             "type": "STRING",
             "enum": ["required", "preferred", "unspecified"],
@@ -39,7 +39,7 @@ RESPONSE_SCHEMA: dict[str, Any] = {
             "type": "STRING",
             "enum": ["total_professional", "skill_specific", "unknown"],
         },
-        "experience_evidence": {"type": ["STRING", "NULL"]},
+        "experience_evidence": {"type": "STRING", "nullable": True},
         "required_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
         "preferred_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
         "confidence": {"type": "NUMBER"},
