@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — v10 deployed; LinkedIn observation and fresh-alert validation pending  
+**Snapshot:** 2026-10-12 — PR #26 workflow audit merged; v10 observation pending  
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -21,8 +21,8 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 - **Retain V2 CI.** The old main version of `v2/radar.py` still points to `raw.githubusercontent.com/AvinashBhalla/job-beeper/naukri-relay/...`; `.github/workflows/naukri-relay.yml` populates that private branch. The active release branch uses the separate public `job-beeper-naukri-relay` repository and the VM timer. Remove the private workflow/branch only together with replacing main's old URL/code during the V2 promotion. Do not delete the private `naukri-relay` branch now.
 
 ### Branch cleanup
-- User's latest stale-branch check returned `24 0` (release branch ahead by 24 commits relative to the stale optimization branch; the stale branch has zero commits ahead). The behind count changes as docs/releases merge, so zero ahead is the relevant signal. Re-check refs and open PRs just before deletion.
-- The deletion command they were preparing omitted `docs/record-v10-deployment-20261012` (merged PR #25); add it. PR #26's branch `docs/main-workflow-audit-20261012` should also be deleted after it merges. Keep `main`, `v2-live-radar`, `naukri-relay` until main promotion.
+- User's preflight returned `24 0`; after PR #26 merged, current GitHub comparison is `25 behind / 0 ahead`. The behind count changes as docs/releases merge; zero ahead is the relevant signal. Re-check remote refs and open PRs just before deletion.
+- The delete command must include PR #25's `docs/record-v10-deployment-20261012` and PR #26's `docs/main-workflow-audit-20261012`; after PR #27 merges, include `docs/record-workflow-audit-merge-20261012`. Preserve `main`, `v2-live-radar`, `naukri-relay` until main promotion.
 
 ### Main promotion gate
 Do not promote yet. First complete v10 LinkedIn request/yield measurement and confirm one new match scoring ≥55% follows dashboard → canonical ledger → Telegram. Then prepare a dedicated reviewed `v2-live-radar`→`main` PR that replaces the legacy private Naukri URL with the separate public relay, removes unused/legacy workflow files and private relay data branch, preserves V2 CI, and runs CI/smoke tests. Do not direct-push/force-push main or switch Oracle deployment ref until a separately verified cutover.
@@ -30,7 +30,7 @@ Do not promote yet. First complete v10 LinkedIn request/yield measurement and co
 ### Next actions
 1. After 20–30 minutes of v10 runtime, send the timestamped LinkedIn log/source-status output requested in the detailed handover.
 2. Verify a fresh ≥55% match end-to-end without replaying suppressed older entries.
-3. After PR #26 merges, re-run remote refs/open-PR audit and delete merged topic branches, adding PR #25 and #26 heads to the list.
+3. After PR #27 merges, re-run remote refs/open-PR audit and delete merged topic branches, including PR #25 (`docs/record-v10-deployment-20261012`), PR #26 (`docs/main-workflow-audit-20261012`), and PR #27's `docs/record-workflow-audit-merge-20261012`.
 4. Promote V2 to main only after those checks pass.
 
 ### Continuation prompt
@@ -171,3 +171,7 @@ The workflow inventory was inspected on both `main` and `v2-live-radar`. [PR #22
 
 ## Latest user prompt — 2026-10-12
 No application-code changes. User confirms config v10 is live. Both handover files record the live config, `23 0` branch comparison, exact 20–30-minute observation command, safe cleanup, and the promotion gate. Update both docs again after the next prompt.
+
+
+## Latest user prompt — workflow audit — 2026-10-12
+PR #26 merged as `ed7c159b1d0c4cc46d9f8be297f9551d06535bc5`; CI #38202816842 passed. Main workflow audit: keep V2 CI; retire `deploy-dashboard`/Pages, disabled `job-watch` and root-config `check-sources` during the reviewed V2 promotion; retain private `naukri-relay.yml` and branch until main's old code reference points at the separate public relay. User output was `24 0`, then GitHub comparison after PR #26 was `25 0`. Both handover docs record the audit and corrected cleanup list. No app code changed.
