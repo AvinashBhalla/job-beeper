@@ -327,3 +327,24 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 - Draft validation PR: https://github.com/AvinashBhalla/job-beeper/pull/35. It is not merged and must not be merged until dev VM tests and shadow review pass. The GitHub connector reported no status checks/workflow runs for the latest head at the time of this update; this is not evidence of passing CI.
 - Latest app-code commit at this point: \`cd3a8a694e08b451d738d6fbc789b86c323c4f5b\`. New and existing tests have not yet been executed on the VM.
 
+
+
+## 2026-10-12 — Dev VM feedback: test syntax fixed; rerun required
+
+### User-reported evidence
+- The Gemini API smoke test succeeded with the synthetic posting and returned 4–6 years, required Python/FastAPI, preferred Kubernetes, and \`total_professional\` scope.
+- Dev health was OK; Naukri was the only enabled source. Dev config confirmed \`notifications_enabled=false\`; production port 8000 remained healthy.
+- \`/api/llm-shadow-status\` showed Gemini enabled/configured, 3 calls today, 3 successful cached results, 0 errors. Recent Naukri results included several role/domain experience ranges incorrectly or ambiguously labeled \`skill_specific\`; treat this as an extraction-quality issue, not a matcher input, because mode remains shadow-only.
+
+### Fixes made on \`v2-live-radar\`
+- Fixed malformed dictionary/list brackets in \`v2/test_gemini_extractor.py\` that caused a SyntaxError during unittest discovery. Fix commit: \`7941a99129614ffb03a7406e8fd002e1535fb05d\`.
+- Tightened the prompt in \`v2/gemini_extractor.py\`: \`total_professional\` requires explicit overall/total/professional/work wording; named technology experience is \`skill_specific\`; role/domain-only phrases such as “Java Full Stack Development experience” should be \`unknown\` unless scope is explicit. Prompt change commit: \`def76ed2fe1f181b8501f25c09098161ef669b87\`.
+- The previously reported full test run is **failed**, not passed: 79 tests discovered, with one import-time SyntaxError. No new full test run has yet confirmed the fix.
+
+### Immediate next steps
+1. Fetch latest \`origin/v2-live-radar\` on \`/home/ubuntu/job-beeper-dev\`.
+2. Rebuild only \`job-radar-dev\`, rerun the full unittest discovery. Do not continue if any tests fail.
+3. Recheck dev health/config, \`/api/llm-shadow-status\`, and production port 8000. Keep notifications disabled.
+4. Inspect new shadow rows after the next permitted source run. The model output remains observational only; do not connect it to matcher decisions or alerts yet.
+5. Do not merge draft PR #35 or deploy to production until full tests and a representative shadow evaluation pass.
+
