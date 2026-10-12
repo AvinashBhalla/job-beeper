@@ -27,6 +27,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
+from v2.gemini_extractor import shadow_extract_jobs, shadow_status
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -2521,6 +2522,35 @@ def run_source(source: str, config: dict[str, Any]) -> None:
     source_state.setdefault(source, {})["running"] = True
     try:
         jobs = COLLECTORS[source](config)
+
+        # Gemini is deliberately shadow-only: store a separately validated
+        # extraction for evaluation, but never modify matcher inputs or alerts.
+        shadow_candidates = [
+            job for job in jobs
+            if title_allowed(job.get("title", ""), config)
+            and location_allowed(job.get("location", ""), config)
+            and (
+                match_details(job, config)["match"]
+                or phrase_hits(config.get("target_roles", []), job.get("title", ""))
+            )
+        ]
+
+        def _experience_known_for_shadow(job: dict[str, Any]) -> bool:
+            if job.get("jd_experience_min_years") is not None or job.get("jd_experience_max_years") is not None:
+                return True
+            description = job.get("description") or ""
+            if extract_linkedin_labeled_experience(description) != (None, None):
+                return True
+            if extract_jd_experience(description) != (None, None):
+                return True
+            return extract_experience(f"{job.get('title', '')} {description}") != (None, None)
+
+        shadow_extract_jobs(
+            shadow_candidates,
+            DB_PATH,
+            experience_known=_experience_known_for_shadow,
+            configured_skills=config.get("skills", []),
+        )
         new_jobs = upsert_jobs(jobs, config)
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
@@ -2996,6 +3026,12 @@ def opportunity_detail(opportunity_id: int):
         "opportunity": dict(opportunity),
         "observations": [dict(row) for row in observations],
     }
+
+
+@app.get("/api/llm-shadow-status")
+def llm_shadow_status():
+    """Return bounded Gemini shadow-mode health without exposing credentials or JD text."""
+    return shadow_status(DB_PATH)
 
 
 @app.get("/api/daily-summary")
