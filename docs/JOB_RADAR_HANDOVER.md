@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-12 (dual-instance Compose/config committed; branch inventory clean; VM rollout pending)**
+**Last updated: 2026-10-12 (LinkedIn experience metadata regression fix committed to v2; CI passed; dev VM verification pending)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -15,12 +15,12 @@
 >
 > ## Current handoff — 2026-10-12 (authoritative; supersedes historical next-task lists)
 > - **Goal:** dependable fresh multi-source discovery → truthful timestamps/stable IDs → canonical dedupe → deterministic matching → one persisted notification decision → consistent dashboard and Telegram delivery. Grow useful coverage without sacrificing accuracy or rate-limit safety. Architecture reference: `docs/JOBBEEPER_REFERENCE.md`.
-> - **GitHub release:** PR #30 promoted V2 to `main` (`b384b8d6…`); main CI passed. PR #31 synced handover docs; PR #33 synced roadmap; PR #34 corrected branch audit. No open PRs at last audit. `main` and `v2-live-radar` have identical blobs for `v2/radar.py`, `v2/config.json`, `v2/docker-compose.yml`, `v2/Dockerfile`, `v2/requirements.txt`, `dashboard/index.html`, and `.github/workflows/v2-ci.yml`. Runtime behavior is the same; branch differences are docs/dev setup. Oracle still runs the existing service from `/home/ubuntu/job-beeper` on port 8000; GitHub promotion has not switched the running deployment.
-> - **Requested VM model:** same Oracle VM, two isolated Compose projects: production `/home/ubuntu/job-beeper` on `main`, port 8000, retaining the existing production volume and `.env`; development `/home/ubuntu/job-beeper-dev` on `v2-live-radar`, container `job-radar-dev`, loopback-only port 8001, separate volume/database/runtime config/config token. Access development only through an SSH tunnel.
-> - **Development safety files committed directly to `v2-live-radar`:** `v2/docker-compose.dev.yml` commit `da81d4bf…`, `v2/config.dev.json` commit `d14fb3ec…`; root `README.md` updated at `50293998…`. Dev uses independent project/volume, binds `127.0.0.1:8001`, has Telegram credentials blank, uses Naukri relay only, and disables LinkedIn/Instahyre/Greenhouse plus notifications. This gives the dashboard fresh sample data without Telegram spam or doubling LinkedIn traffic. These files are committed but have not yet been run on Oracle.
-> - **Runtime evidence:** config v10, threshold 55, explicit-experience alert gate false, LinkedIn poll 180s and Naukri 300s. A ~27-minute LinkedIn sample showed 22 attempts without visible 429/failure; encouraging but not a long-term guarantee. Three recent qualifying matches (two LinkedIn, one Naukri) were alertable and sent without errors in ~17–35 seconds. Keep historical v9 migration suppressions; never replay them.
+> - **GitHub release:** PR #30 promoted V2 to main; main CI passed. Production VM has not been switched yet. User wants main for production and v2-live-radar for development. Update docs directly on v2-live-radar; do not create docs-only branches/PRs.
+> - **VM model:** production /home/ubuntu/job-beeper -> main, port 8000, existing volume and .env; development /home/ubuntu/job-beeper-dev -> v2-live-radar, isolated Compose project/database/token, loopback-only port 8001, Telegram disabled. Dev clone/container has not yet been verified after the current patch.
+> - **Development safety files:** v2/docker-compose.dev.yml commit da81d4bf..., v2/config.dev.json commit d14fb3ec..., root README commit 50293998.... Dev config enables Naukri relay only; notifications off; LinkedIn, Instahyre and Greenhouse disabled.
+> - **Prior runtime evidence:** config v10 had threshold 55, LinkedIn poll 180s, Naukri 300s. A 27-minute LinkedIn sample showed 22 requests without visible 429/failures, limited evidence only. Three recent matches (two LinkedIn, one Naukri) were sent without errors in 17-35 seconds. Preserve historical v9 migration suppressions.
 > - **Workflow and Naukri:** main retains `.github/workflows/v2-ci.yml` and no longer contains Pages, job-watch, check-sources or private Naukri workflow. Both app branches consume the separate public `AvinashBhalla/job-beeper-naukri-relay` feed. Never delete or alter the public relay branch as part of private repo cleanup.
-> - **Current branch inventory:** latest GitHub audit now shows only `main` and `v2-live-radar`; the temporary docs branch created during prior work is already gone. Do not issue another branch deletion. User explicitly requested direct commits on `v2-live-radar` for documentation; continue that way and do not create docs-only branches.
+> - **Current branch inventory:** only main and v2-live-radar remain in the private repo at last audit. Preserve both. Do not create new branches solely for documentation.
 > - **Exact next sequence:** (1) remove the temporary docs branch; (2) create `/home/ubuntu/job-beeper-dev` from `v2-live-radar` and start isolated dev Compose; verify health, source toggles, port, and data volume; (3) back up production DB/config and inspect the actual Compose project/volume and clean git status; (4) switch the existing production checkout to `main` and rebuild using the same Compose project/volume; smoke-test health/config/dashboard/source status/Naukri/Telegram; (5) observe LinkedIn request/yield for 24–72 hours; (6) run a guarded Greenhouse single-board canary; then add structured ATS sources one at a time.
 > - **Next exact user action:** run the command in the latest chronological handoff below. It leaves the current production container on port 8000 untouched while starting dev on loopback port 8001. Return its health/config/source/resource output. Do not cut production over until dev is healthy and backup/volume identity are verified.
 > - **Mandatory handover rule:** update both `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` after every prompt, including evidence-only turns. Record goal, evidence, paths, commits/CI, actual deployment state, risks, exact next action and continuation prompt. Treat this top block as authoritative; later dated items are history. Never expose secrets; one issue at a time; verify after deployment.
@@ -2344,3 +2344,63 @@ Expected: production container still serves port 8000; dev serves only 127.0.0.1
 
 ## Branch inventory correction — 2026-10-12
 Latest GitHub branch query after the dev setup and direct documentation commits returned only `main` and `v2-live-radar`; the temporary `docs/next-phase-roadmap-20261012` branch is already absent. No branch cleanup command is needed. This update was committed directly to `v2-live-radar`, not a docs branch. Latest handover CI for the previous current head succeeded at run #38209927504; the next update will require its own CI.
+
+
+## Latest handoff — 2026-10-12: LinkedIn experience extraction patch on development branch
+
+### Bug and root cause
+The screenshots show Cvali's LinkedIn Cloud & AI Engineer posting with the visible metadata field Experience: 4.00-6.00 Years. The dashboard/Telegram instead displayed experience as unspecified and sent a 61% match. With candidate experience 2 years and maximum job experience 3 years, a correctly parsed 4-6 year requirement should reject the job. Root cause: linkedin_collect used generic numeric experience detection to skip JD enrichment when a search snippet contained any years phrase; additionally, _linkedin_job_description selected a description element but did not preserve LinkedIn's separate Experience metadata field when it appeared outside that element.
+
+### Patch and verification
+- v2/radar.py commit 6ac58a1d4757c3c545203b84a61f4f8058d4747b adds a strict LinkedIn labeled-experience parser, checks full-page text, preserves that metadata ahead of generic JD content, and prevents a generic snippet number alone from skipping detail enrichment.
+- v2/test_radar.py commit 22496f9714a7628d4c93929005a2d10773a753cc adds two regression tests: metadata outside the description element and generic experience snippets still requiring JD enrichment.
+- V2 CI run 38211941792 passed compile plus the full unit suite on head 22496f9714a7628d4c93929005a2d10773a753cc.
+- Fix is on v2-live-radar only. It has not yet been rebuilt on the Oracle dev instance, merged to main or deployed to production. Do not promote until the dev test command below passes.
+- Correctness can require more JD detail requests when snippets contain incidental years; the global 4-second pacing and stop-on-429 cooldown remain in place. Measure request/yield behavior after verification.
+
+### Exact development-only command
+Run this on Oracle; only the dev service on port 8001 is rebuilt, and tests use a dev-built image with a temporary DB path:
+```bash
+set -e
+cd /home/ubuntu/job-beeper-dev
+git fetch origin
+git switch v2-live-radar
+git pull --ff-only origin v2-live-radar
+
+echo '=== REBUILD DEV ONLY ==='
+sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build radar
+sleep 5
+
+echo '=== FULL UNIT SUITE FROM DEV-BUILT IMAGE ==='
+DEV_IMAGE=$(sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml images -q radar | head -n1)
+test -n "$DEV_IMAGE"
+sudo docker run --rm -e JOB_RADAR_DB=/tmp/job-radar-tests.db "$DEV_IMAGE" python -m unittest discover -s v2 -p 'test_*.py' -v
+
+echo '=== DEV HEALTH ==='
+curl --max-time 10 -fsS http://127.0.0.1:8001/health
+echo
+
+echo '=== DEV SAFE CONFIG ==='
+curl --max-time 10 -fsS http://127.0.0.1:8001/api/config | python3 -c 'import json,sys; c=json.load(sys.stdin)["config"]; print(json.dumps({"config_version":c.get("config_version"),"source_enabled":c.get("source_enabled"),"notifications_enabled":c.get("notifications_enabled")},indent=2))'
+
+echo '=== DEV SOURCE STATUS ==='
+curl --max-time 10 -fsS http://127.0.0.1:8001/api/source-status
+echo
+
+echo '=== PRODUCTION STILL HEALTHY ==='
+curl --max-time 10 -fsS http://127.0.0.1:8000/health
+echo
+```
+Expected: all tests pass; dev health is ok; dev notifications false and only Naukri enabled; port 8000 production remains healthy. Do not paste tokens, .env values or credentials. Once the user returns a green result, promote the tested patch to main via a reviewed PR/merge and confirm main CI; do not switch the Oracle production checkout during this patch promotion.
+
+### Source expansion order
+- Current active: LinkedIn low-volume guest search and Naukri public relay.
+- Implemented but disabled: Greenhouse public Job Board API adapter (three configured boards; prior dry-run around 298 rows without DB writes), and Instahyre adapter (endpoint schema/freshness must be verified again).
+- Next after experience patch is proven: enable Greenhouse in dev on one board only, notifications still off. Validate at least two polls, stable IDs, original posting precision, dedupe/new counts, error/backoff, and no historic alert burst. Then expand selected boards.
+- Instahyre: test live response schema, stable IDs, posted timestamp, useful new-job yield and failure behavior in dev before enabling it there. Do not enable directly in production first.
+- First new structured ATS adapters: Ashby, Lever, SmartRecruiters. Then assess Workable/Recruitee only after confirming usable public interfaces; their official integrations can require tenant credentials.
+- Remaining requested providers requiring per-employer board/domain discovery: Avature, BambooHR, Breezy HR, Darwinbox, Eightfold AI, Freshteam, Hireology, HRsmart, iCIMS/Jibe, Jobvite, Keka, Oracle Cloud Recruiting, Paycom, PeopleStrong, Phenom People, Rippling ATS, SAP SuccessFactors, Oracle Taleo, Teamtailor, UKG Pro/UltiPro, Workday, Zoho Recruit. Separate job boards/aggregators to evaluate: Cutshort, Hirist, Wellfound and Y Combinator jobs.
+- Most vendor platforms do not expose a universal global feed. For each integration we need a supported public endpoint or allowed company career page, discovered board identifiers, truthful timestamps, stable IDs, incremental pagination, failure isolation, tests and shared alert-ledger behavior. Do not mark a vendor integrated merely because an adapter shell exists.
+
+### Continuation prompt
+Continue Job Radar V2. Read both handovers and docs/JOBBEEPER_REFERENCE.md. Update both handover documents directly on v2-live-radar after every prompt; do not create docs-only branches. The LinkedIn experience parser regression fix is committed on V2 (radar 6ac58a1d; tests 22496f97); CI run 38211941792 passed. User screenshot showed Experience 4.00-6.00 Years but dashboard/Telegram sent an unknown-experience 61% match. Root cause: generic search-snippet years skipped actual JD enrichment and the parser did not preserve a separate labeled Experience field. Next run detailed handover's dev-only command: pull/rebuild job-radar-dev on port 8001, run the full test suite using dev-built image and temporary DB, verify dev safe config plus production health. Not merged to main or deployed yet. After dev passes, promote fix to main through reviewed merge and CI. Then Greenhouse single-board dev canary, then Instahyre endpoint/freshness validation, then Ashby, Lever, SmartRecruiters, and remaining employer-tenant ATS adapters. Keep dev notifications disabled; don't turn on LinkedIn in dev while production queries it. Preserve production volume and do not switch branch as part of the bugfix.
