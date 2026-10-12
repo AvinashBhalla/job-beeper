@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — v10 27-minute observation shows no visible 429; topic cleanup complete; fresh-alert validation pending  
+**Snapshot:** 2026-10-12 — v10 low-pressure window clean; 3 fresh qualifying alerts sent; main promotion PR next  
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -13,7 +13,7 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 ### Live deployment and LinkedIn observation
 - User confirmed `/health` OK, app `2.0.0`, config version 10, threshold 55, explicit-experience alert setting false, LinkedIn poll 180s and Naukri poll 300s.
 - User later supplied logs for about 27 minutes, 04:15:05–04:42:05 UTC: 10 scan summaries, 22 requests attempted total (nine scans ×2 and one deep scan ×4), `failed_requests=0` for every shown scan, and no visible 429/cooldown warnings. Latest source status reported `jobs_seen=2`, `new_jobs=0`, `error=null`.
-- This is a good initial low-pressure sample, but not proof that 429 can never recur. It does not reveal cumulative new-job yield for the full window. Next check the API for jobs discovered in the last 30 minutes and trace a fresh ≥55% profile match through dashboard → persisted notification ledger → actual Telegram delivery. Keep older v9 migration suppressions; never replay the historical backlog.
+- This is a good initial low-pressure sample, but not proof that 429 can never recur. User then checked jobs discovered in the last 30 minutes and found 3 genuine profile matches ≥55%, all `alertable=true`, `notification_status=sent`, no delivery errors: Talentgigs Back End Developer–Next JS (85%, ~29s after discovery), D Square Consulting Full Stack Developer (94%, ~17s), and Naukri Creative Hands HR Software Engineer (76%, ~35s). Fresh dashboard/API-to-ledger-to-Telegram verification now passes for these records. Keep older v9 migration suppressions; never replay the historical backlog.
 
 ### Branch cleanup completed
 - User's stale-branch preflight returned `26 0` (26 behind, zero ahead); deleting the stale optimization branch and all audited topic branches succeeded.
@@ -21,15 +21,15 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 ### Workflow / main promotion gate
 - Keep `.github/workflows/v2-ci.yml`. During reviewed promotion to main, remove static Pages/deploy-dashboard, disabled V1 job-watch, and root-config check-sources. Retain the old private Naukri workflow/branch until main's old `v2/radar.py` URL is changed to the active separate public relay; then remove workflow/branch together.
-- Do not promote to `main` until a fresh qualifying match has been verified through dashboard, persisted ledger and actual Telegram send. Once validated, use a dedicated reviewed PR with CI/smoke tests; no direct/force push.
+- The fresh alert gate has passed on three recent records from LinkedIn and Naukri. Proceed to a reviewed `v2-live-radar`→`main` promotion PR; last compare showed 93 commits ahead, zero behind. Require PR-head CI, inspect the workflow/code diff, then post-merge CI/smoke tests before changing Oracle's deploy ref. No direct/force push.
 
 ### Next actions
-1. Run the last-30-minute qualifying-job API diagnostic from `docs/JOB_RADAR_HANDOVER.md`; send output.
-2. If no fresh qualifying match exists, widen to 180 minutes and distinguish source quietness from queue/routing behavior.
-3. After PR #28 merges, delete only its temporary docs branch. Topic cleanup is otherwise complete.
+1. Open/review the dedicated V2-to-main promotion PR. Last compare was 93 commits ahead / 0 behind and 21 files changed; inspect source/relay/workflow changes and require CI.
+2. After merge, verify main CI and smoke tests, but keep Oracle deploying `v2-live-radar` until deliberate cutover.
+3. Delete the temporary documentation branches after their PRs merge; preserve `main`, `naukri-relay`, and `v2-live-radar`.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`; update both handovers after every user prompt. Config v10 is deployed. The 27-minute log window showed 10 LinkedIn scan summaries / 22 attempts, no visible 429/cooldown, zero failed requests, latest `new_jobs=0`; positive but limited rate-limit evidence. All topic branches have been deleted; remaining release branches are main/naukri-relay/v2-live-radar. Next retrieve recent qualifying jobs and verify a fresh ≥55% job dashboard → persisted ledger → Telegram. Do not replay old v9 migration suppressions. Promote to main only after that passes in a reviewed PR; keep V2 CI, retire obsolete V1 workflows, and replace main's private Naukri URL before removing legacy relay workflow/branch.”
+“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`; update both after every prompt. V10 is live. A ~27-minute/22-request LinkedIn window had no visible 429 or failed requests, and three fresh ≥55% jobs (two LinkedIn, one Naukri) are `alertable=true` and `sent` 17–35 seconds after discovery. The rate-limit and fresh-alert gates pass at the initial level. Create/review a dedicated promotion PR from `v2-live-radar` to `main` (last compare 93 ahead / 0 behind, 21 changed files). Inspect workflow cleanup and the relay URL replacement; keep V2 CI, require PR-head CI and post-merge smoke tests. Do not direct-push or switch Oracle branch until cutover proof. Retain private Naukri branch until main no longer references it. Prefer authorized free ATS/career sources; no LinkedIn limit evasion.”
 
 ## 1. Current state
 
@@ -174,3 +174,7 @@ PR #26 merged as `ed7c159b1d0c4cc46d9f8be297f9551d06535bc5`; CI #38202816842 pas
 
 ## Latest user prompt — 2026-10-12: observation and branch cleanup
 No application-code/config changes. User supplied 10 scan summaries over ~27 minutes, 22 attempted requests, no visible HTTP 429/cooldown warnings, zero failed requests, latest source status `new_jobs=0`. User deleted every audited topic branch; final remote branches are main/naukri-relay/v2-live-radar. Next task is fresh qualifying alert proof. This documentation PR's temporary branch is deleted after merge.
+
+
+## Latest user prompt — 2026-10-12: fresh alert proof complete
+No application-code change this turn. API evidence has three qualifying recent jobs ≥55%, all `alertable=true`, `notification_status=sent`, no error; send latency 16.6s, 28.8s and 34.6s after discovery. Combined with config v10 and the observed low-pressure LinkedIn window, this satisfies the initial gate to prepare the reviewed main promotion PR. Both handovers updated.
