@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — PR #30 merged to main; main CI passed; Oracle still deploys v2-live-radar
+**Snapshot:** 2026-10-12 — main promotion complete; only temporary roadmap branch remains; Oracle still deploys v2-live-radar
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -17,10 +17,10 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 - Three fresh recent matches, two LinkedIn and one Naukri, each scored ≥55%, were `alertable=true`, `notification_status=sent`, had no error, and were delivered ~17–35 seconds after discovery. Fresh dashboard/API → persisted ledger → Telegram consistency is verified for those examples. Never replay v9 migration-suppressed historical records.
 
 ### Branch state
-- Topic cleanup was successful. The last branch inventory includes `main`, `v2-live-radar`, private `naukri-relay`, and a temporary docs branch `docs/record-fresh-alerts-main-promotion-20261012`. After the current roadmap docs PR merges, remove the private `naukri-relay` branch and temporary docs branch, preserving `main` and `v2-live-radar` in the private app repo. Do not delete the public relay's own `naukri-relay` branch.
+- Current GitHub branch inventory shows `main`, `v2-live-radar`, and temporary `docs/next-phase-roadmap-20261012`. The private app repo's `naukri-relay` branch and earlier temporary docs refs are already gone. Delete only the roadmap branch after confirming its PR is merged and no open PR depends on it; preserve main and v2-live-radar. Do not delete the public relay repo's own `naukri-relay` branch.
 
 ### Prioritized roadmap
-1. **Housekeeping now:** delete unused private refs, then compare runtime code/config between main and v2 before any production branch switch.
+1. **Housekeeping now:** delete only `docs/next-phase-roadmap-20261012` (the branch inventory shows this as the only temporary ref), then compare runtime code/config between main and v2 before any production branch switch.
 2. **Oracle cutover:** take a backup, verify application/config paths are identical, switch to main only deliberately, rebuild and smoke-test health/config/source status/latency/dashboard/Naukri relay/Telegram. Keep rollback to known-good v2 commit. GitHub promotion is not production deployment.
 3. **LinkedIn 24–72h observation:** keep conservative v10 settings; measure requests, 429/cooldown duration, jobs fetched/unique/new/relevant, and discovery lag. No proxy rotation/control evasion or volume increase without evidence.
 4. **Greenhouse single-board canary:** earlier dry-run found about 298 jobs across three boards without DB writes/notifications. Add a repeatable dry-run summary and validate stable IDs, posted timestamps, dedupe, source backoff and no historical alert burst. Enable only after passing.
@@ -29,7 +29,7 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 7. **Multi-user architecture later:** today config is a personal/global profile. Before accounts, design per-user preferences and an idempotent `(user_id, canonical_opportunity_id)` alert ledger. No Kafka/Redis/browser-farm complexity until measured scale justifies it.
 
 ### Exact next action
-Run the branch cleanup command in `docs/JOB_RADAR_HANDOVER.md`, then send the final `git branch -r` output. Next we compare the runtime paths on main vs v2 and prepare a deliberate Oracle cutover only if the diff is documentation/history-only.
+Run `git push origin --delete docs/next-phase-roadmap-20261012`, then `git fetch --prune origin && git branch -r`. Expected private app refs are only `origin/main` and `origin/v2-live-radar` (plus `origin/HEAD`). Then we compare runtime paths on main vs v2 and prepare a deliberate Oracle cutover only if the diff is documentation/history-only.
 
 ### Continuation prompt
 “Continue Job Radar V2. Read both handover files and `docs/JOBBEEPER_REFERENCE.md`; update both after every user prompt. PR #30 promoted V2 to main (`b384b8d6`) with main CI #38206525826 passed; PR #31 docs sync merged as `76d253a4` with CI #38207296933 passed. Oracle still deploys v2-live-radar. Config v10 threshold 55/LinkedIn 180s/Naukri 300s is live. 27-minute/22-request LinkedIn sample had no visible 429/failures (limited evidence); three recent ≥55% matches across LinkedIn/Naukri were sent with no errors in ~17–35s. Next remove private app repo `naukri-relay` plus temp docs branch after final refs/open-PR check, but never touch the public relay repo's branch. Then diff runtime files and safely cut Oracle over to main with backup and smoke tests. Continue low-pressure measurement for 24–72h; Greenhouse single-board canary; then structured Lever/Ashby/SmartRecruiters; observability; multi-user ledger only if scope requires. No LinkedIn limit evasion.”
@@ -193,3 +193,7 @@ PR #30 merged as `b384b8d6ae00c48c7765ebf11af407981de3cd35`; post-merge main CI 
 
 ## Latest user prompt — roadmap planning — 2026-10-12
 No application code changed. Current branch state: main and v2-live-radar are release refs; private `naukri-relay` and temporary docs branch are candidates for deletion; Oracle remains on v2. Roadmap priority: housekeeping, verified Oracle cutover, 24–72h LinkedIn low-pressure monitoring, Greenhouse single-board canary, then structured ATS adapters, per-source observability/dashboard and later per-user profiles if needed. Both handovers updated.
+
+
+## Latest user prompt follow-through — current branch audit
+The freshest branch inventory after PR #33 contains only `main`, `v2-live-radar`, and `docs/next-phase-roadmap-20261012`. Private `naukri-relay` and `docs/record-fresh-alerts-main-promotion-20261012` are already absent. Next delete only the temporary roadmap branch after no-open-PR check; do not touch the separate public relay. No app code/config change.
