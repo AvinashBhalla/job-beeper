@@ -10,29 +10,32 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 ## Current verified state — 2026-10-12 (authoritative)
 
-### Release and production status
-- PR #30 promoted `v2-live-radar` to `main` as `b384b8d6ae00c48c7765ebf11af407981de3cd35`; main CI #38206525826 passed. PR #31 synced handover state as `76d253a4475223df517a3757795e20f15c1b9524`; CI #38207296933 passed. Main is promoted in GitHub, but Oracle still deploys `v2-live-radar`.
-- Main keeps `.github/workflows/v2-ci.yml` and removes Pages/deploy-dashboard, disabled V1 job-watch, root-config check-sources, and the legacy private Naukri workflow. Naukri consumption points at the separate public `job-beeper-naukri-relay` repository.
-- Runtime v10 is confirmed: threshold 55, explicit-experience alert gate false, LinkedIn poll 180s, Naukri 300s. A 27-minute LinkedIn observation showed 22 attempts, no visible 429/cooldown and zero failed requests in the displayed scan logs. This is a positive sample, not proof that 429 cannot recur.
-- Three fresh recent matches, two LinkedIn and one Naukri, each scored ≥55%, were `alertable=true`, `notification_status=sent`, had no error, and were delivered ~17–35 seconds after discovery. Fresh dashboard/API → persisted ledger → Telegram consistency is verified for those examples. Never replay v9 migration-suppressed historical records.
+### Release/runtime status
+- PR #30 promoted V2 to `main` (`b384b8d6…`); main CI passed. PR #31 synchronized handover docs, PR #33 roadmap, and PR #34 corrected branch audit; docs/CI changes passed. Main and v2 have identical GitHub blob SHAs for `v2/radar.py`, `v2/config.json`, `v2/docker-compose.yml`, `v2/Dockerfile`, `v2/requirements.txt`, `dashboard/index.html`, and `.github/workflows/v2-ci.yml`.
+- Oracle still runs the existing service from the current `/home/ubuntu/job-beeper` checkout on port 8000, currently `v2-live-radar`. No live branch switch has occurred.
+- Config v10: threshold 55, explicit-experience gate false, LinkedIn 180s and Naukri 300s. The ~27-minute LinkedIn sample showed 22 requests without visible 429/failures (positive but limited evidence). Three fresh qualifying matches (two LinkedIn, one Naukri) were alertable and sent without errors in ~17–35 seconds. Preserve v9 migration suppressions.
 
-### Branch state
-- Current GitHub branch inventory shows `main`, `v2-live-radar`, and temporary `docs/next-phase-roadmap-20261012`. The private app repo's `naukri-relay` branch and earlier temporary docs refs are already gone. Delete only the roadmap branch after confirming its PR is merged and no open PR depends on it; preserve main and v2-live-radar. Do not delete the public relay repo's own `naukri-relay` branch.
+### Two instances on one VM
+- User requests production on `main` and development on `v2-live-radar`, coexisting on the same Oracle VM. Production must retain its existing persistent DB/volume; dev must have a separate Compose project, volume, SQLite DB, runtime config and generated token.
+- Added directly to `v2-live-radar`: `v2/docker-compose.dev.yml` (`da81d4bf…`), `v2/config.dev.json` (`d14fb3ec…`), and updated root `README.md` (`50293998…`). Dev container is `job-radar-dev`, binds only `127.0.0.1:8001`, has empty Telegram credentials, and reads from Naukri relay only. LinkedIn/Instahyre/Greenhouse and Telegram notifications are disabled by default; this prevents test-alert spam and avoids doubling LinkedIn request pressure.
+- These development files are committed but not yet run on the VM. Production has not been changed.
 
-### Prioritized roadmap
-1. **Housekeeping now:** delete only `docs/next-phase-roadmap-20261012` (the branch inventory shows this as the only temporary ref), then compare runtime code/config between main and v2 before any production branch switch.
-2. **Oracle cutover:** take a backup, verify application/config paths are identical, switch to main only deliberately, rebuild and smoke-test health/config/source status/latency/dashboard/Naukri relay/Telegram. Keep rollback to known-good v2 commit. GitHub promotion is not production deployment.
-3. **LinkedIn 24–72h observation:** keep conservative v10 settings; measure requests, 429/cooldown duration, jobs fetched/unique/new/relevant, and discovery lag. No proxy rotation/control evasion or volume increase without evidence.
-4. **Greenhouse single-board canary:** earlier dry-run found about 298 jobs across three boards without DB writes/notifications. Add a repeatable dry-run summary and validate stable IDs, posted timestamps, dedupe, source backoff and no historical alert burst. Enable only after passing.
-5. **Expand structured ATSs one connector at a time:** Lever → Ashby → SmartRecruiters; later Workday/company career pages. Reassess Instahyre interface before enablement. Every connector requires stable IDs, truthful timestamps, pagination/incremental fetch, fixtures/tests, failure isolation and notification consistency.
-6. **Observability / dashboard:** metrics by source for last success, errors, 429 cooldown, requests/run, fetched/new/relevant counts, discovery lag, and clear persisted reasons for send/suppression. Add regression tests for dedupe, idempotent delivery and timestamp ordering.
-7. **Multi-user architecture later:** today config is a personal/global profile. Before accounts, design per-user preferences and an idempotent `(user_id, canonical_opportunity_id)` alert ledger. No Kafka/Redis/browser-farm complexity until measured scale justifies it.
+### Branch/docs policy
+- The user's earlier topic cleanup was successful. The only temporary branch in latest GitHub inventory is `docs/next-phase-roadmap-20261012`; delete it. Preserve `main` and `v2-live-radar`.
+- User explicitly asked for handover docs to be committed directly on `v2-live-radar`, not in new branches just for documentation. Follow this unless they ask otherwise. Keep both handovers and root README aligned; no extra docs PRs.
 
-### Exact next action
-Run `git push origin --delete docs/next-phase-roadmap-20261012`, then `git fetch --prune origin && git branch -r`. Expected private app refs are only `origin/main` and `origin/v2-live-radar` (plus `origin/HEAD`). Then we compare runtime paths on main vs v2 and prepare a deliberate Oracle cutover only if the diff is documentation/history-only.
+### Next exact action
+Run the combined command at the bottom of `docs/JOB_RADAR_HANDOVER.md`: delete the temporary docs branch; verify that the app/config/runtime blobs match; report current container Compose project/volume and VM memory/disk; create `/home/ubuntu/job-beeper-dev` from `v2-live-radar`; start isolated dev and return health/config/source status. This leaves production port 8000 untouched.
+
+### Roadmap
+1. Start and verify isolated development instance; ensure Naukri-only and notifications off.
+2. Back up production DB/config and move the existing production checkout to main while preserving the same Compose project and volume; smoke-test and retain rollback. Do not run `down -v`.
+3. Watch LinkedIn source yield/rate-limit behavior for 24–72 hours without increasing request volume or evading restrictions.
+4. Greenhouse single-board canary with dry-run, timestamp, dedupe, backoff and no-history-burst checks.
+5. Add Lever, Ashby, SmartRecruiters one by one; evaluate Workday/company careers later. Add source observability and dashboard decision reasons. Multi-user preferences only if scope later requires it.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read both handover files and `docs/JOBBEEPER_REFERENCE.md`; update both after every user prompt. PR #30 promoted V2 to main (`b384b8d6`) with main CI #38206525826 passed; PR #31 docs sync merged as `76d253a4` with CI #38207296933 passed. Oracle still deploys v2-live-radar. Config v10 threshold 55/LinkedIn 180s/Naukri 300s is live. 27-minute/22-request LinkedIn sample had no visible 429/failures (limited evidence); three recent ≥55% matches across LinkedIn/Naukri were sent with no errors in ~17–35s. Next remove private app repo `naukri-relay` plus temp docs branch after final refs/open-PR check, but never touch the public relay repo's branch. Then diff runtime files and safely cut Oracle over to main with backup and smoke tests. Continue low-pressure measurement for 24–72h; Greenhouse single-board canary; then structured Lever/Ashby/SmartRecruiters; observability; multi-user ledger only if scope requires. No LinkedIn limit evasion.”
+“Read both handovers plus `docs/JOBBEEPER_REFERENCE.md`. Update both handovers directly on `v2-live-radar` after every user prompt; do not create docs-only branches or PRs. Main promotion is complete; main and v2 have identical current app/config/compose/Dockerfile/requirements/dashboard/CI blobs, but Oracle still runs V2 on port 8000. Added dev compose/config: container job-radar-dev, loopback 8001, separate volume/DB/config token, Naukri-only, notifications off and LinkedIn off. Next delete leftover docs branch, check VM resources/container project/volume and runtime diff, clone `/home/ubuntu/job-beeper-dev` from V2, start dev and verify health/config/source status. Then back up production DB/config and move existing production checkout to main using the same Compose project/volume, with smoke tests/rollback. No `down -v`; never expose dev port or secrets. Then 24–72h LinkedIn monitoring and Greenhouse one-board canary.”
 
 ## 1. Current state
 
@@ -197,3 +200,7 @@ No application code changed. Current branch state: main and v2-live-radar are re
 
 ## Latest user prompt follow-through — current branch audit
 The freshest branch inventory after PR #33 contains only `main`, `v2-live-radar`, and `docs/next-phase-roadmap-20261012`. Private `naukri-relay` and `docs/record-fresh-alerts-main-promotion-20261012` are already absent. Next delete only the temporary roadmap branch after no-open-PR check; do not touch the separate public relay. No app code/config change.
+
+
+## Latest user prompt — dual dev/prod VM proposal
+No live VM change. Added isolated dev files to v2-live-radar and updated README. The intended model is production on main, development on v2-live-radar, separate paths/containers/ports/databases/config tokens. Immediate next action is the detailed handover command to start dev safely and inspect the existing production Compose volume; cutover only after dev passes.
