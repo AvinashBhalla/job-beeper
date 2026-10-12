@@ -928,3 +928,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - Record this as a successful 88-test run; the short result alone does not identify individual test names or independently prove the exact invocation/environment.
 - Next: preserve the full test command/output if available, then continue with read-only verification of current remote branch/CI state and production-versus-development source/image provenance.
 - No production deployment, container restart, database mutation, or persistent-volume test was authorized or performed as part of this result. Keep production changes blocked until image/source provenance and a backup/rollback plan are verified.
+
+
+## 88 isolated tests pass; inspect intermittent PR workflow failures — 2026-10-13
+
+- User supplied the complete isolated command output: `python -m unittest v2.test_radar v2.test_gemini_extractor` ran with Docker `--network none`, a disposable `/tmp/jobs.db`, and the development config mounted read-only. Result: `Ran 88 tests in 53.320s`, `OK`.
+- The accompanying Actions screenshot shows docs-only workflow runs #689 and #691 passing, while the “Draft: Gemini JD extraction shadow mode” PR #35 synchronize workflow has both failures (#688 and #692) and a pass (#690). This screenshot alone does not reveal the failing step or root cause.
+- Next: inspect the failed run/job logs for #692 (and compare #688 with passing #690) before changing code or rerunning anything. Treat the local 88-test success and PR CI status as separate evidence.
+- No production deployment, restart, or persistent database operation was performed or authorized. Keep production unchanged pending source/image provenance and backup/rollback verification.
