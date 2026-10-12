@@ -348,3 +348,15 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 4. Inspect new shadow rows after the next permitted source run. The model output remains observational only; do not connect it to matcher decisions or alerts yet.
 5. Do not merge draft PR #35 or deploy to production until full tests and a representative shadow evaluation pass.
 
+
+
+## Latest handoff — 2026-10-12: 84 tests pass; Gemini HTTP 401 is the active blocker
+
+- User-reported full suite: **84 tests, 54.614s, OK**.
+- Dev port 8001 health: healthy; Naukri only, 296 jobs seen and 1 new, no source error. Config remains notifications disabled and other sources disabled.
+- Production port 8000 health: healthy. No production change/deployment.
+- `/api/llm-shadow-status`: Gemini enabled, non-empty key detected, model `gemini-3.5-flash-lite`, shadow-only, cap 20/day, 6 calls today, 3 successful cached results and 3 recent `gemini_http_401` failures.
+- Earlier Gemini requests succeeded in the same overall dev rollout, so the immediate failure is authentication/API authorization, not evidence of a parser/test regression. Root cause is not yet proven. A key-present flag is not key validation.
+- Next: verify key active/project/API access and API-key restrictions in AI Studio/Cloud Console. Re-enter a valid key through the VM's hidden prompt if needed, rebuild only dev, run one synthetic request, and inspect only status/error category. Never echo/commit/share the key. Avoid triggering more source runs while troubleshooting; do not raise caps to compensate.
+- Release gate: tests and both health checks pass; Gemini auth and extraction-quality review still pending. Keep PR #35 unmerged, shadow-only, no matcher/alert mutation, no production deployment.
+- Continuation prompt: “Read the two handovers and `docs/JOBBEEPER_REFERENCE.md`; update both handovers after every prompt. 84 tests pass. Dev and prod health are good. Gemini model `gemini-3.5-flash-lite` has 3 cached successes and 3 latest HTTP 401 failures (6 calls today, cap 20). Diagnose API key/project/API restrictions without exposing the key, then test one synthetic request. Keep feature shadow-only and PR #35 unmerged until auth and representative shadow quality are verified.”
