@@ -2897,3 +2897,7 @@ HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_conf
 ### Next test command clarified — 2026-10-12
 - The prior local isolated run passed all 78 tests (`Ran 78 tests in 53.229s — OK`), but CI run #543 remains red. For a clean full-suite rerun from `/home/ubuntu/job-beeper-parser-fix`, use the network-disabled, read-only Docker command documented above. Do not treat grep-filtered full-suite discovery as an individual-test run: it still executes the full discovered suite.
 - For individual reproduction, use `unittest` discovery to load the suite and filter to one exact `test._testMethodName`, then execute that selected case in a fresh Python process per test. This avoids falsely labeling a full-suite grep as an isolated test. No application changes until the discrepancy reproduces; PR #36 stays open/unmerged.
+
+### Individual-test diagnostic clarification — 2026-10-12
+- User ran a loop whose body invoked `python -m unittest discover -s v2 -t . -p "test_*.py" -v` five times and piped output through `grep`. That executed the full 78-test suite five times; `grep` filtered display only, so this is not isolated per-test evidence. All five repetitions passed (about 53 seconds each), confirming suite stability in that run but not the CI discrepancy.
+- Correct isolated command pattern from `/app`: `python -m unittest v2.test_radar.MatcherTests.<exact_test_method> -v`, once per test, using the same network-disabled Docker container and read-only source mount. PR #36 stays open/unmerged; no application changes or deployment.
