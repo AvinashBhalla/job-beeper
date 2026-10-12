@@ -1322,7 +1322,8 @@
 
     tbody.innerHTML = state.sourceStatus.map(src => {
       const runtime = src.runtime || {};
-      const isError = Boolean(runtime.error);
+      const errorText = runtime.error || src.last_error || '';
+      const isError = Boolean(errorText);
       const isRunning = Boolean(runtime.running);
       const isDisabled = src.enabled === false;
       const sourceLabels = {
@@ -1349,7 +1350,7 @@
           <td class="meta-mono">${esc(src.new_jobs ?? 0)}</td>
           <td class="meta-mono" style="font-size:12px;">${esc(fmtTimestamp(runtime.last_success, 'minute'))}</td>
           <td>
-            ${isError ? `<code style="color:var(--status-error);font-family:var(--font-mono);font-size:11px;">${esc(runtime.error)}</code>` : '<span style="color:var(--text-muted);font-size:12px;">Operational</span>'}
+            ${isError ? `<code style="color:var(--status-error);font-family:var(--font-mono);font-size:11px;">${esc(errorText)}</code>` : '<span style="color:var(--text-muted);font-size:12px;">Operational</span>'}
           </td>
         </tr>
       `;
