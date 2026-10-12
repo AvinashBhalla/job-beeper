@@ -3099,3 +3099,12 @@ Read the two Dockerfiles and relevant Git history without exposing `.env` values
 ## Runtime image identity follow-up — 2026-10-12
 
 VM output: `job-radar-dev` runs image `sha256:13b233998d70787483762a563484aad8a38a6e21ecac49917f3ca913557f4c9f`; `v2-radar-1` runs `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`. Docker cannot inspect the latter as a local image (`No such image`), although the existing container remains running with that image ID. The `v2-radar` tag points to a different image (`sha256:a0c38e435cbc64f13d028c040f25962586eb5050a83ac4b0d72673acd6a7a08d`). Both Compose files use build context `..` and `v2/Dockerfile`. Production checkout HEAD: `61d8271480eaf48b0a6442b62b1b0bb9a032df34`; dev checkout HEAD: `54fc75cbfd6ad92b7b3a63fdc381473c34f459d2`. Behind counts rely on cached refs and are not authoritative. No runtime or checkout changes were made. Next: inspect Dockerfile/history and container mounts/config without exposing secrets; do not restart, recreate, prune, pull, rebuild, or deploy until image provenance, database backup, and rollback are understood.
+
+
+## Dockerfile and image history review — 2026-10-13
+
+Read-only VM output shows the production and development Dockerfiles are currently identical: Python 3.12 slim base, install `v2/requirements.txt`, copy `v2` and `dashboard`, set `/data/jobs.db`, run Uvicorn on port 8000. Their Dockerfile Git histories match through the displayed last four commits. Both Compose build contexts are `..` and Dockerfile is `v2/Dockerfile`. Current dev image `sha256:13b233...` and current `v2-radar:latest` image `sha256:a0c38e...` were built from layers with differing copied `v2` sizes (324kB vs 369kB), so the copied application contents differ. Crucially, the running production container `v2-radar-1` still points to `sha256:973689...`, whose image metadata is unavailable locally; it must not be conflated with the current `v2-radar:latest` tag. Persistent volumes remain distinct: dev `job-radar-dev_radar-dev-data` mounted at `/data`, production `v2_radar-data` mounted at `/data`. No services or data were changed.
+
+### Next safe step
+
+Compare hashes of selected application files in each checkout and inside each running container, and collect container health/restart status plus a non-mutating listing of database file metadata (not contents). Do not restart/recreate/prune/pull/build/deploy or run migrations. Before any rollout, verify a tested backup and rollback method for `v2_radar-data`.
