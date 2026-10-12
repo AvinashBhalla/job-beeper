@@ -1,4 +1,5 @@
 import unittest
+import json
 
 from unittest.mock import patch
 
@@ -45,6 +46,234 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 
 class MatcherTests(unittest.TestCase):
+
+    def test_remote_india_location_does_not_match_remote_jobs_in_other_countries(self):
+        self.assertTrue(radar.location_allowed("Remote - India", BASE_CONFIG))
+        self.assertTrue(radar.location_allowed("Remote, Bengaluru, Karnataka, India", BASE_CONFIG))
+        self.assertFalse(radar.location_allowed("Remote - USA", BASE_CONFIG))
+        self.assertFalse(radar.location_allowed("Remote - Cyprus", BASE_CONFIG))
+
+    def test_unqualified_remote_location_remains_global(self):
+        config = {**BASE_CONFIG, "locations": ["Bengaluru, India", "Remote"]}
+        self.assertTrue(radar.location_allowed("Remote - USA", config))
+
+    def test_linkedin_fast_scan_staggers_all_query_location_pairs(self):
+        config = {
+            "locations": ["Bengaluru, India", "Gurugram, India", "Delhi, India", "Remote, India"],
+            "linkedin_queries": ["software engineer", "automation engineer", "ai engineer", "react developer"],
+        }
+        original_deep_scan = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_target_cursor
+        calls = []
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
+            with patch.object(
+                radar,
+                "_linkedin_search_page",
+                side_effect=lambda query, location, start, fast: (
+                    calls.append((query, location, start, fast)) or []
+                ),
+            ):
+                first_cycle = []
+                cycles = []
+                for cycle_index in range(8):
+                    calls.clear()
+                    radar.linkedin_collect(config)
+                    cycle = list(calls)
+                    cycles.append(cycle)
+                    if cycle_index == 0:
+                        first_cycle = cycle
+            expected = {
+                (query, location, 0, True)
+                for query in config["linkedin_queries"]
+                for location in config["locations"]
+            }
+            self.assertEqual(len(first_cycle), radar.LINKEDIN_FAST_TARGETS_PER_SCAN)
+            for cycle in cycles:
+                self.assertEqual(len(cycle), radar.LINKEDIN_FAST_TARGETS_PER_SCAN)
+            observed = [target for cycle in cycles for target in cycle]
+            self.assertEqual(set(observed), expected)
+            self.assertEqual(len(observed), len(expected))
+            for previous, current in zip(cycles, cycles[1:]):
+                self.assertTrue(set(previous).isdisjoint(set(current)))
+        finally:
+            radar.linkedin_last_deep_scan_at = original_deep_scan
+            radar.linkedin_fast_target_cursor = original_cursor
+
+    def test_linkedin_http_429_honors_retry_after_and_blocks_followup_requests(self):
+        original_state = {
+            "last_request": radar.linkedin_last_http_request_monotonic,
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = 0.0
+            radar.linkedin_rate_limit_streak = 0
+            radar.linkedin_rate_limit_generation = 0
+
+            class RateLimitedResponse:
+                status_code = 429
+                headers = {"Retry-After": "600"}
+
+                def raise_for_status(self):
+                    error = radar.requests.HTTPError("429 Client Error")
+                    error.response = self
+                    raise error
+
+            with patch.object(
+                radar.requests, "get", return_value=RateLimitedResponse()
+            ) as request:
+                with self.assertRaises(radar.requests.HTTPError):
+                    radar._linkedin_http_get("https://www.linkedin.com/jobs-guest/test")
+                with self.assertRaises(radar.LinkedInRateLimitCooldown):
+                    radar._linkedin_http_get("https://www.linkedin.com/jobs-guest/test")
+
+            self.assertEqual(request.call_count, 1)
+            self.assertGreaterEqual(
+                radar.linkedin_rate_limited_until_monotonic - radar.time.monotonic(),
+                599,
+            )
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+        finally:
+            radar.linkedin_last_http_request_monotonic = original_state["last_request"]
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_rate_limit_streak_escalates_across_successful_scans(self):
+        original_state = {
+            "deep_scan": radar.linkedin_last_deep_scan_at,
+            "cursor": radar.linkedin_fast_target_cursor,
+            "last_request": radar.linkedin_last_http_request_monotonic,
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = radar.time.monotonic() - 300
+            radar.linkedin_rate_limit_streak = 1
+            radar.linkedin_rate_limit_generation = 0
+            config = {
+                "locations": ["Bengaluru", "Gurugram", "Delhi", "Remote, India"],
+                "linkedin_queries": ["software engineer", "python developer"],
+            }
+
+            with patch.object(radar, "_linkedin_search_page", return_value=[]):
+                radar.linkedin_collect(config)
+
+            # A successful scan must not erase a recent 429 streak.
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+            cooldown = radar._activate_linkedin_rate_limit(response)
+            self.assertEqual(radar.linkedin_rate_limit_streak, 2)
+            self.assertGreaterEqual(cooldown, 600)
+        finally:
+            radar.linkedin_last_deep_scan_at = original_state["deep_scan"]
+            radar.linkedin_fast_target_cursor = original_state["cursor"]
+            radar.linkedin_last_http_request_monotonic = original_state["last_request"]
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_rate_limit_streak_resets_after_one_clean_hour(self):
+        original_state = {
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = radar.time.monotonic() - 3601
+            radar.linkedin_rate_limit_streak = 3
+            radar.linkedin_rate_limit_generation = 0
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+
+            cooldown = radar._activate_linkedin_rate_limit(response)
+
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+            self.assertGreaterEqual(cooldown, 300)
+        finally:
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_search_batch_stops_after_first_429(self):
+        original_state = {
+            "deep_scan": radar.linkedin_last_deep_scan_at,
+            "cursor": radar.linkedin_fast_target_cursor,
+            "last_request": radar.linkedin_last_http_request_monotonic,
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_rate_limit_streak = 0
+            radar.linkedin_rate_limit_generation = 0
+
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+            error = radar.requests.HTTPError("429 Client Error")
+            error.response = response
+            config = {
+                "locations": ["Bengaluru", "Gurugram", "Delhi", "Remote, India"],
+                "linkedin_queries": ["software engineer", "python developer"],
+            }
+
+            with patch.object(
+                radar, "_linkedin_search_page", side_effect=error
+            ) as search:
+                jobs = radar.linkedin_collect(config)
+
+            self.assertEqual(jobs, [])
+            search.assert_called_once()
+            self.assertEqual(radar.linkedin_fast_target_cursor, 0)
+            self.assertGreater(radar._linkedin_cooldown_remaining(), 0)
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+        finally:
+            radar.linkedin_last_deep_scan_at = original_state["deep_scan"]
+            radar.linkedin_fast_target_cursor = original_state["cursor"]
+            radar.linkedin_last_http_request_monotonic = original_state["last_request"]
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
 
     def test_software_development_engineer_variant_matches(self):
         config = {
@@ -344,6 +573,96 @@ class MatcherTests(unittest.TestCase):
                 radar.DB_PATH = original_db
 
 
+    def test_normalize_job_rejects_posted_timestamp_after_discovery(self):
+        from datetime import timedelta
+
+        observed_at = radar.now()
+        with patch.object(radar, "now", return_value=observed_at):
+            job = normalize_job(
+                "linkedin", "li-future-post", "Acme", "Software Engineer",
+                "Bengaluru", "https://linkedin.com/jobs/view/future-post",
+                observed_at + timedelta(minutes=5), "minute", "2 years experience",
+            )
+
+        self.assertIsNone(job["source_posted_at"])
+        self.assertEqual(job["posted_precision"], "unknown")
+        self.assertIsNone(job["discovery_latency_seconds"])
+
+    def test_existing_job_does_not_backfill_post_time_after_first_discovery(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                first = normalize_job(
+                    "linkedin", "li-late-metadata", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/late-metadata",
+                    None, "unknown", "2 years experience",
+                )
+                self.assertEqual(upsert_jobs([first], BASE_CONFIG), 1)
+
+                original_discovery = radar.parse_relative(first["discovered_at"])
+                second = dict(first)
+                with patch.object(
+                    radar, "now",
+                    return_value=original_discovery + timedelta(minutes=10),
+                ):
+                    second["discovered_at"] = radar.iso(radar.now())
+                    second["source_posted_at"] = radar.iso(
+                        original_discovery + timedelta(minutes=5)
+                    )
+                    second["posted_precision"] = "minute"
+                    second["discovery_latency_seconds"] = 300
+                    self.assertEqual(upsert_jobs([second], BASE_CONFIG), 0)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT source_posted_at, posted_precision FROM jobs WHERE id=1"
+                    ).fetchone()
+                self.assertIsNone(row[0])
+                self.assertEqual(row[1], "unknown")
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_init_db_clears_legacy_post_times_after_discovery(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-legacy-future-post", "Acme", "Software Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/legacy-future-post",
+                    radar.now() - timedelta(minutes=2), "minute", "2 years experience",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                invalid_posted_at = radar.iso(
+                    radar.parse_relative(job["discovered_at"]) + timedelta(minutes=5)
+                )
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute(
+                        "UPDATE jobs SET source_posted_at=?, posted_precision='minute', "
+                        "discovery_latency_seconds=0 WHERE id=1",
+                        (invalid_posted_at,),
+                    )
+                    conn.commit()
+
+                radar.init_db()
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT source_posted_at, posted_precision, discovery_latency_seconds "
+                        "FROM jobs WHERE id=1"
+                    ).fetchone()
+                self.assertIsNone(row[0])
+                self.assertEqual(row[1], "unknown")
+                self.assertIsNone(row[2])
+            finally:
+                radar.DB_PATH = original_db
+
     def test_daily_reset_uses_ist_midnight(self):
         start = current_day_start_utc()
         local = start.astimezone(radar.IST)
@@ -356,6 +675,28 @@ class MatcherTests(unittest.TestCase):
             _format_timestamp("2026-10-08T07:30:50.260596+00:00"),
             "08 Oct 2026, 1:00 PM IST",
         )
+
+    def test_telegram_hides_post_time_after_discovery(self):
+        item = {
+            "score": 100,
+            "title": "Full Stack Developer",
+            "company": "Vertigo Media",
+            "location": "Greater Bengaluru Area",
+            "source": "linkedin",
+            "source_posted_at": "2026-10-11T12:31:00+00:00",
+            "posted_precision": "minute",
+            "discovered_at": "2026-10-11T12:26:00+00:00",
+            "experience_min_years": 1,
+            "experience_max_years": 1,
+            "url": "https://example.com/job/123",
+            "match_reasons_json": "[]",
+        }
+
+        message = format_notification(item)
+
+        self.assertIn("🕐 Posted: Unknown", message)
+        self.assertIn("🔎 Discovered: 11 Oct 2026, 5:56 PM IST", message)
+        self.assertNotIn("6:01 PM IST", message)
 
     def test_telegram_message_format_contains_core_fields(self):
         item = {
@@ -475,6 +816,50 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_jobs_api_returns_persisted_match_and_notification_decisions(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "linkedin", "li-api-consistency", "Acme", "Software Engineer",
+                    "Bengaluru, India", "https://linkedin.com/jobs/view/api-consistency",
+                    None, "unknown", "Build Python services. Experience 1-2 years.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    persisted = conn.execute("""
+                        SELECT e.match, e.score, e.alertable, nl.status,
+                               nl.decision_reason_json
+                        FROM jobs j
+                        JOIN job_evaluations e ON e.job_id=j.id
+                        JOIN notification_ledger nl
+                          ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+                        WHERE j.source_job_id='li-api-consistency'
+                    """).fetchone()
+
+                with patch.object(radar, "get_config", return_value=BASE_CONFIG):
+                    response = radar.jobs(minutes=60, limit=100, today_only=True)
+                item = next(
+                    entry for entry in response["jobs"]
+                    if entry["source_job_id"] == "li-api-consistency"
+                )
+
+                self.assertEqual(item["likely_match"], bool(persisted[0]))
+                self.assertEqual(item["match_score"], persisted[1])
+                self.assertEqual(item["alertable"], bool(persisted[2]))
+                self.assertEqual(item["notification_status"], persisted[3])
+                self.assertEqual(
+                    item["notification_decision_reasons"],
+                    json.loads(persisted[4]),
+                )
+                self.assertEqual(item["notification_status"], "queued")
+            finally:
+                radar.DB_PATH = original_db
+
     def test_queued_opportunity_reverts_to_pending_when_alertability_is_lost(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
@@ -508,12 +893,16 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(row[0], "queued")
                 self.assertEqual(row[1], 1)
 
+                notifications_disabled = {
+                    **BASE_CONFIG,
+                    "notifications_enabled": False,
+                }
                 self.assertEqual(
-                    radar.refresh_job_evaluations(BASE_CONFIG),
+                    radar.refresh_job_evaluations(notifications_disabled),
                     1,
                 )
                 self.assertEqual(
-                    radar.refresh_notification_decisions(BASE_CONFIG),
+                    radar.refresh_notification_decisions(notifications_disabled),
                     1,
                 )
 
@@ -600,7 +989,7 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
-    def test_unknown_experience_new_opportunity_is_suppressed(self):
+    def test_unknown_experience_new_opportunity_is_queued_when_match_threshold_passes(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
             try:
@@ -615,19 +1004,6 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(radar.refresh_notification_decisions(BASE_CONFIG), 1)
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute(
-                        "SELECT status, decision_reason_json FROM notification_ledger"
-                    ).fetchone()
-                self.assertEqual(row[0], "pending")
-                self.assertIn("awaiting future re-evaluation", row[1])
-
-                relaxed = {
-                    **BASE_CONFIG,
-                    "require_explicit_experience_for_alerts": False,
-                }
-                self.assertEqual(radar.refresh_job_evaluations(relaxed), 1)
-                self.assertEqual(radar.refresh_notification_decisions(relaxed), 1)
-                with sqlite3.connect(radar.DB_PATH) as conn:
-                    row = conn.execute(
                         "SELECT status, candidate_job_id FROM notification_ledger"
                     ).fetchone()
                 self.assertEqual(row[0], "queued")
@@ -635,7 +1011,7 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
-    def test_config_change_re_evaluates_existing_jobs(self):
+    def test_deprecated_experience_alert_gate_does_not_change_eligibility(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH
             try:
@@ -652,7 +1028,7 @@ class MatcherTests(unittest.TestCase):
                     row = conn.execute(
                         "SELECT alertable FROM job_evaluations WHERE job_id=1"
                     ).fetchone()
-                self.assertEqual(row[0], 0)
+                self.assertEqual(row[0], 1)
 
                 relaxed = {
                     **BASE_CONFIG,
@@ -841,6 +1217,87 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(score, 88)
         self.assertFalse(auto_link_allowed(score, method))
 
+    def test_legacy_config_migrates_linkedin_poll_to_120_seconds(self):
+        defaults = {
+            "config_version": 8,
+            "poll_seconds": {"linkedin": 120, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+        prior_runtime = {
+            "config_version": 7,
+            "poll_seconds": {"linkedin": 60, "naukri": 420},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+
+        merged = _merge_config(defaults, prior_runtime)
+
+        self.assertEqual(merged["poll_seconds"]["linkedin"], 120)
+        self.assertEqual(merged["poll_seconds"]["naukri"], 420)
+
+    def test_v9_config_migrates_linkedin_to_free_first_request_budget(self):
+        defaults = {
+            "config_version": 10,
+            "poll_seconds": {"linkedin": 180, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+            "require_explicit_experience_for_alerts": False,
+        }
+        previous = {
+            "config_version": 9,
+            "poll_seconds": {"linkedin": 120, "naukri": 420},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+            "require_explicit_experience_for_alerts": False,
+        }
+
+        merged = _merge_config(defaults, previous)
+
+        self.assertEqual(merged["config_version"], 10)
+        self.assertEqual(merged["poll_seconds"]["linkedin"], 180)
+        self.assertEqual(merged["poll_seconds"]["naukri"], 420)
+        self.assertEqual(merged["require_explicit_experience_for_alerts"], False)
+
+    def test_linkedin_request_budget_defaults_are_conservative(self):
+        self.assertEqual(radar.LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS, 4.0)
+        self.assertEqual(radar.LINKEDIN_FAST_TARGETS_PER_SCAN, 2)
+        self.assertEqual(radar.LINKEDIN_DEEP_SCAN_SECONDS, 1800)
+        self.assertEqual(radar.LINKEDIN_DETAIL_WORKERS, 1)
+
+    def test_v8_config_migrates_to_threshold_only_alert_policy(self):
+        defaults = {
+            "config_version": 9,
+            "require_explicit_experience_for_alerts": False,
+            "poll_seconds": {"linkedin": 120, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+        previous = {
+            "config_version": 8,
+            "require_explicit_experience_for_alerts": True,
+            "poll_seconds": {"linkedin": 120, "naukri": 300},
+            "source_enabled": {
+                "linkedin": True, "naukri": True,
+                "instahyre": False, "greenhouse": False,
+            },
+        }
+
+        merged = _merge_config(defaults, previous)
+
+        self.assertEqual(merged["config_version"], 9)
+        self.assertFalse(merged["require_explicit_experience_for_alerts"])
+
     def test_legacy_config_migrates_instahyre_to_opt_in(self):
         defaults = {
             "config_version": 4,
@@ -866,6 +1323,31 @@ class MatcherTests(unittest.TestCase):
         merged = _merge_config(defaults, legacy)
         self.assertEqual(merged["config_version"], 4)
         self.assertFalse(merged["source_enabled"]["instahyre"])
+
+    def test_config_v6_requires_explicit_experience_for_legacy_runtime(self):
+        defaults = {
+            "config_version": 6,
+            "require_explicit_experience_for_alerts": True,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+            },
+        }
+        prior_runtime = {
+            "config_version": 5,
+            "require_explicit_experience_for_alerts": False,
+        }
+
+        merged = _merge_config(defaults, prior_runtime)
+
+        self.assertEqual(merged["config_version"], 6)
+        self.assertTrue(merged["require_explicit_experience_for_alerts"])
 
     def test_config_v5_repairs_persisted_source_queries(self):
         defaults = {
@@ -907,32 +1389,286 @@ class MatcherTests(unittest.TestCase):
         # for forcing legacy Instahyre enablement back to disabled.
         self.assertTrue(merged["source_enabled"]["instahyre"])
 
-    def test_naukri_relay_retries_transient_404(self):
+    def test_naukri_relay_reads_public_feed_without_a_token(self):
         class Response:
-            def __init__(self, status_code, payload=None):
-                self.status_code = status_code
-                self._payload = payload or {"jobs": []}
+            status_code = 200
 
             def raise_for_status(self):
-                if self.status_code >= 400:
-                    import requests
-                    raise requests.HTTPError(f"{self.status_code} error")
+                return None
 
             def json(self):
-                return self._payload
+                return {"updated_at": "2026-10-09T05:04:08+00:00", "jobs": []}
 
-        responses = [
-            Response(404),
-            Response(200, {"updated_at": "2026-10-08T18:00:00+00:00", "jobs": []}),
-        ]
-
-        with patch.object(radar.requests, "get", side_effect=responses):
-            with patch.object(radar.time, "sleep") as sleep:
-                jobs = radar.naukri_collect()
+        with patch.object(radar.requests, "get", return_value=Response()) as request:
+            jobs = radar.naukri_collect()
 
         self.assertEqual(jobs, [])
-        self.assertEqual(sleep.call_count, 1)
-        self.assertEqual(sleep.call_args.args[0], 1)
+        request.assert_called_once()
+        args, kwargs = request.call_args
+        self.assertEqual(args[0], radar.NAUKRI_RELAY_URL)
+        self.assertIsInstance(kwargs["params"]["t"], int)
+        self.assertNotIn("Authorization", kwargs["headers"])
+        self.assertEqual(kwargs["headers"]["Accept"], "application/json")
+        self.assertEqual(kwargs["timeout"], 20)
+
+
+    def test_parse_relative_accepts_utc_z_suffix_without_lowercasing_iso_text(self):
+        for value in (
+            "2026-10-08T10:00:00Z",
+            "2026-10-08T10:00:00z",
+        ):
+            with self.subTest(value=value):
+                parsed = radar.parse_relative(value)
+                self.assertEqual(radar.iso(parsed), "2026-10-08T10:00:00+00:00")
+
+    def test_greenhouse_collector_uses_first_published_and_does_not_use_updated_at(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 123,
+                        "title": "Software Engineer",
+                        "absolute_url": "https://boards.greenhouse.io/example/jobs/123",
+                        "location": {"name": "Bengaluru, India"},
+                        "first_published": "2026-10-08T10:00:00Z",
+                        "updated_at": "2026-10-09T10:00:00Z",
+                        "content": "<p>Build Python APIs.</p><p>2+ years experience.</p>",
+                        "departments": [{"name": "Engineering"}],
+                    }]
+                }
+
+        config = {
+            "greenhouse_boards": [{"token": "example", "company": "Example Labs"}]
+        }
+        with patch.object(radar.requests, "get", return_value=Response()) as request:
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        self.assertEqual(job["source"], "greenhouse")
+        self.assertEqual(job["source_job_id"], "gh-example-123")
+        self.assertEqual(job["company"], "Example Labs")
+        self.assertEqual(job["location"], "Bengaluru, India")
+        self.assertIn("Build Python APIs.", job["description"])
+        self.assertIn("Department: Engineering", job["description"])
+        self.assertNotIn("<p>", job["description"])
+        self.assertEqual(job["source_posted_at"], "2026-10-08T10:00:00+00:00")
+        self.assertEqual(job["posted_precision"], "minute")
+        self.assertIsNotNone(job["discovery_latency_seconds"])
+        self.assertGreaterEqual(job["discovery_latency_seconds"], 0)
+
+        args, kwargs = request.call_args
+        self.assertEqual(args[0], "https://boards-api.greenhouse.io/v1/boards/example/jobs")
+        self.assertEqual(kwargs["params"], {"content": "true"})
+        self.assertNotIn("Authorization", kwargs["headers"])
+        self.assertEqual(kwargs["timeout"], 20)
+
+    def test_greenhouse_collector_keeps_posting_time_unknown_if_first_published_missing(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 789,
+                        "title": "Backend Engineer",
+                        "absolute_url": "https://boards.greenhouse.io/example/jobs/789",
+                        "location": {"name": "Remote - India"},
+                        "updated_at": "2026-10-09T10:00:00Z",
+                        "content": "<p>Build services.</p>",
+                    }]
+                }
+
+        config = {
+            "greenhouse_boards": [{"token": "example", "company": "Example Labs"}]
+        }
+        with patch.object(radar.requests, "get", return_value=Response()):
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        self.assertIsNone(jobs[0]["source_posted_at"])
+        self.assertEqual(jobs[0]["posted_precision"], "unknown")
+        self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+    def test_greenhouse_collector_keeps_successful_board_when_another_board_fails(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "jobs": [{
+                        "id": 456,
+                        "title": "Python Developer",
+                        "absolute_url": "https://boards.greenhouse.io/good/jobs/456",
+                        "location": {"name": "Remote - India"},
+                        "content": "<p>Build automation.</p>",
+                        "departments": [{"name": "Engineering"}],
+                    }]
+                }
+
+        def fake_get(url, **kwargs):
+            if "/bad/" in url:
+                raise radar.requests.HTTPError("404 board not found")
+            return Response()
+
+        config = {
+            "greenhouse_boards": [
+                {"token": "bad", "company": "Bad Board"},
+                {"token": "good", "company": "Good Board"},
+            ]
+        }
+        with patch.object(radar.requests, "get", side_effect=fake_get):
+            jobs = radar.greenhouse_collect(config)
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["company"], "Good Board")
+        self.assertEqual(jobs[0]["source_job_id"], "gh-good-456")
+
+    def test_greenhouse_collector_fails_when_no_boards_are_configured(self):
+        with self.assertRaises(RuntimeError):
+            radar.greenhouse_collect({"greenhouse_boards": []})
+
+    def test_config_v7_keeps_greenhouse_source_opt_in_for_existing_runtime(self):
+        defaults = {
+            "config_version": 7,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+                "greenhouse": False,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+                "greenhouse": 900,
+            },
+        }
+        prior_runtime = {
+            "config_version": 6,
+            "source_enabled": {
+                "linkedin": True,
+                "naukri": True,
+                "instahyre": False,
+                "greenhouse": True,
+            },
+            "poll_seconds": {
+                "linkedin": 60,
+                "naukri": 300,
+                "instahyre": 600,
+            },
+        }
+
+        merged = _merge_config(defaults, prior_runtime)
+
+        self.assertEqual(merged["config_version"], 7)
+        self.assertFalse(merged["source_enabled"]["greenhouse"])
+        self.assertEqual(merged["poll_seconds"]["greenhouse"], 900)
+
+    def test_config_validation_rejects_unsafe_greenhouse_board_tokens(self):
+        config = {
+            **BASE_CONFIG,
+            "greenhouse_boards": [{"token": "../private", "company": "Example"}],
+        }
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config(config)
+
+    def test_naukri_date_precision_does_not_claim_exact_discovery_latency(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "updated_at": "2026-10-09T05:04:08+00:00",
+                    "jobs": [{
+                        "id": "naukri-1",
+                        "url": "https://www.naukri.com/job-listings-example",
+                        "company": "Example Co",
+                        "title": "Software Engineer",
+                        "location": "Bengaluru",
+                        "posted": "2026-10-08",
+                    }],
+                }
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            jobs = radar.naukri_collect()
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["posted_precision"], "date")
+        self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+
+    def test_naukri_relay_does_not_retry_public_feed_404(self):
+        class Response:
+            status_code = 404
+
+            def raise_for_status(self):
+                raise radar.requests.HTTPError("404 public relay feed not found")
+
+        with patch.object(radar.requests, "get", return_value=Response()) as request:
+            with self.assertRaises(radar.requests.HTTPError):
+                radar.naukri_collect()
+
+        request.assert_called_once()
+
+    def test_linkedin_skips_deep_scan_after_fast_lane_rate_limit(self):
+        config = {
+            "locations": ["Bengaluru, India", "Remote, India"],
+            "linkedin_queries": ["software engineer", "automation engineer"],
+        }
+        original_deep_scan = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_target_cursor
+        original_rate_limit_state = (
+            radar.linkedin_last_http_request_monotonic,
+            radar.linkedin_rate_limited_until_monotonic,
+            radar.linkedin_rate_limit_streak,
+            radar.linkedin_rate_limit_generation,
+            dict(radar.source_state.get("linkedin", {})),
+        )
+        calls = []
+
+        def fake_search(query, location, start, fast):
+            calls.append((query, location, start, fast))
+            if len(calls) == 1:
+                response = type("Response", (), {"status_code": 429})()
+                error = radar.requests.HTTPError("429 Too Many Requests")
+                error.response = response
+                raise error
+            return []
+
+        try:
+            radar.linkedin_last_deep_scan_at = None
+            radar.linkedin_fast_target_cursor = 0
+            with patch.object(radar, "_linkedin_search_page", side_effect=fake_search):
+                radar.linkedin_collect(config)
+            self.assertTrue(calls)
+            self.assertTrue(all(start == 0 and fast for _, _, start, fast in calls))
+        finally:
+            radar.linkedin_last_deep_scan_at = original_deep_scan
+            radar.linkedin_fast_target_cursor = original_cursor
+            (
+                radar.linkedin_last_http_request_monotonic,
+                radar.linkedin_rate_limited_until_monotonic,
+                radar.linkedin_rate_limit_streak,
+                radar.linkedin_rate_limit_generation,
+                original_linkedin_runtime,
+            ) = original_rate_limit_state
+            if original_linkedin_runtime:
+                radar.source_state["linkedin"] = original_linkedin_runtime
+            else:
+                radar.source_state.pop("linkedin", None)
 
     def test_linkedin_fast_scan_uses_broader_recency_window(self):
         params = []
@@ -1016,15 +1752,84 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertNotIn("skills: ai", result["reasons"])
 
-    def test_unknown_experience_can_match_but_is_not_alertable(self):
-        result = match_details(
-            make_job("AI Engineer", "Build AI systems with Python."),
-            BASE_CONFIG,
-        )
+    def test_unknown_experience_match_is_alertable_at_configured_threshold(self):
+        job = make_job("AI Engineer", "Build AI systems with Python.")
+        result = match_details(job, BASE_CONFIG)
         self.assertTrue(result["match"])
-        alert = alertability_details(make_job("AI Engineer", "Build AI systems with Python."), result, BASE_CONFIG)
-        self.assertFalse(alert["alertable"])
-        self.assertIn("explicit experience required for alerts", alert["reasons"])
+        self.assertGreaterEqual(result["score"], BASE_CONFIG["match_threshold"])
+        alert = alertability_details(job, result, BASE_CONFIG)
+        self.assertTrue(alert["alertable"])
+        self.assertIn("passes match threshold", alert["reasons"][0])
+
+    def test_policy_migration_suppresses_old_gate_backlog_but_keeps_recent_pending(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                old_job = normalize_job(
+                    "linkedin", "li-policy-old", "Acme", "AI Engineer",
+                    "Bengaluru", "https://linkedin.com/jobs/view/policy-old", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+                recent_job = normalize_job(
+                    "linkedin", "li-policy-recent", "Other Acme", "AI Engineer",
+                    "Bengaluru, Karnataka, India", "https://linkedin.com/jobs/view/policy-recent", None,
+                    "unknown", "Build AI systems with Python.",
+                )
+                self.assertEqual(upsert_jobs([old_job, recent_job], BASE_CONFIG), 2)
+
+                old_time = radar.iso(radar.now() - timedelta(minutes=20))
+                recent_time = radar.iso(radar.now() - timedelta(minutes=5))
+                legacy_reason = json.dumps(["explicit experience required for alerts"])
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    old_id = conn.execute(
+                        "SELECT canonical_opportunity_id FROM jobs WHERE source_job_id='li-policy-old'"
+                    ).fetchone()[0]
+                    recent_id = conn.execute(
+                        "SELECT canonical_opportunity_id FROM jobs WHERE source_job_id='li-policy-recent'"
+                    ).fetchone()[0]
+                    conn.execute(
+                        "UPDATE job_evaluations SET alertable=0, alertability_reasons_json=? "
+                        "WHERE job_id=(SELECT id FROM jobs WHERE source_job_id='li-policy-old')",
+                        (legacy_reason,),
+                    )
+                    conn.execute(
+                        "UPDATE job_evaluations SET alertable=0, alertability_reasons_json=? "
+                        "WHERE job_id=(SELECT id FROM jobs WHERE source_job_id='li-policy-recent')",
+                        (legacy_reason,),
+                    )
+                    conn.execute(
+                        "UPDATE notification_ledger SET status='pending', created_at=?, "
+                        "candidate_job_id=NULL, attempt_count=0, sent_at=NULL WHERE canonical_opportunity_id=?",
+                        (old_time, old_id),
+                    )
+                    conn.execute(
+                        "UPDATE notification_ledger SET status='pending', created_at=?, "
+                        "candidate_job_id=NULL, attempt_count=0, sent_at=NULL WHERE canonical_opportunity_id=?",
+                        (recent_time, recent_id),
+                    )
+                    conn.commit()
+
+                self.assertEqual(
+                    radar.suppress_preexisting_unknown_experience_pending_notifications(),
+                    1,
+                )
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    rows = dict(conn.execute(
+                        "SELECT canonical_opportunity_id, status FROM notification_ledger"
+                    ).fetchall())
+                    reason = conn.execute(
+                        "SELECT decision_reason_json FROM notification_ledger WHERE canonical_opportunity_id=?",
+                        (old_id,),
+                    ).fetchone()[0]
+                self.assertEqual(rows[old_id], "suppressed")
+                self.assertEqual(rows[recent_id], "pending")
+                self.assertIn("avoid a historical Telegram alert burst", reason)
+            finally:
+                radar.DB_PATH = original_db
 
     def test_excluded_role_category_is_configurable(self):
         config = {**BASE_CONFIG, "excluded_role_terms": ["quality assurance"]}
@@ -1033,6 +1838,68 @@ class MatcherTests(unittest.TestCase):
             config,
         )
         self.assertFalse(result["match"])
+
+    def test_linkedin_fast_lane_rotates_two_targets_and_covers_all_locations(self):
+        original_state = radar.source_state
+        original_deep = radar.linkedin_last_deep_scan_at
+        radar.source_state = {}
+        radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+        config = {
+            **BASE_CONFIG,
+            "linkedin_queries": ["ai engineer"],
+            "locations": [
+                "Bengaluru, Karnataka, India",
+                "Gurugram, Haryana, India",
+                "Delhi, India",
+                "Remote, India",
+            ],
+        }
+        calls = []
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body><ul>
+              <li>
+                <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/1234567890">Apply</a>
+                <h3 class="base-search-card__title">AI Engineer</h3>
+                <h4 class="base-search-card__subtitle">Acme</h4>
+                <span class="job-search-card__location">Bengaluru, Karnataka, India</span>
+                <time>1 minute ago</time>
+                <span>2 years experience</span>
+              </li>
+            </ul></body></html>
+            """
+
+        def fake_request(_endpoint, params):
+            calls.append((params["location"], params["start"]))
+            return Response()
+
+        expected = sorted([
+            ("Bengaluru, Karnataka, India", 0),
+            ("Gurugram, Haryana, India", 0),
+            ("Delhi, India", 0),
+            ("Remote, India", 0),
+        ])
+        try:
+            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+                radar.linkedin_collect(config)
+                first_cycle = sorted(calls)
+                calls.clear()
+                radar.linkedin_collect(config)
+                second_cycle = sorted(calls)
+
+            self.assertEqual(len(first_cycle), 2)
+            self.assertEqual(len(second_cycle), 2)
+            self.assertEqual(first_cycle, [("Bengaluru, Karnataka, India", 0), ("Gurugram, Haryana, India", 0)])
+            self.assertEqual(
+                set(first_cycle + second_cycle),
+                set(expected),
+            )
+        finally:
+            radar.source_state = original_state
+            radar.linkedin_last_deep_scan_at = original_deep
+
 
     def test_linkedin_fast_lane_and_periodic_deep_scan(self):
         original_state = radar.source_state

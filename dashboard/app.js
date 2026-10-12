@@ -465,9 +465,15 @@
       discovered_at: raw.discovered_at || null,
       discovery_latency_seconds: raw.discovery_latency_seconds ?? null,
       match_score: score,
+      likely_match: Boolean(raw.likely_match),
       match_reasons: reasons,
-      alertable: Boolean(raw.alertable ?? (score >= (state.config?.match_threshold ?? 55))),
+      alertable: Boolean(raw.alertable),
       alertability_reasons: Array.isArray(raw.alertability_reasons) ? raw.alertability_reasons : [],
+      notification_status: String(raw.notification_status || 'not_eligible').toLowerCase(),
+      notification_decision_reasons: Array.isArray(raw.notification_decision_reasons) ? raw.notification_decision_reasons : [],
+      notification_sent_at: raw.notification_sent_at || null,
+      notification_last_error: raw.notification_last_error || null,
+      notification_candidate_job_id: raw.notification_candidate_job_id ?? null,
       experience_min_years: minExp,
       experience_max_years: maxExp,
       experience_label: expLabel,
@@ -853,7 +859,9 @@
 
       const matchesQuery = !query || textHaystack.includes(query);
       const matchesSource = !source || job.source.toLowerCase() === source.toLowerCase();
-      const matchesScore = job.match_score >= minScore;
+      const configuredThreshold = state.config?.match_threshold ?? 55;
+      const matchesScore = job.match_score >= minScore
+        && (minScore < configuredThreshold || job.likely_match);
       const matchesAge = ageHours(ts) <= maxAge;
       const matchesAlertable = !alertableOnly || job.alertable;
       const matchesRemote = !remoteOnly || job.work_mode.toLowerCase().includes('remote') || job.location.toLowerCase().includes('remote');
@@ -901,8 +909,35 @@
       const scoreTier = getScoreTierClass(job.match_score);
 
       const alertableBadge = job.alertable
-        ? `<span class="tag-alertable-compact">ALERTABLE</span>`
+        ? `<span class="tag-alertable-compact" title="${esc((job.alertability_reasons || []).join('; '))}">ALERTABLE</span>`
         : '';
+      const notificationStatus = String(job.notification_status || 'not_eligible').toLowerCase();
+      const configuredThreshold = state.config?.match_threshold ?? 55;
+      const qualifiesForAlertPolicy = job.likely_match && job.match_score >= configuredThreshold;
+      const notificationTooltip = [
+        ...(job.notification_decision_reasons || []),
+        ...(job.notification_last_error ? [`Delivery error: ${job.notification_last_error}`] : []),
+      ].join('; ') || (job.alertability_reasons || []).join('; ');
+      let notificationBadge = '';
+      if (qualifiesForAlertPolicy) {
+        if (notificationStatus === 'sent') {
+          notificationBadge = `<span class="tag-alertable-compact" title="Telegram sent${job.notification_sent_at ? ` at ${esc(fmtTimestamp(job.notification_sent_at))}` : ''}">TELEGRAM SENT</span>`;
+        } else if (notificationStatus === 'queued' || notificationStatus === 'sending') {
+          notificationBadge = `<span class="tag-alertable-compact" title="${esc(notificationTooltip || 'Eligible opportunity queued for Telegram')}">TELEGRAM QUEUED</span>`;
+        } else if (notificationStatus === 'failed') {
+          notificationBadge = `<span class="tag-applied-compact" title="${esc(notificationTooltip || 'Telegram delivery failed')}">TELEGRAM FAILED</span>`;
+        } else if (notificationStatus === 'suppressed') {
+          notificationBadge = `<span class="tag-applied-compact" title="${esc(notificationTooltip || 'Suppressed by freshness or canonical-opportunity policy')}">NOT ALERTED</span>`;
+        } else if (notificationStatus === 'pending' && job.alertable) {
+          notificationBadge = `<span class="tag-alertable-compact" title="${esc(notificationTooltip || 'Waiting for the next notification decision cycle')}">TELEGRAM PENDING</span>`;
+        } else if (!job.alertable) {
+          const alertabilityText = (job.alertability_reasons || []).join('; ');
+          const label = alertabilityText.toLowerCase().includes('disabled') ? 'TELEGRAM OFF' : 'NOT ALERTABLE';
+          notificationBadge = `<span class="tag-applied-compact" title="${esc(notificationTooltip || alertabilityText || 'Does not pass notification policy')}">${label}</span>`;
+        } else if (notificationStatus === 'not_eligible') {
+          notificationBadge = `<span class="tag-applied-compact" title="No notification-ledger entry found for this job">NO ALERT RECORD</span>`;
+        }
+      }
       const appliedBadge = applied
         ? `<span class="tag-applied-compact">APPLIED</span>`
         : '';
@@ -929,6 +964,7 @@
             <span class="score-display-num">${job.match_score}%</span>
             <span class="score-display-label">MATCH</span>
             ${alertableBadge}
+            ${notificationBadge}
             ${appliedBadge}
           </div>
 
@@ -1288,8 +1324,18 @@
       const runtime = src.runtime || {};
       const isError = Boolean(runtime.error);
       const isRunning = Boolean(runtime.running);
+      const isDisabled = src.enabled === false;
+      const sourceLabels = {
+        linkedin: 'LinkedIn',
+        naukri: 'Naukri (Relay)',
+        instahyre: 'Instahyre',
+        greenhouse: 'Greenhouse',
+      };
+      const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
-      if (isError) {
+      if (isDisabled) {
+        statusBadge = `<span class="signal-pill" style="background:var(--surface-muted);color:var(--text-muted);border-color:var(--border-default);">DISABLED</span>`;
+      } else if (isError) {
         statusBadge = `<span class="signal-pill" style="background:var(--status-error-subtle);color:var(--status-error);border-color:var(--status-error-border);">${SVG_ICONS.x} ERROR</span>`;
       } else if (isRunning) {
         statusBadge = `<span class="signal-pill signal-warning">${SVG_ICONS.rotateCw} RUNNING</span>`;
@@ -1297,7 +1343,7 @@
 
       return `
         <tr>
-          <td><b style="color:var(--text-primary);">${esc(src.source)}</b></td>
+          <td><b style="color:var(--text-primary);">${esc(sourceName)}</b></td>
           <td>${statusBadge}</td>
           <td class="meta-mono">${esc(src.jobs_seen ?? 0)}</td>
           <td class="meta-mono">${esc(src.new_jobs ?? 0)}</td>
@@ -1483,9 +1529,10 @@
       }
     } catch (e) {
       state.sourceStatus = [
-        { source: 'LinkedIn', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'Naukri (Relay)', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'Instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'linkedin', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'naukri', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'greenhouse', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
+        { source: 'instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
       ];
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
@@ -1510,6 +1557,7 @@
       { value: '', label: 'All Sources' },
       { value: 'linkedin', label: 'LinkedIn' },
       { value: 'naukri', label: 'Naukri' },
+      { value: 'greenhouse', label: 'Greenhouse' },
       { value: 'instahyre', label: 'Instahyre' },
     ];
     if (dropdowns.source) {

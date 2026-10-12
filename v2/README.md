@@ -13,13 +13,16 @@ A job is not called "fresh" unless we record:
 
 No synthetic timestamps are used to make a job look newer.
 
-## First sources
+## Sources and polling
 
-1. LinkedIn public guest jobs endpoint — 2 minute polling target
-2. Naukri via the existing GitHub-hosted relay — 2 minute relay polling target
-3. Instahyre — 10 minute polling target, initially treated as experimental until freshness is verified
+- **LinkedIn:** public guest jobs endpoint with a 180-second scheduling target, at least 4 seconds between global HTTP requests, two first-page search targets per scan, one JD-detail enrichment worker, and deep pagination every 30 minutes. Treat this as a lower-load measurement phase, not a guarantee that HTTP 429s are eliminated; source limits and search indexing mean target rotation makes discovery slower.
+- **Naukri:** separate public relay feed, 300-second polling target. The relay preserves the external collection timestamp because acquisition happens on a GitHub-hosted runner.
+- **Greenhouse:** public Job Board API, 900-second polling target, opt-in. The initial board registry is in `v2/config.json` (`greenhouse_boards`); the source is disabled by default until explicitly enabled through the preferences UI/API. The adapter requests `content=true` to capture full public job descriptions, scopes IDs by board token, isolates failures per board, and keeps jobs from successful boards if another board fails. The adapter uses `first_published` for original posting time when available, never substitutes `updated_at` (which can reflect later edits), and leaves posting time unknown when `first_published` is absent.
+- **Instahyre:** 600-second polling target but disabled by default until its interface and freshness are verified.
 
-The collector is deliberately small and low-volume. LinkedIn's guest endpoint currently exposes logged-out job cards and supports recency filtering. Naukri is acquired by the existing GitHub-hosted watcher and published as a relay feed because direct Naukri access from the Oracle VM is timing out. The relay preserves source posting data and its collection timestamp.
+The Greenhouse Job Board API documents unauthenticated GET endpoints for public board data and supports retrieving all job posts, with full descriptions available through the `content=true` query parameter: [official documentation](https://developers.greenhouse.io/job-board.html). Three board tokens are preconfigured after live API validation from the Oracle VM: `coinbase`, `gravitonresearchcapital`, and `zocdoc`. Edit `greenhouse_boards` in `v2/config.json` to add or remove employers; test each board's public API endpoint before enabling it. Each token is validated before it is used in the fixed Greenhouse API URL.
+
+The collector remains deliberately low-volume. LinkedIn HTTP 429s stop the active search batch, activate a global cooldown with escalating 5/10/20/30-minute backoff and honor `Retry-After`; never add proxy/IP rotation, fake identities or CAPTCHA bypass to evade limits. Each new source feeds the same normalization, canonical opportunity linking, evaluation, alertability, notification ledger, and Telegram path. Source-specific failures must not stop other collectors, and date-only or unavailable posting timestamps must never be turned into invented freshness measurements. Free-first coverage improvement should prioritize permitted public ATS/company-career sources, one adapter at a time, before evaluating paid collection services.
 
 ## Storage
 
@@ -40,6 +43,14 @@ V2 now keeps source observations in `jobs` and canonical cross-source groupings 
 - `GET /api/dedupe-candidates?limit=100` (cross-source candidate diagnostics)
 
 Runtime user preferences are persisted at `/data/config.json`. The configuration API is protected by a generated token stored at `/data/config_token`, unless `JOB_RADAR_CONFIG_TOKEN` is supplied to the container.
+
+### Isolated Naukri relay
+
+The main `AvinashBhalla/job-beeper` repository and application remain private. Naukri acquisition runs from a separate public relay-only repository, `AvinashBhalla/job-beeper-naukri-relay`. That repository should contain only the scheduled relay workflow, setup documentation and the generated feed on its `naukri-relay` branch; it must not contain or mirror the application source.
+
+The public relay workflow checks out the private repository into a temporary runner directory and reads its `config.json` using a fine-grained `PRIVATE_APP_READ_TOKEN` secret with **Contents: read** permission limited to `AvinashBhalla/job-beeper`. The checkout is not committed to or published from the relay repository. Never paste the token into chat or commit it. The FastAPI container reads the generated JSON from the public raw URL, so the VM no longer needs a GitHub token. The public feed intentionally contains job postings and source URLs; do not publish credentials, runtime preferences or application configuration in the feed.
+
+Do not deploy this consumer change until the public relay repository and its first successful feed publication have been verified. Once the public feed is live, stop the old VM timer that dispatches the private repository's relay workflow to avoid duplicate runs and private Actions-minute usage.
 
 The dashboard is packaged with V2 and is served at `/dashboard/` by the FastAPI process. It reads jobs and settings from the V2 API rather than the legacy V1 GitHub JSON feed.
 

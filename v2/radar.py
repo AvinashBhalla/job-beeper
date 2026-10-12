@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+from email.utils import parsedate_to_datetime
 import hashlib
 import html as html_lib
 import json
@@ -44,9 +45,14 @@ UA = {
     "Accept-Language": "en-IN,en;q=0.9",
 }
 
-LINKEDIN_SEARCH_WORKERS = 2
-LINKEDIN_DETAIL_WORKERS = 4
-LINKEDIN_DEEP_SCAN_SECONDS = 300
+# Keep LinkedIn requests paced and honor HTTP 429 with an escalating global cooldown.
+LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 4.0
+LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS = 300
+LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 1800
+LINKEDIN_DETAIL_WORKERS = 1
+LINKEDIN_FAST_TARGETS_PER_SCAN = 2
+LINKEDIN_DEEP_SCAN_SECONDS = 1800
+LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
 
@@ -69,6 +75,13 @@ db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
+linkedin_fast_target_cursor = 0
+linkedin_http_lock = threading.Lock()
+linkedin_last_http_request_monotonic = 0.0
+linkedin_rate_limited_until_monotonic = 0.0
+linkedin_last_rate_limit_monotonic = 0.0
+linkedin_rate_limit_streak = 0
+linkedin_rate_limit_generation = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
 
@@ -103,11 +116,41 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             json.dumps(defaults.get("naukri_queries", []))
         )
 
+    # Version 6 temporarily requires explicit captured experience for Telegram
+    # alerts. LinkedIn public guest pages can omit poster-added requirements,
+    # so unknown-experience jobs stay visible in the dashboard but do not alert.
+    if current_version < 6 <= default_version:
+        merged["require_explicit_experience_for_alerts"] = True
+
+    # Version 7 adds Greenhouse as an opt-in structured ATS source. Existing
+    # runtimes must not start querying/alerting from it without an explicit opt-in.
+    if current_version < 7 <= default_version:
+        merged.setdefault("source_enabled", {})["greenhouse"] = False
+
     if isinstance(defaults.get("poll_seconds"), dict):
         merged["poll_seconds"] = {
             **defaults.get("poll_seconds", {}),
             **current.get("poll_seconds", {}),
         }
+    # Version 8 reduces LinkedIn request pressure. Older persisted configs may
+    # retain the previous 60-second poll interval, so migrate it explicitly.
+    if current_version < 8 <= default_version:
+        merged.setdefault("poll_seconds", {})["linkedin"] = max(
+            120, int(defaults.get("poll_seconds", {}).get("linkedin", 120) or 120)
+        )
+
+    # Version 9 makes the configured match threshold the only relevance
+    # threshold for an otherwise-valid match. Unknown experience is neutral,
+    # not a separate reason to withhold Telegram alerts.
+    if current_version < 9 <= default_version:
+        merged["require_explicit_experience_for_alerts"] = False
+
+    # Version 10 applies the free-first LinkedIn low-pressure request budget:
+    # 180-second poll cadence. Do not keep a prior 120-second setting.
+    if current_version < 10 <= default_version:
+        merged.setdefault("poll_seconds", {})["linkedin"] = max(
+            180, int(defaults.get("poll_seconds", {}).get("linkedin", 180) or 180)
+        )
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -118,6 +161,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         # repository default during migration.
         if current_version < 4 <= default_version:
             merged["source_enabled"]["instahyre"] = False
+        if current_version < 7 <= default_version:
+            merged["source_enabled"]["greenhouse"] = False
     return merged
 
 
@@ -177,6 +222,29 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
     for key in ("remote_only", "notifications_enabled", "require_explicit_experience_for_alerts"):
         config[key] = bool(config.get(key, False))
 
+    greenhouse_boards = config.get("greenhouse_boards", [])
+    if not isinstance(greenhouse_boards, list):
+        raise HTTPException(status_code=422, detail="greenhouse_boards must be a list.")
+    if len(greenhouse_boards) > 50:
+        raise HTTPException(status_code=422, detail="greenhouse_boards cannot contain more than 50 boards.")
+    normalized_boards: list[dict[str, str]] = []
+    seen_board_tokens: set[str] = set()
+    for board in greenhouse_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each greenhouse board must be an object.")
+        token = board.get("token")
+        company = board.get("company")
+        if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", token.strip()):
+            raise HTTPException(status_code=422, detail="Each greenhouse board requires a valid public board token.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each greenhouse board requires a company label of at most 120 characters.")
+        token = token.strip()
+        if token.lower() in seen_board_tokens:
+            raise HTTPException(status_code=422, detail=f"Duplicate Greenhouse board token: {token}.")
+        seen_board_tokens.add(token.lower())
+        normalized_boards.append({"token": token, "company": company.strip()})
+    config["greenhouse_boards"] = normalized_boards
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -184,6 +252,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "linkedin": bool(source_enabled.get("linkedin", True)),
         "naukri": bool(source_enabled.get("naukri", True)),
         "instahyre": bool(source_enabled.get("instahyre", True)),
+        "greenhouse": bool(source_enabled.get("greenhouse", False)),
     }
 
     poll_seconds = config.get("poll_seconds", {})
@@ -195,10 +264,64 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "linkedin": 60,
             "naukri": 300,
             "instahyre": 600,
+            "greenhouse": 900,
         }.items()
     }
 
     return config
+
+
+def suppress_preexisting_unknown_experience_pending_notifications(
+    cutoff_minutes: int = 10,
+) -> int:
+    """Avoid replaying old pending matches when migrating away from the hidden experience gate.
+
+    Only pending, never-attempted opportunities that were specifically blocked by
+    the old explicit-experience policy and are older than the short live window
+    are suppressed. New pending matches stay eligible under the updated policy.
+    """
+    if not DB_PATH.exists():
+        return 0
+    cutoff = iso(now() - dt.timedelta(minutes=max(1, cutoff_minutes)))
+    timestamp = iso(now())
+    reasons = json.dumps([
+        "suppressed during alert-policy migration",
+        "not replayed to avoid a historical Telegram alert burst",
+        "future fresh source observations will use the updated threshold policy",
+    ], ensure_ascii=False)
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"notification_ledger", "jobs", "job_evaluations"}.issubset(tables):
+            return 0
+        cursor = conn.execute("""
+            UPDATE notification_ledger
+            SET status='suppressed',
+                candidate_job_id=NULL,
+                updated_at=?,
+                next_attempt_at=NULL,
+                decision_reason_json=?
+            WHERE status='pending'
+              AND candidate_job_id IS NULL
+              AND attempt_count=0
+              AND sent_at IS NULL
+              AND created_at < ?
+              AND canonical_opportunity_id IN (
+                  SELECT DISTINCT j.canonical_opportunity_id
+                  FROM jobs j
+                  JOIN job_evaluations e ON e.job_id=j.id
+                  WHERE j.canonical_opportunity_id IS NOT NULL
+                    AND e.match=1
+                    AND e.alertable=0
+                    AND e.alertability_reasons_json LIKE
+                        '%explicit experience required for alerts%'
+              )
+        """, (timestamp, reasons, cutoff))
+        conn.commit()
+        return cursor.rowcount
 
 
 def ensure_runtime_config() -> None:
@@ -211,12 +334,28 @@ def ensure_runtime_config() -> None:
             current = {}
     else:
         current = {}
+
+    current_version = int(current.get("config_version", 1) or 1)
+    default_version = int(defaults.get("config_version", 1) or 1)
+    migrate_alert_policy = current_version < 9 <= default_version
+
     merged = validate_config(_merge_config(defaults, current))
     serialized = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
     if not RUNTIME_CONFIG_PATH.exists() or RUNTIME_CONFIG_PATH.read_text(encoding="utf-8") != serialized:
         tmp = RUNTIME_CONFIG_PATH.with_suffix(".tmp")
         tmp.write_text(serialized, encoding="utf-8")
         os.replace(tmp, RUNTIME_CONFIG_PATH)
+
+    # init_db runs before startup config migration. Preserve recently discovered
+    # pending matches, but suppress older entries that were held only by the
+    # retired experience gate so the new policy does not replay historical alerts.
+    if migrate_alert_policy:
+        suppressed = suppress_preexisting_unknown_experience_pending_notifications()
+        if suppressed:
+            log.warning(
+                "alert policy migration suppressed %s historical pending notifications",
+                suppressed,
+            )
 
 
 def get_config() -> dict[str, Any]:
@@ -283,7 +422,8 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
             return dt.datetime.fromtimestamp(timestamp, tz=UTC)
         except (OverflowError, OSError, ValueError):
             return None
-    text = str(value).strip().lower()
+    raw_text = str(value).strip()
+    text = raw_text.lower()
     if text in {"just now", "now", "today"}:
         return base
     if text == "yesterday":
@@ -291,7 +431,12 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
     m = re.search(r"(\d+)\s*(minute|min|hour|hr|day|week)s?\s*(?:ago)?", text)
     if not m:
         try:
-            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+            iso_text = (
+                raw_text[:-1] + "+00:00"
+                if raw_text.endswith(("Z", "z"))
+                else raw_text
+            )
+            parsed = dt.datetime.fromisoformat(iso_text)
             return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
         except ValueError:
             return None
@@ -307,6 +452,15 @@ def normalize_job(source: str, source_id: str, company: str, title: str,
                   location: str, url: str, posted_at: dt.datetime | None,
                   posted_precision: str, description: str = "") -> dict[str, Any]:
     discovered = now()
+    if posted_at is not None:
+        comparable_posted_at = posted_at
+        if comparable_posted_at.tzinfo is None:
+            comparable_posted_at = comparable_posted_at.replace(tzinfo=UTC)
+        if comparable_posted_at.astimezone(UTC) > discovered:
+            # Some source "just now" labels can resolve later than first discovery.
+            # Keep the discovery time authoritative rather than showing a future post.
+            posted_at = None
+            posted_precision = "unknown"
     return {
         "source": source,
         "source_job_id": str(source_id),
@@ -598,6 +752,18 @@ def init_db() -> None:
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
         conn.execute("UPDATE jobs SET discovery_latency_seconds=NULL WHERE discovery_latency_seconds < 0")
+        # Repair records written by older builds where source metadata placed
+        # the posting after the first time this VM had already discovered it.
+        conn.execute("""
+            UPDATE jobs
+            SET source_posted_at=NULL,
+                posted_precision='unknown',
+                discovery_latency_seconds=NULL
+            WHERE source_posted_at IS NOT NULL
+              AND julianday(source_posted_at) IS NOT NULL
+              AND julianday(discovered_at) IS NOT NULL
+              AND julianday(source_posted_at) > julianday(discovered_at)
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_lookup ON canonical_opportunities(company_norm, location_norm)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
@@ -609,12 +775,34 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
     new_count = 0
     config = config or get_config()
     with db_lock, sqlite3.connect(DB_PATH) as conn:
-        for j in jobs:
+        for incoming in jobs:
+            j = dict(incoming)
+            observed_at = parse_relative(j.get("discovered_at"))
+            incoming_posted_at = parse_relative(j.get("source_posted_at"))
+            if observed_at and incoming_posted_at and incoming_posted_at > observed_at:
+                j["source_posted_at"] = None
+                j["posted_precision"] = "unknown"
+                j["discovery_latency_seconds"] = None
+
             existing = conn.execute(
-                "SELECT id, canonical_opportunity_id FROM jobs WHERE source=? AND source_job_id=?",
+                "SELECT id, canonical_opportunity_id, discovered_at FROM jobs WHERE source=? AND source_job_id=?",
                 (j["source"], j["source_job_id"])
             ).fetchone()
             if existing:
+                posted_at_for_update = j["source_posted_at"]
+                precision_for_update = j["posted_precision"]
+                first_discovered_at = parse_relative(existing[2])
+                incoming_posted_at = parse_relative(posted_at_for_update)
+                if (
+                    incoming_posted_at
+                    and first_discovered_at
+                    and incoming_posted_at > first_discovered_at
+                ):
+                    # Never backfill a moving relative label ("just now", "1 min ago")
+                    # with a timestamp that contradicts the job's original discovery.
+                    posted_at_for_update = None
+                    precision_for_update = "unknown"
+
                 conn.execute("""
                     UPDATE jobs SET last_seen_at=?, source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
@@ -622,8 +810,8 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     END
                     WHERE id=?
                 """, (
-                    j["discovered_at"], j["source_posted_at"], j["posted_precision"],
-                    j["posted_precision"],
+                    j["discovered_at"], posted_at_for_update, precision_for_update,
+                    precision_for_update,
                     j["description"], j["description"], existing[0]
                 ))
                 if not existing[1]:
@@ -779,10 +967,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     now_value = now()
     max_age = int(config.get("max_age_hours", 72))
-    alert_window_minutes = 10
-    alert_cutoff = iso(
-        now_value - dt.timedelta(minutes=alert_window_minutes)
-    )
+    rediscovery_cutoff = iso(now_value - dt.timedelta(minutes=10))
     changed = 0
 
     with db_lock, sqlite3.connect(DB_PATH) as conn:
@@ -805,7 +990,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                )
             ORDER BY created_at ASC
             """,
-            (alert_cutoff,),
+            (rediscovery_cutoff,),
         ).fetchall()
 
         for row in candidates:
@@ -861,20 +1046,14 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
 
                 fresh_matches.append(item)
 
-                discovery_timestamp = parse_relative(
-                    item.get("discovered_at")
-                )
-                is_recently_discovered = (
-                    discovery_timestamp is not None
-                    and discovery_timestamp >=
-                    now_value - dt.timedelta(minutes=alert_window_minutes)
-                )
+                # Discovery is the alert trigger. Do not expire a valid
+                # opportunity just because evaluation or queue processing took
+                # longer than expected. max_age above remains the historical
+                # relevance guard.
+                recent_matches.append(item)
 
-                if is_recently_discovered:
-                    recent_matches.append(item)
-
-                    if item["alertable"]:
-                        fresh_alertable.append(item)
+                if item["alertable"]:
+                    fresh_alertable.append(item)
 
             timestamp = iso(now_value)
 
@@ -887,7 +1066,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                     reasons = [
                         "revalidated queued opportunity",
                         "passes current match and alert policy",
-                        f"detected within the last {alert_window_minutes} minutes",
+                        "eligible opportunity queued for prompt delivery",
                     ]
 
                     conn.execute(
@@ -965,7 +1144,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                         else "new source observation for previously suppressed opportunity"
                     ),
                     "passes match and alert policy",
-                    f"detected within the last {alert_window_minutes} minutes",
+                    "eligible opportunity queued for prompt delivery",
                     f"within {max_age} hour age window",
                 ]
 
@@ -1151,9 +1330,27 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
     value = normalize_phrase(location)
     if not value:
         return False
-    if config.get("remote_only") and not phrase_hits(["remote"], value):
+    is_remote = bool(phrase_hits(["remote"], value))
+    if config.get("remote_only") and not is_remote:
         return False
-    terms = location_terms(config)
+
+    # A configured region such as "Remote, India" is not a wildcard for
+    # every remote job worldwide. Match its qualifier as well as "remote".
+    # A plain "Remote" entry intentionally remains a global remote filter.
+    configured_locations = config.get("locations", [])
+    for raw in configured_locations:
+        parts = str(raw).split(",", 1)
+        primary = normalize_phrase(parts[0])
+        if primary != "remote" or not is_remote:
+            continue
+        qualifier = normalize_phrase(parts[1]) if len(parts) > 1 else ""
+        if not qualifier or phrase_hits([qualifier], value):
+            return True
+
+    terms = [
+        term for term in location_terms(config)
+        if term != "remote"
+    ]
     return any(phrase_hits([term], value) for term in terms)
 
 
@@ -1280,14 +1477,19 @@ def _linkedin_job_description(url: str) -> str:
 
     for endpoint in endpoints:
         try:
-            response = requests.get(
+            response = _linkedin_http_get(
                 endpoint,
                 headers={**UA, "Accept": "text/html,application/xhtml+xml"},
                 timeout=10,
             )
             if response.status_code != 200:
                 continue
-        except requests.RequestException:
+        except LinkedInRateLimitCooldown:
+            return ""
+        except requests.RequestException as exc:
+            if getattr(getattr(exc, "response", None), "status_code", None) == 429:
+                log.warning("linkedin JD enrichment stopped after HTTP 429")
+                return ""
             continue
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -1370,16 +1572,23 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
     if job.get("source") != "linkedin":
         return job
 
-    combined = f"{job.get('title', '')} {job.get('description', '')}"
-    if extract_experience(combined) != (None, None):
-        return job
-
+    # Always inspect the actual LinkedIn JD when available. Search-result
+    # snippets can contain unrelated numbers (or omit requirements entirely),
+    # so a generic experience hit must not short-circuit JD enrichment.
+    existing_description = job.get("description") or ""
     detail = _linkedin_job_description(job.get("url", ""))
     if not detail:
         job.pop("needs_jd_enrichment", None)
         return job
 
-    existing_description = job.get("description") or ""
+    # Replace the previous captured JD section rather than appending a new
+    # copy on every poll; keep the source metadata and latest detail text.
+    existing_description = re.sub(
+        r"\s*JD:\s*.*$",
+        "",
+        existing_description,
+        flags=re.I,
+    ).strip()
     job["description"] = (
         f"{existing_description} JD: {detail}".strip()
     )[:30000]
@@ -1504,7 +1713,16 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
         score += min(30, 6 * len(skill_hits))
         reasons.append("skills: " + ", ".join(skill_hits[:5]))
 
-    exp_min, exp_max = extract_experience(combined)
+    # Prefer structured JD extraction, then a JD-focused parse of the
+    # description. Only fall back to generic text parsing when the JD has no
+    # explicit requirement; never let a generic title/snippet override JD data.
+    exp_min = job.get("jd_experience_min_years")
+    exp_max = job.get("jd_experience_max_years")
+    if exp_min is None and exp_max is None:
+        exp_min, exp_max = extract_jd_experience(description)
+    if exp_min is None and exp_max is None:
+        exp_min, exp_max = extract_experience(combined)
+
     candidate_years = config.get("candidate_experience_years")
     max_years = float(config.get("max_experience_years", 3))
     minimum_job_years = config.get("min_experience_years")
@@ -1593,11 +1811,10 @@ def alertability_details(job: dict[str, Any], details: dict[str, Any], config: d
     if not config.get("notifications_enabled", True):
         return {"alertable": False, "reasons": ["Telegram notifications disabled"]}
 
-    if config.get("require_explicit_experience_for_alerts"):
-        if details.get("experience_min_years") is None and details.get("experience_max_years") is None:
-            return {"alertable": False, "reasons": ["explicit experience required for alerts"]}
-
-    return {"alertable": True, "reasons": ["passes current alert policy"]}
+    # Unknown experience is neutral for profile matching. Explicit incompatible
+    # experience is already rejected by match_details(); do not add a hidden
+    # second gate after the configured match threshold has passed.
+    return {"alertable": True, "reasons": ["passes match threshold and notification policy"]}
 
 
 
@@ -1606,10 +1823,123 @@ def likely_match(job: dict[str, Any]) -> bool:
     return bool(match_details(job)["match"])
 
 
+class LinkedInRateLimitCooldown(RuntimeError):
+    """Raised when a previous LinkedIn HTTP 429 is still in its cooldown window."""
+
+
+def _linkedin_cooldown_remaining() -> float:
+    return max(0.0, linkedin_rate_limited_until_monotonic - time.monotonic())
+
+
+def _retry_after_seconds(response: requests.Response) -> float | None:
+    raw = str(getattr(response, "headers", {}).get("Retry-After", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        try:
+            parsed = parsedate_to_datetime(raw)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return max(0.0, (parsed.astimezone(UTC) - now()).total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+
+def _activate_linkedin_rate_limit(response: requests.Response) -> float:
+    """Back off globally when any LinkedIn endpoint returns HTTP 429."""
+    global linkedin_rate_limited_until_monotonic
+    global linkedin_last_rate_limit_monotonic
+    global linkedin_rate_limit_streak, linkedin_rate_limit_generation
+
+    remaining = _linkedin_cooldown_remaining()
+    if remaining > 0:
+        return remaining
+
+    monotonic_now = time.monotonic()
+    # A single successful scan must not erase evidence of repeated 429s. Reset
+    # the escalation streak only after an hour without another rate-limit event.
+    if (
+        linkedin_last_rate_limit_monotonic
+        and monotonic_now - linkedin_last_rate_limit_monotonic >= 3600
+    ):
+        linkedin_rate_limit_streak = 0
+    linkedin_rate_limit_streak += 1
+    linkedin_last_rate_limit_monotonic = monotonic_now
+    multiplier = 2 ** min(linkedin_rate_limit_streak - 1, 3)
+    fallback = min(
+        LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS,
+        LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS * multiplier,
+    )
+    retry_after = _retry_after_seconds(response)
+    cooldown = max(fallback, retry_after or 0.0)
+    linkedin_rate_limited_until_monotonic = monotonic_now + cooldown
+    linkedin_rate_limit_generation += 1
+
+    until_utc = now() + dt.timedelta(seconds=cooldown)
+    source_runtime = source_state.setdefault("linkedin", {})
+    source_runtime["rate_limited_until"] = iso(until_utc)
+    source_runtime["rate_limit_cooldown_seconds"] = int(cooldown)
+    log.warning(
+        "linkedin: HTTP 429; pausing all LinkedIn HTTP requests for %ss "
+        "(streak=%s, retry_after=%s)",
+        int(cooldown),
+        linkedin_rate_limit_streak,
+        int(retry_after) if retry_after is not None else "not-provided",
+    )
+    return cooldown
+
+
+def _linkedin_http_get(
+    endpoint: str,
+    *,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 25,
+) -> requests.Response:
+    """Serialize and pace all LinkedIn HTTP calls, including JD enrichment."""
+    global linkedin_last_http_request_monotonic
+
+    with linkedin_http_lock:
+        remaining = _linkedin_cooldown_remaining()
+        if remaining > 0:
+            raise LinkedInRateLimitCooldown(
+                f"LinkedIn HTTP cooldown active for {int(remaining)}s"
+            )
+
+        spacing = LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS - (
+            time.monotonic() - linkedin_last_http_request_monotonic
+        )
+        if spacing > 0:
+            time.sleep(spacing)
+
+        # Re-check after waiting in case another worker received a 429.
+        remaining = _linkedin_cooldown_remaining()
+        if remaining > 0:
+            raise LinkedInRateLimitCooldown(
+                f"LinkedIn HTTP cooldown active for {int(remaining)}s"
+            )
+
+        linkedin_last_http_request_monotonic = time.monotonic()
+        response = requests.get(
+            endpoint,
+            params=params,
+            headers=headers or UA,
+            timeout=timeout,
+        )
+        if response.status_code == 429:
+            _activate_linkedin_rate_limit(response)
+            response.raise_for_status()
+        return response
+
+
 def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
     for attempt in range(3):
-        response = requests.get(endpoint, params=params, headers=UA, timeout=25)
-        if response.status_code not in {429, 500, 502, 503, 504}:
+        response = _linkedin_http_get(
+            endpoint, params=params, headers=UA, timeout=25
+        )
+        if response.status_code not in {500, 502, 503, 504}:
             response.raise_for_status()
             return response
         wait = min(30, 2 ** attempt * 2)
@@ -1687,7 +2017,13 @@ def _linkedin_search_page(query: str, location: str, start: int, fast: bool = Tr
 
 
 def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    global linkedin_last_deep_scan_at
+    global linkedin_last_deep_scan_at, linkedin_fast_target_cursor
+    global linkedin_rate_limit_streak
+    scan_started = time.monotonic()
+    if _linkedin_cooldown_remaining() > 0:
+        remaining = int(_linkedin_cooldown_remaining())
+        log.info("linkedin scan skipped; rate-limit cooldown has %ss remaining", remaining)
+        return []
     jobs: list[dict[str, Any]] = []
     last_deep = linkedin_last_deep_scan_at
     last_deep_at = parse_relative(last_deep) if last_deep else None
@@ -1696,35 +2032,103 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         or (now() - last_deep_at).total_seconds() >= LINKEDIN_DEEP_SCAN_SECONDS
     )
 
-    configured_locations = list(config.get("locations", []))
-    targets = [
-        (query, location, start, start != 10)
-        for query in config.get("linkedin_queries", [])
-        for location in configured_locations
-        for start in ((0, 10) if do_deep else (0,))
+    # Spread first-page searches over consecutive cycles to reduce HTTP 429s.
+    # If a target is rate-limited, keep the cursor on that target for the first
+    # retry after cooldown instead of skipping the unattempted targets in its batch.
+    scan_locations = list(config.get("locations", []))
+    scan_queries = list(config.get("linkedin_queries", []))
+    all_fast_targets = [
+        (query, location, 0, True)
+        for query in scan_queries
+        for location in scan_locations
     ]
+    if all_fast_targets:
+        batch_size = min(LINKEDIN_FAST_TARGETS_PER_SCAN, len(all_fast_targets))
+        start_index = linkedin_fast_target_cursor % len(all_fast_targets)
+        end_index = start_index + batch_size
+        if end_index <= len(all_fast_targets):
+            fast_targets = all_fast_targets[start_index:end_index]
+        else:
+            fast_targets = all_fast_targets[start_index:] + all_fast_targets[:end_index % len(all_fast_targets)]
+        linkedin_fast_target_cursor = end_index % len(all_fast_targets)
+    else:
+        fast_targets = []
+    # Deep pagination is limited to the same small batch of pairs as the fast
+    # lane, rather than creating a full-size burst on top of it.
+    failed_pages = 0
+    rate_limited = False
+    search_requests_attempted = 0
 
-    with ThreadPoolExecutor(max_workers=LINKEDIN_SEARCH_WORKERS) as executor:
-        futures = [
-            executor.submit(_linkedin_search_page, query, location, start, fast)
-            for query, location, start, fast in targets
-        ]
-        for future in as_completed(futures):
+    def run_batch(
+        targets: list[tuple[str, str, int, bool]],
+        *,
+        retry_rate_limited_fast_target: bool = False,
+    ) -> None:
+        global linkedin_fast_target_cursor
+        nonlocal failed_pages, rate_limited, search_requests_attempted
+        # Run in paced order. Do not queue more search requests once a 429 occurs.
+        for attempted, (query, location, start, fast) in enumerate(targets, start=1):
+            search_requests_attempted += 1
             try:
-                jobs.extend(future.result())
+                jobs.extend(_linkedin_search_page(query, location, start, fast))
             except Exception as exc:
+                failed_pages += 1
+                response = getattr(exc, "response", None)
+                status_code = getattr(response, "status_code", None)
+                if status_code == 429:
+                    if _linkedin_cooldown_remaining() <= 0:
+                        _activate_linkedin_rate_limit(response)
+                    rate_limited = True
+                    if retry_rate_limited_fast_target and all_fast_targets:
+                        rewind = len(targets) - attempted + 1
+                        linkedin_fast_target_cursor = (
+                            linkedin_fast_target_cursor - rewind
+                        ) % len(all_fast_targets)
+                    log.warning("linkedin search batch stopped after HTTP 429")
+                    break
+                if isinstance(exc, LinkedInRateLimitCooldown):
+                    rate_limited = True
+                    if retry_rate_limited_fast_target and all_fast_targets:
+                        rewind = len(targets) - attempted + 1
+                        linkedin_fast_target_cursor = (
+                            linkedin_fast_target_cursor - rewind
+                        ) % len(all_fast_targets)
+                    log.info("linkedin search batch stopped; rate-limit cooldown is active")
+                    break
                 log.warning("linkedin page request failed: %r", exc)
 
-    if do_deep:
+    run_batch(fast_targets, retry_rate_limited_fast_target=True)
+    deep_targets: list[tuple[str, str, int, bool]] = []
+
+    # A 429 on the fast lane is a strong signal to reduce pressure. Do not
+    # compound it with deep pagination in this same scan.
+    if do_deep and not rate_limited:
+        deep_targets = [
+            (query, location, start, False)
+            for query, location, _, _ in fast_targets
+            for start in range(10, 10 + LINKEDIN_DEEP_PAGE_BATCH * 10, 10)
+        ]
+        run_batch(deep_targets)
         linkedin_last_deep_scan_at = iso(now())
 
     unique_jobs: dict[str, dict[str, Any]] = {
         job["source_job_id"]: job for job in jobs
     }
     jobs = list(unique_jobs.values())
+    log.info(
+        "linkedin discovery scan: queries=%s locations=%s requests_attempted=%s "
+        "deep=%s unique_jobs=%s failed_requests=%s elapsed=%.1fs",
+        len(scan_queries),
+        len(scan_locations),
+        search_requests_attempted,
+        do_deep,
+        len(jobs),
+        failed_pages,
+        time.monotonic() - scan_started,
+    )
 
-    # Only enrich jobs that can plausibly alert. This keeps the fast lane
-    # focused on new/relevant postings instead of serially fetching every JD.
+    # Keep enrichment bounded so it cannot consume the search worker pool.
+    # Discovery results are returned even when a detail request fails.
     candidates = []
     for job in jobs:
         combined = f"{job.get('title', '')} {job.get('description', '')}"
@@ -1742,32 +2146,40 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         for future in as_completed(futures):
             try:
                 future.result()
+            except LinkedInRateLimitCooldown:
+                log.info("linkedin JD enrichment skipped; rate-limit cooldown is active")
             except Exception as exc:
                 log.warning("linkedin JD enrichment failed: %r", exc)
 
     return jobs
 
+# The public relay repository contains only the Naukri feed and its small
+# scheduled collector workflow. The main application repository stays private.
 NAUKRI_RELAY_URL = (
-    "https://raw.githubusercontent.com/AvinashBhalla/job-beeper/naukri-relay/"
-    "dashboard/data/naukri_relay.json"
+    "https://raw.githubusercontent.com/AvinashBhalla/"
+    "job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json"
 )
 
 
 def naukri_collect() -> list[dict[str, Any]]:
+    # The separate public relay exposes only a generated feed, not the private
+    # application source. No GitHub token is required to read public JSON.
+    relay_headers = {**UA, "Accept": "application/json"}
     response: requests.Response | None = None
-    retryable_statuses = {404, 429, 500, 502, 503, 504}
+    retryable_statuses = {429, 500, 502, 503, 504}
     for attempt in range(4):
         try:
             candidate = requests.get(
                 NAUKRI_RELAY_URL,
+                # GitHub's raw-content CDN can briefly serve the previous feed
+                # after the relay branch advances. Bust that cache on each poll.
                 params={"t": int(time.time())},
-                headers=UA,
+                headers=relay_headers,
                 timeout=20,
             )
             if candidate.status_code in retryable_statuses:
-                response = candidate
                 if attempt == 3:
-                    response.raise_for_status()
+                    candidate.raise_for_status()
                 wait = min(8, 2 ** attempt)
                 log.warning(
                     "naukri relay fetch returned HTTP %s; retrying in %ss",
@@ -1776,14 +2188,18 @@ def naukri_collect() -> list[dict[str, Any]]:
                 )
                 time.sleep(wait)
                 continue
+            # A missing feed or wrong public URL is a setup fault, not a
+            # transient server error. Fail quickly without retrying a 404.
             candidate.raise_for_status()
             response = candidate
             break
+        except requests.HTTPError:
+            raise
         except requests.RequestException:
             if attempt == 3:
                 raise
             wait = min(8, 2 ** attempt)
-            log.warning("naukri relay fetch failed; retrying in %ss", wait)
+            log.warning("naukri relay network fetch failed; retrying in %ss", wait)
             time.sleep(wait)
 
     if response is None:
@@ -1829,14 +2245,13 @@ def naukri_collect() -> list[dict[str, Any]]:
         # Preserve that timestamp rather than pretending the Oracle VM fetched
         # the job at the same moment.
         job["discovered_at"] = iso(collected_at) or job["discovered_at"]
-        if posted_at and posted_at.tzinfo:
-            job["discovery_latency_seconds"] = max(
-                0, int((collected_at - posted_at).total_seconds())
-            )
+        # Relay currently supplies date-level posting precision. Midnight
+        # parsed from a date is not an exact posting time, so do not report a
+        # misleading discovery-latency metric from it.
+        job["discovery_latency_seconds"] = None
         jobs.append(job)
 
     return jobs
-
 
 def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
@@ -1887,10 +2302,149 @@ def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+
+def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect public Greenhouse job-board postings for configured employers.
+
+    Greenhouse's public Job Board GET endpoint does not require authentication.
+    The documented updated_at field describes an update time, not necessarily
+    the original posting time, so it is intentionally not mapped to source_posted_at.
+    """
+    boards = config.get("greenhouse_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Greenhouse is enabled but no public greenhouse_boards are configured")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+
+    for board in boards:
+        token = str(board.get("token") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not token or not company:
+            failures.append(f"{token or '<missing-token>'}: invalid board configuration")
+            continue
+
+        endpoint = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
+        try:
+            response = requests.get(
+                endpoint,
+                params={"content": "true"},
+                headers={**UA, "Accept": "application/json"},
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
+                raise ValueError("Greenhouse response did not contain a jobs list")
+            successful_boards += 1
+        except Exception as exc:
+            failures.append(f"{token}: {exc!r}")
+            log.warning("greenhouse: board=%s failed: %r", token, exc)
+            continue
+
+        for item in payload["jobs"]:
+            if not isinstance(item, dict):
+                continue
+            raw_id = item.get("id")
+            title = str(item.get("title") or "").strip()
+            url = str(item.get("absolute_url") or "").strip()
+            if raw_id is None or not title or not url:
+                continue
+
+            source_id = f"gh-{token}-{raw_id}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            raw_location = item.get("location")
+            if isinstance(raw_location, dict):
+                location = str(raw_location.get("name") or "").strip()
+            elif isinstance(raw_location, str):
+                location = raw_location.strip()
+            else:
+                location = ""
+
+            if not location:
+                offices = item.get("offices") or []
+                office_names = []
+                if isinstance(offices, list):
+                    for office in offices:
+                        if not isinstance(office, dict):
+                            continue
+                        label = str(office.get("location") or office.get("name") or "").strip()
+                        if label and label not in office_names:
+                            office_names.append(label)
+                location = ", ".join(office_names)
+
+            description_html = html_lib.unescape(str(item.get("content") or ""))
+            description = BeautifulSoup(
+                description_html, "html.parser"
+            ).get_text(" ", strip=True)
+            departments = item.get("departments") or []
+            department_names = [
+                str(dept.get("name")).strip()
+                for dept in departments
+                if isinstance(dept, dict) and str(dept.get("name") or "").strip()
+            ] if isinstance(departments, list) else []
+            if department_names:
+                description = f"{description} Department: {', '.join(department_names)}".strip()
+
+            # first_published records when the job post first went live.
+            # Never substitute updated_at, which may reflect a later edit.
+            published_raw = item.get("first_published")
+            published_at = (
+                parse_relative(str(published_raw))
+                if published_raw not in (None, "")
+                else None
+            )
+            if published_at is None:
+                posted_precision = "unknown"
+            elif isinstance(published_raw, str) and re.search(
+                r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", published_raw
+            ):
+                posted_precision = "minute"
+            else:
+                posted_precision = "date"
+
+            jobs.append(normalize_job(
+                "greenhouse",
+                source_id,
+                company,
+                title,
+                location,
+                url,
+                published_at,
+                posted_precision,
+                description,
+            ))
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Greenhouse boards failed: {details}")
+
+    if failures:
+        log.warning(
+            "greenhouse: partial board failures=%s successful_boards=%s",
+            len(failures),
+            successful_boards,
+        )
+    log.info(
+        "greenhouse: boards=%s successful=%s failed=%s jobs=%s",
+        len(boards),
+        successful_boards,
+        len(failures),
+        len(jobs),
+    )
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
     "instahyre": instahyre_collect,
+    "greenhouse": greenhouse_collect,
 }
 
 
@@ -1906,15 +2460,37 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         new_jobs = upsert_jobs(jobs, config)
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
+
+        # Deliver immediately after a discovery cycle queues eligible jobs.
+        # The background worker remains as a fallback/retry path.
+        try:
+            from v2.telegram import credentials_available, deliver_queued_notifications
+
+            if credentials_available():
+                delivered = deliver_queued_notifications(50)
+                if delivered:
+                    log.info("telegram: delivered=%s source=%s", delivered, source)
+        except Exception:
+            log.exception("telegram immediate delivery failed source=%s", source)
+
         finished = now()
         record_run(source, started_at, finished, len(jobs), new_jobs)
-        source_state[source] = {
+        runtime = {
             "running": False,
             "last_success": iso(finished),
             "jobs_seen": len(jobs),
             "new_jobs": new_jobs,
             "error": None,
         }
+        cooldown_remaining = (
+            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
+        )
+        if cooldown_remaining > 0:
+            runtime["rate_limited_until"] = iso(
+                now() + dt.timedelta(seconds=cooldown_remaining)
+            )
+            runtime["rate_limit_cooldown_seconds"] = int(cooldown_remaining)
+        source_state[source] = runtime
         log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
     except Exception as exc:
         finished = now()
@@ -1964,9 +2540,13 @@ async def scheduler() -> None:
         for name in COLLECTORS:
             if not enabled.get(name, True):
                 continue
+            if name == "linkedin" and _linkedin_cooldown_remaining() > 0:
+                continue
             if source_state.get(name, {}).get("running"):
                 continue
             interval = max(60, int(intervals.get(name, 600)))
+            if name == "linkedin":
+                interval = max(180, interval)
             if current >= next_run[name]:
                 next_run[name] = current + interval
                 asyncio.create_task(asyncio.to_thread(run_source, name, config))
@@ -2040,7 +2620,7 @@ def latency_summary(hours: int = 24):
             WHERE discovered_at >= ?
               AND discovery_latency_seconds IS NOT NULL
               AND discovery_latency_seconds >= 0
-              AND source IN ('linkedin', 'naukri', 'instahyre')
+              AND source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
             ORDER BY source, discovery_latency_seconds ASC
         """, (cutoff,)).fetchall()
 
@@ -2055,7 +2635,7 @@ def latency_summary(hours: int = 24):
         return values[index]
 
     summary = {}
-    for source in ("linkedin", "naukri", "instahyre"):
+    for source in ("linkedin", "naukri", "instahyre", "greenhouse"):
         values = by_source.get(source, [])
         under_60 = sum(1 for value in values if value <= 60)
         under_120 = sum(1 for value in values if value <= 120)
@@ -2100,7 +2680,7 @@ def source_status():
     }
 
     sources = []
-    for source in ("linkedin", "naukri", "instahyre"):
+    for source in ("linkedin", "naukri", "instahyre", "greenhouse"):
         item = history.get(source, {})
         sources.append({
             "source": source,
@@ -2122,7 +2702,7 @@ def dedupe_candidates(limit: int = 100):
         rows = conn.execute("""
             SELECT id, source, source_job_id, company, title, location, url, description
             FROM jobs
-            WHERE source IN ('linkedin', 'naukri', 'instahyre')
+            WHERE source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
             ORDER BY id ASC
         """).fetchall()
 
@@ -2209,7 +2789,6 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
 
 @app.get("/api/jobs")
 def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
-    config = get_config()
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = (
@@ -2220,26 +2799,64 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
-            SELECT * FROM jobs
-            WHERE discovered_at >= ?
-            ORDER BY COALESCE(source_posted_at, discovered_at) DESC, discovered_at DESC
+            SELECT
+                j.*,
+                e.match AS evaluation_match,
+                e.score AS evaluation_score,
+                e.reasons_json AS evaluation_reasons_json,
+                e.experience_min_years AS evaluation_experience_min_years,
+                e.experience_max_years AS evaluation_experience_max_years,
+                e.alertable AS evaluation_alertable,
+                e.alertability_reasons_json AS evaluation_alertability_reasons_json,
+                nl.status AS notification_status,
+                nl.decision_reason_json AS notification_decision_reasons_json,
+                nl.sent_at AS notification_sent_at,
+                nl.last_error AS notification_last_error,
+                nl.candidate_job_id AS notification_candidate_job_id
+            FROM jobs j
+            LEFT JOIN job_evaluations e ON e.job_id=j.id
+            LEFT JOIN notification_ledger nl
+              ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+            WHERE j.discovered_at >= ?
+            ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
+                     j.discovered_at DESC
             LIMIT ?
         """, (cutoff, limit)).fetchall()
+
+    def parse_json_list(value: Any) -> list[Any]:
+        try:
+            parsed = json.loads(value or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return []
+        return parsed if isinstance(parsed, list) else []
+
     result = []
     for row in rows:
         item = dict(row)
-        details = match_details(item, config)
-        alertability = alertability_details(item, details, config)
-        item["likely_match"] = details["match"]
-        item["match_score"] = details["score"]
-        item["match_reasons"] = details["reasons"]
-        item["experience_min_years"] = details["experience_min_years"]
-        item["experience_max_years"] = details["experience_max_years"]
-        item["alertable"] = alertability["alertable"]
-        item["alertability_reasons"] = alertability["reasons"]
-        item["canonical_opportunity_id"] = item.get("canonical_opportunity_id")
-        item["canonical_match_method"] = item.get("canonical_match_method")
-        item["canonical_match_confidence"] = item.get("canonical_match_confidence")
+        # Telegram reads job_evaluations and notification_ledger directly.
+        # The dashboard deliberately returns those same decisions rather than
+        # independently re-running the matcher at request time.
+        item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
+        score = item.pop("evaluation_score", None)
+        item["match_score"] = int(score or 0)
+        item["match_reasons"] = parse_json_list(
+            item.pop("evaluation_reasons_json", None)
+        )
+        exp_min = item.pop("evaluation_experience_min_years", None)
+        exp_max = item.pop("evaluation_experience_max_years", None)
+        item["experience_min_years"] = exp_min
+        item["experience_max_years"] = exp_max
+        item["alertable"] = bool(item.pop("evaluation_alertable", 0) or 0)
+        item["alertability_reasons"] = parse_json_list(
+            item.pop("evaluation_alertability_reasons_json", None)
+        )
+        item["notification_status"] = item.get("notification_status") or "not_eligible"
+        item["notification_decision_reasons"] = parse_json_list(
+            item.pop("notification_decision_reasons_json", None)
+        )
+        item["notification_sent_at"] = item.get("notification_sent_at")
+        item["notification_last_error"] = item.get("notification_last_error")
+        item["notification_candidate_job_id"] = item.get("notification_candidate_job_id")
         result.append(item)
     return {"jobs": result}
 

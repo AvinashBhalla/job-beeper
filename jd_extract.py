@@ -120,11 +120,10 @@ def extract_work_mode(text, location):
 
 def extract_skills(text):
     t = clean_text(text).lower()
-    found = []
-    for skill in SKILL_TERMS:
-        if re.search(rf"(?<![a-z0-9+#]){re.escape(skill)}(?![a-z0-9+#])", t):
-            found.append(skill)
-    return found[:20]
+    return [
+        skill for skill in SKILL_TERMS
+        if re.search(rf"(?<![a-z0-9+#]){re.escape(skill)}(?![a-z0-9+#])", t)
+    ][:20]
 
 def extract_location(text, fallback):
     fallback = clean_text(fallback)
@@ -151,20 +150,14 @@ def extract_location(text, fallback):
 
 def enrich_job(job):
     existing = job.get("desc") or ""
-    description = existing if len(existing) >= 500 else fetch_description(job.get("url", ""))
-    if not description:
-        description = existing
+    description = existing if len(existing) >= 500 else (fetch_description(job.get("url", "")) or existing)
 
-    experience = extract_experience(description)
-    skills = extract_skills(" ".join([job.get("title", ""), description]))
-    work_mode = extract_work_mode(description, job.get("location", ""))
-    location = extract_location(description, job.get("location", ""))
-
-    enriched = dict(job)
-    enriched["description"] = description[:12000]
-    enriched["experience"] = experience
-    enriched["skills_detected"] = skills
-    enriched["work_mode"] = work_mode
-    enriched["jd_location"] = location
-    enriched["jd_enriched"] = bool(description)
-    return enriched
+    return {
+        **job,
+        "description": description[:12000],
+        "experience": extract_experience(description),
+        "skills_detected": extract_skills(" ".join([job.get("title", ""), description])),
+        "work_mode": extract_work_mode(description, job.get("location", "")),
+        "jd_location": extract_location(description, job.get("location", "")),
+        "jd_enriched": bool(description),
+    }

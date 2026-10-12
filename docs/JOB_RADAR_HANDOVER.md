@@ -4,11 +4,26 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-08 (43-test suite green; hardened deployment verified against BlueOptima JD parsing)
+**Last updated: 2026-10-12 (PR #30 promotion open; fresh sends verified; latest-head CI to recheck after handover update)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
-> **Reconciliation note:** This document is the durable source of truth for the current V2 direction. Telegram delivery is active and has delivered real fresh alerts; the notification path now requires recent discovery for queued alerts so old backlog cannot trigger unexpectedly; deterministic matcher improvements are validated by the current 43-test Docker suite; the Naukri relay remains the Oracle-safe acquisition path; and Agent-Reach is recorded only as a future source-access optimisation, not a current dependency.
+> ## Mandatory agent handover rule — every prompt
+> **Every user prompt must end with an update to this handover and the linked `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, before the agent considers the turn/session complete.** This applies even when a prompt only changes the plan or adds an observation; record “no code change” explicitly when applicable. After any code/config change, update both documents in the same PR where practical, or immediately afterward if runtime evidence arrives later.
+>
+> Each update must connect the work to the overarching goal (reliable, fresh, multi-source job discovery → normalization/deduplication → one consistent preference/match decision → explainable dashboard and Telegram delivery), and record: evidence received; diagnosis and confidence; code/config/docs paths; PR/commit and CI results; whether deployed (with actual runtime proof, not assumption); what changed and deliberately did not change; remaining risks; the exact next action; copyable commands/output expected from the user; and a continuation prompt for the next chat. Cross-link the detailed chronological handover, the compact knowledge transfer, and `docs/JOBBEEPER_REFERENCE.md` where relevant. **The latest dated handoff supersedes older instructions/checklists**; label superseded entries historical rather than leaving conflicting “next task” instructions active. Never expose secrets. One issue at a time, evidence first, verify after deploy.
+>
+> ## Current handoff — 2026-10-12 (read before all historical notes)
+> - **Product goal:** reliable, always-on job discovery across enabled sources → truthful normalization/timestamps and stable IDs → canonical cross-source dedupe → deterministic, explainable profile matching → one persisted notification decision shared by dashboard and Telegram → dependable delivery. Freshness, match correctness and one alert per canonical opportunity are more important than raw count. Architecture reference: `docs/JOBBEEPER_REFERENCE.md`.
+> - **Live production proof:** user reported `/health` `status=ok`, version `2.0.0`, uptime 26 seconds after restart, LinkedIn `running=true`; Naukri last success `2026-10-12T03:45:00.791518+00:00`, 296 jobs seen, 0 new, no error. `/api/config` confirms config v10, threshold 55, `require_explicit_experience_for_alerts=false`, LinkedIn 180s, Naukri 300s, Instahyre 600s, Greenhouse 900s. User supplied 10 scan summaries from 04:15:05Z through 04:42:05Z (~27 minutes): 22 attempted requests (nine fast scans ×2 and one deep scan ×4), each shown scan had `failed_requests=0`, and no 429/cooldown warning appeared. The latest status at 04:42:05Z showed `jobs_seen=2`, `new_jobs=0`, `error=null`; this is positive limited rate-limit evidence, not a guarantee against future 429s. The subsequent API output confirmed three fresh true matches ≥55%, all `alertable=true`, `notification_status=sent`, and `notification_last_error=null`: Talentgigs Back End Developer–Next JS (discovered 04:45:02Z, sent 04:45:31Z; 29s), D Square Consulting Full Stack Developer (discovered 04:33:02Z, sent 04:33:18Z; ~17s), and Naukri Software Engineer at Creative Hands HR (discovered 04:34:48Z, sent 04:35:23Z; ~35s). The observed end-to-end alert consistency gate now passes for these records; continue monitoring, but do not requeue v9 migration suppressions.
+> - **Current LinkedIn strategy:** PR #21 merged as `6c93473844cd469493a0c61acf1477ba20252d69`, CI #38161863816 passed 76 tests. Config v10 uses 4-second global HTTP spacing, a single JD-enrichment worker, two first-page targets per scan, deep scan every 30 minutes, and 180-second scheduler polling, preserving stop-on-429, `Retry-After`, and 5/10/20/30-minute cooldown escalation. The user's ~27-minute sample had 22 attempts, no visible 429/cooldown warnings, and zero failed requests per scan; latest source status had no new jobs. Positive, limited evidence only; gather future yield before tuning further. Continue permitted free ATS/company-career sources and do not evade source limits with proxies/CAPTCHA bypass/fake accounts.
+> - **Main workflow audit from actual YAML + screenshot:** GitHub Actions shows `check-sources`, `deploy-dashboard`, `naukri-relay`, `V2 CI`, and `job-watch` (disabled). `deploy-dashboard` is `.github/workflows/pages.yml`; it deploys only static `dashboard/` files to Pages. The current V2 dashboard expects relative `/api` routes served by the Oracle FastAPI app, so Pages is not the correct V2 deployment path and is a removal candidate. `job-watch.yml` is disabled/manual V1, writes `seen.json`, `source_state.json`, `jd_cache.json` and `dashboard/data/jobs.json` to `main`; retire it. `check-sources.yml` is manual V1 maintenance that edits root `config.json`, not V2 runtime config; retire it.
+> - **Why old `naukri-relay.yml` and its private `naukri-relay` branch must wait:** main's old `v2/radar.py` still fetches `https://raw.githubusercontent.com/AvinashBhalla/job-beeper/naukri-relay/dashboard/data/naukri_relay.json`. Its workflow manually writes that branch. Current production `v2-live-radar` reads the separate public repo `AvinashBhalla/job-beeper-naukri-relay`, and the Oracle timer triggers that separate repo. So the private workflow/branch is not the current production relay, but deleting it before the V2 code is promoted to `main` would leave main's old code pointing at a missing feed. Retire the workflow and old private branch together in the dedicated V2 promotion PR/cutover. Keep `.github/workflows/v2-ci.yml`.
+> - **Promotion PR #30:** [Promote Job Radar V2 to main](https://github.com/AvinashBhalla/job-beeper/pull/30) is open from `v2-live-radar` to `main`. At creation the diff was 94 commits ahead, 0 behind, 21 files changed. CI run [#38205996937](https://github.com/AvinashBhalla/job-beeper/actions/runs/38205996937) passed on head `02eaaac067cf31f178260ecdd1bbc2fc2254865b`; this handover update advances the source head, so verify latest-head CI again before merging. The diff brings V2 app/tests/docs, removes legacy `pages.yml`, `job-watch.yml`, `check-sources.yml`, and private `naukri-relay.yml`, retains V2 CI, and replaces main's old private Naukri feed URL with the active separate public relay. Inspect the full diff, require current-head CI green and review, and do not switch Oracle's deploy branch during merge. No direct/force push.
+> - **Branch cleanup:** main code/topic cleanup completed; two temporary documentation refs remain after their merged PRs: `docs/record-linkedin-v10-observation-20261012` and `docs/record-fresh-alerts-main-promotion-20261012`. Delete these after current promotion PR status is recorded. Keep `main`, `naukri-relay`, and `v2-live-radar`.
+> - **Next action:** review PR #30 and recheck latest-head CI after this handover update. Confirm workflow removals and the Naukri relay URL transition; merge only after the current head is green and reviewed. Then verify main CI and smoke tests while keeping Oracle on `v2-live-radar` until deliberate cutover. Delete the two temporary documentation branches after their merged PRs; preserve `main`, `naukri-relay`, and `v2-live-radar`.
+> - **Mandatory handover rule:** after every user prompt, update both `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, even on evidence-only turns. Record goal, evidence, diagnosis, code/docs changes, PR/CI/merge/deploy proof, risks, exact expected user output, next action and continuation prompt. Latest handoff supersedes older tasks. Never expose secrets; do one issue at a time.
+> **Historical baseline (2026-10-09; superseded by latest handoff above):** The latest confirmed Oracle deployment is still commit `f91f047ca6e71c69492a03f0bafaf7b18362f613` (`Bust cache when polling public Naukri relay`). The cache-busting change was reviewed in [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5); PR CI [run #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682) and post-merge CI [run #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) passed. The Oracle container was rebuilt and `/health` returned `status=ok`, version `2.0.0`. The public relay [run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) published a valid feed with 359 jobs; the next radar scan reported `jobs_seen=359`, `new_jobs=0`, and `error=null`. The cache-busting change reconciled the prior 345-versus-359 mismatch; stale caching was the plausible cause, not proven in isolation. The old VM user-crontab entry that dispatched the private repository relay every five minutes was removed after backing up the crontab. Its untracked `logs/` and `scripts/` were moved to `/home/ubuntu/job-beeper-local-backup-20261009`. The public relay continues on its own five-minute GitHub Actions schedule. PR #6 added the Greenhouse collector and dashboard integration in repository commit `1cfd55b28b4409d71aee3ca3fe1db314d9aa766f`, with pre-merge CI [run #286](https://github.com/AvinashBhalla/job-beeper/actions/runs/37927758499) passing. **That Greenhouse change is not yet deployed on Oracle and remains disabled by default.** Telegram delivery is active; Agent-Reach remains parked and is not a production dependency.
 
 ---
 
@@ -198,38 +213,32 @@ Problems included:
 V1 remains useful as reference/fallback only.
 
 Do not recreate the V1 architecture unless there is a specific, justified reason.
-
 ---
 
 ## 5. IMPORTANT SOURCE DECISIONS
 
 ### LinkedIn
 
-Current approach:
+Current production approach (verified after deployment of commit `3e5b51b`):
 
-- public logged-out guest jobs endpoint
-- low-volume polling
-- newest-first
-- six-hour safety window
-- deduplicate using stable LinkedIn job IDs
-- record source posting time separately from discovery time
-- retry/backoff on 429 and transient 5xx errors
+- public logged-out guest jobs endpoint; do not rely on authenticated MCP/browser execution in production
+- stable LinkedIn job IDs for deduplication
+- source-posted time kept separate from first-discovery time; never invent timestamp precision
+- six-hour search recency window (`f_TPR=r21600`)
+- search requests are sequential/bounded with `LINKEDIN_SEARCH_WORKERS = 1`
+- `LINKEDIN_FAST_TARGETS_PER_SCAN = 4`: the default 4-query × 4-location configuration is visited in four scan cycles, not two
+- fast target cursor advances round-robin across query/location pairs; cursor is process-local and resets on container restart
+- deep scan interval is `LINKEDIN_DEEP_SCAN_SECONDS = 900` (15 minutes)
+- deep pagination is limited to one extra page (`start=10`) for the current four fast-lane targets; a normal deep cycle therefore reports 8 requests (4 first-page + 4 deep-page requests)
+- a 429 on any fast-lane request suppresses deep pagination for that same scan; do not compound rate limiting with more requests
+- plausible alert candidates may be enriched with the bounded detail worker pool; public guest detail responses can still omit poster-added experience requirements
+- persistent runtime query lists are repaired by config-version migration so stale `/data/config.json` query families do not silently remove important role variants
 
-Current V2 LinkedIn freshness target:
+The polling interval is a scheduling target, not a guarantee of job-discovery latency. Search visibility, scan duration, target rotation and source-side throttling all affect actual freshness. Measure current p50/p90/max with a short window after rollout and inspect the logs for `requests`, `failed_requests`, `unique_jobs`, and `new` before changing settings.
 
-- poll every 60 seconds
-- fast lane scans `start=0` every poll with LinkedIn low-applicant filtering (`f_EA=true`) and a one-hour recency window
-- scan `start=0` on every poll
-- scan `start=10` as a deeper six-hour sweep every 5 minutes, without the low-applicant filter
-- run LinkedIn search requests concurrently with a bounded worker pool
-- fetch only plausible alert candidates for JD enrichment, also concurrently
-- prefer the public LinkedIn guest job-detail endpoint for enrichment
-- parse one job per actual LinkedIn job-card link instead of iterating every nested `<li>`, preventing duplicate/nested-list explosions
-
-This is intended to reduce discovery lag without blindly multiplying request volume. The target is to make a newly surfaced LinkedIn posting reach the matcher/Telegram path within a few minutes under normal source behavior. Actual median/p95 latency must be measured from runtime logs before declaring that target met.
+Production evidence after the latest deployment: the supplied 30-minute log sample showed nine scans with `failed_requests=0`, one deep scan at `requests=8, elapsed=4.3s`, and subsequent fast scans at `requests=4, elapsed≈1.9–2.6s`. This is encouraging but only a small observation window; do not claim zero ongoing 429 risk based on it.
 
 LinkedIn direct collection from Oracle has been **proven**.
-
 ### Naukri
 
 Direct Naukri access from Oracle was abandoned after:
@@ -278,18 +287,52 @@ Repository defaults and the V2 runtime migration now make Instahyre opt-in. Conf
 
 Zero results or request errors must not automatically justify increasing polling or scraping volume.
 
-### Agent-Reach — future optimisation, not current dependency
+### Agent-Reach — experiment completed and parked
 
-The repository `Panniantong/agent-reach` was evaluated conceptually as a possible source-access optimisation.
+Agent-Reach was evaluated and then actually exercised on the Oracle VM so the project could make a decision from runtime evidence rather than documentation claims.
+
+Experiment environment:
+
+- Agent-Reach v1.5.0 installed in the isolated `~/.agent-reach-venv`
+- Agent-Reach was **not** installed into the Job Radar repository or V2 Docker image
+- LinkedIn MCP Server v4.26.2 was run through `uvx mcp-server-linkedin@4.26.2`
+- Lightweight TigerVNC + Openbox was used only to provide an X display for the headed browser on Oracle
+- Node.js 22.23.3 was installed with `nvm` for MCP Inspector tooling; the existing system Node runtime was not replaced
+
+Authentication experiment:
+
+1. A fresh `--login` from the Oracle datacenter browser stalled at LinkedIn's security-check page.
+2. LinkedIn login was completed successfully through the managed MCP browser on Windows.
+3. Windows `--status` confirmed a valid source session.
+4. The portable MCP session artifacts were transferred to Oracle.
+5. Oracle `--status` recognized the Windows-authenticated source as a foreign-runtime profile and prepared a fresh Linux bridge.
+
+End-to-end bridge result:
+
+- MCP `initialize` succeeded on Oracle.
+- `tools/list` succeeded and exposed LinkedIn job capabilities including `search_jobs` and `get_job_details`.
+- During the first real authenticated tool execution, the Linux browser was created successfully and imported 5 LinkedIn bridge cookies, including `li_at`.
+- The VNC browser visibly reached the authenticated LinkedIn feed.
+- Therefore **Windows authentication → portable session → Linux Chromium bridge → authenticated LinkedIn page is proven**.
+
+Failure boundary:
+
+- Real read-only MCP tool calls such as `get_my_profile` and `search_jobs` did not complete.
+- The MCP Inspector client timed out after 60 seconds, while the MCP server eventually hit its own 180-second tool timeout.
+- The server logged that the optional remember-me container did not appear, but the source code gives that selector check a bounded 3-second timeout and returns `False`; this is not sufficient evidence that the remember-me check itself is the root cause.
+- The remaining failure is therefore in the post-bridge browser/tool execution path (navigation/extraction/runtime interaction), and it was **not fully resolved** during the experiment.
+- After the failed tool execution, the browser was cleaned up, so it disappearing from VNC is expected.
 
 Decision:
 
-- **Do not replace the current V2 collectors with Agent-Reach now.**
-- Keep LinkedIn direct ingestion and the Naukri GitHub relay as the working production paths.
-- Revisit Agent-Reach after the V2 MVP is stable.
-- The first future experiment should benchmark it against the existing LinkedIn collector on freshness, job-detail quality, latency, failure/429 rate, and Oracle CPU/RAM impact.
-- Treat Naukri support as unverified until a real end-to-end Naukri retrieval test proves it.
-- Potential later use: generic web/ATS access for structured career sources, but source-specific adapters remain preferred where stable APIs exist.
+- **Do not integrate Agent-Reach or authenticated LinkedIn MCP into V2 production now.**
+- Do not replace the current LinkedIn guest collector because of this experiment.
+- Do not make Agent-Reach a scheduler, source, or runtime dependency.
+- Keep the isolated Oracle Agent-Reach environment available only for future controlled benchmarking.
+- Revisit only after core V2 MVP acceptance is complete, and preferably with a fresh upstream/runtime benchmark rather than continuing indefinite debugging on the current Oracle setup.
+
+The main learning is important: **Agent-Reach can solve access/authentication mechanics, but that does not prove fast, reliable production job acquisition. Source completeness, tool reliability, latency, rate-limit behavior, and resource cost still need empirical validation.**
+
 ### Future ATS sources
 
 The product should progressively prioritize structured/source-specific adapters such as:
@@ -397,8 +440,7 @@ The V2 runtime configuration layer is now implemented in the repository.
 
 The frontend must allow the user to configure, without editing Python:
 
-- target roles
-- keywords
+- target roles- keywords
 - skills
 - locations
 - remote preference
@@ -521,6 +563,18 @@ V2 container is running:
 
 The deployed service is verified through its root redirect and V2 APIs. There is no `/api/health` endpoint in the current implementation; `/` redirects to `/dashboard/`.
 
+### Agent-Reach experiment runtime (isolated)
+
+Agent-Reach is not part of the V2 Docker runtime. The Oracle experiment used:
+
+- `~/.agent-reach-venv`
+- `uvx mcp-server-linkedin@4.26.2`
+- TigerVNC + Openbox only to provide a private X display
+- Node.js 22 via `nvm` for MCP Inspector tooling
+
+No Agent-Reach process, browser session, or credentials are required by the production V2 service.
+
+
 ### Naukri systemd scheduler
 
 The following units exist:
@@ -594,11 +648,10 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ V2 persistent runtime configuration API implemented
 ✅ Frontend connected to V2 configuration API in repository
 ✅ Config validation + generated configuration token
-✅ LinkedIn freshness acceleration implemented: 60-second fast polling, bounded concurrency, five-minute deeper pagination, bounded concurrent JD enrichment
+✅ LinkedIn conservative polling deployed: 4 first-page targets per scan, one search worker, 15-minute deep-scan interval, one extra page only for current fast targets, and a 429 guard that skips deep pagination
 ✅ Experience-range parser fixed to preserve hyphen/en-dash ranges
 ✅ Runtime config migration hardened: pre-v3 configs disable unverified Instahyre
-✅ Canonical opportunity schema and conservative cross-source linking implemented
-✅ Canonical opportunity API and dedupe diagnostics implemented
+✅ Canonical opportunity schema and conservative cross-source linking implemented✅ Canonical opportunity API and dedupe diagnostics implemented
 ✅ Persistent job evaluation state with score/reasons/experience/alertability
 ✅ Persistent notification ledger per canonical opportunity
 ✅ Telegram claim/retry/recovery path implemented
@@ -614,8 +667,8 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Matcher role-family aliases added for Software Engineer / Software Development Engineer / SDE variants
 ✅ Configured-skill + developer/engineer title fallback added for variants such as Javascript Developer
 ✅ Unknown experience made neutral for matching while alertability remains a separate policy
-✅ V2 regression suite expanded to 43 tests; Docker execution is now green after JD-hardening and today-only feed coverage
-✅ Updated 43-test suite passes in Docker (39 baseline + 3 JD-hardening tests + 1 today-only feed test)
+✅ Latest V2 GitHub Actions run #281 passed on commit `3e5b51b`: 53 unit tests green
+✅ Latest 53-test V2 suite is green in GitHub Actions; includes LinkedIn 429/deep-scan guard and date-only Naukri latency regression coverage
 ✅ Production fresh-job validation completed after matcher deployment: a latest 10-minute diagnostic showed 20 matching job rows, all 20 alertable, no queued backlog, and 17 rows whose canonical notification ledger state was sent
 ✅ Repository .gitignore now ignores Python __pycache__ artifacts
 ✅ Agent-Reach evaluated as a possible future source-access optimisation and deliberately parked until core V2 MVP stability
@@ -626,31 +679,55 @@ The system is therefore **ingesting real jobs continuously**.
 ✅ Corrected the today-only regression test after discovering the restored version had not actually moved `discovered_at` across IST midnight; the production contract remains correct and the test now models it correctly
 ✅ Found and fixed a separate `/api/jobs?today_only=true` bug: the endpoint accepted the flag but previously ignored it, and `/api/opportunities` referenced an undefined `today_only` variable; today-only filtering is now explicitly driven by India-local midnight and covered by regression tests
 ✅ Fixed the first today-only regression test itself: it had moved only source posting timestamps across midnight while discovery timestamps remained current; the corrected test now moves `discovered_at` across IST midnight and verifies both `/api/jobs` and `/api/opportunities`
+✅ Agent-Reach v1.5.0 evaluated in an isolated Oracle environment without coupling it to V2 production
+✅ LinkedIn MCP v4.26.2 authenticated session bridge proven end-to-end from Windows source session to Oracle Linux Chromium
+✅ MCP initialization and tool discovery proven on Oracle; `search_jobs` / `get_job_details` exposed
+✅ Agent-Reach experiment stopped at the real-tool execution boundary because authenticated read operations still hang; integration is deliberately parked rather than promoted to production
 ```
 
 ### Currently in progress
 
-> **MVP implementation status:** Core V2 MVP development is complete. Remaining work is acceptance validation and bug fixing only; new feature development should wait for MVP sign-off.
+> **MVP implementation status:** Core V2 implementation is feature-complete. Remaining work is acceptance validation, operational hardening and bug fixing only. Agent-Reach is parked and is not part of MVP delivery.
 
 ```
-✅ Pulled the latest branch to Oracle, verified all 43 tests pass in Docker, and recreated the V2 container with the hardened JD extraction/retrieval and today-only feed fixes
-⏳ Verify the strengthened V2 CI run passes the same 43-test suite on GitHub Actions
-✅ Verified the BlueOptima-style 5–7-year JD case after deployment: fetched detail contains the explicit requirement, evaluation stores 5–7, and current 3-year policy rejects it
-⏳ MVP blocker: make LinkedIn experience acquisition reliable for poster-added requirements, or enforce explicit-experience-only Telegram alerts until a reliable source-access path exists
-⏳ Re-test LinkedIn freshness after the role-query coverage correction and measure 429 rate / discovery lag
-⏳ Manual acceptance test: measure true end-to-end alert latency from source posting/discovery through evaluation/JD enrichment, queue and Telegram send
-⏳ Manual acceptance test: classify the two non-sent opportunities from the latest one-hour matching window and verify their notification decisions
-⏳ Manual acceptance test: validate persistent runtime configuration changes end-to-end from frontend/API through evaluation and notification reconsideration
-⏳ Manual acceptance test: validate restart/recovery behavior with persisted config, evaluations and notification ledger
-⏳ Manual acceptance test: finish browser verification of the live dashboard against real V2 API data
-⏳ Post-MVP enhancement: complete changed-opportunity detection so materially changed requirements can be reconsidered without duplicate alerts
-⏳ Manual acceptance test: validate source-health UI and remaining convenience features
+✅ Latest V2 code path uses a 60-second LinkedIn fast poll, six-hour fast/deep recency, full query/location coverage, 2 bounded search workers and 4 JD-detail workers
+✅ Persistent runtime config is version 5 with expanded LinkedIn/Naukri query families and Instahyre disabled
+✅ Naukri relay artifact verified on the private `naukri-relay` branch (150 jobs, updated 2026-10-09 05:04 UTC); production 404 traced to unauthenticated raw URL access after repo privatization; collector now uses authenticated Contents API with `JOB_RADAR_GITHUB_READ_TOKEN` and fails fast on 401/403/404
+✅ 43-test V2 Docker regression suite is green on the hardened branch
+✅ BlueOptima-style 5–7-year JD extraction is hardened and verified at the parser/evaluation layer
+✅ Agent-Reach/authenticated LinkedIn experiment completed to a decision point and deliberately parked
+✅ LinkedIn fast-lane burst reduction restored: with 4 configured locations, fast cycles now cover 2 rotating locations per minute (8 search requests/minute across 4 query families), while the 5-minute deep scan still covers all locations; CI run 37844340637 is green
+⏳ Re-test LinkedIn freshness using a short post-fix window and measure discovery-age distribution plus 429/failure rate
+⏳ Verify Naukri relay reliability across several normal five-minute cycles after the transient-404 retry change
+⏳ Manual acceptance: measure true end-to-end alert latency from source discovery through evaluation/JD enrichment/queue/Telegram
+⏳ Manual acceptance: classify currently non-sent matching opportunities and verify canonical-level notification decisions
+⏳ Manual acceptance: validate runtime configuration changes from frontend/API through reevaluation and notification reconsideration
+⏳ Manual acceptance: validate restart/recovery with persisted config, evaluations and notification ledger
+⏳ Manual acceptance: finish browser verification of the live dashboard against real V2 API data
+⏳ Manual acceptance: validate source-health UI and remaining convenience features
 ⏳ Final V2 MVP sign-off after manual acceptance checks pass
+⏸️ Agent-Reach: no further debugging during MVP; revisit only for controlled post-MVP benchmarking
 ```
 ### V1 status
 
 The legacy `job-watch.yml` Telegram workflow is no longer active. GitHub reports it as inactive/not listed in the active workflows; V2 is now the sole intended Telegram alert path. Other active workflows such as `check-sources`, `naukri-relay`, `deploy-dashboard`, and `V2 CI` do not replace the V2 Telegram worker.
 ## 12. IMMEDIATE NEXT STEPS
+
+
+### Current priority override — post-deploy source strategy (2026-10-09)
+
+The earlier checklist below remains useful product acceptance work, but this priority order reflects the latest verified runtime and supersedes stale polling/deployment steps in historical sections 40–42.
+
+1. **Observe the current deployment before tuning again.** Commit `3e5b51b` is on the VM and the container is healthy. Recheck logs/source status after another short window; compare request count, failed requests/429s, elapsed time, unique jobs and new jobs. Do not change scan settings if the reduced-pressure behavior holds.
+2. **Measure freshness honestly.** Use recent samples and inspect individual job timestamps. The currently supplied 24-hour aggregate was LinkedIn p50=900s, p90=7200s, max=21600s; Naukri p50=115407s. These are mixed historical samples, not a current post-deploy SLA. Date-only Naukri posting timestamps now have `discovery_latency_seconds=null` because exact latency cannot be inferred from a date-only value.
+3. **Expand independent sources, starting with structured ATS feeds.** Build and test source-specific adapters for Greenhouse, Lever and Ashby before adding broad HTML/browser scraping. Keep each collector isolated so a failing source cannot stop another.
+4. **Preserve the existing normalize → canonical identity/dedupe → match/alertability → notification-ledger pipeline.** New sources must use it rather than adding a second alert path. Validate full descriptions/experience extraction before allowing a source to generate Telegram alerts.
+5. **Treat aggregators as a controlled experiment, not a dependency.** Compare an optional Google-for-Jobs discovery API/provider (e.g. OpenWeb Ninja) and/or a small Apify scraper trial against direct sources on freshness, relevant-new-jobs yield, description completeness, duplicates, stability, monthly request allowance and actual cost. Provider tiers and terms change; re-check them before use.
+6. **Do not implement proxy rotation, CAPTCHA workarounds, or a headless-browser cluster to evade LinkedIn controls.** Public descriptions do not establish JobBeeper’s private implementation details. Prefer independent permitted sources and lower-volume collection.
+7. **Keep privacy and cost boundaries intact.** The application repository and user preferences remain private. The separate public Naukri relay may publish only its intended job feed and setup/workflow files; never publish app code, secrets, user config or SQLite state.
+
+Acceptance gate before expanding production scope: stable consecutive source runs, last-good data preserved on failures, measured freshness and 429 rate, validated job experience where needed for alerts, correct canonical notification state, and green CI plus a verified VM deployment.
+
 
 ### Step A — Hardened LinkedIn JD extraction end-to-end — VERIFIED
 
@@ -677,7 +754,7 @@ Do not interpret source-row count as alert count.
 
 ### Step C — Measure end-to-end alert latency and LinkedIn freshness
 
-Measure both alert latency and source freshness:
+Measure both alert latency and source freshness (the current API exposes p50/p90/max source-discovery latency):
 
 ```
 source posting
@@ -689,7 +766,7 @@ source posting
  → Telegram send
 ```
 
-Record median and p95 latency.
+Record median, p90 and max latency.
 
 ### Step D — Validate runtime configuration + recovery
 
@@ -703,9 +780,9 @@ Validate live refresh, current-day feed, daily counters, filters/settings, job d
 
 Define material changes including experience requirements, description/requirements, location/work mode and application URL changes, then reconsider without duplicate alerts.
 
-### Step G — Source-access optimisation evaluation
+### Step G — Keep Agent-Reach parked during MVP acceptance
 
-Only after the core V2 path is stable, benchmark Agent-Reach against the current LinkedIn collector for freshness, detail quality, latency, 429/failure rate and Oracle resource usage.
+The initial Agent-Reach experiment is complete enough to make the current decision. Do not spend more MVP time debugging the authenticated MCP browser path. After V2 sign-off, a new controlled benchmark may compare Agent-Reach/LinkedIn MCP against the guest collector for freshness, JD completeness, latency, 429/failure rate, session reliability and Oracle resource usage.
 
 ### Step H — MVP sign-off
 
@@ -797,7 +874,6 @@ The next gate is measured runtime latency, not merely a shorter configured inter
 ### Observation 4 — Real cross-source overlap is currently ambiguous, not safely deduplicable
 
 The latest Oracle diagnostic considered 1,206 jobs and found 38 cross-source candidates, with 0 auto-link candidates. The observed same-title/company/location examples include materially different explicit experience ranges, so the system correctly keeps them separate.
-
 ### Observation 5 — Daily feed reset is a presentation lifecycle, not data deletion
 
 The active user-facing feed resets at India local midnight. Historical job observations remain in SQLite so deduplication, notification history and auditability are not lost. The API now exposes a current-day feed and daily summary without deleting historical data.
@@ -997,8 +1073,7 @@ Do not treat the current branch's merged PR as evidence that a full visual redes
 A real Telegram alert for ReqPedia's `Full Stack Engineer` posting showed approximately:
 
 ```
-Posted:     6:28 PM IST
-Discovered: 7:28 PM IST
+Posted:     6:28 PM ISTDiscovered: 7:28 PM IST
 ```
 
 The LinkedIn browser page showed the posting at about one hour old with over 100 applicants. This is outside the intended freshness goal for the radar.
@@ -1082,19 +1157,34 @@ The daily notification ledger currently contains 785 rows for the day:
 The daily summary reports 1,070 jobs discovered, 52 matched, 52 alertable and 43 alerts sent. These are different layers and must not be conflated: source jobs, evaluations and canonical notification records represent different units of measurement.
 
 
-### Observation 19 — Agent-Reach is a candidate optimisation, not a dependency
+### Observation 19 — Agent-Reach was taken from theory to a controlled runtime experiment
 
-Agent-Reach may reduce the amount of bespoke web-access code for some future sources, particularly LinkedIn or generic web/ATS discovery.
+The project did not stop at documentation-level evaluation. Agent-Reach v1.5.0 plus LinkedIn MCP v4.26.2 were actually exercised on Oracle.
 
-It is deliberately parked until:
+The experiment proved the authentication bridge path:
 
-- current ingestion/matching/alerting is stable
-- alert latency and dedupe are measured
-- resource impact on the tiny Oracle VM is understood
+```
+Windows authenticated LinkedIn session
+        ↓
+portable MCP source session
+        ↓
+Oracle foreign-runtime bridge
+        ↓
+Linux Patchright Chromium
+        ↓
+LinkedIn authenticated feed
+```
 
-Do not introduce it into production source flow merely because it supports more platforms on paper.
+The experiment then failed at the next boundary: real MCP read operations such as `get_my_profile` and `search_jobs` hung until the server-side 180-second tool timeout.
 
----
+The source inspection also showed the logged "remember-me container did not appear in time" message is only a bounded 3-second selector wait that returns `False`; it should not be treated as the proven root cause. The exact post-bridge navigation/extraction hang remains unresolved.
+
+Product conclusion:
+
+- Authentication portability is feasible.
+- Agent-Reach does **not** currently provide a reliable production LinkedIn acquisition path on this Oracle environment.
+- This experiment is enough evidence to park the integration rather than spend more MVP time debugging it.
+- The correct future evaluation is a controlled benchmark against the existing collector, not a production replacement motivated by platform breadth alone.
 
 ## 15. WHAT NOT TO DO
 
@@ -1164,8 +1254,8 @@ Oracle Always Free VM + Docker + SQLite.
 
 LINKEDIN:
 Direct ingestion from Oracle. Proven.
-Polling is approximately every 60 seconds with bounded fast/deep scanning.
-Historical 429/rate-limit pressure exists and must be measured, not solved by blindly increasing request volume.
+Current deployed scan settings: 4 first-page query/location targets per scan, one search worker, six-hour recency filter, 15-minute deep-scan interval, and at most one extra page for the current batch. With the default 16 pairs, a full first-page pass takes 4 cycles.
+The deployed commit is `3e5b51b`; CI run #281 passed all 53 tests. The initial post-deploy log window showed nine scans with zero failed requests, but continued observation is required. Historical 429/rate-limit pressure must not be solved by blindly increasing request volume.
 JD enrichment is required for cards missing experience; detail retrieval/parsing has a known BlueOptima-style incident under hardening.
 
 NAUKRI:
@@ -1186,7 +1276,7 @@ Supports Software Engineer / Software Development Engineer / SDE variants.
 Supports skill + generic developer/engineer title matching such as Javascript Developer.
 Unknown experience is neutral for matching.
 Configured maximum experience remains strict.
-39 regression tests were green before the latest JD-hardening change; the latest branch now contains JD and today-only feed coverage and must pass the updated 43-test suite.
+The latest V2 GitHub Actions run passed 53 tests, including the LinkedIn round-robin, 429/deep-scan guard and date-only Naukri latency regressions.
 
 TELEGRAM:
 Working.
@@ -1198,6 +1288,9 @@ DEDUPLICATION:
 Canonical opportunity layer is implemented conservatively.
 Ambiguous cross-source overlap stays separate.
 Do not count source rows as distinct alerts.
+FRESHNESS / SOURCE ROADMAP:
+Prioritize structured ATS/career feeds (Greenhouse, Lever, Ashby) as independent adapters. Keep aggregator providers as measured optional POCs, not assumptions of instant or free coverage. JobBeeper’s private use of multi-tenant pooling, proxy pools, or headless clusters is not publicly verified.
+Do not add proxies/CAPTCHA workarounds to evade source controls. Measure actual freshness and request failures.
 
 FRONTEND:
 Dashboard uses V2 APIs and can target the deployed Oracle API during local development.
@@ -1207,11 +1300,11 @@ V1:
 Legacy job-watch Telegram workflow is inactive/disabled.
 
 AGENT-REACH:
-Parked as a future source-access optimisation.
-Do not make it a runtime dependency until the core V2 MVP is stable and benchmarked.
+Experiment completed. Windows-authenticated session → Oracle foreign-runtime browser bridge works, but real LinkedIn MCP read tools still hang on Oracle. Parked; not a V2 dependency.
+Do not resume during MVP acceptance.
 
 NEXT:
-Deploy JD hardening → verify 5–7-year extraction end-to-end → verify canonical alert counts → measure end-to-end latency → validate config persistence/recovery → finish frontend verification → changed-opportunity detection → MVP sign-off → benchmark Agent-Reach and expand sources.
+Verify post-fix LinkedIn freshness/429 behavior → verify Naukri relay reliability → verify canonical alert counts → measure end-to-end latency → validate config persistence/recovery → finish frontend verification → changed-opportunity detection → MVP sign-off → only then benchmark Agent-Reach and expand sources.
 ```
 
 ## 18. SOURCE OF TRUTH HIERARCHY
@@ -1398,7 +1491,6 @@ The repository and this file should be kept in sync deliberately.
 - Next Oracle action after CI passes: rebuild the container again so the v4 migration and reduced-burst LinkedIn collector become active. Then inspect `/api/config` to confirm Instahyre is false and inspect LinkedIn source runs/latency over several fresh postings.
 
 ## Critical LinkedIn Delay Root Cause — 2026-10-08
-
 - Manual acceptance found a severe case: Infosys `AI-Driven - Full Stack Engineer` was shown by LinkedIn as posted around 6:13 PM IST but was first discovered/alerted around 11:13 PM IST.
 - Runtime `/data/config.json` exposed the root cause: although repository `v2/config.json` had the broadened LinkedIn query families, the persistent runtime configuration had an older narrowed set that did not include `full stack engineer`, `react engineer`, `python engineer`, `frontend engineer`, `backend engineer`, or other required variants. Therefore the live Oracle collector was not actually searching the same query vocabulary as the repository.
 - The alert was delayed because the posting did not enter the fast lane through the missing query variant; the slower/deeper scan eventually found it. The timestamp gap therefore represented a real acquisition/coverage failure, not a Telegram delivery delay.
@@ -1413,7 +1505,724 @@ The repository and this file should be kept in sync deliberately.
 - Oracle was rebuilt successfully and the persisted runtime configuration is now version 5 with the intended expanded LinkedIn/Naukri query sets and Instahyre disabled.
 - The 24-hour latency sample is not a current-SLA measurement: LinkedIn p50 is 44 minutes and p90/max are 6 hours, while Naukri p50 is about 33 hours. These values include historical first-discovery samples gathered before the latest query/config fixes and therefore should not be treated as the post-fix latency baseline.
 - Current runtime logs after the rebuild showed LinkedIn succeeding without a 429 in the sampled window, including a cycle with 131 jobs seen and 13 new jobs; Telegram delivered 4 alerts.
-- Naukri had a transient relay-branch HTTP 404 even though the GitHub relay workflow itself succeeded. The branch currently contains the relay file. V2 now retries transient Naukri relay 404/429/5xx responses with bounded backoff before failing the source run.
+- Naukri returned HTTP 404 from an unauthenticated `raw.githubusercontent.com` URL after the repository was made private. The relay artifact itself exists on `naukri-relay`: the authenticated GitHub connection verified `dashboard/data/naukri_relay.json`, with 150 jobs and `updated_at=2026-10-09T05:04:08Z`. This makes private-content access the high-confidence root cause, not a missing workflow output path.
+- The Naukri collector was changed to fetch through GitHub's authenticated Contents API (`Accept: application/vnd.github.raw+json`) using a fine-grained `JOB_RADAR_GITHUB_READ_TOKEN` restricted to this repository and Contents:read. The Docker Compose service passes that environment variable from the ignored VM `.env`. HTTP 401/403/404 are configuration/permission failures and are not retried; 429/5xx/network failures retain bounded retries.
+- Deployment remains pending until the VM creates a least-privilege token, adds it to `.env`, pulls the branch, and rebuilds the container.
 - CI is green for the Naukri retry change.
 - Next validation should use `/api/latency-summary?hours=1` after several fresh LinkedIn cycles and compare new Telegram alerts against dashboard jobs. Do not use the 24-hour aggregate as the post-fix SLA baseline.
 - Platform expansion remains blocked until this short-window freshness check and LinkedIn experience acquisition are validated.
+## 31. AGENT-REACH EXPERIMENT — FINAL LEARNING & HANDOVER
+
+This section records the exact decision boundary so a future agent does not repeat the same setup from scratch.
+
+### What was proven
+
+- Agent-Reach can be installed and kept completely isolated from the Job Radar repository.
+- LinkedIn MCP v4.26.2 can create a valid authenticated source session on Windows.
+- That session can be recognized on Linux as a foreign-runtime source profile.
+- Oracle can create the Linux Patchright Chromium runtime from that foreign profile.
+- The bridge can import the required LinkedIn cookies, including `li_at`.
+- The bridged browser can visibly reach the authenticated LinkedIn feed in VNC.
+- MCP HTTP transport, `initialize`, and `tools/list` all work.
+
+### What was not proven
+
+- `get_my_profile` did not complete.
+- `search_jobs` did not complete.
+- Therefore reliable authenticated LinkedIn job acquisition through the MCP tool layer is **not proven**.
+
+### Why this matters to Job Radar
+
+The original reasons for exploring Agent-Reach were speed, richer authenticated JD content, future source coverage and reduced bespoke scraping. The experiment only established the access/authentication half. It did **not** establish the operational half needed by a continuously running job radar: predictable tool latency, robust navigation/extraction, controlled request volume, and stable long-running sessions on the small Oracle VM.
+
+### Decision
+
+```
+CURRENT V2 COLLECTORS
+    ↓
+remain production
+
+AGENT-REACH / LINKEDIN MCP
+    ↓
+parked after controlled experiment
+    ↓
+revisit only post-MVP via benchmark
+```
+
+Do not modify `main` or `v2-live-radar` source ingestion code solely because of this experiment. The production LinkedIn collector remains the guest/API-style collector already implemented in V2, and Naukri remains the GitHub relay path.
+
+### Future benchmark, when justified
+
+A future benchmark should compare the two paths over the same controlled time window and record:
+
+- fresh-job discovery latency
+- JD completeness, especially poster-added experience requirements
+- tool failure/timeout rate
+- LinkedIn 429/failure frequency
+- duplicate rate
+- session persistence/re-authentication frequency
+- CPU/RAM impact on Oracle
+- number of source requests per useful job
+
+Only a measured win should justify replacing or augmenting the production collector.
+
+
+
+## 32. Live acceptance checkpoint and scraper strategy — 2026-10-09
+
+### Live evidence
+
+The latest Oracle health response reports V2 healthy, config version 5, LinkedIn enabled, Naukri enabled but failing its relay fetch, and Instahyre disabled. The failing request was the anonymous raw URL; the relay branch artifact exists and contains 150 records. The private-repo 404 is addressed in code with the authenticated GitHub Contents API, but production is not considered fixed until the VM has a read-only token configured and the next source run succeeds. Commit `66145ba49696981201500c3184d9ae94c7ee386d` has passed V2 CI with 50 tests; deployment still needs the VM token and rebuild.
+
+The latest `/api/latency-summary?hours=1` observed LinkedIn `p50=2040s` (34 minutes), `p90=3600s` (60 minutes), `max=21600s` (6 hours), and only 7 samples under five minutes out of 43. In code this field is the difference between source-posted time and first discovery when the source posting precision supports it; it is not merely the collector's internal processing duration. Treat it as an estimated posted-to-discovery metric and keep its source timestamp precision in mind.
+
+### Correct order of work
+
+1. Restore authenticated Naukri relay access without making the repository public. Add a fine-grained token with only this repository's Contents:read permission to the VM's ignored `.env` as `JOB_RADAR_GITHUB_READ_TOKEN`; never put it in git or chat. Rebuild and verify `/api/source-status`, relay update time, and Naukri rows ingested.
+2. Resolve the GitHub Actions budget before accepting the relay schedule. Recent relay runs trigger about every five minutes and take ~1m45s–2m33s. At ~8,640 runs per 30-day month, that is roughly 15,000–22,000 runner-minutes if the cadence continues. GitHub Free includes 2,000 minutes/month for private-repository GitHub-hosted runners. Do not leave the five-minute private-repo cadence running indefinitely without checking usage/billing. Decision approved 2026-10-09: create a separate public relay-only repository `AvinashBhalla/job-beeper-naukri-relay`, while keeping `AvinashBhalla/job-beeper` private. The public repo will expose only a small scheduled Naukri collector workflow, its setup notes and the generated public job feed. It will read the private repo's `config.json` using a fine-grained `PRIVATE_APP_READ_TOKEN` secret limited to Contents: read on `AvinashBhalla/job-beeper`; it must not mirror or publish private application files. The private app will read the generated public raw JSON URL without a runtime GitHub token. The connected GitHub tool cannot create a repository, so a human must first create an empty public repo with that exact name; then populate it, verify one successful feed publication, switch/verify the consumer on the VM, and stop the old private workflow timer.
+3. Improve LinkedIn freshness without increasing request volume blindly. There are observed HTTP 429s on deep `start=10` scans. Keep the location rotation, measure the next 1–2 hours, and tune deep-page frequency/rotation only with source-run and latency measurements. Do not use the authenticated MCP browser experiment in production: its login bridge worked, but real tool calls still hung.
+4. Test one alternative source adapter in isolation, not all sources at once. JobSpy is a plausible low-cost benchmark and already powers the Naukri relay, but upstream docs note LinkedIn rate-limit sensitivity and issue reports include incomplete descriptions. Compare actual jobs found, complete-JD rate, freshness, 429s, run duration and cost before enabling Telegram alerts from a new adapter.
+5. Make ATS job feeds the first expansion candidate. Greenhouse, Lever and Ashby publish structured job-board endpoints, and SmartRecruiters has a public postings API. This is a better fit for the tiny Oracle VM than running a browser farm; the trade-off is curated company coverage rather than whole-market discovery.
+6. Do not put Firecrawl or Crawl4AI in the critical collector path yet. Firecrawl's current hosted free tier is 1,000 credits/month and a normal page scrape uses one credit; self-hosting loses the managed anti-bot/proxy layer and adds infrastructure. Crawl4AI is an open-source browser crawler but consumes the same constrained VM resources. Keep these as limited evaluation tools for awkward ATS pages, not a fix for LinkedIn/Naukri blocking.
+7. Acceptance criteria before adding more production sources: Naukri succeeds on consecutive relay cycles; source errors are visible and do not wipe last-good data; Telegram matches the canonical ledger; experience extraction is verified against full descriptions; p50/p90/max freshness and 429 rates improve over a measured window; restart/config persistence is verified.
+
+### Platform and budget cautions
+
+- LinkedIn's own help documentation says third-party scraping/automation is not permitted and can risk account restrictions. Agent-Reach/MCP remains parked; do not reattempt CAPTCHA workarounds or use the authenticated account browser as a production crawler.
+- GitHub's standard runner usage is free for public repositories; private repositories have plan-specific included minutes and may incur usage over the free allowance. Keep the repository private and do not move the entire application public merely to save runner minutes. If an isolated public relay is ever considered, document exactly which workflow/source code and generated job data would become public before changing anything.
+
+
+
+## 33. External references reviewed for source strategy — 2026-10-09
+
+- JobSpy supported sources and upstream limitations: https://github.com/speedyapply/JobSpy
+- JobSpy reports LinkedIn as its most restrictive source and notes rate limiting around deeper pages; treat this as project guidance, not an independent benchmark.
+- Firecrawl current billing/free-tier information: https://github.com/firecrawl/firecrawl-docs/blob/main/billing.mdx
+- Firecrawl current rate-limit information: https://github.com/firecrawl/firecrawl-docs/blob/main/rate-limits.mdx
+- Firecrawl open-source versus hosted service limitations: https://www.firecrawl.dev/crawl
+- Crawl4AI self-hosted options and license: https://github.com/unclecode/crawl4ai
+- Greenhouse public Job Board API: https://docs.greenhouse.io/job-board.html
+- Lever public Postings API: https://github.com/lever/postings-api
+- Ashby public Job Posting API: https://developers.ashbyhq.com/docs/public-job-posting-api
+- LinkedIn official policy on prohibited scraping/automation: https://www.linkedin.com/help/linkedin/answer/a1341387/prohibition-of-scraping-software
+- GitHub Actions limits and included minutes: https://docs.github.com/en/actions/reference/limits
+- GitHub Actions billing/public versus private repo guidance: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+
+Decision remains: repair relay delivery and validate existing sources before adding another production dependency. Firecrawl/Crawl4AI are not proposed as the primary LinkedIn/Naukri ingestion path; ATS public APIs and a controlled JobSpy alternative-source POC are the preferred next experiments.
+
+
+## 34. Approved isolated Naukri relay decision — 2026-10-09
+
+- **Private app repo remains private:** `AvinashBhalla/job-beeper`, active branch `v2-live-radar`. Never change its visibility.
+- **New public relay repo:** `AvinashBhalla/job-beeper-naukri-relay` exists and is public. Its default branch is `main`; the scheduled workflow and setup README are committed.
+- **Purpose of public repo:** run the JobSpy Naukri collection workflow on a scheduled public GitHub-hosted runner and publish only `dashboard/data/naukri_relay.json` to its orphan `naukri-relay` branch. The default branch should contain only relay workflow/setup documentation. Do not copy the private app repository into this repository.
+- **Private source access:** add a fine-grained PAT as repository secret `PRIVATE_APP_READ_TOKEN` in the new public repo. Scope it to only `AvinashBhalla/job-beeper` with Contents: read permission. Do not paste the token into chat or commit it. The workflow checks out only `v2/config.json` from the private repo's `v2-live-radar` branch into a temporary runner directory; all workflow execution stays in the public repo for its public-runner budget.
+- **Consumer code committed, not yet deployed:** `v2/radar.py` now reads `https://raw.githubusercontent.com/AvinashBhalla/job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json` anonymously, and the GitHub read-token environment variable was removed from `v2/docker-compose.yml`. Public feed URL will 404 until the new repository's first successful relay run; do not deploy/force-recreate the production container before verifying that URL returns a valid JSON payload with `updated_at` and `jobs`.
+- **Remaining cutover steps:** configure the `PRIVATE_APP_READ_TOKEN` repository Actions secret with read-only access to the private app; run the public workflow manually; check feed timestamp/count and public raw URL; then deploy/verify the private app consumer and only then disable the old VM systemd timer that dispatches the private repo's relay workflow. Identify the exact timer name using `systemctl list-timers --all --no-pager | grep -i naukri`; disable only the matching relay timer. After cutover, retire the old private relay workflow to prevent duplicate runs.
+- **Cost goal:** retain the roughly five-minute relay freshness on GitHub's public runner without making the main app repository public or spending private-repository runner minutes for recurring Naukri collection. Public feed visibility is intentional; credentials, user preference files, SQLite DB and the rest of the app must remain private.
+
+
+## 35. Telegram precision safeguard — 2026-10-09
+
+- **Decision:** require explicit captured job experience for Telegram alerts until the LinkedIn acquisition layer reliably captures poster-added requirements. Public guest job details can omit requirements shown in authenticated browser sessions; parser improvements cannot recover text that was never fetched.
+- **Behavior:** jobs with unknown experience can still appear in the dashboard and match results, but are not eligible for Telegram alerts. Jobs with explicit experience continue through the existing configured experience-fit rules.
+- **Implementation:** v2/config.json now uses config version 6 and sets require_explicit_experience_for_alerts=true. The V6 runtime-config migration forcibly applies this safeguard to persisted configurations from V5 or earlier, rather than leaving the live VM's saved false value in place. A unit test covers this migration.
+- **Operational note:** this changes the live effective preference on next application startup/config reload. It does not delete stored jobs or historical notification records. Existing queued notifications are revalidated against current alertability before delivery.
+- **Acceptance gate:** keep this safeguard until production tests demonstrate reliable capture of explicit experience from the actual source acquisition path. Do not claim the acquisition limitation is solved by parser-only changes.
+
+
+## 36. Naukri relay last-good-feed guard — 2026-10-09
+
+The private relay workflow now fails rather than publishing a zero-job feed. This protects the existing public relay artifact from being replaced by an empty result when Naukri blocks the runner or collection silently fails. Validate the workflow run after relay isolation is completed; this guard is not deployed to the public relay because that repository still needs to be created.
+
+
+## 37. Relay bootstrap staged — 2026-10-09
+
+Prepared the isolated public relay workflow and setup README under `docs/relay-bootstrap/` on `v2-live-radar`. The workflow runs every five minutes on a public runner, checks out only `v2/config.json` from the private app using `PRIVATE_APP_READ_TOKEN`, publishes only the generated Naukri feed to the relay branch, and refuses to replace the last-good feed with an empty result. V2 CI passed after the empty-feed guard commit. The public repository now exists, and `.github/workflows/naukri-relay.yml` plus its README are committed. The workflow reads only the private config file from `v2-live-radar`, uses the configured Naukri queries and locations, and publishes only the generated feed. The repository currently has no workflow runs, so configure `PRIVATE_APP_READ_TOKEN`, run the workflow manually, and verify fresh JSON at the raw feed URL before changing production timers. No production deployment or timer change has been made.
+
+
+## 38. Public relay repository created — 2026-10-09
+
+- Repository: `AvinashBhalla/job-beeper-naukri-relay` (public), default branch `main`.
+- Added `.github/workflows/naukri-relay.yml`: five-minute schedule and manual dispatch; sparse-checks out only `v2/config.json` from private branch `v2-live-radar`; collects configured Naukri queries across configured locations; fails on empty results; publishes only `dashboard/data/naukri_relay.json` to branch `naukri-relay` without force-pushing.
+- Added README with setup and validation instructions. GitHub API currently reports zero workflow runs, so the feed has not yet been generated/validated.
+- **Still required:** add repository Actions secret `PRIVATE_APP_READ_TOKEN` with read-only access to the private app, run workflow manually, validate raw JSON and freshness, deploy/recreate the V2 app on the Oracle VM and verify `/api/source-status`, then disable the old private-repo relay timer only after the new path is confirmed working. The Oracle VM and its timer have not been changed from this chat.
+
+
+## 39. Public Naukri relay first-run verified — 2026-10-09
+
+- **Successful manual run:** [public-naukri-relay run 37902413775](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37902413775), completed successfully on 2026-10-09 at 08:03 UTC. All collection and publish steps succeeded.
+- **Published feed:** https://raw.githubusercontent.com/AvinashBhalla/job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json
+- **Feed validation:** JSON returned successfully with `updated_at=2026-10-09T08:03:27.351028+00:00` and `count=226`; `jobs` is populated. Private config checkout succeeded and the workflow used the configured Naukri query/location keys.
+- **Remaining production cutover:** the public feed is confirmed, but the Oracle VM consumer deployment and old private-repo timer have not been changed or verified from this chat. On the VM, update the working tree to the intended `v2-live-radar` commit, recreate the V2 container, and verify `/api/source-status` shows Naukri healthy/fresh. Only after this check, identify the exact old relay timer with `systemctl list-timers --all --no-pager | grep -i naukri` and disable that timer. Do not disable unrelated timers. Then confirm a subsequent public relay run updates the feed and confirm the app still reads it.
+- **Security note:** public feed data intentionally contains job listings and descriptions. The private application repo remains private; no application source was copied into the public relay repo.
+
+
+
+## 40. LinkedIn discovery CI fixes and throttling lessons — 2026-10-09
+
+### Current branch and commits
+- Active implementation branch for this work: `v2-live-radar`.
+- Fixed stale location-rotation tests in `v2/test_radar.py`: commit `06a6179429d077042578a8dc54975bbde04b7128`. The production code no longer uses `linkedin_fast_location_cursor`; tests must verify every configured query/location is scanned each fast cycle, not expect rotation.
+- Bounded deep-scan request bursts: commit `092a07187b8dca9ad33ad5f1cc7ed4967cffe285`.
+- Updated deep-pagination test: commit `ac22c8845426184bfb84c06d5723edbf94502fe6`.
+- Fixed telemetry after scan batching: commit `4c13835fcd98db3bd21d354d65f1dadb6ad1d000`. CI run [37913344863](https://github.com/AvinashBhalla/job-beeper/actions/runs/37913344863) passed, including Python compilation and the full V2 unit-test suite.
+- Latest throttling mitigation commit: `60b14ba197772e5b0c569d99056458d44fb3e210` — reduce `LINKEDIN_SEARCH_WORKERS` from 3 to 2, reduce `LINKEDIN_DEEP_PAGE_BATCH` from 4 to 1, and stop retrying HTTP 429 inside the same scan. **At the time this handover note was written, its CI run was still in progress; verify CI before deploying.**
+
+### Production observations from Oracle VM logs
+The user supplied live logs from `sudo docker compose -f v2/docker-compose.yml logs --since=10m radar`:
+- Deep scan: `queries=4 locations=4 requests=80 deep=True unique_jobs=217 failed_requests=5 elapsed=61.3s`; it added 47 new jobs.
+- Fast scans: typically `requests=16`, `unique_jobs=83–84`, and `elapsed=2.8–3.2s` when successful.
+- HTTP 429s occurred on several query/location/page combinations. One fast scan took 15.3s with one 429.
+- Naukri log showed `seen=226 new=0`; this alone does not prove the feed is fresh or stale. Inspect the public relay JSON `updated_at` to verify freshness.
+
+### Decisions and lessons — read before changing discovery
+1. **Do not increase LinkedIn concurrency as the default response to slow discovery.** The 429 evidence shows the source is already throttling. More parallel requests can increase failures and reduce successful coverage.
+2. **Protect the fast lane.** It searches the first/newest page for all configured query/location combinations. It is the reliable low-latency path; deep pagination should be bounded and must not delay every fast cycle.
+3. **Keep deep scans small and separate.** The observed deep scan issued 80 requests and took 61.3 seconds, versus 16 requests and around 3 seconds for successful fast scans. The latest mitigation limits deep pagination to one additional page per query/location and uses two workers.
+4. **Do not retry HTTP 429 immediately inside the same scan.** That multiplies traffic while the source is rejecting requests. Let a future scheduled scan retry; continue to honor sensible retry handling for transient 5xx errors. Revisit only with measured evidence and a rate-limit-aware design.
+5. **Do not claim a one-minute scan interval guarantees one-minute discovery.** Search endpoint visibility, request duration, source throttling, and scheduling affect real discovery lag. Measure actual logs and job timestamps.
+6. **Keep scan telemetry aligned with implementation.** When replacing a `targets` list with separate `fast_targets` and `deep_targets`, update request counts and tests in the same commit. A previous CI failure was caused by telemetry referencing the deleted `targets` variable.
+7. **Update tests alongside behavior changes.** Old tests that asserted location rotation failed after rotation was intentionally removed. Update tests to assert full query/location coverage and bounded deep-page starts; do not restore obsolete production state just to satisfy stale tests.
+8. **Historical red GitHub Actions runs remain red.** Judge current health from the latest commit's run, not whether the Actions history page contains old failed runs.
+9. **No deployment should be claimed from a GitHub commit or green CI alone.** The Oracle VM must pull the intended commit and rebuild the Docker container. Confirm deployed commit and live logs separately.
+
+### Next steps
+- Check CI for commit `60b14ba197772e5b0c569d99056458d44fb3e210`. If red, fetch the job logs and fix the exact failing test/code before deployment.
+- After CI passes, on `ubuntu@job-radar` in `~/job-beeper`, pull `v2-live-radar`, rebuild/recreate with `sudo docker compose -f v2/docker-compose.yml up -d --build`, then inspect the next 10 minutes of logs.
+- Compare `elapsed`, `requests`, `failed_requests`, `unique_jobs`, and `new` across fast/deep scans. Confirm the deep scan no longer causes a long request burst and whether 429 frequency decreases.
+- If 429s persist, reduce request frequency or use a compliant, permitted source/API rather than increasing parallelism. Respect LinkedIn's applicable terms and access controls.
+- Stay focused on discovery until this is stable; do not start dashboard or Telegram feature work unless the user explicitly changes priority.
+
+
+
+## 41. Follow-up: production still throttled; deep-page test mismatch — 2026-10-09
+
+- New VM logs after the previous rollout still show widespread HTTP 429 responses across first-page searches and deep pages. The deep scan reported `requests=32 deep=True unique_jobs=75 failed_requests=15 elapsed=6.6s`, adding 2 new jobs. A fast scan later reported `requests=16 deep=False unique_jobs=82 failed_requests=0 elapsed=4.7s`, adding 4 new jobs; another fast scan had 6 failed requests. This indicates throttling remains intermittent and is not solved solely by reducing concurrency.
+- The user may not have deployed the latest commit when sharing logs; always verify the running container's code/commit before attributing logs to a specific mitigation.
+- CI for throttling mitigation commit `60b14ba` failed because `test_linkedin_fast_lane_and_periodic_deep_scan` still expected deep starts `[0, 10, 20, 30, 40]`, but the intended one-extra-page cap produces `[0, 10]`. Fixed assertion in commit `07973594927c7867d4ca4a4e0228556683871ecb`; check the latest CI run before deployment.
+- Important lesson: when changing `LINKEDIN_DEEP_PAGE_BATCH`, update test expectations to reflect the cap. Do not leave a test expecting the previous four-page setting.
+- Continue prioritizing fast scan coverage and measure 429s after deployment. If throttling persists, reduce how often all query/location pairs are hit (e.g. spread them across staggered cycles while keeping the most valuable/newest queries first) rather than increasing concurrency. Avoid evasion techniques; prefer a permitted API/source if LinkedIn continues rejecting automated requests.
+
+
+## 42. Stagger LinkedIn discovery requests to reduce 429s — 2026-10-09
+
+- Implemented commit `f3be91d`: LinkedIn no longer fires all 16 configured query/location first-page requests in every 60-second cycle. It rotates through an 8-target batch per cycle, so the default 16 pairs are covered across roughly two cycles.
+- Deep pagination now applies only to the current small fast batch instead of every query/location pair. With the default 8-target batch and one extra page, a deep cycle targets at most 16 requests rather than 32, before any request retries for transient 5xx errors.
+- Kept two search workers and the no-immediate-retry behavior for HTTP 429. This is a reduction in request pressure, not a guarantee that LinkedIn will stop throttling.
+- Added a unit test in commit `962f09d` to assert that two consecutive fast cycles cover all configured query/location pairs without duplicate first-page targets in that two-cycle window.
+- Next: verify CI for the latest branch commit. If green, deploy on the Oracle VM with `git pull origin v2-live-radar` followed by `sudo docker compose -f v2/docker-compose.yml up -d --build`. Confirm the container's behavior from logs: each fast scan should report 8 requests by default; a deep scan should report 16 total requests; check whether 429s decrease over at least 10 minutes.
+- Caveat: the round-robin cursor is process-local and resets on container restart. This only affects which batch is scanned first after a restart; all pairs should still be covered across two cycles.
+
+
+### CI follow-up for section 42
+- The first staggered-scan test failed because its fixture contained only 8 query/location pairs, equal to the configured batch size, so two cycles correctly repeated the same full set. The test fixture now uses 4 queries × 4 locations (16 pairs) to model the default setup and verify two disjoint 8-pair cycles. Fix commit: `fb9945d0ef30b85907945912bfaa9432729bf3ce`.
+- Do not deploy until the latest CI run for this fix completes successfully.
+
+
+
+## 43. Research learnings, current deployed state, and goals — 2026-10-09
+
+### What the research is useful for
+
+The shared research about JobBeeper's apparent architecture is useful as a source-strategy hypothesis, not as verified knowledge of its private backend. The public JobBeeper website describes monitoring LinkedIn, Naukri, Workday, Greenhouse, Lever, Ashby, SmartRecruiters, Darwinbox, Instahyre, Hirist, Cutshort and company career pages. It does not publicly establish that its internal implementation specifically uses thousands of residential/mobile proxies, a headless-browser cluster, or the exact aggregated-polling/CDC design described in the research.
+
+References:
+- Public JobBeeper product/source description: https://jobbeeper.com/
+- OpenWeb Ninja Job Scraper API: https://www.openwebninja.com/api/job-scraper
+- Apify scraper example: https://apify.com/silentflow/linkedin-jobs-scraper
+- Greenhouse public Job Board API: https://docs.greenhouse.io/job-board.html
+- Lever Postings API: https://github.com/lever/postings-api
+- Ashby public Job Posting API: https://developers.ashbyhq.com/docs/public-job-posting-api
+
+### Adopted architectural principles
+
+1. **Separate acquisition from matching.** Collect broad-enough source results, normalize them, persist them, then apply the user's private filters locally. Query consolidation is worth testing where role variants overlap, but only if relevant-job coverage remains acceptable.
+2. **Prefer multiple independent source adapters over more pressure on one source.** Build structured ATS collectors first (Greenhouse, Lever, Ashby), then consider SmartRecruiters, Workday or individual company career pages. Avoid a single generic scraper as the main architecture.
+3. **Keep one ingestion and alerting path.** Every new source must pass through stable source IDs, timestamp/precision handling, canonical opportunity linking, deduplication, deterministic matching, alertability checks, notification ledger and Telegram delivery.
+4. **Use change detection rather than repeated full reprocessing when the source supports stable IDs/updated-at fields.** Do not infer exact posting times from date-only fields. Preserve source-posted time, discovery time, precision and valid discovery latency separately.
+5. **Use aggregators only after a controlled POC.** Google-for-Jobs/aggregator APIs are third-party providers rather than a guarantee of a universal, unlimited official Google Jobs feed. Test OpenWeb Ninja or a small Apify trial against the same saved sample/criteria; record relevant new jobs, duplicate rate, description completeness, update lag, HTTP failures, free-tier allowance and projected cost. Pricing, quotas and terms can change; verify them on the provider site before committing.
+6. **Do not recreate claims we cannot validate.** Treat JobBeeper's multi-tenant polling, proxy rotation, headless clusters and CDC details as hypotheses unless supported by direct public evidence. Do not use proxy rotation, CAPTCHA workarounds, or simulated human activity to evade LinkedIn controls. The safer high-value move is independent sources + bounded, observable polling.
+
+### Latest CI and deployment checkpoint
+
+- Commit deployed on `v2-live-radar`: `3e5b51bce9e471dc839daa3842e4a5e8e1cc1e35` — “Fix LinkedIn staggered polling test for four-cycle rotation”.
+- CI: [run #281 / 37921218421](https://github.com/AvinashBhalla/job-beeper/actions/runs/37921218421) completed successfully; `py_compile` passed and the full suite reported `Ran 53 tests`, `OK`.
+- VM: `git log -1` matched `3e5b51b`; Docker Compose showed the V2 radar container up; `/health` returned `status=ok`.
+- Post-deploy scan sample: one deep scan reported `requests=8 deep=True unique_jobs=59 failed_requests=0 elapsed=4.3s`; the following eight fast scans shown reported `requests=4 deep=False`, `failed_requests=0`, and roughly 1.9–2.6 seconds each. This is encouraging evidence from one 30-minute sample, not a guarantee against future 429s.
+- Latest source-status sample: LinkedIn was enabled, `last_success=2026-10-09T11:14:10Z`, `jobs_seen=25`, `new_jobs=0`, `error=null`; Naukri was enabled, `last_success=2026-10-09T11:12:06Z`, `jobs_seen=347`, `new_jobs=10`, `error=null`. The LinkedIn response happened to report `running=true`, which can be transient if a scan is in progress.
+- The shared 24-hour latency API output showed LinkedIn p50=900 seconds, p90=7200 seconds and max=21600 seconds; Naukri p50=115407 seconds, p90=288207 seconds and max=305275 seconds. These aggregates include historical samples and are not a post-deploy SLA. Because Naukri's relay often supplies date-only timestamps, the collector now sets discovery latency to null for those records; existing historical values are not retroactively corrected.
+- Do not rebuild or tune solely because scans report `new=0`; that means that run inserted no new job rows, not that the source is offline.
+
+### Current goals, in priority order
+
+**Goal 1 — Complete short-window observation of the conservative LinkedIn release**
+- Check at least one more 10-minute window of scan logs and source status.
+- Track `requests`, `failed_requests`, any HTTP 429, `elapsed`, `unique_jobs`, and `new`.
+- Do not widen concurrency or target batch size unless the evidence shows a need and an explicit safe test supports it.
+- Use `/api/latency-summary?hours=1` only after enough fresh, valid-precision samples exist; do not use the historical 24-hour summary as the release baseline.
+
+**Goal 2 — Verify freshness and end-to-end delivery**
+- Compare a newly posted source listing's available posted time, first-seen time, job row, match/alertability decision and notification-ledger state.
+- Check whether eligible new jobs reach Telegram promptly and only once per canonical opportunity.
+- Validate that a date-only Naukri record has `posted_precision=date` and `discovery_latency_seconds=null`.
+- Keep the explicit-experience alert safeguard until source acquisition reliably captures real required experience; parser-only improvements cannot recover missing source text.
+
+**Goal 3 — Add structured ATS sources one at a time**
+- Start with public Greenhouse, Lever and Ashby job-board endpoints, each behind an independent collector and feature/source flag.
+- Prefer configured employer board IDs/domains and explicit coverage over broad scraping.
+- Test fixtures, timestamp precision, dedupe, last-good-data preservation and source-specific freshness before enabling alerts.
+- Expand later to SmartRecruiters, Workday and company career pages after the first adapters are stable.
+
+**Goal 4 — Benchmark one aggregator as an optional source**
+- Evaluate OpenWeb Ninja's Job Scraper API or a tightly capped Apify run with a fixed set of roles/locations and saved comparison window.
+- Compare source coverage versus existing LinkedIn/Naukri/ATS records, relevant-new-job yield, posting-date precision, description completeness, duplicate rate, latency, 429/5xx behavior, request quota and actual cost.
+- Do not add it as a required dependency until its incremental value is measured. Free-tier allowances are limited and subject to provider changes.
+
+**Goal 5 — Preserve the current operational boundaries**
+- Main application repo remains private; the isolated Naukri relay repo may publish only its intentionally public feed/workflow/documentation.
+- No secrets, `/data/config.json`, config tokens, SQLite DB, or application source should be copied into the public relay.
+- Oracle V2 remains browser-free in its production collector path.
+- Keep CI green and verify the deployed VM commit/container after each production change.
+
+### Definition of progress
+
+A goal is complete only when there is a reproducible code change or an observed operational result, regression tests pass, the deployment is confirmed when relevant, and the evidence is recorded here. Architecture ideas from external product descriptions are not treated as facts until independently verified.
+
+## 44. Public Naukri relay cutover completed; cache-busting fix verified — 2026-10-09
+
+### Change and validation
+- Added `params={"t": int(time.time())}` to the public relay request in `v2/radar.py`. The timestamp query parameter reduces the chance of GitHub's raw-content CDN returning an older feed after the relay branch advances.
+- Updated `test_naukri_relay_reads_public_feed_without_a_token` in `v2/test_radar.py` to assert that the cache-busting `t` parameter is present and retain the no-Authorization-header assertion.
+- Merged as commit `f91f047ca6e71c69492a03f0bafaf7b18362f613`. [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5), [pre-merge CI #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682), and [post-merge CI #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) all passed.
+- Oracle VM fast-forwarded `v2-live-radar` from `3e5b51b` to `f91f047` and rebuilt the `radar` Docker service. An initial health curl immediately after the restart received a connection reset as the container was starting; after reconnecting and rechecking, the container was running normally and `/health` returned `status=ok`.
+
+### Observed end state
+- Public relay repository: `AvinashBhalla/job-beeper-naukri-relay`; its scheduled workflow runs every five minutes independently of the private app repository.
+- [Public relay workflow run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) completed successfully and published `updated_at=2026-10-09T11:37:11.483292+00:00`, `count=359`, with 359 records in `jobs`.
+- The rebuilt Oracle radar consumed the refreshed feed. Naukri status reported `jobs_seen=359`, `new_jobs=0`, `error=null`; the `0` means no new database rows were inserted by that poll, not that collection failed.
+- At the same health check, LinkedIn also reported a successful recent scan with `new_jobs=1` and no error.
+- Removed the Ubuntu user's old `*/5 * * * * /home/ubuntu/job-beeper/scripts/trigger-naukri-relay.sh` crontab entry to stop dispatching the private repository's relay workflow. The previous crontab was saved as `/home/ubuntu/crontab.backup.20261009-113638`.
+- Preserved the old local operational files outside the Git working tree at `/home/ubuntu/job-beeper-local-backup-20261009/` (`logs/` and `scripts/`) instead of deleting them. No local backups or operational files were committed.
+- The old `job-radar-naukri-relay.service` is a static oneshot service and was inactive/dead at inspection time; no matching system timer was found. The removed user cron entry was the active five-minute trigger found during inspection.
+
+### Supersession note
+This section and the current-state reconciliation above supersede earlier historical checklist statements that the isolated public relay had not yet been deployed, that the old private-repository trigger still needed removal, or that the consumer lacked cache busting. Those earlier notes are retained as historical context, not current instructions.
+
+### Next priorities
+1. Continue observing consecutive public relay refreshes and Oracle consumption without reintroducing a private-repo polling trigger.
+2. Track source freshness honestly, including LinkedIn 429/failure rates and date-only Naukri timestamp precision.
+3. Keep the application repository private and keep the public relay repository limited to its workflow/setup documentation and intentionally public generated job feed.
+4. Proceed next with an independent structured ATS adapter (Greenhouse, Lever, or Ashby) once normal relay stability is confirmed.
+
+## 45. Greenhouse public ATS source implemented, opt-in, pending Oracle deployment — 2026-10-09
+
+### Implementation and validation
+- Merged [PR #6](https://github.com/AvinashBhalla/job-beeper/pull/6) as code commit `1cfd55b28b4409d71aee3ca3fe1db314d9aa766f`. V2 CI [run #286](https://github.com/AvinashBhalla/job-beeper/actions/runs/37927758499) passed: Python compilation and the full unit-test suite completed successfully.
+- Added `greenhouse_collect(config)` to the V2 collector registry. It fetches each configured public board through `GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true`; the official [Greenhouse Job Board API documentation](https://developers.greenhouse.io/job-board.html) says public GET data does not require authentication and `content=true` includes the full description, department, and office.
+- Five starting board tokens are configured in `v2/config.json`: `coinbase`, `clarifai`, `gravitonresearchcapital`, `as` (Veradigm Asia), and `zocdoc`. These are seed candidates based on publicly indexed Greenhouse job-board pages, not a guarantee that each endpoint is currently reachable; validate the live API on activation. The board registry is capped at 50 entries and tokens are validated before being interpolated into the fixed Greenhouse API host URL.
+- Each job uses a board-scoped stable ID (`gh-{token}-{id}`), retains the published application URL and location, converts HTML description into text, and appends public department metadata. Source IDs avoid collisions when different companies reuse the same numeric job ID.
+- Posting freshness is deliberately conservative: Greenhouse's documented `updated_at` field may be a modification timestamp, not the original posting time. The adapter leaves `source_posted_at=null`, `posted_precision=unknown`, and discovery latency null unless a true posting timestamp is available. Discovery time remains recorded normally by the common normalizer.
+- Board failures are isolated. A failed board logs a warning while successful boards continue to contribute jobs. If every configured board fails (or none is configured while the source is enabled), the collector raises an error so source health shows the failure; the common ingestion path does not insert an empty feed to replace saved jobs.
+- Added `greenhouse` to the configured source flags, source polling settings (900-second target), source-health API, latency-summary/dedupe source filters, dashboard settings checkbox, source filter, and source-health label. Disabled sources now show a DISABLED badge rather than looking ACTIVE.
+- Added regression tests for normalization and HTML parsing, no invented posting time, per-board failure isolation, empty-board configuration, unsafe token rejection, and V6-to-V7 opt-in migration.
+
+### Activation and deployment boundary
+- Source is **disabled by default** in repository defaults. Config schema version 7 explicitly forces `source_enabled.greenhouse=false` while migrating older runtime config; user must turn it on explicitly after deployment.
+- The source implementation has not been deployed to Oracle yet. The VM remains at the last confirmed healthy commit `f91f047`; no Greenhouse requests or Greenhouse Telegram alerts should be expected before the code is deployed and the feature is enabled.
+- After deployment, first verify health and the `greenhouse` row in `/api/source-status`. Enable Greenhouse through the V2 preferences UI only when ready, then inspect `greenhouse: boards=...` and any per-board warnings in Docker logs. If all boards fail, leave it disabled until the registry is corrected. Do not infer success solely from a successful CI run; live endpoint availability still needs runtime proof.
+- Keep the current LinkedIn and Naukri sources untouched while validating this independent source. Compare the resulting relevant-new-job yield, description completeness, deduplication, and age precision before treating the adapter as a valuable ongoing source.
+
+
+
+## 46. Greenhouse live endpoint validation and seed registry cleanup — 2026-10-09
+
+### Oracle VM result
+- The deployed V2 app is healthy at commit `39847b8`; `/health` returned HTTP 200 and the runtime configuration reports schema version 7, Greenhouse disabled, and a 900-second poll target.
+- The user tested all five seed URLs from the VM using the exact public Job Board API collector endpoint:
+  - `coinbase`: HTTP 200, 220 jobs returned.
+  - `gravitonresearchcapital`: HTTP 200, 21 jobs returned; sample included an Application Reliability Engineer in Gurugram.
+  - `zocdoc`: HTTP 200, 57 jobs returned; sample included an Analyst, Quality Assurance in Pune.
+  - `clarifai`: HTTP 404. Indexed legacy job pages exist, but the tested public jobs endpoint is not currently usable; do not treat this as a validated board token.
+  - `as` (Veradigm Asia): HTTP 404. Veradigm's current official careers page now sends job seekers to its Workday job site, so remove it from the Greenhouse registry rather than assuming the old Greenhouse board is active.
+- The failed board URLs do not affect LinkedIn/Naukri. The collector's per-board isolation is intended to preserve jobs from successful boards even when a configured board fails, but failed tokens should not remain in the starter registry.
+
+### Follow-up and activation boundary
+- Repository defaults are being narrowed to the three VM-validated boards: `coinbase`, `gravitonresearchcapital`, and `zocdoc`.
+- Runtime config is persisted separately at `/data/config.json` in the Docker named volume. Updating `v2/config.json` alone does not replace the persisted board list on an existing VM; update the runtime config via the protected API or preferences UI as a separate step.
+- Greenhouse remains disabled until the runtime registry is cleaned and the operator explicitly enables it. After activation, inspect source status and logs for one full 15-minute poll cycle and confirm jobs are inserted and evaluated. Do not assume freshness latency for these jobs: the adapter intentionally leaves posting time unknown.
+- Clarifai may be re-added only after its current public listing endpoint and board token are verified from the VM. Do not replace it with guessed API URLs. Consider a separate Workday adapter for Veradigm later; do not mix Workday URLs into the Greenhouse collector.
+
+
+## 47. Greenhouse dry run exposed and fixed remote-country matching — 2026-10-09
+
+### Live preview result
+- On the Oracle VM, the actual Greenhouse collector fetched 298 jobs from the three validated boards (Coinbase 220, Graviton Research Capital 21, Zocdoc 57), with no failed boards.
+- The current matcher returned five profile matches. Four were Coinbase jobs labelled `Remote - USA` and passed the alert policy; one Graviton Research Capital role was in Gurugram and not alertable under the explicit-experience safeguard.
+- The saved location config is Bengaluru, Gurugram, Delhi, and `Remote, India`. These US-remote results exposed a location-filter bug: the matcher split `Remote, India` at the comma and treated `remote` as a global wildcard. The dry-run script itself performed no database writes or Telegram sends; Greenhouse stayed disabled.
+
+### Corrective change
+- Implemented and merged as [PR #8](https://github.com/AvinashBhalla/job-beeper/pull/8), commit `2074bdab`. The matcher now requires the configured country qualifier for `Remote, India`, while deliberately plain `Remote` remains global.
+- Tests cover India remote acceptance, US/Cyprus remote rejection, and unqualified global remote behavior. CI passed and the fix is deployed to the Oracle VM.
+- The subsequent live preview rejected 190 remote postings outside configured location targets. Greenhouse remains disabled pending the separate ingestion/dashboard freshness safety gate.
+
+## 48. Greenhouse first-published timestamp support — 2026-10-09
+
+### Evidence from Oracle VM
+- The corrected location dry run fetched 298 jobs from the three validated Greenhouse boards with no board failures. The location fix rejected 190 remote postings outside the configured India targets; one job matched the profile and zero passed the current explicit-experience alert policy.
+- Read-only checks of the public list responses found `first_published` on Coinbase 220/220, Graviton Research Capital 20/21, and Zocdoc 57/57. The separate `updated_at` field existed on all 298 listings.
+- Official Greenhouse Job Board API documentation shows `first_published` as a job post's first publication timestamp in the retrieve-job response; `updated_at` is a separate value. The live list response exposes `first_published`, so the adapter can use it without extra per-job requests.
+
+### Implementation
+- Collector parses `first_published` when present and stores it as `source_posted_at`; timestamps with hour/minute use `posted_precision=minute`, while date-only values use `date`. Missing or invalid values remain `unknown`.
+- Never fall back to `updated_at`: later edits must not make an old posting look newly posted.
+- Regression tests cover valid first-publication timestamps and a fallback guard (missing `first_published` plus present `updated_at` remains unknown).
+- PR #9 is merged and the first-published timestamp implementation is deployed to the Oracle VM; post-merge CI passed. The latest dry run reported 298 jobs, 297 with minute-precision timestamps and 1 unknown; 10 were posted within 72 hours, 287 were older, and none had future timestamps. The only profile match was the September 1 Gurugram graduate role, which is stale and not alertable. Greenhouse remains disabled pending the ingestion/dashboard freshness fix; keep the explicit-experience policy unchanged.
+
+
+## 49. Current employee knowledge transfer — 2026-10-09
+
+The maintained, current operating summary is [`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`](JOB_RADAR_KNOWLEDGE_TRANSFER.md). It records deployment evidence, source status, architecture, merged PRs, repository/branch purposes, cleanup notes, blockers, next tasks and the release checklist.
+
+Important current-state corrections to older historical sections above:
+- Active release branch is `v2-live-radar`; latest code merge at this snapshot is `c2f2ce65`. Post-merge CI passed, and the VM health/dry-run output reflects the updated timestamp parser.
+- Remote-country matching and Greenhouse first-published timestamp parsing are implemented, merged and deployed.
+- Greenhouse remains disabled. The current blocker is ingestion/dashboard freshness semantics: the collector returns all public listings while the dashboard's existing "today" lifecycle is discovery-based, so old board listings may look newly discovered. Resolve this before activation.
+- `main` is still the GitHub default but is 59 commits behind the active V2 branch. Keep it until there is an explicit promotion/default-branch decision.
+- Five topic branches for merged PRs #5–#9 are stale and safe to prune. The private repo's `naukri-relay` branch is a legacy one-file snapshot still referenced by the older `main` code and its manual `naukri-relay.yml` workflow. Keep it until that legacy path is retired or redirected; the active V2 relay remains the separate `AvinashBhalla/job-beeper-naukri-relay` repository.
+
+Use the knowledge-transfer document for the next work session; this file remains the detailed chronological record.
+
+
+## 50. Remote topic branch cleanup verified — 2026-10-09
+
+- The user fast-forwarded the VM working tree from `c2f2ce6` to `0327c74` (`Keep legacy Naukri snapshot until main is retired`). The commit contained documentation changes, so the running container did not need a rebuild for that documentation-only sync.
+- The user then successfully deleted seven remote branches: the five merged topic branches for PRs #5–#9 plus `docs/current-job-radar-knowledge-transfer` and `docs/keep-legacy-relay-branch-safe`.
+- After `git fetch --prune`, the confirmed remote refs were `origin/HEAD -> origin/main`, `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar`.
+- `main` and `naukri-relay` were intentionally retained. The old `main` collector reads the private orphan feed branch, and its manual workflow can republish it; removing it before a planned migration would break the legacy path.
+- Current release branch HEAD is `0327c746`; latest application-code merge is `c2f2ce65`. The VM's latest supplied health response was HTTP 200, LinkedIn and Naukri scans succeeded, and Greenhouse remains disabled.
+- Next release work is not branch cleanup: fix the dashboard/ingestion semantics for old Greenhouse board imports before enabling the source.
+
+
+## 51. Current operational handoff — 2026-10-11
+
+**Read first:** the newer operational summary is in [`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`](JOB_RADAR_KNOWLEDGE_TRANSFER.md), under **“Latest operating update — 2026-10-11”**. It includes the full next-agent instructions and a copyable prompt. This section records the detailed chronological evidence and prevents the older Greenhouse/branch-cleanup notes from being mistaken for today's active task.
+
+### Product/workflow goal right now
+
+Restore dependable job discovery without creating noisy or false alerts. Work on one failure at a time, inspect real evidence, make one small change, verify the result, and only then proceed. The immediate blocker is **Naukri relay freshness**. LinkedIn coverage/rate limits are the following separate task. Do not work on Greenhouse in this session and keep it disabled.
+
+### Telegram issue is resolved and verified
+
+- The Oracle VM is `job-radar`; repository path is `~/job-beeper`; the V2 Compose file is `v2/docker-compose.yml`; service/container is `radar` / `v2-radar-1`.
+- The repo-root `.env` contains both Telegram environment variables, but Compose resolved them as missing when invoked without explicitly naming the env file. Use the following pattern for Compose commands on this VM:
+  `sudo docker compose --env-file .env -f v2/docker-compose.yml ...`
+- The user recreated the service container with `--env-file .env`. The two variables were confirmed **SET** in the running container; `/health` returned `status=ok`, `version=2.0.0`.
+- The three intentionally retained recent LinkedIn notifications were verified in the ledger as `sent`, `last_error=None`: HealthEdge — Software Development Engineer in Test; Scoutit — Frontend Developer; GeeksGod — Python Developer Job Openings by Gramener | Jobs 2025.
+- At the later ledger check: `pending=26`, `sent=78`, `suppressed=3514`. The approved backlog action suppressed 37 older queued ledger entries and preserved the three recent ones; no job records were deleted. An additional older Scoutit ledger entry was already suppressed.
+- Do not repeat the backlog cleanup, weaken explicit-experience notification requirements, or print any token/chat ID.
+
+### Evidence: Naukri database is aligned with a stale upstream feed
+
+From the user's read-only checks around 2026-10-11 18:45–18:47 IST:
+- `/api/source-status` showed LinkedIn enabled and Naukri enabled, with recent scan runs completing without runtime errors. One latest sample: LinkedIn `jobs_seen=20, new_jobs=0`; Naukri `jobs_seen=328, new_jobs=0`.
+- The jobs table contained 2,668 LinkedIn records and 1,227 Naukri rows. In the past 24 hours, 372 LinkedIn records and 83 Naukri records had new `discovered_at` timestamps. In the past hour, LinkedIn had 25 and Naukri had 0. Latest LinkedIn discovery was `2026-10-11T13:11:56.042328Z`; latest Naukri discovery was `2026-10-11T07:05:55.267174Z`.
+- The direct request to the public Naukri relay JSON returned `updated_at=2026-10-11T07:05:55.267174Z`, declared count 328, actual entries 328, and 328 unique IDs/URLs. Every feed ID was already in the radar database; 0 IDs were missing. No Naukri rows had a `discovered_at` within six hours of that check. This indicates the private V2 ingestion can match the current feed; the immediately evidenced problem is that the public feed is old.
+- The feed's first sample jobs included Epam Systems listings, including some repeated titles with distinct source entries. Do not dedupe only on company/title without first confirming stable IDs and URLs.
+
+### User-supplied GitHub Actions run history to continue from
+
+The user ran a relay workflow listing and a last-12-runs JSON command in repository `AvinashBhalla/job-beeper-naukri-relay`. The user will send this same output to the next agent in the new session. Use it as input and do not ask them to rerun it by default.
+
+- Workflow list: `public-naukri-relay  active  379327541`.
+- All 12 returned history entries had `name=public-naukri-relay`, `conclusion=success`, `status=completed`, `event=schedule`, `headBranch=main`, and the same head SHA `9d564e016da2ec50c70ee8bde9f2726539167460`.
+- Latest shown run: ID `38120124080`; created `2026-10-11T07:04:06Z`, updated `2026-10-11T07:06:01Z`.
+- Earlier shown starts were `2026-10-11T01:01:47Z`, then `2026-10-10T22:13:33Z`, `18:54:55Z`, `14:44:49Z`, `08:39:36Z`, `02:17:55Z`, and earlier timestamps. Observed gaps span roughly 2h48 to 6h21—not a five-minute cadence.
+- Latest public JSON `updated_at` equaled the latest workflow's output time (`07:05:55Z)); by 18:47 IST it was more than six hours old. A successful workflow conclusion alone does not prove it fetched fresh jobs or published a new payload.
+- The run-history command initially failed only because the requested `gh run list --json` field `workflowName` is not supported by that installed `gh` version. The retry used supported fields such as `name`, `conclusion`, `createdAt`, `databaseId`, `event`, `headBranch`, `headSha`, `status`, `updatedAt`, and `url`. Avoid `workflowName` in future `gh run list --json` queries.
+
+### Archived next steps for the previous Naukri-relay incident (superseded by the latest handoff at the end of this document)
+
+1. Read the top of `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and this section. Consume the workflow-history JSON that the user pastes; continue from that evidence.
+2. Inspect the **separate public relay repository** `AvinashBhalla/job-beeper-naukri-relay` on `main`. Read its active workflow YAML (find the actual file rather than guessing its path), exact `schedule.cron`, any job/step `if` conditions, `concurrency`, triggers, collector code, and artifact/commit/publish code. Compare configured cadence with the timestamps above.
+3. Inspect all recent workflow runs—not only successful scheduled runs. Check the available CLI's supported `--json` fields first if needed. Examine the latest run logs to answer: did the source collector actually execute, did it fetch current results, did it write the output JSON, did the commit/publish step run, and did `updated_at` advance? Confirm whether other runs are hidden by query filters and whether the cron itself is actually five minutes.
+4. Do not assume the schedule is wrong until the YAML is checked. Identify whether this is a low-frequency cron, missing/delayed scheduled events, early job exits, source-side staleness, or a publish/write problem.
+5. Only after proving the cause, implement **one small relay-side fix**, ideally on a topic branch/PR with tests. Preserve the JSON contract, stable job IDs and timestamps. Do not patch the private app's ingestion code while all 328 feed IDs already match the database; do not broaden the feed by simply lowering identity thresholds.
+6. Validate a single manual dispatch if the workflow supports it and it is safe: wait for the run to finish, review its logs and conclusion, fetch the public JSON again, and verify that `updated_at` advanced and the job set is plausible. Then wait for/trigger the normal radar scan and verify the deployed app consumes the new relay timestamp with no inappropriate Telegram backlog.
+7. Only after Naukri freshness is verified, address LinkedIn coverage. Its guest endpoint is repeatedly returning HTTP 429. Current V2 code is conservative: `LINKEDIN_SEARCH_WORKERS=1`, four fast query/location targets per scan, deep scan every ~900 seconds, one deep page batch, no same-scan retry on 429, and deep pagination is skipped when the fast lane receives a 429. Measure 429 rate and useful new jobs before changing schedules or query coverage; increasing concurrency first is not recommended.
+8. Do not add/enable sources or redesign the architecture in the same patch. Keep Greenhouse disabled. Do not claim a deployment until the merge/rebuild/health/source-status evidence is actually provided. Avoid printing any secrets.
+
+### Archived continuation prompt for the previous Naukri-relay incident (do not use; superseded by the latest handoff at the end)
+
+> You are taking over Job Radar V2. Read `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and this handover first. Continue from the latest 2026-10-11 update, not from the older Greenhouse or branch-cleanup tasks. I will send you the output showing the active `public-naukri-relay` workflow and its last 12 runs. Use that output, inspect the actual workflow YAML and latest run logs in `AvinashBhalla/job-beeper-naukri-relay`, and establish why the public relay JSON remains at `updated_at=2026-10-11T07:05:55Z` despite successful scheduled runs. All 328 feed IDs already exist in the radar DB, so do not change private ingestion yet. Prove whether the cause is the cron, missing scheduled runs, the collector, or the publish step; then make one minimal relay-side fix and validate the JSON timestamp/count before moving to LinkedIn HTTP 429 coverage. One change at a time, verify before proceeding, keep Greenhouse disabled, and never print secrets.
+
+
+---
+
+## Latest chronological handoff — 2026-10-11: PR #17 deployed; alert consistency queued
+
+### User instruction: handover is mandatory after every prompt
+The user explicitly directed that after every modification—and after every prompt so a context switch never loses the thread—the handover must be updated for the next model. This instruction is itself a repository rule now: update this file and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` every turn; write an explicit no-code-change note when appropriate. The latest handoff entry is authoritative over older sections.
+
+### LinkedIn fix and actual production evidence
+- [PR #17](https://github.com/AvinashBhalla/job-beeper/pull/17) merged successfully. Merge SHA: `097131797ddfbdec40c8d9911c6d5bc5b7b8a3bb`.
+- CI run [#38156008065](https://github.com/AvinashBhalla/job-beeper/actions/runs/38156008065) passed: compile/syntax check plus 71 unit tests.
+- Code change: `v2/radar.py` now paces all LinkedIn HTTP calls at 3s minimum; scheduler applies a minimum 120s LinkedIn poll interval. `v2/config.json` moved to schema/config version 8 and poll target 120s. `_merge_config()` migrates persisted version-7 runtime configs to at least 120s for LinkedIn. Rate-limit streaks persist across otherwise-successful scans and reset only after at least an hour without another 429; cooldown escalates 5→10→20→30 minutes (or longer if Retry-After says so). Logs count attempted search targets rather than the originally planned batch count. New regressions cover persistent escalation, reset after a clean hour, and runtime config migration.
+- The user ran `git pull` and Docker rebuild with `--env-file .env`. Supplied output:
+  - `/health`: status ok, version 2.0.0, uptime 53 seconds, LinkedIn runtime `running=true`.
+  - `/api/config`: config_version 8; poll_seconds LinkedIn=120, Naukri=300, Instahyre=600, Greenhouse=900.
+  - `/api/source-status` at the prior check showed Naukri `last_success=2026-10-11T16:39:02.300960+00:00`, 312 jobs seen, 0 new, error null.
+- Do not claim sustained LinkedIn behavior is already proven. The supplied event trace predates deployment and showed 429 at `16:20:50.693Z`, a 300s cooldown through `16:25:50.693Z`, and scans resuming only after cooldown. This confirmed the old cooldown was respected but repeated rate limits remained possible after resumption.
+- **Next action:** wait ~12 minutes after deployment, then run:
+  ```bash
+  echo "=== LINKEDIN EVENTS ==="
+  sudo docker logs --timestamps --since 15m v2-radar-1 2>&1 \
+    | grep -Ei 'linkedin: HTTP 429|cooldown|discovery scan|batch stopped' \
+    | tail -n 100
+  echo
+  echo "=== LINKEDIN STATUS ==="
+  curl --max-time 15 -fsS http://127.0.0.1:8000/api/source-status \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps(next(s for s in d["sources"] if s["source"]=="linkedin"),indent=2))'
+  ```
+  Inspect request cadence, real attempted requests, 429 recurrence, escalation, and whether cooldown prevents further outbound requests. Send those exact outputs back. Do not add concurrency, rotate identities/proxies, or try to evade LinkedIn limits.
+
+### Next bug: dashboard and Telegram must share the same eligibility decisions
+- User supplied screenshots showing dashboard Jobs Feed cards and a Telegram alert, and reports the two surfaces are showing different jobs. This is now the next task **after** LinkedIn production verification.
+- User’s stated product expectation: with threshold set to 55%, every *fresh, new, profile-matched* opportunity with score ≥ the threshold should be eligible for Telegram; the dashboard should transparently show why an apparently qualifying item was not sent. Preserve canonical deduplication (one notification per opportunity), valid source/experience incompatibility checks, max-age policy, notification setting, and delivery-failure handling. Do not send a flood of historical jobs while correcting the rule.
+- Current code/config findings already confirmed:
+  - `v2/config.json`: `match_threshold=55`, `require_explicit_experience_for_alerts=true`, `notifications_enabled=true`.
+  - `match_details()` marks a match when score meets the threshold **and** a configured role hit exists.
+  - `alertability_details()` adds an extra gate: unknown experience can make a matching job non-alertable.
+  - `refresh_notification_decisions()` picks eligible observations under age/alertability rules and persists one status per canonical opportunity.
+  - Telegram `_claim_one()` requires `job_evaluations.match=1` AND `alertable=1`, plus ledger state queued/eligible retry; dedupe/history/freshness also affect whether an alert sends.
+  - Dashboard `/api/jobs` independently calculates `match_details` and `alertability_details`; frontend applies time/score/source/alertable-only filters. Need compare the returned `alertable` status, match reason, ledger status/decision reason, and sent state per canonical opportunity rather than assuming every difference is a bug.
+- Proposed investigation/fix order after LinkedIn: inspect `GET /api/jobs?today_only=true&limit=500`, `/api/notification-queue`, `/api/daily-summary`, relevant schema and `notification_ledger`; add deterministic unit tests for threshold boundary, unknown experience, fresh match queueing, stale suppression, canonical duplicate suppression, and dashboard/Telegram consistency. Change the shared decision path so UI and Telegram consume the same persisted evaluation/decision wherever possible. Recompute pending decisions safely on deploy/config update; never automatically replay the historical suppressed backlog. Then deploy and verify with rows/ledger evidence and one genuinely new fresh job.
+
+### Overarching architecture goal and related docs
+Target pipeline documented in `docs/JOBBEEPER_REFERENCE.md`: source registry/source-specific collection → normalize and preserve source timestamps/stable IDs → canonical identity and cross-source dedupe → new/changed detection → deterministic preference match with reasons → freshness/alert policy → dashboard + Telegram. Collection should be independent of each individual user's preferences where the source offers broad collection; LinkedIn remains a rate-limited, query-catalog adapter, not a reason to evade access controls. Expand ATS adapters only after ingestion and alert consistency are measured and safe. Keep Greenhouse disabled until its older-board freshness risk has been resolved and explicitly trialed.
+
+
+---
+
+## Latest chronological handoff — 2026-10-11: PR #19 merged; production deployment pending
+
+### LinkedIn verification result (evidence from the user)
+The timestamped post-deployment sequence shows 120-second scan scheduling with a five-minute 429 cooldown that blocks scans:
+- `16:39:22.293Z`: deep scan, 8 attempted search targets, 39 unique jobs, 0 failed requests, 21.3 seconds.
+- `16:41:10.867Z`: fast scan, 4 attempts, 20 jobs, 0 failed requests.
+- `16:43:10.873Z`: fast scan, 4 attempts, 20 jobs, 0 failed requests.
+- `16:45:04.912Z`: HTTP 429; only 2 search targets attempted; first 300s cooldown since this deployment.
+- `16:50:15.296Z` and `16:52:15.513Z`: scans resumed after cooldown at the new 120s cadence.
+- Source status at `16:52:30.482Z`: 22 jobs seen, 1 new, `error=null`.
+Conclusion: request pace and cooldown gate work; LinkedIn still rate-limits us. The log does not yet prove 10/20/30-minute escalation because only one post-restart 429 occurred. Never bypass source limits.
+
+### Alert-policy diagnosis and intended behavior
+User's screenshot showed a 94% BlackLine opportunity and a 79% Five9 opportunity in the dashboard; the BlackLine alert was present in Telegram while the second high-scoring job was not. Source code showed:
+- `v2/config.json`: `match_threshold=55`, `require_explicit_experience_for_alerts=true`, notifications enabled.
+- Matcher can classify unknown experience neutrally and return a match score ≥55; then `alertability_details()` separately blocked the alert if explicit experience was not captured.
+- Telegram reads persisted `job_evaluations.match/alertable` and `notification_ledger`, but the dashboard's `/api/jobs` endpoint recomputed matching/alertability per request and did not expose the canonical ledger status/reason. That made the dashboard score/badge hard to reconcile with actual Telegram delivery.
+- User requirement: true profile matches at/above the configured threshold are alert-eligible even with unknown experience; explicit incompatible experience, excluded role/title, invalid location, disabled notifications, freshness, canonical dedupe and failed delivery remain legitimate explanations. A dashboard time filter (e.g. “Last hour”) is a separate view filter, so a 72-hour-eligible Telegram alert may be older than that dashboard slice; show transparent notification status/reasons instead of implying those filters are identical.
+
+### PR #19 implementation status
+[PR #19](https://github.com/AvinashBhalla/job-beeper/pull/19) merged as `05e1a19374b7cca830cb0cd442743b5f3d0468be`; latest-head CI [#38159529440](https://github.com/AvinashBhalla/job-beeper/actions/runs/38159529440) passed all 74 tests. The initial CI run identified two old assertions dependent on the retired gate; those were updated to test threshold-only eligibility and the real notifications-disabled policy. The merged code includes:
+- `v2/radar.py`: v9 config migration; remove unknown-experience-only alert gate; at upgrade suppress only pending, never-attempted entries older than 10 minutes whose prior stored alertability reason explicitly names the retired gate; make `/api/jobs` return persisted evaluation and canonical-ledger data.
+- `v2/config.json`: config schema 9 and `require_explicit_experience_for_alerts=false` as the documented deprecated setting.
+- `dashboard/app.js`: true profile-match filter for 55%+ selection; add per-canonical `TELEGRAM SENT / QUEUED / PENDING / FAILED / NOT ALERTED` status labels with reason tooltips. Data is bound to the persisted API decision.
+- `v2/test_radar.py`: regression tests for unknown-experience eligibility, config v9 migration, safe suppression of old pending backlog while preserving recent pending, and dashboard API consistency with the ledger.
+- No production deployment of PR #19 confirmed yet. The next action is user `git pull`/Docker rebuild and the health/config/qualifying-jobs diagnostic listed in the current handoff. Confirm schema 9, score threshold, API ledger status and a new qualifying match's Telegram delivery; keep Greenhouse disabled and do not replay the old suppressed queue.
+
+### Copyable continuation prompt
+“You are continuing Job Radar V2. Read both handover documents and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handovers after every user prompt. PR #19 merged as `05e1a19374b7cca830cb0cd442743b5f3d0468be`; latest CI [#38159529440](https://github.com/AvinashBhalla/job-beeper/actions/runs/38159529440) passed 74 tests, but production deployment is not yet confirmed. Ask the user to pull `v2-live-radar`, rebuild using `--env-file .env`, and send the health, schema-9 config, and qualifying jobs/ledger diagnostic in the current handoff. Verify a current qualifying match is queued/sent and that the dashboard badge agrees with the Telegram ledger. No historical alert burst; keep incompatible-experience rejection, freshness, canonical dedupe, notifications-enabled policy and Greenhouse disabled.”
+
+
+---
+
+## Latest chronological handoff — 2026-10-11: v9 deployed, free-first LinkedIn request budget proposed, main/workflow inventory
+
+### Latest deployment evidence
+User provided `/health` status ok, version 2.0.0, uptime 32 seconds, LinkedIn running; runtime config version 9; match threshold 55; explicit-experience alert gate false; LinkedIn/Naukri poll targets 120s/300s. Today feed API returned 454 job rows, 26 true profile matches scoring >=55. It showed intentional migration suppressions on older pending entries previously blocked by explicit experience; do not manually queue all of these. Examples of already-sent opportunities were also present. This demonstrates the v9 dashboard response returns the notification ledger status and reasons as intended, but does not yet prove fresh alert end-to-end under v9.
+
+### Free-first rate-limit strategy
+The user explicitly prefers free and self-built measures before paid products. Public LinkedIn terms prohibit scraping tools and bypassing usage limits; proxy/IP rotation or CAPTCHA bypass would be evasion, not a durable fix. Current policy is to keep any direct LinkedIn access limited and back off; expand collection from permitted employer ATS/career sources as a separate coverage strategy.
+- PR #21 code/test commit `644180cba5a8ccfc17399d7bc0070d319e7c41bf` passed [CI run #38161564620](https://github.com/AvinashBhalla/job-beeper/actions/runs/38161564620), compile plus 76 tests. The first CI run found an old assertion that expected the entire target list after four scans; it was corrected to cover the full list after eight scans with two targets per cycle. This doc edit moves the topic head, so re-check latest CI before merge. It changes spacing to 4s; one JD-enrichment worker; two first-page targets per scan; deep pagination every 30m; and schema v10 migration from 120s to 180s. The 429 cooldown/Retry-After remains. Query/location revisit takes longer; measure useful new jobs over 20–30 minutes.
+- Free coverage diversification to prioritize after this trial: one public/authorized ATS/company-careers connector at a time with stable source IDs, exact posted timestamps, health/backoff, dedupe and notification tests. Greenhouse still stays disabled pending its stale-publication freshness guard.
+- Paid scraping APIs (Apify etc.) are deferred, not adopted as a way to bypass LinkedIn blocks. If revisited later, review provider/data-source terms and budget; no assertion of identical data quality or legal permission.
+
+### Workflow/branch inventory and main promotion
+Inspected YAML from `main` and `v2-live-radar`:
+- Keep `.github/workflows/v2-ci.yml`.
+- `.github/workflows/pages.yml` deploys static dashboard files from `main` on dashboard changes; V2 API base is relative `/api`, so GitHub Pages would not reach the Oracle service by default. Remove/disable for V2 unless a proper API origin architecture is intentionally designed.
+- `.github/workflows/job-watch.yml` is manual-only legacy V1; writes legacy JSON/job state to `main`.
+- `.github/workflows/naukri-relay.yml` is manual-only legacy Naukri using root `config.json`; live Naukri relay is the separate `job-beeper-naukri-relay` repo controlled by Oracle systemd timer.
+- `.github/workflows/check-sources.yml` is manual-only V1 config pruning of root `config.json`; it does not manage V2 config.
+These are candidates for a focused cleanup PR; check any remaining recovery need and ensure they are not the active deployment/scheduler before removal.
+- Branch inventory includes active release `v2-live-radar`, default `main`, legacy `naukri-relay`, and six old topic/docs branches. Merged PR branches #15–#20 are cleanup candidates after verifying exact head/base/merge metadata. Keep default/main, active branch and legacy relay until the release promotion has completed. Direct branch deletion is not available through the connected GitHub tool, so use GitHub's merged-PR delete button or verified `gh` commands once safe.
+- Do not push everything to `main` immediately. First merge/deploy PR #21 and validate the current threshold→dashboard→ledger→Telegram behavior with at least one fresh qualifying job. Then clean workflow automation on `v2-live-radar`, create a dedicated `v2-live-radar`→`main` promotion PR that deletes obsolete V1 jobs/workflows and updates docs, and validate V2 CI on `main`. Disable/retire GitHub Pages static publishing before this merge because it would publish a dashboard whose relative `/api` points at the GitHub Pages host. Keep Oracle deployment source on `v2-live-radar` until a deliberate cutover is verified.
+
+### Copyable continuation prompt
+“You are continuing Job Radar V2. Read `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, the latest section of this detailed handover, and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handover docs after every user prompt. Production v9 was confirmed healthy with threshold 55 and explicit-experience gate false; 26 matches were shown, with some old pending matches intentionally suppressed to avoid a notification flood. PR #21 is the free-first LinkedIn load-reduction work: 4s spacing, one detail worker, 2 target searches per scan, 30-minute deep scan interval, runtime migration to poll 180s, with 429 escalating cooldown retained. Check CI before merge/deploy. LinkedIn terms prohibit scraping and access-limit evasion; avoid IP/proxy/CAPTCHA bypass. Workflow inventory: keep V2 CI; Pages static workflow, manual V1 job-watch, manual legacy private Naukri workflow, and root-config check-sources are obsolete candidates to remove in a separate PR after checking recovery needs. Clean topic refs only after verified merges. Promote to main only after deployed alert path passes and legacy workflows are retired; write a dedicated promotion PR and do not alter Oracle deploy source until validated.”
+
+
+---
+
+## Historical release note — 2026-10-11: PR #21 merged; PR #22 cleanup complete (current state is in the handoff at the top)
+
+### PR #21 merge and CI
+- Merged [PR #21](https://github.com/AvinashBhalla/job-beeper/pull/21) as `6c93473844cd469493a0c61acf1477ba20252d69`.
+- Latest-head CI [#38161863816](https://github.com/AvinashBhalla/job-beeper/actions/runs/38161863816) passed compile and **76 tests**. The initial run had one expected stale test assertion about seeing 16 targets after four cycles; the test was corrected to verify full 16-target rotation over eight two-target cycles, then latest CI passed.
+- Free-first modifications: 4s global spacing, one-at-a-time detail enrichment, 2 search targets per scan, deep scan every 30m, config version 10 and migration from LinkedIn polling 120s→180s, while retaining the global 429 stop and escalating cooldown (5/10/20/30m / Retry-After). This reduces average query volume at the cost of slower target rotation. It is not yet deployed as of this handover.
+- User must run deployment command below, then verify config schema 10 and LinkedIn 180s. Log request attempts, 429, cooldown and useful `new_jobs` over 20–30m; compare the yield, not just success/error counts. If volume/freshness becomes unacceptable or 429 persists, next free-first lever is approved public ATS/career coverage, not proxy evasion.
+
+### Workflow cleanup merged
+The audit inspected actual workflow YAML from `main` and `v2-live-radar`. [PR #22](https://github.com/AvinashBhalla/job-beeper/pull/22) merged as `8eae61f2605c14903bccbc25c1a95d438e3a9f79`; CI [#38162375556](https://github.com/AvinashBhalla/job-beeper/actions/runs/38162375556) passed all 76 tests. Only `.github/workflows/v2-ci.yml` remains on `v2-live-radar`; the four workflows below were removed from V2, but remain on `main` until the later promotion:
+- `.github/workflows/pages.yml`: static GitHub Pages deployment of `dashboard/`. Current V2 JS API base is relative `/api`, so this static page would query the Pages host, not the Oracle service. Remove to prevent broken static publish on V2 promotion.
+- `.github/workflows/job-watch.yml`: manual-only V1 recovery; root `job_watch.py`, uses old secrets, writes legacy root JSON state and the static dashboard feed to `main`.
+- `.github/workflows/naukri-relay.yml`: manual-only legacy relay in private repo; active relay is in separate `job-beeper-naukri-relay` repo, driven by Oracle systemd timer.
+- `.github/workflows/check-sources.yml`: manual-only V1 tool that edits root `config.json`, unrelated to V2's `v2/config.json` and protected runtime config.
+`main` was intentionally not changed by PR #22. It still contains the four legacy workflows, which should disappear when a deliberate V2 promotion PR is reviewed and merged.
+
+### Branch cleanup and main release
+Verified merged PR metadata:
+- #15 → `fix/prevent-posted-after-discovered`, merge `b3b59b6682c320b869980f75dc7508fa9bdc6e84`
+- #16 → `fix/linkedin-rate-limit-backoff`, merge `d59f0372de68c2b0d3c5a912b752463846f288e3`
+- #17 → `fix/linkedin-lower-pressure-cooldown`, merge `097131797ddfbdec40c8d9911c6d5bc5b7b8a3bb`
+- #18 → `docs/current-handover-rule-20261011`, merge `e895c9363d208dfd35157405bc53ea20c144ded3`
+- #19 → `fix/dashboard-telegram-alert-consistency`, merge `05e1a19374b7cca830cb0cd442743b5f3d0468be`
+- #20 → `docs/record-alert-consistency-merge-20261011`, merge `4654a01a38dc3384a3a730e13dcd88647ef39000`
+- #21 → `fix/linkedin-free-first-request-budget`, merge `6c93473844cd469493a0c61acf1477ba20252d69`
+These topic refs are merged and are deletion candidates after checking `git ls-remote --heads origin` and confirming no extra work was pushed. The connected GitHub tool cannot delete refs; use the merged PR's Delete branch button or an authenticated `git push origin --delete <topic-branch>`. Keep `main`, `v2-live-radar`, and legacy `naukri-relay` until main promotion is complete. The PR #22 head branch and current docs-only branch become candidates only after their respective PRs merge.
+- **Main promotion timing:** not immediately. Finish deployment/observability for PR #21 and prove fresh alert end-to-end on the v9→v10 alert-consistency release; merge the workflow cleanup PR; then create a separate reviewed `v2-live-radar`→`main` PR, ensure deletions/README/docs are included, verify CI on main, retire static Pages before merge, and keep Oracle deploy source explicitly on `v2-live-radar` until a documented cutover. This avoids an unreviewed all-at-once change to the default branch.
+
+### Copyable deployment command and expected next output
+```bash
+cd /home/ubuntu/job-beeper
+git pull --ff-only origin v2-live-radar
+git log -1 --oneline
+sudo docker compose --env-file .env -f v2/docker-compose.yml up -d --build radar
+sleep 10
+echo "=== HEALTH ==="
+curl --max-time 15 -fsS http://127.0.0.1:8000/health
+echo
+echo "=== CONFIG ==="
+curl --max-time 15 -fsS http://127.0.0.1:8000/api/config | python3 -c 'import json,sys; d=json.load(sys.stdin); c=d.get("config",d); print(json.dumps({k:c.get(k) for k in ("config_version","match_threshold","require_explicit_experience_for_alerts","poll_seconds")},indent=2))'
+```
+Expected: `config_version=10`, threshold 55, explicit-experience setting false, LinkedIn 180s, Naukri 300s. Then run after 20–30 minutes:
+```bash
+echo "=== LINKEDIN RATE / YIELD ==="
+sudo docker logs --timestamps --since 30m v2-radar-1 2>&1 | grep -Ei 'linkedin: HTTP 429|cooldown|discovery scan|batch stopped|JD enrichment' | tail -n 120
+echo
+echo "=== LINKEDIN STATUS ==="
+curl --max-time 15 -fsS http://127.0.0.1:8000/api/source-status | python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps(next(s for s in d["sources"] if s["source"]=="linkedin"),indent=2))'
+```
+Do not print secrets. Separately verify one *new, fresh* match in `/api/jobs` with `notification_status`, ledger decision reasons, and sent status before declaring dashboard/Telegram consistency proven.
+
+### Next-session prompt
+“You are continuing Job Radar V2. Read the knowledge-transfer doc, this latest handover and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handovers after every user prompt. PR #21 merged as `6c93473844cd469493a0c61acf1477ba20252d69`; CI #38161863816 passed 76 tests; production v9 is healthy but PR #21’s config v10/LinkedIn 180s pacing is not yet deployed. Ask the user to pull/rebuild using the commands above and send health/config. Then observe 20–30m of timestamped request/429/cooldown/new-job yield. A separate branch `chore/remove-legacy-v1-workflows` removes four obsolete V1 workflows from v2-live-radar while retaining V2 CI; check its PR/CI and merge once green. Audit only verified merged topic branches for deletion; no delete-branch tool is available, so use the GitHub PR UI or safe authenticated git command. Promote V2 to main only after alert path is verified and cleanup merges; use a dedicated PR and keep Oracle deploy ref unchanged until cutover. Never use proxy/CAPTCHA evasion; expand free authorized ATS/company feeds first.”
+
+
+## Latest chronological handoff — 2026-10-12: config v10 live; 20–30 minute observation pending
+
+### Evidence received
+- `/health`: `status=ok`, app `2.0.0`, uptime 26s after restart; LinkedIn `running=true`. Naukri last success `2026-10-12T03:45:00.791518+00:00`, 296 jobs seen, 0 new, no error.
+- `/api/config`: version 10, threshold 55, old explicit-experience alert setting false, LinkedIn poll 180s, Naukri 300s, Instahyre 600s, Greenhouse 900s.
+- Remote stale-branch comparison returned `23 0`: 23 behind and zero commits ahead. Re-run refs/open-PR checks immediately before deletion.
+- No application code changed this turn. PR #25 updates the handover docs and must merge before deleting its own topic ref.
+
+### Next 20–30 minute observation
+```bash
+echo "=== LINKEDIN RATE / YIELD (last 30 minutes) ==="
+sudo docker logs --timestamps --since 30m v2-radar-1 2>&1 \
+  | grep -Ei 'linkedin: HTTP 429|cooldown|discovery scan|batch stopped|JD enrichment' \
+  | tail -n 120
+echo
+echo "=== LINKEDIN STATUS ==="
+curl --max-time 15 -fsS http://127.0.0.1:8000/api/source-status \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps(next(s for s in d["sources"] if s["source"]=="linkedin"),indent=2))'
+```
+Evaluate attempted request count, cooldown enforcement/escalation, successful scans, and useful `new_jobs`. Do not use proxy/IP rotation, fake accounts or CAPTCHA bypass.
+
+### Promotion / continuation gate
+1. Validate one new true match scoring at least 55% across dashboard, persisted notification ledger, and actual Telegram send. Do not requeue entries deliberately suppressed during the v9 migration.
+2. After PR #25 merges, re-run `git ls-remote --heads origin`, verify no open PRs and confirm the stale branch remains zero commits ahead.
+3. Delete only verified merged topic refs using the command below; preserve `main`, `v2-live-radar`, and `naukri-relay`.
+4. Promote to `main` only after v10 observation and fresh-alert validation, with a reviewed PR and CI.
+
+### Continuation prompt for the next chat
+“Read both handover documents and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both docs after every user prompt. Oracle config v10 is deployed: health OK, threshold 55, explicit-experience gate false, LinkedIn poll 180s / Naukri 300s. Wait for 20–30 minutes of timestamped LinkedIn request/429/cooldown/new-job logs and source status, then verify one fresh ≥55% match dashboard → persisted ledger → Telegram. Latest stale-branch compare is `23 0`; recheck refs/open PRs before deleting merged topics, preserve main/v2-live-radar/naukri-relay. Promote V2 to main only after runtime and alert validation. Prefer authorized free ATS/company-career sources; no LinkedIn limit evasion.”
+
+## Latest chronological handoff — 2026-10-12: v10 low-pressure observation and topic cleanup complete
+
+### Evidence supplied by the user
+- The remote branch deletion command succeeded. Final `git branch -r` showed only `origin/HEAD -> origin/main`, `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar`. The stale optimization compare before deletion was `26 0` (26 behind, zero ahead). Topic cleanup is complete.
+- LinkedIn logs between `2026-10-12T04:15:05Z` and `04:42:05Z` showed ten scan summaries: nine fast scans at two attempted requests each and one deep scan at four attempts, totaling 22 requests. Every shown scan reported `failed_requests=0`; no 429/cooldown warning appeared in the provided filtered output. Latest source status at `04:42:05Z`: `jobs_seen=2`, `new_jobs=0`, `error=null`.
+- Interpretation: the v10 lower-pressure setup had a clean approximately 27-minute sample, with no visible 429. This is not a long-term guarantee. Aggregate new-job count over the whole window is not available from these specific logs, and the latest scan added zero jobs. Continue tracking useful yield/freshness.
+- No application code or runtime config changed during this prompt. Both handover files are updated. PR #28 carries this documentation update; delete its temporary branch after merge.
+
+### What remains
+1. Fetch the API records for jobs discovered in the last 30 minutes and list true matches scoring at least 55 with alertability and notification status:
+
+```bash
+echo "=== QUALIFYING JOBS DISCOVERED IN LAST 30 MINUTES ==="
+curl --max-time 20 -fsS 'http://127.0.0.1:8000/api/jobs?minutes=30&limit=500' \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); js=[j for j in d.get("jobs",[]) if j.get("likely_match") and int(j.get("match_score",0))>=55 and j.get("alertable")]; print(json.dumps({"qualifying_count":len(js),"jobs":[{k:j.get(k) for k in ("id","source","title","company","discovered_at","source_posted_at","match_score","alertable","notification_status","notification_decision_reasons","notification_sent_at","notification_last_error","canonical_opportunity_id")} for j in js[:15]]},indent=2))'
+```
+
+Send the output so one fresh job can be traced through dashboard → persisted notification ledger → actual Telegram send. If none were discovered, use a 180-minute window and distinguish low source yield from an alert-routing issue. Do not requeue old entries suppressed during the v9 migration.
+2. Only after a fresh qualifying alert is verified, open the reviewed `v2-live-radar`→`main` promotion PR. Keep V2 CI; retire Pages/job-watch/check-sources as part of that promotion; only remove the private Naukri workflow/branch after replacing main's old URL with the current separate public relay URL.
+
+### Continuation prompt
+“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handover documents after every user prompt. Config v10 is live (threshold 55, LinkedIn 180s/Naukri 300s). User provided ~27 minutes of LinkedIn scan logs (04:15–04:42 UTC): ten scans, 22 attempted requests, no displayed 429/cooldown warnings, zero failed requests per scan; latest source status had `new_jobs=0`. Treat as positive limited evidence, not a permanent guarantee. All merged topic branches were deleted; final remote refs are only main, naukri-relay and v2-live-radar. Next retrieve jobs discovered in the last 30 minutes, inspect ≥55% true matches and validate a fresh notification through dashboard → persisted ledger → Telegram. Do not requeue old v9 migration suppressions. Promote to main only after fresh-alert proof, with a reviewed PR; keep V2 CI, retire obsolete V1 workflows, and replace main's old private Naukri relay URL before removing its workflow/branch. No LinkedIn limit evasion; prefer permitted free ATS/career sources.”
+
+## Temporary documentation branch cleanup
+
+After PR #28 merges, delete only the temporary docs branch (production/topic cleanup is complete):
+
+```bash
+git push origin --delete docs/record-linkedin-v10-observation-20261012
+git fetch --prune origin
+git branch -r
+```
+
+Expected branches: `origin/main`, `origin/naukri-relay`, `origin/v2-live-radar` (and `origin/HEAD`).
+---
+
+## Latest handoff — 2026-10-12: fresh alert consistency proven; prepare main promotion
+
+### Fresh alert evidence received
+The user ran `GET /api/jobs?minutes=30&limit=500` and got three qualifying new jobs. Each was a true profile match scoring ≥55, `alertable=true`, and `notification_status=sent`, with no `notification_last_error`:
+
+| Source | Opportunity | Score | Discovered (UTC) | Telegram sent (UTC) | Delay |
+|---|---|---:|---|---|---:|
+| LinkedIn | Back End Developer – Next JS, Talentgigs | 85% | 04:45:02.394 | 04:45:31.156 | 28.8 s |
+| LinkedIn | Full Stack Developer, D Square Consulting Services Pvt Ltd | 94% | 04:33:02.005 | 04:33:18.640 | 16.6 s |
+| Naukri | Software Engineer, Creative Hands HR | 76% | 04:34:48.604 | 04:35:23.247 | 34.6 s |
+
+All three records have canonical opportunity IDs and distinct ledger entries; this is strong evidence that recent dashboard/API decisions and Telegram delivery agree for both active sources. It does not guarantee every older suppressed record should alert. Preserve the v9 migration suppression and prevent a historical burst.
+
+### Release decision
+- The v10 rate-limit observation and fresh alert gate are satisfied at the intended initial level: approximately 27 minutes/22 requests with no displayed 429 or failed request, followed by three fresh ≥55% matches sent in 17–35 seconds. Continue monitoring; one window does not prove zero future 429s.
+- Last repository compare showed `v2-live-radar` 93 commits ahead of `main`, 0 behind, with 21 changed files. The observed diff removes `check-sources.yml`, `job-watch.yml`, `naukri-relay.yml`, and `pages.yml`; retains `.github/workflows/v2-ci.yml`; brings the V2 app/matching/tests/docs forward; and replaces the old main private Naukri feed reference with the separate public relay path. Inspect this diff thoroughly before merging.
+- Create a dedicated reviewed PR from `v2-live-radar` to `main`. CI on the promotion head must pass. Do not directly push/force-push main. Do not change the Oracle deploy branch until a deliberate cutover plan has passed post-merge smoke tests.
+- Main workflows retired by this promotion: static Pages/deploy-dashboard, V1 job-watch, root-config check-sources, and the legacy private Naukri relay workflow. Keep the private data branch `naukri-relay` until the promotion is merged and the old code reference is confirmed gone; the current public relay repo and VM timer are the active path.
+- Branch cleanup of merged topics was completed, leaving `main`, `naukri-relay`, `v2-live-radar`. Temporary docs branches should be deleted after their respective docs PRs merge.
+
+### Next action
+1. Review [the promotion compare](https://github.com/AvinashBhalla/job-beeper/compare/main...v2-live-radar) (93 commits ahead / 0 behind at the last check) and open a PR from `v2-live-radar` to `main`.
+2. Wait for CI, inspect any failures and ensure workflow removal and relay URL replacement are in the same reviewed PR.
+3. After merge, verify main CI and smoke tests. Keep production on `v2-live-radar` until separately verified.
+4. Clean up temporary docs branch refs after merges, preserving `main`, `naukri-relay`, `v2-live-radar`.
+
+### Continuation prompt
+“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`; update both after every user prompt. Config v10 is live. User supplied three fresh ≥55% matches from the last 30 minutes: LinkedIn Talentgigs (85%, sent 29s after discovery), LinkedIn D Square Consulting (94%, sent 17s after discovery), and Naukri Creative Hands HR (76%, sent 35s after discovery), all `alertable=true`, `notification_status=sent`, no errors. Together with the prior 27-minute/22-request window with no visible 429/failures, this passes the initial rate-limit and fresh-alert gates. Prepare a reviewed PR from `v2-live-radar` to `main` (93 commits ahead, 0 behind, 21 changed files at last comparison). Inspect the diff: remove Pages/job-watch/check-sources/private legacy Naukri workflow, retain V2 CI, replace main's old private Naukri URL with active separate public relay path. Require CI and post-merge smoke tests; do not direct-push or switch Oracle branch until verified. Keep private Naukri data branch until main's old URL is removed. Free compliant ATS sources before paid tools.”
+
+
+## Latest handoff — 2026-10-12: fresh alerts verified; main promotion PR #30 open
+
+- User supplied three recent qualifying matches from `/api/jobs?minutes=30&limit=500`. All score ≥55%, `alertable=true`, `notification_status=sent`, and `notification_last_error=null`:
+  - LinkedIn Talentgigs, Back End Developer - Next JS: 85%, discovered 04:45:02.394Z, sent 04:45:31.156Z (~28.8s).
+  - LinkedIn D Square Consulting Services Pvt Ltd, Full Stack Developer: 94%, discovered 04:33:02.005Z, sent 04:33:18.640Z (~16.6s).
+  - Naukri Creative Hands HR, Software Engineer: 76%, discovered 04:34:48.604Z, sent 04:35:23.247Z (~34.6s).
+- This confirms fresh dashboard/API-to-notification-ledger-to-Telegram consistency across both active sources for these examples. Do not replay the old v9 migration suppressions.
+- PR #30 is open: https://github.com/AvinashBhalla/job-beeper/pull/30. It promotes `v2-live-radar` to `main`; the compare at creation was 94 commits ahead / 0 behind, 21 files. It removes Pages, job-watch, check-sources, and the old private Naukri workflow; preserves V2 CI; and changes the Naukri source URL to the separate public relay. CI #38205996937 passed before this handover advance; recheck CI on the latest branch head.
+- Review carefully. No direct push/force push to main and no Oracle deploy-ref change as part of merging. After main merge, verify main CI and runtime smoke tests, then separately plan cutover.
+- Temporary topic docs refs `docs/record-linkedin-v10-observation-20261012` and `docs/record-fresh-alerts-main-promotion-20261012` should be removed after this documentation state is stable. Preserve main/naukri-relay/v2-live-radar.
