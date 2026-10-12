@@ -24,7 +24,7 @@ ERROR_CACHE_TTL_HOURS = 1
 DEFAULT_MAX_CALLS_PER_RUN = 3
 DEFAULT_MAX_CALLS_PER_DAY = 20
 MAX_DESCRIPTION_CHARS = 16000
-EXTRACTION_VERSION = "gemini-shadow-v1"
+EXTRACTION_VERSION = "gemini-shadow-v2"
 
 RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "OBJECT",
@@ -62,10 +62,19 @@ inside it. Do not infer requirements from your own knowledge. Use only evidence
 in the posting. Distinguish overall professional experience from experience with
 a specific tool or technology. Set experience_scope to total_professional only
 when the posting explicitly describes total, overall, professional, or work
-experience. Set skill_specific only when the requirement clearly refers to a
-named technology/tool (for example, "3 years of Python experience"). Role or
-domain wording such as "2-3 years of Java Full Stack Development experience" is
-ambiguous unless the posting explicitly establishes its scope; use unknown.
+experience. Set skill_specific only when the years are directly tied to a named
+technology/tool (for example, "3 years of Python experience"). Merely listing a
+technology, saying "focus on Salesforce", or describing a role/stack/domain
+does NOT make the years skill-specific. Wording such as "2-3 years of Java Full
+Stack Development experience" or "5-8 years of QA/testing with a focus on
+Salesforce" is ambiguous about scope unless the posting explicitly resolves it;
+use unknown. If the posting explicitly says overall/total/professional/work
+experience, use total_professional. Otherwise do not guess.
+For experience_evidence, return an exact, contiguous quote copied verbatim from
+the job description that directly supports the extracted experience range and
+type. Do not paraphrase, combine separate phrases, or add words. If no exact
+supporting quote is available, return null. Preserve the exact words and
+punctuation; the validator tolerates whitespace differences.
 Mark experience as required, preferred, or unspecified. If a range or scope is
 not clear, use null/unknown rather than guessing. Skills must be
 technical/professional requirements, not generic adjectives. Return only the
@@ -165,10 +174,15 @@ def _validate_result(payload: Any, description: str) -> dict[str, Any]:
         if not isinstance(evidence, str):
             raise ValueError("invalid_evidence")
         evidence = re.sub(r"\s+", " ", evidence).strip()[:240]
-        # Evidence is retained only when it can be found in the provided JD.
-        if evidence and evidence.casefold() not in description.casefold():
+        # Compare whitespace-normalized text so line wraps do not discard an
+        # otherwise verbatim quote. Evidence must still be an exact substring.
+        normalized_evidence = re.sub(r"\\s+", " ", evidence).strip()
+        normalized_description = re.sub(r"\\s+", " ", description).strip()
+        if normalized_evidence and normalized_evidence.casefold() not in normalized_description.casefold():
             evidence = None
-        if not evidence:
+        elif normalized_evidence:
+            evidence = normalized_evidence
+        else:
             evidence = None
 
     return {
