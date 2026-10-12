@@ -335,12 +335,16 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
     enabled = os.getenv("GEMINI_EXTRACTION_ENABLED", "").strip().lower() in {"1", "true", "yes"}
     model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
     today = _utc_now().date().isoformat()
+    try:
+        daily_limit = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
+    except ValueError:
+        daily_limit = DEFAULT_MAX_CALLS_PER_DAY
     result: dict[str, Any] = {
         "enabled": enabled,
         "api_key_configured": bool(os.getenv("GEMINI_API_KEY", "").strip()),
         "model": model,
         "mode": "shadow_only",
-        "daily_limit": max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY)))),
+        "daily_limit": daily_limit,
         "calls_today": 0,
         "cache_successes": 0,
         "cache_errors": 0,
