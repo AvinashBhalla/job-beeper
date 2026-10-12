@@ -64,7 +64,15 @@ class GeminiValidationTests(unittest.TestCase):
             }
             mock_response = type("Response", (), {
                 "status_code": 200,
-                "json": lambda self: {"candidates": [{"content": {"parts": [{"text": json.dumps(self_payload)}] }]},
+                "json": lambda self: {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": json.dumps(self_payload)}]
+                            }
+                        }
+                    ]
+                },
             })()
             self_payload = self.payload
             with patch.dict(os.environ, {
