@@ -2609,3 +2609,32 @@ HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_conf
 - Remaining-work gate: manually evaluate a small labelled sample using original job descriptions and cache outputs; then run any extractor/schema regression tests if a concrete defect is identified. Keep PR #35 unmerged, Gemini shadow-only, notifications disabled, and production unchanged. Greenhouse one-board dev canary remains blocked until this quality gate passes.
 - Exact next action: user can access dashboard through SSH tunnel and provide a small sample of job titles/IDs plus the original JD experience sentence(s) (no secrets or personal data) to compare against `/api/llm-shadow-status`. Avoid additional scans while daily Gemini usage is 12/20. After the labelled sample passes, proceed to the guarded Greenhouse one-board dev canary with notifications off.
 - Continuation prompt: “Read both handovers and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Dev is isolated on localhost:8001 and Telegram is deliberately disabled; production stays on 8000. Gemini remains shadow-only (12/20 calls, 6 successes, 6 historical cached errors; latest three succeeded). Compare a small sample against original JD evidence before any Greenhouse canary. Do not trigger unnecessary scans, enable dev Telegram, merge PR #35, or deploy production.”
+
+
+## Latest handoff — 2026-10-12: Dev access clarification and Gemini evidence-quality patch
+
+### Dev dashboard URL correction
+- Production dashboard is publicly reachable at `http://130.210.27.197:8000/dashboard/#jobs` (port 8000). The development service binds only to `127.0.0.1:8001`; therefore `http://130.210.27.197:8001` is intentionally not a valid public URL.
+- From the user's Windows computer, open a terminal and run `ssh -L 8001:127.0.0.1:8001 ubuntu@130.210.27.197` using their normal SSH key/options; keep the terminal open, then visit `http://127.0.0.1:8001/dashboard/#jobs`. If local port 8001 is already occupied, use `ssh -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197` and open `http://127.0.0.1:18001/dashboard/#jobs`.
+- Dev is healthy per latest user output; Naukri last success 2026-10-12T08:54:57Z, 294 jobs seen, zero new in that run, no source error. Production remains separate and was not changed in this turn.
+
+### Latest Gemini status and quality observations
+- Latest user status: shadow-only, 20/20 daily calls used, 14 successes and 6 cached errors. Do not trigger scans or further API tests today. Daily cap must not be increased.
+- Several recent successful records have populated experience ranges but `experience_evidence=null`; scope labels such as `skill_specific` for “QA/testing with a focus on Salesforce” require conservative treatment. Since original job descriptions were not included, these are review flags rather than confirmed range errors.
+
+### Patch on `v2-live-radar`
+- Updated `v2/gemini_extractor.py` to require exact, contiguous verbatim JD evidence, avoid classifying technology focus/role/domain as skill-specific unless the years are directly tied to a named tool, and use unknown for ambiguous scope. Evidence verification now collapses whitespace in both quote and JD before exact-substring comparison, so line wraps do not erase a valid quote.
+- Bumped cache extraction version to `gemini-shadow-v2` so prior outputs do not count as results from the revised prompt on future requests.
+- Added regression tests for multiline evidence and prompt guidance in `v2/test_gemini_extractor.py`.
+- Commits: extractor prompt/logic initially `a9acd2e571760e325ddb9d98441f0924545dade8`, whitespace fix `0e4fd7332e4b8662ef89c500c7124f98e48dd712`, tests `782b2b8c4aead193e275d88adb7e9c98ec3a3c9a`.
+- GitHub Actions V2 CI run #435 (run ID 38226790483) was `in_progress` at last check; combined status endpoint returned no status entries. Do not claim CI passed until it completes. No dev VM rebuild/test has yet been reported for this patch.
+
+### Immediate next actions
+1. Access the dev dashboard using the SSH tunnel above; never make port 8001 public.
+2. Wait for V2 CI run #435; if it fails, inspect the exact failing test and fix on this branch only.
+3. Pull the latest `v2-live-radar` in `/home/ubuntu/job-beeper-dev`, rebuild only the dev service, run the full test suite, and check dev health/status. Keep notifications disabled and production port 8000 untouched.
+4. Since the 20-call daily cap is exhausted, do not trigger a source run today. After the next UTC daily window, review fresh `gemini-shadow-v2` outputs against original JDs before Greenhouse canary.
+5. Keep PR #35 unmerged; Greenhouse canary remains gated on representative extraction quality and passing tests.
+
+### Continuation prompt
+“Read both handovers and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Production dashboard is `http://130.210.27.197:8000/dashboard/#jobs`. Dev is loopback-only: SSH tunnel `ssh -L 8001:127.0.0.1:8001 ubuntu@130.210.27.197`, then open `http://127.0.0.1:8001/dashboard/#jobs`. Latest status: Gemini calls 20/20, 14 successes, 6 errors; do not trigger more calls today. Patch on branch bumps extraction version to gemini-shadow-v2, asks for exact verbatim evidence, conservatively labels ambiguous experience scope, normalizes whitespace, and adds regression tests. CI run #435 was in progress; verify it, then rebuild/test dev only. Keep notifications off, production unchanged, PR #35 unmerged, and validate fresh results against source JDs before Greenhouse canary.”
