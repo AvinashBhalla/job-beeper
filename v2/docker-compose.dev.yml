@@ -1,0 +1,24 @@
+# Isolated development instance.
+# Run with: docker compose -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build
+# Port is loopback-only; use an SSH tunnel to open the dashboard.
+services:
+  radar:
+    build:
+      context: ..
+      dockerfile: v2/Dockerfile
+    container_name: job-radar-dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - radar-dev-data:/data
+      - ./config.dev.json:/app/v2/config.json:ro
+    environment:
+      JOB_RADAR_DB: /data/jobs.db
+      # Deliberately blank: development must never Telegram-alert users.
+      JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
+      JOB_RADAR_TELEGRAM_CHAT_ID: ""
+      LOG_LEVEL: INFO
+
+volumes:
+  radar-dev-data:
