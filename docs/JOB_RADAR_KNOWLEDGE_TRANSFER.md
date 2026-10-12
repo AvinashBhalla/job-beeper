@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — main promotion complete; only temporary roadmap branch remains; Oracle still deploys v2-live-radar
+**Snapshot:** 2026-10-12 — dual-instance setup committed; only main and v2 branches remain; Oracle cutover pending
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -21,7 +21,7 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 - These development files are committed but not yet run on the VM. Production has not been changed.
 
 ### Branch/docs policy
-- The user's earlier topic cleanup was successful. The only temporary branch in latest GitHub inventory is `docs/next-phase-roadmap-20261012`; delete it. Preserve `main` and `v2-live-radar`.
+- The private repository now has only `main` and `v2-live-radar`. User requested direct documentation commits on `v2-live-radar`; no docs-only branches/PRs should be created.
 - User explicitly asked for handover docs to be committed directly on `v2-live-radar`, not in new branches just for documentation. Follow this unless they ask otherwise. Keep both handovers and root README aligned; no extra docs PRs.
 
 ### Next exact action
@@ -204,3 +204,7 @@ The freshest branch inventory after PR #33 contains only `main`, `v2-live-radar`
 
 ## Latest user prompt — dual dev/prod VM proposal
 No live VM change. Added isolated dev files to v2-live-radar and updated README. The intended model is production on main, development on v2-live-radar, separate paths/containers/ports/databases/config tokens. Immediate next action is the detailed handover command to start dev safely and inspect the existing production Compose volume; cutover only after dev passes.
+
+
+## Branch inventory correction — 2026-10-12
+The latest GitHub branch listing contains only main and v2-live-radar, so no further topic cleanup is needed. Both handovers are committed directly to v2-live-radar per user preference. Immediate next task is safely starting the dev instance without modifying production.
