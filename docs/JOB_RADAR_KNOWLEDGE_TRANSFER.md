@@ -701,3 +701,14 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 - Recommended next action: inspect the current PR checks/branch protection and request an authorized maintainer review if required. Then, after explicit user authorization and any required approval, merge PR #36 into `main`. Keep deployment separate and preserve production DB/volume/env; do not enable LinkedIn or notifications as part of merge.
 - Safety and goal: maintain reliable source discovery and accurate matching while avoiding live LinkedIn requests during tests and protecting production. No code/config/runtime changes in this turn.
 - Continuation prompt: “Read the latest dated handoff sections in `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`. Recheck PR #36 status, current required checks and branch protection. Do not merge or deploy without explicit authorization. If approved, merge only PR #36 to main; keep PR #35 separate and production rollout separate.”
+
+
+## PR #36 merged — 2026-10-12
+- User confirmed “merged”; live GitHub verification confirms PR #36 is `closed` and `merged: true`, merged at 2026-10-12T17:45:33Z.
+- PR: https://github.com/AvinashBhalla/job-beeper/pull/36
+- Merge commit on `main`: `58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`. PR head: `572f56573fa8f66a532ee676c2aa66b25a843d0a`. Scope: `v2/radar.py` and `v2/test_radar.py`.
+- Before merge, isolated local tests passed 78/78 and PR-head GitHub Actions run #592 was green. Check CI on the merge commit before any release action; do not infer it from PR-head CI.
+- No production deployment was performed or verified in this turn. Keep production DB/volume/env unchanged, keep dev LinkedIn disabled and notifications off, and do not trigger live LinkedIn scans as a smoke test.
+- Next action: verify CI for merge commit `58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`; then inspect clean git state, production/development checkout and Compose/volume identity, take a verified backup, and only then plan a separately authorized controlled deployment.
+- Goal remains reliable multi-source discovery and correct matching with isolated tests and production-safe rollout. No runtime/deployment changes in this turn.
+- Continuation prompt: “Read the latest dated sections in `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`. PR #36 was merged to main at `58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`. Check merge-commit CI first, then prepare a production-safe deployment checklist. Do not deploy, enable LinkedIn, or enable notifications without explicit authorization and verified backups/volume identity.”
