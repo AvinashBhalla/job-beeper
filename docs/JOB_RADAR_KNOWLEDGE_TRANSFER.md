@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — dual-instance setup committed; only main and v2 branches remain; Oracle cutover pending
+**Snapshot:** 2026-10-12 — LinkedIn experience patch on v2, CI passed; dev verification next
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -208,3 +208,8 @@ No live VM change. Added isolated dev files to v2-live-radar and updated README.
 
 ## Branch inventory correction — 2026-10-12
 The latest GitHub branch listing contains only main and v2-live-radar, so no further topic cleanup is needed. Both handovers are committed directly to v2-live-radar per user preference. Immediate next task is safely starting the dev instance without modifying production.
+
+
+## Latest prompt — LinkedIn experience bug and source expansion
+
+The screenshots show a 4-6 year Experience label on LinkedIn while the dashboard/Telegram treated it as unknown and sent a 61% match. Patch committed to v2-live-radar: radar.py 6ac58a1d, regression tests 22496f97; CI #38211941792 passed. Not yet VM-dev tested, merged to main or deployed. Next use the dev-only verification command in the detailed handover; dev remains Naukri-only with notifications off and LinkedIn disabled. After dev passes, promote the patch to main, then Greenhouse one-board canary in dev, validate Instahyre endpoint and freshness, then integrate Ashby/Lever/SmartRecruiters and proceed through the full requested source inventory. Handover documents committed directly on v2-live-radar, no docs-only branch.
