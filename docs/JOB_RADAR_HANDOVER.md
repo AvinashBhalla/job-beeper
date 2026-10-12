@@ -2538,3 +2538,33 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 4. Inspect new shadow rows after the next permitted source run. The model output remains observational only; do not connect it to matcher decisions or alerts yet.
 5. Do not merge draft PR #35 or deploy to production until full tests and a representative shadow evaluation pass.
 
+
+
+## Latest handoff — 2026-10-12: Gemini tests pass; API authentication errors need diagnosis
+
+### User-provided evidence
+- Full dev test suite: **84 tests ran in 54.614s; OK**.
+- Dev health is healthy on port 8001; Naukri completed successfully, 296 jobs seen, 1 new, no source error.
+- Gemini shadow status: enabled, key-present flag true, model `gemini-3.5-flash-lite`, shadow-only, daily limit 20, calls today 6, 3 successful cached results and 3 cached errors.
+- The three newest Gemini requests failed with `gemini_http_401`; earlier requests in the same runtime had succeeded. Dev config remains Naukri-only with notifications disabled. Production port 8000 remains healthy.
+- No API key was included in the user message. No code changes were made in response to this evidence.
+
+### Diagnosis (high confidence on symptom, root cause unconfirmed)
+HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_configured=true` only confirms that a non-empty key was supplied; it does not prove that the key is valid, active, unrestricted for the Generative Language API, or still the same key used for earlier successes. Because earlier calls succeeded and the newest calls failed, check whether the VM environment/container was recreated with a different, malformed, revoked, or API-restricted key; also verify that the Google project/API and selected model are enabled. Do not paste the key into chat, terminal output, logs, or docs. Do not print environment variables or run commands that echo the key.
+
+### Next action — diagnose without exposing credentials
+1. On the VM, inspect only safe metadata (container name, configured model, feature toggle and key-present boolean) without printing the key.
+2. In Google AI Studio / Google Cloud, confirm the key is active, belongs to the intended project, has access to the Gemini API/Generative Language API, and has no incompatible API/referrer/IP restriction. If uncertain, create a replacement key and enter it through the existing hidden-input prompt.
+3. Recreate only the dev `radar` service with the key injected through the hidden prompt; do not change production or enable notifications.
+4. Run a single synthetic API smoke test and inspect only HTTP status/error category and whether a structured response was accepted. Avoid triggering another full source scan while troubleshooting, since the 20-call/day cap is active and three calls have already failed.
+5. Recheck `/api/llm-shadow-status`; do not delete cached error rows or increase call limits merely to hide the issue. If authentication succeeds, resume a small representative shadow sample and review experience scope quality. Keep PR #35 unmerged and Gemini shadow-only.
+
+### Current release gate
+- Unit tests are green: 84 passed.
+- Dev app health is green; production health is green.
+- Gemini authentication is **not green**: three recent calls failed with HTTP 401.
+- Feature remains isolated in dev and shadow-only. No production deployment, matcher mutation, or notification behavior change occurred.
+- Do not promote/merge PR #35 until the authentication issue is resolved and shadow quality is reviewed.
+
+### Continuation prompt
+“Continue Job Radar V2. First read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every user prompt. Latest VM evidence: 84 tests pass in 54.614s; dev port 8001 healthy, Naukri-only, notifications off; production port 8000 healthy. Gemini shadow status is enabled for `gemini-3.5-flash-lite`, 6 calls today, 3 successful cached results, 3 errors; latest three errors are `gemini_http_401`. Earlier calls succeeded, so verify key validity/API enablement/restrictions using Google AI Studio and hidden-input key entry; never print or share the key. Test one synthetic request only, then recheck status. Do not increase budgets, merge PR #35, alter matcher/alerts, or deploy production until authentication and representative shadow quality pass.”
