@@ -493,3 +493,11 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 - Targeted radar module and complete suite both pass in the isolated dev container. This is test evidence only; it does not authorize production deployment or enabling LinkedIn.
 - Next: inspect CI status for current `v2-live-radar` commits and review exact parser patch / release diff. Only then decide on reviewed promotion to `main`. No live scan or Gemini API call.
 - Guardrails unchanged: LinkedIn disabled, notifications off, Gemini disabled, production port 8000 untouched, PR #35 unmerged.
+
+
+## 2026-10-12 — Release diff blocked by missing local base ref
+- Dev checkout is clean and aligned with `origin/v2-live-radar`; HEAD was `54fc75c` (`docs: record source status CI success`). Recent five commits are documentation commits; this alone does not establish whether the parser patch is in the branch history.
+- The requested `git diff origin/main...HEAD -- v2/radar.py v2/test_radar.py` failed with `fatal: bad revision 'origin/main...HEAD'`, so the code diff has not been reviewed. Likely issue is an absent/unfetched local `origin/main` ref; verify with `git remote -v` and `git branch -a` before fetching/comparing.
+- Full dev-container suite reported green: 88 tests in 53.229s. Continue with read-only remote/branch and file-history checks, then fetch the intended base ref if appropriate and inspect the exact parser/test diff. Do not promote to `main` until review and CI evidence for the relevant code commit.
+- Safety constraints: LinkedIn disabled; notifications off; Gemini disabled; no live scans/API calls; production port 8000 and its DB/config untouched; PR #35 remains unmerged.
+- Continuation: Read both handovers plus `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Review is paused on missing `origin/main` ref. Run the prescribed read-only diagnostics, then safely establish the base ref and inspect parser/test changes before any release decision.
