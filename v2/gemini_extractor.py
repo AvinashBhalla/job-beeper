@@ -35,6 +35,10 @@ RESPONSE_SCHEMA: dict[str, Any] = {
             "type": "STRING",
             "enum": ["required", "preferred", "unspecified"],
         },
+        "experience_scope": {
+            "type": "STRING",
+            "enum": ["total_professional", "skill_specific", "unknown"],
+        },
         "experience_evidence": {"type": ["STRING", "NULL"]},
         "required_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
         "preferred_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
@@ -44,6 +48,7 @@ RESPONSE_SCHEMA: dict[str, Any] = {
         "experience_min_years",
         "experience_max_years",
         "experience_type",
+        "experience_scope",
         "experience_evidence",
         "required_skills",
         "preferred_skills",
@@ -123,6 +128,9 @@ def _validate_result(payload: Any, description: str) -> dict[str, Any]:
     exp_type = payload.get("experience_type")
     if exp_type not in {"required", "preferred", "unspecified"}:
         raise ValueError("invalid_experience_type")
+    exp_scope = payload.get("experience_scope")
+    if exp_scope not in {"total_professional", "skill_specific", "unknown"}:
+        raise ValueError("invalid_experience_scope")
 
     def skills(name: str) -> list[str]:
         value = payload.get(name)
@@ -161,6 +169,7 @@ def _validate_result(payload: Any, description: str) -> dict[str, Any]:
         "experience_min_years": float(low) if low is not None else None,
         "experience_max_years": float(high) if high is not None else None,
         "experience_type": exp_type,
+        "experience_scope": exp_scope,
         "experience_evidence": evidence,
         "required_skills": skills("required_skills"),
         "preferred_skills": skills("preferred_skills"),
