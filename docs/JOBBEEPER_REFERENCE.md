@@ -140,3 +140,12 @@ For every source: identify allowed endpoint and board discovery method; stable s
 5. Improve per-source observability and continue low-pressure LinkedIn monitoring over 24-72 hours.
 
 Do not enable every provider simultaneously, and do not use proxy/IP rotation or CAPTCHA bypass to evade LinkedIn rate limits.
+
+## Gemini JD extraction (development shadow mode)
+
+- \`v2/gemini_extractor.py\` calls Gemini only when deterministic experience is missing/ambiguous or configured skills are absent from a sufficiently long JD.
+- Default model: \`gemini-3.5-flash-lite\`; override with \`GEMINI_MODEL\`. Current Google pricing documentation lists a free tier and 1M-token context for this model family; free-tier quotas and data-use terms apply and must be checked in AI Studio.
+- Feature is disabled by default. Enable only in the isolated dev Compose runtime with \`GEMINI_EXTRACTION_ENABLED=true\` and a VM-injected \`GEMINI_API_KEY\`.
+- Limits: at most 3 requests per source run and 20 per day by default; bounded JD length, short timeout, hash-keyed SQLite cache, temporary error cache, strict schema/semantic validation.
+- Results are stored in \`gemini_shadow_cache\` and exposed via \`GET /api/llm-shadow-status\`. They never modify the job record, matcher inputs, match score, notification decision, or Telegram delivery.
+- Treat the posting as untrusted input. Do not send candidate PII. Never log/commit the API key or raw JD. Keep notifications disabled and do not merge/deploy until dev tests and a reviewed shadow sample pass.
