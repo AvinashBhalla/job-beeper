@@ -11,7 +11,7 @@ from v2 import gemini_extractor as gemini
 
 class GeminiValidationTests(unittest.TestCase):
     def setUp(self):
-        self.description = "Required experience: 4-6 years of professional experience. Python and FastAPI are required."
+        self.description = "Required experience: 4-6 years of professional experience. Python and FastAPI are required. Build and maintain production APIs, collaborate with product teams, and write automated tests."
         self.payload = {
             "experience_min_years": 4,
             "experience_max_years": 6,
