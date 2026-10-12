@@ -3186,3 +3186,11 @@ Safety qualification: grep output is a partial static audit, not proof that ever
 Follow-up static inspection of current remote `v2/radar.py` confirms `DB_PATH` is set from `JOB_RADAR_DB` (defaulting to `ROOT / jobs.db`) and FastAPI startup calls `init_db()`. Therefore tests should not be run directly in the long-running development container or against its persistent `/data/jobs.db` volume. The test modules use standard-library `unittest`; the Gemini test's HTTP POST is patched in its network-related test. Many radar DB tests explicitly replace `radar.DB_PATH` with a `TemporaryDirectory` database, but the suite as a whole was not executed during this audit and no claim is made that every test is isolated.
 
 Recommended next validation is a disposable one-off container from the dev image, with `--network none`, no persistent data-volume mounts, `JOB_RADAR_DB=/tmp/jobs.db`, and the dev config bind-mounted read-only at `/app/v2/config.json`. Run `python -m unittest v2.test_radar v2.test_gemini_extractor` from `/app` in that container. This isolates any startup-created DB to the disposable container and prevents external network calls; it does not change the long-running dev or production containers or their database volumes. Do not use production container/image or production database for tests.
+
+
+## Isolated test suite passed — 2026-10-13
+
+- The user reported the isolated test run completed successfully: `Ran 88 tests in 53.320s`, `OK`.
+- Record this as a successful 88-test run; the short result alone does not identify individual test names or independently prove the exact invocation/environment.
+- Next: preserve the full test command/output if available, then continue with read-only verification of current remote branch/CI state and production-versus-development source/image provenance.
+- No production deployment, container restart, database mutation, or persistent-volume test was authorized or performed as part of this result. Keep production changes blocked until image/source provenance and a backup/rollback plan are verified.
