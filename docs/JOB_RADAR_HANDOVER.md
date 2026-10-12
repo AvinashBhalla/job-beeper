@@ -3108,3 +3108,19 @@ Read-only VM output shows the production and development Dockerfiles are current
 ### Next safe step
 
 Compare hashes of selected application files in each checkout and inside each running container, and collect container health/restart status plus a non-mutating listing of database file metadata (not contents). Do not restart/recreate/prune/pull/build/deploy or run migrations. Before any rollout, verify a tested backup and rollback method for `v2_radar-data`.
+
+
+## Runtime source-hash and database metadata verification — 2026-10-13
+
+Read-only VM checks compared SHA-256 hashes of application files in both checkouts and running containers, inspected container state, and read only database file metadata from the named Docker volumes. Findings:
+
+- Production checkout `/home/ubuntu/job-beeper/v2/radar.py` and running container `v2-radar-1:/app/v2/radar.py` match exactly: `bba3558aa293e6729ba431d72e61fcf298f6ad845ad86fda335c4847b3863bfe`.
+- Development checkout `/home/ubuntu/job-beeper-dev/v2/radar.py` and running container `job-radar-dev:/app/v2/radar.py` match exactly: `ef3ce0e99f1527afc306227043478e53780bab1da235fcd6173f692f97e0a8f6`.
+- Both checkouts and containers have matching `v2/requirements.txt` hash `9904eb1672148185b976a1e4228123eeacb012c864948414243b3259e6fd431b`.
+- Production `/app/v2/config.json` matches the production checkout config hash `2a4faf5710cf36829646be3c91dda8da35e914e60937d07488d6d4367f3000b5`. Development `/app/v2/config.json` matches the development config bind-mounted from `v2/config.dev.json`, hash `c8961f5b288ec6b808163f1c4fc91b52237b60b1d1a4c1a4b5ccbe71c637d201`.
+- Both containers were running with restart count 0; health checks are not configured. This establishes running state, not application-level health.
+- Separate database volumes remain in use. Read-only metadata showed dev `jobs.db` size 3,960,832 bytes (modified 2026-10-12 18:59:03 UTC) and production `jobs.db` size 17,670,144 bytes (modified 2026-10-12 19:00:39 UTC). No database contents were read or changed.
+- The diagnostic command pulled `python:3.12-slim` because it was not locally available, then mounted each database volume read-only for metadata inspection. No app containers or database data were modified.
+- The command output was slightly malformed at the shell loop boundary, but both volume metadata checks completed and returned the above results.
+
+Interpretation and next safe step: the current source files inside each running container match their respective checkout files, and dev/prod app code differs as expected. This does not prove which Git commit or image build produced the production container, because image provenance labels are absent and its reported image ID was not found in local image metadata. Before any rollout, read-only inspect each checkout's current branch, HEAD, working-tree status, and the Git commit(s) containing the exact `radar.py` blob; separately capture container image IDs and available image metadata. Do not rebuild, retag, restart, pull application code, or deploy, and do not query or mutate database contents until provenance and rollback/backup are established.
