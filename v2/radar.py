@@ -2547,14 +2547,14 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             # A tool-specific phrase like "2 years of Python experience" is
             # not reliable evidence of the overall experience requirement.
             skill_specific_only = re.search(
-                r"\\b\\d+(?:\\.\\d+)?\\s*\\+?\\s*(?:years?|yrs?)\\s+of\\s+"
-                r"(?!overall\\b|total\\b|professional\\b|work\\b)"
-                r"[A-Za-z0-9.+#/-]{2,40}\\s+experience\\b",
+                r"\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+"
+                r"(?!overall\b|total\b|professional\b|work\b)"
+                r"[A-Za-z0-9.+#/-]{2,40}\s+experience\b",
                 description,
                 re.I,
             )
             overall_context = re.search(
-                r"\\b(?:overall|total|professional|work)\\s+experience\\b",
+                r"\b(?:overall|total|professional|work)\s+experience\b",
                 description,
                 re.I,
             )
