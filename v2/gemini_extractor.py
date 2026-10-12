@@ -251,7 +251,7 @@ def shadow_extract_jobs(
         log.info("gemini shadow extraction enabled but API key is not configured")
         return stats
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     try:
         max_per_run = max(0, min(10, int(os.getenv("GEMINI_MAX_CALLS_PER_RUN", DEFAULT_MAX_CALLS_PER_RUN))))
         max_per_day = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
@@ -333,7 +333,7 @@ def shadow_extract_jobs(
 
 def shadow_status(db_path: str | Path) -> dict[str, Any]:
     enabled = os.getenv("GEMINI_EXTRACTION_ENABLED", "").strip().lower() in {"1", "true", "yes"}
-    model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
+    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     today = _utc_now().date().isoformat()
     try:
         daily_limit = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
