@@ -8,28 +8,31 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 
 
-## Current verified state — 2026-10-12
+## Current verified state — 2026-10-12 (authoritative)
 
-### Live deployment and LinkedIn observation
-- User confirmed `/health` OK, app `2.0.0`, config version 10, threshold 55, explicit-experience alert setting false, LinkedIn poll 180s and Naukri poll 300s.
-- User later supplied logs for about 27 minutes, 04:15:05–04:42:05 UTC: 10 scan summaries, 22 requests attempted total (nine scans ×2 and one deep scan ×4), `failed_requests=0` for every shown scan, and no visible 429/cooldown warnings. Latest source status reported `jobs_seen=2`, `new_jobs=0`, `error=null`.
-- This is a good initial low-pressure sample, but not proof that 429 can never recur. User then checked jobs discovered in the last 30 minutes and found 3 genuine profile matches ≥55%, all `alertable=true`, `notification_status=sent`, no delivery errors: Talentgigs Back End Developer–Next JS (85%, ~29s after discovery), D Square Consulting Full Stack Developer (94%, ~17s), and Naukri Creative Hands HR Software Engineer (76%, ~35s). Fresh dashboard/API-to-ledger-to-Telegram verification now passes for these records. Keep older v9 migration suppressions; never replay the historical backlog.
+### Release and production status
+- PR #30 promoted `v2-live-radar` to `main` as `b384b8d6ae00c48c7765ebf11af407981de3cd35`; main CI #38206525826 passed. PR #31 synced handover state as `76d253a4475223df517a3757795e20f15c1b9524`; CI #38207296933 passed. Main is promoted in GitHub, but Oracle still deploys `v2-live-radar`.
+- Main keeps `.github/workflows/v2-ci.yml` and removes Pages/deploy-dashboard, disabled V1 job-watch, root-config check-sources, and the legacy private Naukri workflow. Naukri consumption points at the separate public `job-beeper-naukri-relay` repository.
+- Runtime v10 is confirmed: threshold 55, explicit-experience alert gate false, LinkedIn poll 180s, Naukri 300s. A 27-minute LinkedIn observation showed 22 attempts, no visible 429/cooldown and zero failed requests in the displayed scan logs. This is a positive sample, not proof that 429 cannot recur.
+- Three fresh recent matches, two LinkedIn and one Naukri, each scored ≥55%, were `alertable=true`, `notification_status=sent`, had no error, and were delivered ~17–35 seconds after discovery. Fresh dashboard/API → persisted ledger → Telegram consistency is verified for those examples. Never replay v9 migration-suppressed historical records.
 
-### Branch cleanup completed
-- User's stale-branch preflight returned `26 0` (26 behind, zero ahead); deleting the stale optimization branch and all audited topic branches succeeded.
-- Main code/topic cleanup succeeded. Remaining candidates: private repo `naukri-relay` branch (unused after PR #30 changed the code URL and removed its workflow) plus two merged temporary docs refs `docs/record-linkedin-v10-observation-20261012` and `docs/record-fresh-alerts-main-promotion-20261012`. Verify remote refs/open PRs, then delete those three private-repo refs. Preserve `main` and `v2-live-radar`; do not delete the public relay repo's own `naukri-relay` branch.
+### Branch state
+- Topic cleanup was successful. The last branch inventory includes `main`, `v2-live-radar`, private `naukri-relay`, and a temporary docs branch `docs/record-fresh-alerts-main-promotion-20261012`. After the current roadmap docs PR merges, remove the private `naukri-relay` branch and temporary docs branch, preserving `main` and `v2-live-radar` in the private app repo. Do not delete the public relay's own `naukri-relay` branch.
 
-### Workflow / main promotion gate
-- Main promotion is complete: PR #30 merged as `b384b8d6ae00c48c7765ebf11af407981de3cd35`; post-merge main CI [#38206525826](https://github.com/AvinashBhalla/job-beeper/actions/runs/38206525826) passed. `.github/workflows/v2-ci.yml` remains. Pages, disabled V1 job-watch, root-config check-sources, and private Naukri workflow were removed. Main's Naukri URL points to the active separate public relay; keep the private data branch only until the final cleanup command is checked, then it can be deleted.
-- The fresh-alert gate passed on three recent records (two LinkedIn, one Naukri), all `alertable=true`, `notification_status=sent`, no errors, sent ~17–35s after discovery. PR #30 is open to promote `v2-live-radar`→`main`: 94 commits ahead, 0 behind, 21 changed files at creation. CI run #38205996937 passed on pre-doc-update head; latest handover edit advances the head, so verify the new CI before merge. Inspect workflow removals and Naukri URL transition; after merge validate main CI/smoke tests while keeping Oracle on the release branch until deliberate cutover.
+### Prioritized roadmap
+1. **Housekeeping now:** delete unused private refs, then compare runtime code/config between main and v2 before any production branch switch.
+2. **Oracle cutover:** take a backup, verify application/config paths are identical, switch to main only deliberately, rebuild and smoke-test health/config/source status/latency/dashboard/Naukri relay/Telegram. Keep rollback to known-good v2 commit. GitHub promotion is not production deployment.
+3. **LinkedIn 24–72h observation:** keep conservative v10 settings; measure requests, 429/cooldown duration, jobs fetched/unique/new/relevant, and discovery lag. No proxy rotation/control evasion or volume increase without evidence.
+4. **Greenhouse single-board canary:** earlier dry-run found about 298 jobs across three boards without DB writes/notifications. Add a repeatable dry-run summary and validate stable IDs, posted timestamps, dedupe, source backoff and no historical alert burst. Enable only after passing.
+5. **Expand structured ATSs one connector at a time:** Lever → Ashby → SmartRecruiters; later Workday/company career pages. Reassess Instahyre interface before enablement. Every connector requires stable IDs, truthful timestamps, pagination/incremental fetch, fixtures/tests, failure isolation and notification consistency.
+6. **Observability / dashboard:** metrics by source for last success, errors, 429 cooldown, requests/run, fetched/new/relevant counts, discovery lag, and clear persisted reasons for send/suppression. Add regression tests for dedupe, idempotent delivery and timestamp ordering.
+7. **Multi-user architecture later:** today config is a personal/global profile. Before accounts, design per-user preferences and an idempotent `(user_id, canonical_opportunity_id)` alert ledger. No Kafka/Redis/browser-farm complexity until measured scale justifies it.
 
-### Next actions
-1. Delete the unused private `naukri-relay` branch and the two temporary merged docs refs after a final remote-ref/open-PR check; preserve `main` and `v2-live-radar`.
-2. Main CI has passed. Keep Oracle deploying `v2-live-radar` until a separate deliberate deployment cutover and smoke test.
-3. Delete temporary merged docs refs `docs/record-linkedin-v10-observation-20261012` and `docs/record-fresh-alerts-main-promotion-20261012`; preserve `main`, `naukri-relay`, and `v2-live-radar`.
+### Exact next action
+Run the branch cleanup command in `docs/JOB_RADAR_HANDOVER.md`, then send the final `git branch -r` output. Next we compare the runtime paths on main vs v2 and prepare a deliberate Oracle cutover only if the diff is documentation/history-only.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`; update both after every user prompt. PR #30 merged as `b384b8d6ae00c48c7765ebf11af407981de3cd35`, and main CI #38206525826 passed. Main has V2, deleted the unused Pages/job-watch/check-sources/private Naukri workflows, kept V2 CI, and switched Naukri to the separate public relay. Three fresh ≥55% matches were sent in ~17–35 seconds; the 27-minute/22-request LinkedIn window had no visible 429/failures, but that does not guarantee zero future 429. Oracle still deploys `v2-live-radar`; do not switch to main without a separate cutover plan. Delete private repo `naukri-relay` and two temporary merged docs refs after final ref/open-PR check, but never delete the public relay's branch. No direct/force push to main or LinkedIn limit evasion.”
+“Continue Job Radar V2. Read both handover files and `docs/JOBBEEPER_REFERENCE.md`; update both after every user prompt. PR #30 promoted V2 to main (`b384b8d6`) with main CI #38206525826 passed; PR #31 docs sync merged as `76d253a4` with CI #38207296933 passed. Oracle still deploys v2-live-radar. Config v10 threshold 55/LinkedIn 180s/Naukri 300s is live. 27-minute/22-request LinkedIn sample had no visible 429/failures (limited evidence); three recent ≥55% matches across LinkedIn/Naukri were sent with no errors in ~17–35s. Next remove private app repo `naukri-relay` plus temp docs branch after final refs/open-PR check, but never touch the public relay repo's branch. Then diff runtime files and safely cut Oracle over to main with backup and smoke tests. Continue low-pressure measurement for 24–72h; Greenhouse single-board canary; then structured Lever/Ashby/SmartRecruiters; observability; multi-user ledger only if scope requires. No LinkedIn limit evasion.”
 
 ## 1. Current state
 
@@ -186,3 +189,7 @@ User's API output proves three fresh ≥55% matches were alertable and sent, no 
 
 ## Latest user prompt — promotion to main — 2026-10-12
 PR #30 merged as `b384b8d6ae00c48c7765ebf11af407981de3cd35`; post-merge main CI #38206525826 passed. This promotes V2 in GitHub only; Oracle continues deploying `v2-live-radar`. The main code uses the separate public Naukri relay and the four legacy workflows are removed. Three recent qualifying matches have been sent through Telegram. Remaining cleanup is the now-unused private `naukri-relay` data branch and two temporary docs refs; do not delete the public relay repo's branch. Both handovers updated.
+
+
+## Latest user prompt — roadmap planning — 2026-10-12
+No application code changed. Current branch state: main and v2-live-radar are release refs; private `naukri-relay` and temporary docs branch are candidates for deletion; Oracle remains on v2. Roadmap priority: housekeeping, verified Oracle cutover, 24–72h LinkedIn low-pressure monitoring, Greenhouse single-board canary, then structured ATS adapters, per-source observability/dashboard and later per-user profiles if needed. Both handovers updated.
