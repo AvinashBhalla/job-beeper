@@ -19,6 +19,12 @@ services:
       JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
       JOB_RADAR_TELEGRAM_CHAT_ID: ""
       LOG_LEVEL: INFO
+      # Shadow-only Gemini JD extraction; never changes match decisions or alerts.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_EXTRACTION_ENABLED: ${GEMINI_EXTRACTION_ENABLED:-false}
+      GEMINI_MAX_CALLS_PER_RUN: ${GEMINI_MAX_CALLS_PER_RUN:-3}
+      GEMINI_MAX_CALLS_PER_DAY: ${GEMINI_MAX_CALLS_PER_DAY:-20}
 
 volumes:
   radar-dev-data:
