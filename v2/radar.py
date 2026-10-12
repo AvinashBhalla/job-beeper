@@ -2548,11 +2548,19 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             # not reliable evidence of the overall experience requirement.
             skill_specific_only = re.search(
                 r"\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+"
-                r"(?!overall\b|total\b|professional\b|work\b)"
-                r"[A-Za-z0-9.+#/-]{2,40}\s+experience\b",
+                r"(?:(?!overall\b|total\b|professional\b|work\b)"
+                r"(?:experience\s+(?:with|in)\s+|[A-Za-z0-9.+#/-]{2,40}\s+)"
+                r"experience\b)",
                 description,
                 re.I,
             )
+            if not skill_specific_only:
+                skill_specific_only = re.search(
+                    r"\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+"
+                    r"(?:of\s+)?experience\s+(?:with|in)\s+[A-Za-z0-9.+#/-]{2,40}\b",
+                    description,
+                    re.I,
+                )
             overall_context = re.search(
                 r"\b(?:overall|total|professional|work)\s+experience\b",
                 description,
