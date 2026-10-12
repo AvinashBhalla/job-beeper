@@ -640,3 +640,7 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 ## Test command clarification — 2026-10-12
 - Important correction to the next-step instructions: piping full `unittest discover` output through `grep` only filters displayed lines; it does not run an individual test in isolation. Do not use that as proof of isolated reproduction.
 - The recorded full isolated suite result remains 78/78 passing, while CI run #543 remains red. For the next diagnostic pass, select each test case by exact method name from the discovered suite and run each in a fresh Python process; then compare CI Python/dependency/workflow configuration. No code change or merge/deploy until root cause is established.
+
+## Individual test command correction — 2026-10-12
+- The user-provided five-heading loop ran full `unittest discover` five times and only filtered the output with `grep`; it did not isolate the named tests. Each full-suite run passed all 78 tests.
+- Use `python -m unittest v2.test_radar.MatcherTests.<exact_test_method> -v` from `/app` to execute exactly one named method. Run each of the five CI-failing methods in a fresh invocation within the network-disabled Docker container, with source mounted read-only. Continue to compare environment/workflow only after obtaining true isolated results. No code changes, merge, or deployment authorized.
