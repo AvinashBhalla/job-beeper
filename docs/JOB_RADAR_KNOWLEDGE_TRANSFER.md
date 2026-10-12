@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — v10 low-pressure window clean; 3 fresh qualifying alerts sent; main promotion PR next  
+**Snapshot:** 2026-10-12 — 3 fresh qualifying alerts sent; main promotion PR #30 open; latest-head CI recheck pending  
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -21,15 +21,15 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 ### Workflow / main promotion gate
 - Keep `.github/workflows/v2-ci.yml`. During reviewed promotion to main, remove static Pages/deploy-dashboard, disabled V1 job-watch, and root-config check-sources. Retain the old private Naukri workflow/branch until main's old `v2/radar.py` URL is changed to the active separate public relay; then remove workflow/branch together.
-- The fresh alert gate has passed on three recent records from LinkedIn and Naukri. Proceed to a reviewed `v2-live-radar`→`main` promotion PR; last compare showed 93 commits ahead, zero behind. Require PR-head CI, inspect the workflow/code diff, then post-merge CI/smoke tests before changing Oracle's deploy ref. No direct/force push.
+- The fresh-alert gate passed on three recent records (two LinkedIn, one Naukri), all `alertable=true`, `notification_status=sent`, no errors, sent ~17–35s after discovery. PR #30 is open to promote `v2-live-radar`→`main`: 94 commits ahead, 0 behind, 21 changed files at creation. CI run #38205996937 passed on pre-doc-update head; latest handover edit advances the head, so verify the new CI before merge. Inspect workflow removals and Naukri URL transition; after merge validate main CI/smoke tests while keeping Oracle on the release branch until deliberate cutover.
 
 ### Next actions
-1. Open/review the dedicated V2-to-main promotion PR. Last compare was 93 commits ahead / 0 behind and 21 files changed; inspect source/relay/workflow changes and require CI.
+1. Review PR #30 and check latest-head CI after the handover update; merge only after the current head is green and the full diff is approved.
 2. After merge, verify main CI and smoke tests, but keep Oracle deploying `v2-live-radar` until deliberate cutover.
-3. Delete the temporary documentation branches after their PRs merge; preserve `main`, `naukri-relay`, and `v2-live-radar`.
+3. Delete temporary merged docs refs `docs/record-linkedin-v10-observation-20261012` and `docs/record-fresh-alerts-main-promotion-20261012`; preserve `main`, `naukri-relay`, and `v2-live-radar`.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`; update both after every prompt. V10 is live. A ~27-minute/22-request LinkedIn window had no visible 429 or failed requests, and three fresh ≥55% jobs (two LinkedIn, one Naukri) are `alertable=true` and `sent` 17–35 seconds after discovery. The rate-limit and fresh-alert gates pass at the initial level. Create/review a dedicated promotion PR from `v2-live-radar` to `main` (last compare 93 ahead / 0 behind, 21 changed files). Inspect workflow cleanup and the relay URL replacement; keep V2 CI, require PR-head CI and post-merge smoke tests. Do not direct-push or switch Oracle branch until cutover proof. Retain private Naukri branch until main no longer references it. Prefer authorized free ATS/career sources; no LinkedIn limit evasion.”
+“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`; update both after every prompt. V10 is live. A ~27-minute/22-request LinkedIn window showed no visible 429/failures; three fresh ≥55% matches (two LinkedIn, one Naukri) were sent ~17–35 seconds after discovery. PR #30 is open from `v2-live-radar` to `main` (94 ahead / 0 behind, 21 changed files at creation). CI #38205996937 passed on the previous head; recheck latest-head CI after handover updates. Review all source/relay/workflow changes, keep V2 CI, remove obsolete V1 workflows, and confirm main's Naukri URL points to the separate public relay. Merge only after current-head CI and review; run main CI/smoke checks, but do not switch Oracle deploy branch until verified. Delete temporary merged docs refs; preserve main/naukri-relay/v2-live-radar. No direct/force push to main or LinkedIn limit evasion.”
 
 ## 1. Current state
 
@@ -178,3 +178,7 @@ No application-code/config changes. User supplied 10 scan summaries over ~27 min
 
 ## Latest user prompt — 2026-10-12: fresh alert proof complete
 No application-code change this turn. API evidence has three qualifying recent jobs ≥55%, all `alertable=true`, `notification_status=sent`, no error; send latency 16.6s, 28.8s and 34.6s after discovery. Combined with config v10 and the observed low-pressure LinkedIn window, this satisfies the initial gate to prepare the reviewed main promotion PR. Both handovers updated.
+
+
+## Latest user prompt — fresh alerts and main promotion — 2026-10-12
+User's API output proves three fresh ≥55% matches were alertable and sent, no delivery errors, send delay 16.6s/28.8s/34.6s. PR #30 is open from v2-live-radar to main, compare 94 ahead/0 behind and 21 files changed. Its old head CI passed, but this handover commit advances v2-live-radar so latest-head CI must be rechecked. No main merge/deployment yet.
