@@ -1456,6 +1456,45 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
     return None, None
 
 
+def extract_linkedin_labeled_experience(text: str) -> tuple[float | None, float | None]:
+    """Parse LinkedIn's structured metadata label, e.g. 'Experience: 4.00-6.00 Years'.
+
+    This is intentionally stricter than the generic JD parser so incidental
+    mentions of years in a search-card snippet cannot masquerade as the job's
+    experience requirement.
+    """
+    raw = _clean_experience_text(text)
+    if not raw:
+        return None, None
+
+    range_match = re.search(
+        r"\bexperience\s*:\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*"
+        r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
+        raw,
+        re.I,
+    )
+    if range_match:
+        return float(range_match.group(1)), float(range_match.group(2))
+
+    plus_match = re.search(
+        r"\bexperience\s*:\s*(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)\b",
+        raw,
+        re.I,
+    )
+    if plus_match:
+        return float(plus_match.group(1)), None
+
+    single_match = re.search(
+        r"\bexperience\s*:\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
+        raw,
+        re.I,
+    )
+    if single_match:
+        years = float(single_match.group(1))
+        return years, years
+    return None, None
+
+
 def _linkedin_job_id(url: str) -> str | None:
     match = re.search(r"(?:-|/)(\d{8,})(?:[/?#]|$)", url or "")
     return match.group(1) if match else None
@@ -1493,6 +1532,8 @@ def _linkedin_job_description(url: str) -> str:
             continue
 
         soup = BeautifulSoup(response.text, "html.parser")
+        page_text = soup.get_text(" ", strip=True)
+        labeled_experience = extract_linkedin_labeled_experience(page_text)
         candidates: list[str] = []
 
         # Prefer JSON-LD JobPosting descriptions when available. This is
@@ -1563,7 +1604,20 @@ def _linkedin_job_description(url: str) -> str:
                 if re.search(r"\bexperience\b", text, re.I)
             ]
             pool = with_experience or unique
-            return max(pool, key=len)[:20000]
+            selected = max(pool, key=len)[:20000]
+            # LinkedIn sometimes renders its Experience field outside the
+            # description element. Preserve that structured field explicitly
+            # and place it first so it takes precedence over generic JD mentions.
+            if labeled_experience != (None, None):
+                low, high = labeled_experience
+                label = (
+                    f"Experience: {low:g}-{high:g} years"
+                    if high is not None and high != low
+                    else (f"Experience: {low:g}+ years" if high is None else f"Experience: {low:g} years")
+                )
+                if extract_linkedin_labeled_experience(selected) != labeled_experience:
+                    selected = f"{label}. {selected}"
+            return selected[:20000]
 
     return ""
 
@@ -1593,7 +1647,11 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
         f"{existing_description} JD: {detail}".strip()
     )[:30000]
 
-    detail_experience = extract_jd_experience(detail)
+    # The labeled LinkedIn metadata is more reliable than incidental years
+    # mentioned elsewhere in the JD (for example, '2 years of Python experience').
+    detail_experience = extract_linkedin_labeled_experience(detail)
+    if detail_experience == (None, None):
+        detail_experience = extract_jd_experience(detail)
     if detail_experience != (None, None):
         job["jd_experience_min_years"] = detail_experience[0]
         job["jd_experience_max_years"] = detail_experience[1]
@@ -2132,9 +2190,15 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     candidates = []
     for job in jobs:
         combined = f"{job.get('title', '')} {job.get('description', '')}"
-        if extract_experience(combined) != (None, None):
+        labeled_experience = extract_linkedin_labeled_experience(combined)
+        if labeled_experience != (None, None):
+            job["jd_experience_min_years"] = labeled_experience[0]
+            job["jd_experience_max_years"] = labeled_experience[1]
             job.pop("needs_jd_enrichment", None)
             continue
+        # Do not skip full JD inspection just because a search snippet contains
+        # an incidental year count; the actual LinkedIn JD may state a different
+        # experience band in its structured metadata.
         preliminary = match_details(job, config)
         if preliminary["match"]:
             candidates.append(job)
