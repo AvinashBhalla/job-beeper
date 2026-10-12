@@ -133,7 +133,7 @@ def _validate_result(payload: Any, description: str) -> dict[str, Any]:
         for item in value[:20]:
             if not isinstance(item, str):
                 continue
-            item = re.sub(r"\\s+", " ", item).strip()[:80]
+            item = re.sub(r"\s+", " ", item).strip()[:80]
             key = item.casefold()
             if item and key not in seen:
                 seen.add(key)
@@ -150,7 +150,7 @@ def _validate_result(payload: Any, description: str) -> dict[str, Any]:
     if evidence is not None:
         if not isinstance(evidence, str):
             raise ValueError("invalid_evidence")
-        evidence = re.sub(r"\\s+", " ", evidence).strip()[:240]
+        evidence = re.sub(r"\s+", " ", evidence).strip()[:240]
         # Evidence is retained only when it can be found in the provided JD.
         if evidence and evidence.casefold() not in description.casefold():
             evidence = None
