@@ -2188,3 +2188,78 @@ class MatcherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class SourceStatusPersistenceTests(unittest.TestCase):
+    def _source_status_for_rows(self, rows):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE source_runs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            source TEXT NOT NULL,
+                            started_at TEXT NOT NULL,
+                            finished_at TEXT NOT NULL,
+                            jobs_seen INTEGER NOT NULL,
+                            new_jobs INTEGER NOT NULL,
+                            error TEXT
+                        )
+                    """)
+                    conn.executemany(
+                        "INSERT INTO source_runs "
+                        "(source, started_at, finished_at, jobs_seen, new_jobs, error) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        rows,
+                    )
+                with patch.object(
+                    radar,
+                    "get_config",
+                    return_value={"source_enabled": {"linkedin": False, "naukri": True}},
+                ), patch.object(radar, "source_state", {}):
+                    return radar.source_status()
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_source_status_exposes_persisted_error_from_latest_run(self):
+        payload = self._source_status_for_rows([
+            (
+                "naukri",
+                "2026-10-12T10:00:00+00:00",
+                "2026-10-12T10:01:00+00:00",
+                0,
+                0,
+                "HTTP 503 Service Unavailable",
+            )
+        ])
+        naukri = next(item for item in payload["sources"] if item["source"] == "naukri")
+        self.assertEqual(naukri["last_error"], "HTTP 503 Service Unavailable")
+        self.assertEqual(naukri["last_run"], "2026-10-12T10:01:00+00:00")
+        self.assertEqual(naukri["jobs_seen"], 0)
+
+    def test_successful_latest_run_clears_persisted_source_error(self):
+        payload = self._source_status_for_rows([
+            (
+                "naukri",
+                "2026-10-12T09:00:00+00:00",
+                "2026-10-12T09:01:00+00:00",
+                0,
+                0,
+                "HTTP 503 Service Unavailable",
+            ),
+            (
+                "naukri",
+                "2026-10-12T10:00:00+00:00",
+                "2026-10-12T10:01:00+00:00",
+                18,
+                2,
+                None,
+            ),
+        ])
+        naukri = next(item for item in payload["sources"] if item["source"] == "naukri")
+        self.assertIsNone(naukri["last_error"])
+        self.assertEqual(naukri["jobs_seen"], 18)
+        self.assertEqual(naukri["new_jobs"], 2)
