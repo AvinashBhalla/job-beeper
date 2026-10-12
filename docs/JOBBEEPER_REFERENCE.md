@@ -156,3 +156,14 @@ Do not enable every provider simultaneously, and do not use proxy/IP rotation or
 - The full test suite failed because \`v2/test_gemini_extractor.py\` contained a malformed mock response literal. Fixed in commit \`7941a99129614ffb03a7406e8fd002e1535fb05d\`.
 - Prompt clarified experience scope; role/domain experience without explicit overall-vs-tool scope should be \`unknown\`. Commit \`def76ed2fe1f181b8501f25c09098161ef669b87\`.
 - Rerun the full test suite on dev before any further evaluation. Keep feature shadow-only and notifications disabled.
+
+
+## Greenhouse two-poll development canary
+
+- Utility: `v2/greenhouse_canary.py`; tests: `v2/test_greenhouse_canary.py`.
+- Run from the repository root with an explicit single public board token and company label:
+  `python -m v2.greenhouse_canary --board-token <board-slug> --company "<company>" --interval-seconds 900`
+- It performs two GET-only polls through the existing Greenhouse collector, separated by 15 minutes by default (minimum allowed interval 60 seconds). It reports job counts, unique/stable/new/missing source IDs, and known/unknown publication timestamp coverage.
+- It does not read or write the radar database, run matching, change source enablement, or send notifications. A successful report is evidence for that board and those two snapshots only; it does not authorize enabling Greenhouse in the scheduler or production.
+- Keep the development config's `source_enabled.greenhouse` false while using the utility. Choose one board from the existing dev config; do not add or activate boards for this test.
+- Acceptance review: check request success, stable ID behavior, duplicate counts, timestamp coverage, useful job yield, and any board errors; retain the JSON report. Repeat or investigate before considering scheduler activation.
