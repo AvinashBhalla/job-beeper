@@ -213,3 +213,14 @@ The latest GitHub branch listing contains only main and v2-live-radar, so no fur
 ## Latest prompt — LinkedIn experience bug and source expansion
 
 The screenshots show a 4-6 year Experience label on LinkedIn while the dashboard/Telegram treated it as unknown and sent a 61% match. Patch committed to v2-live-radar: radar.py 6ac58a1d, regression tests 22496f97; CI #38211941792 passed. Not yet VM-dev tested, merged to main or deployed. Next use the dev-only verification command in the detailed handover; dev remains Naukri-only with notifications off and LinkedIn disabled. After dev passes, promote the patch to main, then Greenhouse one-board canary in dev, validate Instahyre endpoint and freshness, then integrate Ashby/Lever/SmartRecruiters and proceed through the full requested source inventory. Handover documents committed directly on v2-live-radar, no docs-only branch.
+
+
+## Interruption recovery record — 2026-10-12
+
+- Code fix is committed on development branch only: `v2/radar.py` `6ac58a1d4757c3c545203b84a61f4f8058d4747b`; tests `v2/test_radar.py` `22496f9714a7628d4c93929005a2d10773a753cc`.
+- Full regression suite passed in GitHub Actions run [#38211941792](https://github.com/AvinashBhalla/job-beeper/actions/runs/38211941792). Follow-up CI checks for directly committed documentation updates also passed: [#38212605092](https://github.com/AvinashBhalla/job-beeper/actions/runs/38212605092), [#38212615004](https://github.com/AvinashBhalla/job-beeper/actions/runs/38212615004), [#38212626814](https://github.com/AvinashBhalla/job-beeper/actions/runs/38212626814).
+- Current branch inventory: `main` and `v2-live-radar` only; no open PRs. No docs-only branch should be created.
+- No VM rebuild/test has been confirmed from user output since the patch. No merge of this fix to main and no production deploy has happened.
+- **The next step is exactly the dev-only test command immediately above this record in the handover.** Pull latest V2 in `/home/ubuntu/job-beeper-dev`, rebuild only Compose project `job-radar-dev`, run the full unittest suite in the built image with temporary DB path, check port 8001 health/safe config/source status and confirm port 8000 production remains healthy. Do not enable LinkedIn or Telegram in dev for this test and do not change production.
+- After green dev evidence: review/promote the experience fix to main and confirm main CI. Next enable Greenhouse only as a one-board development canary with notifications off; validate Instahyre endpoint/schema/freshness before enabling that source. Continue the ATS rollout list in `docs/JOBBEEPER_REFERENCE.md`.
+- Continuity rule reaffirmed: after every user prompt update both handovers directly on `v2-live-radar`.
