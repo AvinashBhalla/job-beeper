@@ -176,8 +176,8 @@ def _validate_result(payload: Any, description: str) -> dict[str, Any]:
         evidence = re.sub(r"\s+", " ", evidence).strip()[:240]
         # Compare whitespace-normalized text so line wraps do not discard an
         # otherwise verbatim quote. Evidence must still be an exact substring.
-        normalized_evidence = re.sub(r"\\s+", " ", evidence).strip()
-        normalized_description = re.sub(r"\\s+", " ", description).strip()
+        normalized_evidence = re.sub(r"\s+", " ", evidence).strip()
+        normalized_description = re.sub(r"\s+", " ", description).strip()
         if normalized_evidence and normalized_evidence.casefold() not in normalized_description.casefold():
             evidence = None
         elif normalized_evidence:
