@@ -894,3 +894,15 @@ Used GitHub's read-only compare endpoint against remote branch head `a158b9bf73a
 - `docker diff v2-radar-1` showed only Python-generated `.pyc`/`__pycache__` paths under runtime Python packages and `/app/v2`; no source modifications were listed. This is expected runtime cache behavior and does not by itself suggest source tampering.
 
 Next safe work: inspect exact source/test diffs between the production code baseline and the candidate remote branch through read-only GitHub commit/file inspection, then review CI/test evidence and current dev runtime behavior. Do not deploy or restart production until a database backup and rollback path are explicitly verified and the production image provenance gap is resolved. No production or database changes were made during this comparison.
+
+
+## Exact production-versus-remote source review — 2026-10-13
+
+Read-only GitHub file inspection compared `v2/radar.py`, `v2/test_radar.py`, `v2/gemini_extractor.py`, `v2/test_gemini_extractor.py`, and `v2/requirements.txt` at production baseline commit `61d8271480eaf48b0a6442b62b1b0bb9a032df34` versus remote `v2-live-radar`.
+
+- Production `v2/radar.py` blob is `db405442e706af778a2a1e927864629a6e699d3e` (114,244 chars, 2,991 lines); remote blob is `e1b30717bfeac33fa9e0973ab5ad7d426ccf7085` (120,033 chars, 3,126 lines). Remote `radar.py` blob matches the previously measured dev checkout/container SHA-1 Git blob identity, confirming dev code matches the current remote file at this path.
+- The 143 changed lines in `radar.py` comprise 139 additions and 4 deletions. Reviewed hunks show: a new LinkedIn structured `Experience:` parser; prioritization of labeled experience metadata over incidental JD year counts; additional LinkedIn JD selection/enrichment handling; Gemini LLM shadow-only extraction integration with fail-open exception handling; `/api/llm-shadow-status`; and persistence/exposure of latest source errors as `last_error` in source status.
+- Production baseline lacks `v2/gemini_extractor.py` and `v2/test_gemini_extractor.py`; both exist on remote (16,708 and 5,491 characters respectively). `v2/test_radar.py` also differs (production blob `3b6d0eef70683c8ccb95d4730da36c671b679365`, remote blob `8a739fa3f5f1d8c09a5e80501e25a2d2f625c892`). `v2/requirements.txt` is byte-identical at both refs (blob `77919a4fcd76ebc09137e54e46b9be5aa0f37922`).
+- The code review confirms that current remote/dev code is functionally newer than production code. It does not, by itself, prove end-to-end test success, production compatibility, Gemini credentials/limits, or a safe release. No application or database changes were made.
+
+Next safe step: inspect CI/check status for the code-bearing commit(s), then run or review the project's test suite against the dev checkout with explicit confirmation tests use isolated temporary databases/config. Do not run tests against production DB, deploy, restart, or change database state until backup and rollback are verified.
