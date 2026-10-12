@@ -149,3 +149,10 @@ Do not enable every provider simultaneously, and do not use proxy/IP rotation or
 - Limits: at most 3 requests per source run and 20 per day by default; bounded JD length, short timeout, hash-keyed SQLite cache, temporary error cache, strict schema/semantic validation.
 - Results are stored in \`gemini_shadow_cache\` and exposed via \`GET /api/llm-shadow-status\`. They never modify the job record, matcher inputs, match score, notification decision, or Telegram delivery.
 - Treat the posting as untrusted input. Do not send candidate PII. Never log/commit the API key or raw JD. Keep notifications disabled and do not merge/deploy until dev tests and a reviewed shadow sample pass.
+
+
+### Dev validation follow-up — 2026-10-12
+- User-reported Gemini synthetic API smoke test passed; dev and production health were OK; notifications were disabled; 3/20 daily calls were used with 3 successful cached results.
+- The full test suite failed because \`v2/test_gemini_extractor.py\` contained a malformed mock response literal. Fixed in commit \`7941a99129614ffb03a7406e8fd002e1535fb05d\`.
+- Prompt clarified experience scope; role/domain experience without explicit overall-vs-tool scope should be \`unknown\`. Commit \`def76ed2fe1f181b8501f25c09098161ef669b87\`.
+- Rerun the full test suite on dev before any further evaluation. Keep feature shadow-only and notifications disabled.
