@@ -486,3 +486,10 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 - Project Docker image installs `v2/requirements.txt` in Python 3.12 container; dev Compose service/container is `radar` / `job-radar-dev`. Prefer testing with the dev container's Python environment (e.g. `sudo docker exec job-radar-dev python -m unittest v2.test_radar` only if the tests are present inside that image; current Dockerfile copies only `v2/radar.py` and related runtime files? Verify test availability before using this exact command). Safer next step is inspect `v2/requirements.txt` and available repo test-run instructions, then use an isolated virtual environment if host tests are needed; do not pip-install into system Python.
 - Keep LinkedIn disabled, do not run source scans, notifications off, Gemini disabled, production untouched, PR #35 unmerged.
 - Continuation: “Read both handovers and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Host `python3 -m unittest v2.test_radar` failed during import because host Python lacks `bs4`; no tests ran. Docker dev container installs app requirements but may not contain tests; verify test availability before choosing container or isolated venv. Never install into system Python. Keep LinkedIn disabled, no scans, notifications off, Gemini disabled, production untouched, PR #35 unmerged.”
+
+
+## 2026-10-12 — Full test suite passed
+- User reports complete dev-container suite: `Ran 88 tests in 53.229s`, `OK`.
+- Targeted radar module and complete suite both pass in the isolated dev container. This is test evidence only; it does not authorize production deployment or enabling LinkedIn.
+- Next: inspect CI status for current `v2-live-radar` commits and review exact parser patch / release diff. Only then decide on reviewed promotion to `main`. No live scan or Gemini API call.
+- Guardrails unchanged: LinkedIn disabled, notifications off, Gemini disabled, production port 8000 untouched, PR #35 unmerged.
