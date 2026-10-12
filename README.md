@@ -1,33 +1,60 @@
-# Job Radar V2
+# Job Radar
 
-The active production application is the V2 service on the `v2-live-radar` branch. It runs on an Oracle Cloud Ubuntu VM using Docker Compose and SQLite persistence. Do not use the older `main` branch as the deployment source for V2; `main` is behind the active release branch and still describes the earlier static-dashboard implementation.
+Job Radar is a personal, always-on job discovery and matching service. Its pipeline is source-specific ingestion → normalization and canonical deduplication → deterministic preference matching → a persisted notification ledger → dashboard and Telegram.
 
-## Current production path
+## Branch and VM model
 
-- **App:** FastAPI service in `v2/radar.py`.
-- **Runtime:** `v2/docker-compose.yml`; service `radar`, port 8000.
-- **Persistent data:** Docker volume `radar-data`, SQLite at `/data/jobs.db`, runtime preferences at `/data/config.json`.
-- **Collectors:** LinkedIn, Naukri (from a separate public relay), Instahyre (disabled), Greenhouse (disabled pending ingestion-safety validation).
-- **Pipeline:** normalize → upsert → canonical dedupe → match/evaluate → freshness and alertability policy → notification ledger → Telegram.
-- **Naukri relay:** [separate repository](https://github.com/AvinashBhalla/job-beeper-naukri-relay). Do not confuse it with the legacy `naukri-relay` branch in this repository.
+- **`main` = production release branch.**
+- **`v2-live-radar` = development/integration branch.** Develop and validate changes here first; promote tested releases to main through a reviewed PR.
+- **VM rollout status:** GitHub main promotion is complete, but Oracle currently still runs the existing checkout/container from `v2-live-radar`. Do not claim production has switched until the controlled cutover and smoke tests are complete.
+- Target VM layout: `/home/ubuntu/job-beeper` will become the production checkout on `main`; `/home/ubuntu/job-beeper-dev` is the isolated development checkout on `v2-live-radar`.
 
-## Start / inspect
+## Production service
 
-```bash
-sudo docker compose -f v2/docker-compose.yml ps
-curl -fsS http://127.0.0.1:8000/health
-sudo docker compose -f v2/docker-compose.yml logs --tail=100 radar
-```
+- Compose file: `v2/docker-compose.yml`
+- Production host port: `8000`
+- Database: persistent Docker volume mounted at `/data`, with SQLite at `/data/jobs.db` and runtime preferences at `/data/config.json`.
+- Preserve the existing Compose project and volume during the production branch switch; do not bring production down with `down -v`.
+- Start/inspect:
+  ```bash
+  sudo docker compose --env-file .env -f v2/docker-compose.yml ps
+  curl -fsS http://127.0.0.1:8000/health
+  sudo docker compose --env-file .env -f v2/docker-compose.yml logs --tail=100 radar
+  ```
 
-Runtime preferences are protected by the `X-Config-Token` header. Retrieve the token only on the VM from `/data/config_token`; never print it to chat or commit it.
+## Isolated development service
 
-## Knowledge transfer
+- Compose file: `v2/docker-compose.dev.yml`; safe defaults: `v2/config.dev.json`.
+- Loopback-only host port: `8001`; use an SSH tunnel to view it from your computer.
+- Independent database volume: `job-radar-dev_radar-dev-data`; independent generated config and config token.
+- Dev defaults: Naukri relay ingestion only; LinkedIn, Instahyre and Greenhouse disabled; Telegram notifications disabled and credentials blank. This keeps dev data separate, prevents test notifications, and avoids doubling LinkedIn requests/raising its 429 risk.
+- Build/start from the dev clone root:
+  ```bash
+  sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build
+  sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml ps
+  curl -fsS http://127.0.0.1:8001/health
+  ```
+- View logs:
+  ```bash
+  sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml logs --tail=100 radar
+  ```
+- On the developer's computer, forward the port with `ssh -L 8001:127.0.0.1:8001 ubuntu@<VM_HOST>`, then open `http://127.0.0.1:8001/dashboard/`.
+- Never add production Telegram credentials to the dev Compose file. Enable source collectors in dev only deliberately; do not enable LinkedIn while production is querying it unless conducting a coordinated rate-limit test.
 
-- **Current state, branch map, blockers, next work, release checklist:** [Job Radar V2 Knowledge Transfer](docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md)
+## Sources and pipeline
+
+- **LinkedIn:** low-volume guest-job requests with a 180-second scheduler target, 4-second minimum request spacing, global stop-on-429, Retry-After support and escalating 5/10/20/30-minute cooldowns. These measures reduce pressure; they do not guarantee that 429 never recurs.
+- **Naukri:** separate [public relay repository](https://github.com/AvinashBhalla/job-beeper-naukri-relay), polled by both environments; the app instances maintain separate databases.
+- **Greenhouse:** public Job Board API, opt-in and disabled until the single-board canary passes ingestion/dedupe/timestamp tests.
+- **Instahyre:** disabled until interface and freshness are verified.
+
+Runtime preferences are protected by `X-Config-Token`. Each environment has its own token at `/data/config_token`; never print tokens or commit them.
+
+## Handover and product reference
+
+- **Current status, next task and release checklist:** [Job Radar V2 Knowledge Transfer](docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md)
 - **Chronological engineering history:** [Job Radar Handover](docs/JOB_RADAR_HANDOVER.md)
 - **V2 implementation notes:** [V2 README](v2/README.md)
-- **Public JobBeeper behavior reference:** [JobBeeper Reference](docs/JOBBEEPER_REFERENCE.md)
+- **Product behavior and source roadmap:** [JobBeeper Reference](docs/JOBBEEPER_REFERENCE.md)
 
-## Branch policy
-
-Branch all production V2 work from `v2-live-radar`, merge tested changes back into it, and deploy only after CI passes. Keep `main` until the repository's default-branch/promotion decision is made separately. Delete topic branches after their PRs merge; do not delete the production branch or the separate relay repository.
+Mandatory process: update both handover files after every user prompt, directly on `v2-live-radar` for working-state documentation. Do not create a separate branch solely for docs. Code and config changes require tests; promote to `main` only when verified.
