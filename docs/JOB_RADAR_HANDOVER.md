@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-12 (PR #26 merged; workflow audit documented; v10 observation pending)**
+**Last updated: 2026-10-12 (v10 LinkedIn observation recorded; topic cleanup completed; fresh-alert validation pending)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -15,13 +15,13 @@
 >
 > ## Current handoff — 2026-10-12 (read before all historical notes)
 > - **Product goal:** reliable, always-on job discovery across enabled sources → truthful normalization/timestamps and stable IDs → canonical cross-source dedupe → deterministic, explainable profile matching → one persisted notification decision shared by dashboard and Telegram → dependable delivery. Freshness, match correctness and one alert per canonical opportunity are more important than raw count. Architecture reference: `docs/JOBBEEPER_REFERENCE.md`.
-> - **Live production proof:** user reported `/health` `status=ok`, version `2.0.0`, uptime 26 seconds after restart, LinkedIn `running=true`; Naukri last success `2026-10-12T03:45:00.791518+00:00`, 296 jobs seen, 0 new, no error. `/api/config` confirms config v10, threshold 55, `require_explicit_experience_for_alerts=false`, LinkedIn 180s, Naukri 300s, Instahyre 600s, Greenhouse 900s. Still awaiting a 20–30-minute timestamped observation of 429/cooldown/request attempts/new-job yield and a fresh qualifying match traced dashboard → ledger → Telegram. Do not claim 429 fixed from health/config alone.
-> - **Current LinkedIn strategy:** PR #21 merged as `6c93473844cd469493a0c61acf1477ba20252d69`, CI #38161863816 passed 76 tests. Config v10 uses 4-second global HTTP spacing, a single JD-enrichment worker, two first-page targets per scan, deep scan every 30 minutes, and 180-second scheduler polling, while preserving global stop-on-429, `Retry-After`, and 5/10/20/30-minute escalating cooldowns. User prefers free/self-built measures; use permitted ATS/company career endpoints for further coverage. No IP/proxy rotation, CAPTCHA bypass, fake identities or traffic disguise to evade limits. Paid scrapers are deferred pending measured free-first results and terms review.
+> - **Live production proof:** user reported `/health` `status=ok`, version `2.0.0`, uptime 26 seconds after restart, LinkedIn `running=true`; Naukri last success `2026-10-12T03:45:00.791518+00:00`, 296 jobs seen, 0 new, no error. `/api/config` confirms config v10, threshold 55, `require_explicit_experience_for_alerts=false`, LinkedIn 180s, Naukri 300s, Instahyre 600s, Greenhouse 900s. User then supplied 10 scan summaries from 04:15:05Z through 04:42:05Z (~27 minutes): 9 scans ×2 requests and one deep scan ×4 = 22 attempted requests; all shown scans had `failed_requests=0`, and no 429/cooldown warning appeared in the filtered output. Latest `/api/source-status` was `jobs_seen=2`, `new_jobs=0`, `error=null`. This is positive rate-limit evidence for the observed window, not a guarantee of zero future 429s; cumulative new-job yield for the full window is not exposed by those lines. Still need a fresh qualifying match traced dashboard → ledger → Telegram.
+> - **Current LinkedIn strategy:** PR #21 merged as `6c93473844cd469493a0c61acf1477ba20252d69`, CI #38161863816 passed 76 tests. Config v10 uses 4-second global HTTP spacing, a single JD-enrichment worker, two first-page targets per scan, deep scan every 30 minutes, and 180-second scheduler polling, preserving stop-on-429, `Retry-After`, and 5/10/20/30-minute cooldown escalation. The user's ~27-minute sample had 22 attempts, no visible 429/cooldown warnings, and zero failed requests per scan; latest source status had no new jobs. Positive, limited evidence only; gather future yield before tuning further. Continue permitted free ATS/company-career sources and do not evade source limits with proxies/CAPTCHA bypass/fake accounts.
 > - **Main workflow audit from actual YAML + screenshot:** GitHub Actions shows `check-sources`, `deploy-dashboard`, `naukri-relay`, `V2 CI`, and `job-watch` (disabled). `deploy-dashboard` is `.github/workflows/pages.yml`; it deploys only static `dashboard/` files to Pages. The current V2 dashboard expects relative `/api` routes served by the Oracle FastAPI app, so Pages is not the correct V2 deployment path and is a removal candidate. `job-watch.yml` is disabled/manual V1, writes `seen.json`, `source_state.json`, `jd_cache.json` and `dashboard/data/jobs.json` to `main`; retire it. `check-sources.yml` is manual V1 maintenance that edits root `config.json`, not V2 runtime config; retire it.
 > - **Why old `naukri-relay.yml` and its private `naukri-relay` branch must wait:** main's old `v2/radar.py` still fetches `https://raw.githubusercontent.com/AvinashBhalla/job-beeper/naukri-relay/dashboard/data/naukri_relay.json`. Its workflow manually writes that branch. Current production `v2-live-radar` reads the separate public repo `AvinashBhalla/job-beeper-naukri-relay`, and the Oracle timer triggers that separate repo. So the private workflow/branch is not the current production relay, but deleting it before the V2 code is promoted to `main` would leave main's old code pointing at a missing feed. Retire the workflow and old private branch together in the dedicated V2 promotion PR/cutover. Keep `.github/workflows/v2-ci.yml`.
 > - **Promotion to `main`:** not yet. Wait for v10 LinkedIn request/yield observation and proof that a fresh ≥55% match goes dashboard → canonical notification ledger → actual Telegram delivery without replaying deliberately suppressed historical matches. Then create a reviewed `v2-live-radar`→`main` PR with the current V2 app/docs and deletion of obsolete V1/Pages workflows; retain V2 CI and verify CI/smoke tests before any production cutover. No direct/force push.
-> - **Branch cleanup:** user initially saw `24 0`; after PR #26 merged, current GitHub comparison is `25 behind / 0 ahead` for `optimize/behavior-preserving-pr12`. The behind count changes with docs merges, so zero ahead is the safety condition. Keep `main`, `v2-live-radar`, `naukri-relay`. The delete command must include merged PR #25's `docs/record-v10-deployment-20261012` and PR #26's `docs/main-workflow-audit-20261012`; after PR #27 merges, include `docs/record-workflow-audit-merge-20261012`. Re-run `git ls-remote --heads origin` and check for open PRs immediately before deletion.
-> - **Next action:** after 20–30 minutes from v10 restart, send timestamped LinkedIn log/source-status output. After confirming a fresh alert path, run safe topic-ref cleanup. Keep `main`, `v2-live-radar`, `naukri-relay` until promotion; then the private `naukri-relay` workflow/branch can be removed with main's code reference upgraded to the separate public relay.
+> - **Branch cleanup completed:** the user deleted all audited topic branches after verifying `26 0` for the stale optimization branch. The final `git branch -r` showed only `origin/HEAD -> origin/main`, `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar`. Preserve these three branches. This observation's temporary docs branch (`docs/record-linkedin-v10-observation-20261012`) should be deleted after its PR merges.
+> - **Next action:** fetch jobs discovered in the last 30 minutes and inspect qualifying matches' `notification_status` / decision reasons, then verify a fresh ≥55% match reaches actual Telegram delivery. Do not replay migration-suppressed historical matches. The topic cleanup is complete; only the temporary documentation PR branch remains to delete. Main promotion remains gated on this fresh-alert proof. During promotion, keep V2 CI and remove obsolete V1 workflows; replace main's old private Naukri URL before removing that legacy workflow/branch.
 > - **Mandatory handover rule:** after every user prompt, update both `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, even on evidence-only turns. Record goal, evidence, diagnosis, code/docs changes, PR/CI/merge/deploy proof, risks, exact expected user output, next action and continuation prompt. Latest handoff supersedes older tasks. Never expose secrets; do one issue at a time.
 > **Historical baseline (2026-10-09; superseded by latest handoff above):** The latest confirmed Oracle deployment is still commit `f91f047ca6e71c69492a03f0bafaf7b18362f613` (`Bust cache when polling public Naukri relay`). The cache-busting change was reviewed in [PR #5](https://github.com/AvinashBhalla/job-beeper/pull/5); PR CI [run #283](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925152682) and post-merge CI [run #284](https://github.com/AvinashBhalla/job-beeper/actions/runs/37925221172) passed. The Oracle container was rebuilt and `/health` returned `status=ok`, version `2.0.0`. The public relay [run #16](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/37924632737) published a valid feed with 359 jobs; the next radar scan reported `jobs_seen=359`, `new_jobs=0`, and `error=null`. The cache-busting change reconciled the prior 345-versus-359 mismatch; stale caching was the plausible cause, not proven in isolation. The old VM user-crontab entry that dispatched the private repository relay every five minutes was removed after backing up the crontab. Its untracked `logs/` and `scripts/` were moved to `/home/ubuntu/job-beeper-local-backup-20261009`. The public relay continues on its own five-minute GitHub Actions schedule. PR #6 added the Greenhouse collector and dashboard integration in repository commit `1cfd55b28b4409d71aee3ca3fe1db314d9aa766f`, with pre-merge CI [run #286](https://github.com/AvinashBhalla/job-beeper/actions/runs/37927758499) passing. **That Greenhouse change is not yet deployed on Oracle and remains disabled by default.** Telegram delivery is active; Agent-Reach remains parked and is not a production dependency.
 
@@ -2150,77 +2150,37 @@ Evaluate attempted request count, cooldown enforcement/escalation, successful sc
 ### Continuation prompt for the next chat
 “Read both handover documents and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both docs after every user prompt. Oracle config v10 is deployed: health OK, threshold 55, explicit-experience gate false, LinkedIn poll 180s / Naukri 300s. Wait for 20–30 minutes of timestamped LinkedIn request/429/cooldown/new-job logs and source status, then verify one fresh ≥55% match dashboard → persisted ledger → Telegram. Latest stale-branch compare is `23 0`; recheck refs/open PRs before deleting merged topics, preserve main/v2-live-radar/naukri-relay. Promote V2 to main only after runtime and alert validation. Prefer authorized free ATS/company-career sources; no LinkedIn limit evasion.”
 
-## Latest chronological handoff — 2026-10-12: production v10 live; workflow inventory and branch cleanup
+## Latest chronological handoff — 2026-10-12: v10 low-pressure observation and topic cleanup complete
 
-### Evidence in this prompt
-- User reports the branch cleanup preflight `git rev-list --left-right --count origin/v2-live-radar...origin/optimize/behavior-preserving-pr12` returned `24 0`. The branch has zero commits ahead; the behind count increased from 23 after `v2-live-radar` gained a docs merge. Recheck immediately before branch deletion.
-- User screenshot of main Actions page lists `check-sources`, `deploy-dashboard`, `naukri-relay`, `V2 CI`, and disabled `job-watch`. I inspected the workflow YAML on `main`, and compared old/current Naukri relay URLs.
-- No app source changes this turn. PR #26 documents the workflow classification, latest branch count, and safe cleanup plan.
+### Evidence supplied by the user
+- The remote branch deletion command succeeded. Final `git branch -r` showed only `origin/HEAD -> origin/main`, `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar`. The stale optimization compare before deletion was `26 0` (26 behind, zero ahead). Topic cleanup is complete.
+- LinkedIn logs between `2026-10-12T04:15:05Z` and `04:42:05Z` showed ten scan summaries: nine fast scans at two attempted requests each and one deep scan at four attempts, totaling 22 requests. Every shown scan reported `failed_requests=0`; no 429/cooldown warning appeared in the provided filtered output. Latest source status at `04:42:05Z`: `jobs_seen=2`, `new_jobs=0`, `error=null`.
+- Interpretation: the v10 lower-pressure setup had a clean approximately 27-minute sample, with no visible 429. This is not a long-term guarantee. Aggregate new-job count over the whole window is not available from these specific logs, and the latest scan added zero jobs. Continue tracking useful yield/freshness.
+- No application code or runtime config changed during this prompt. Both handover files are updated. PR #28 carries this documentation update; delete its temporary branch after merge.
 
-### Workflow disposition (do not delete all blindly)
-| Workflow shown in Actions | Actual file / purpose | Decision |
-|---|---|---|
-| `V2 CI` | `.github/workflows/v2-ci.yml`; compile/tests on `main` and `v2-live-radar` | Keep. |
-| `deploy-dashboard` | `.github/workflows/pages.yml`; deploys static `dashboard/` to GitHub Pages on main dashboard changes/manual run. V2 dashboard API base is relative `/api`, which would resolve to GitHub Pages rather than Oracle FastAPI. | Retire in the reviewed V2-to-main promotion; if a separate GitHub Pages site is intentionally needed, design an explicit API origin first. |
-| `job-watch` (disabled in screenshot) | `.github/workflows/job-watch.yml`; manual V1 watcher writes legacy JSON/state/feed to main and consumes old secrets | Retire in promotion. |
-| `check-sources` | `.github/workflows/check-sources.yml`; manual V1 helper prunes root `config.json`, not V2's `v2/config.json` or protected runtime config | Retire in promotion. |
-| `naukri-relay` | `.github/workflows/naukri-relay.yml`; manual legacy collector publishes `job-beeper/naukri-relay`. Main's current `v2/radar.py` still reads that private feed. Current production `v2-live-radar` instead reads the separate `job-beeper-naukri-relay` repository, which the VM timer dispatches. | Not production's current relay, but retain until the V2 code that points at the separate public repo is promoted to main. Remove the old workflow and its private `naukri-relay` data branch together during promotion; do not delete the branch now. |
-
-Therefore, the screenshot does not mean these are all equivalent. Keep V2 CI; retire static Pages, disabled V1 job-watch and root-config check-sources as part of the reviewed promotion; retire private Naukri workflow/branch only alongside the main code-reference change. `main` should not receive a partial direct push while the v10 alert validation gate is still pending.
-
-### Branch command correction
-The user's delete command includes the merged topic heads PR #15–#24, but it omitted `docs/record-v10-deployment-20261012`, which is also now merged via PR #25. Add that branch, and add `docs/main-workflow-audit-20261012` after this PR #26 merges. Keep `main`, `v2-live-radar`, and `naukri-relay` for now. Current stale comparison is `24 0`; use zero ahead, not a fixed behind count, as the key condition. Re-run `git ls-remote --heads origin` and inspect open PRs before deleting.
-
-### Next actions
-1. Let v10 run 20–30 minutes; collect timestamped LinkedIn request attempts, 429/cooldown, discovery scan/new-job output and `/api/source-status`.
-2. Verify a fresh true profile match ≥55% through dashboard → persisted notification ledger → actual Telegram send. Do not requeue v9 migration suppressions.
-3. After this docs PR merges, perform branch cleanup with `docs/record-v10-deployment-20261012` and `docs/main-workflow-audit-20261012` both included. Preserve the three protected branches.
-4. Only after the v10 observation and fresh-alert verification, open a dedicated V2 promotion PR to main: update V2 code/reference, remove the obsolete workflow YAMLs, keep V2 CI, and remove the private Naukri relay branch only with the corresponding code transition.
-
-### Continuation prompt
-“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handover documents after every user prompt. Config v10 is live (threshold 55, LinkedIn 180s); 20–30 minute 429/request-yield observation and fresh dashboard→ledger→Telegram alert proof are pending. User's branch check now says `24 0`, so zero ahead is key and count changes with docs merges. The user showed `main` Actions: `check-sources`, `deploy-dashboard`, `naukri-relay`, `V2 CI`, and disabled `job-watch`. Keep V2 CI. Retire Pages, job-watch and check-sources in reviewed main promotion; retain private naukri-relay workflow/branch until main's old `v2/radar.py` reference is replaced with the separate public relay URL, then remove it. Delete merged topic branches after final ref/open-PR check; include the omitted PR25 branch and this PR26 branch, but preserve main/v2-live-radar/naukri-relay until promotion. Never direct-push/force-push main or evade LinkedIn limits.”
-
-## Latest chronological handoff — 2026-10-12: PR #26 workflow audit merged
-
-- PR #26, [Audit main workflows and correct branch cleanup handover](https://github.com/AvinashBhalla/job-beeper/pull/26), merged as `ed7c159b1d0c4cc46d9f8be297f9551d06535bc5`. CI run [#38202816842](https://github.com/AvinashBhalla/job-beeper/actions/runs/38202816842) passed the V2 compile and unit-test job. The PR changed only both handover documents.
-- Workflow audit: keep `v2-ci.yml`; retire `pages.yml`/deploy-dashboard, disabled `job-watch.yml`, and root-config `check-sources.yml` during the reviewed V2 promotion. Keep old private `naukri-relay.yml`/branch until main's old `v2/radar.py` URL changes to the separate public relay. Then remove the private workflow and branch together.
-- User's preflight returned `24 0`; after PR #26 merged, GitHub's comparison is `25 behind / 0 ahead`. The behind count changes as the release branch moves. Re-run comparison and target-ref/open-PR checks immediately before deletion.
-- No application source or runtime config changed. Config v10 remains deployed; 20–30 minute LinkedIn request/yield observation and fresh ≥55% dashboard → ledger → Telegram proof are pending. The branch `docs/record-workflow-audit-merge-20261012` will itself need deletion after PR #27 merges.
-
-### Continuation prompt
-“Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handover docs after every user prompt. Config v10 is deployed (threshold 55, LinkedIn 180s); observe 20–30 minutes of timestamped LinkedIn attempts/429/cooldown/new-job logs and prove one fresh qualifying job goes dashboard → ledger → Telegram. PR #26 merged as `ed7c159b1d0c4cc46d9f8be297f9551d06535bc5`, CI #38202816842 passed. Main workflow audit: keep V2 CI; retire Pages, disabled job-watch and check-sources during reviewed promotion; retain private Naukri workflow/branch until main's old private-feed URL is replaced by the separate public relay. Branch comparison moved from 24 0 to 25 0 after docs merge; zero ahead is key. Verify no open PRs before deleting topics, include PR25/26 and this PR27 branch, and preserve main/v2-live-radar/naukri-relay until promotion.”
-
-## Safe topic-branch cleanup after PR #27 merges
-
-Run only after PR #27 merges and after confirming no open PRs or unique work on the target heads:
+### What remains
+1. Fetch the API records for jobs discovered in the last 30 minutes and list true matches scoring at least 55 with alertability and notification status:
 
 ```bash
-cd /home/ubuntu/job-beeper
-git fetch --prune origin
-git ls-remote --heads origin
-git rev-list --left-right --count origin/v2-live-radar...origin/optimize/behavior-preserving-pr12
+echo "=== QUALIFYING JOBS DISCOVERED IN LAST 30 MINUTES ==="
+curl --max-time 20 -fsS 'http://127.0.0.1:8000/api/jobs?minutes=30&limit=500' \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); js=[j for j in d.get("jobs",[]) if j.get("likely_match") and int(j.get("match_score",0))>=55 and j.get("alertable")]; print(json.dumps({"qualifying_count":len(js),"jobs":[{k:j.get(k) for k in ("id","source","title","company","discovered_at","source_posted_at","match_score","alertable","notification_status","notification_decision_reasons","notification_sent_at","notification_last_error","canonical_opportunity_id")} for j in js[:15]]},indent=2))'
 ```
 
-If the stale optimization comparison still has zero ahead and every target branch exists, delete the merged topic heads:
+Send the output so one fresh job can be traced through dashboard → persisted notification ledger → actual Telegram send. If none were discovered, use a 180-minute window and distinguish low source yield from an alert-routing issue. Do not requeue old entries suppressed during the v9 migration.
+2. Only after a fresh qualifying alert is verified, open the reviewed `v2-live-radar`→`main` promotion PR. Keep V2 CI; retire Pages/job-watch/check-sources as part of that promotion; only remove the private Naukri workflow/branch after replacing main's old URL with the current separate public relay URL.
+
+### Continuation prompt
+“Continue Job Radar V2. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. Mandatory: update both handover documents after every user prompt. Config v10 is live (threshold 55, LinkedIn 180s/Naukri 300s). User provided ~27 minutes of LinkedIn scan logs (04:15–04:42 UTC): ten scans, 22 attempted requests, no displayed 429/cooldown warnings, zero failed requests per scan; latest source status had `new_jobs=0`. Treat as positive limited evidence, not a permanent guarantee. All merged topic branches were deleted; final remote refs are only main, naukri-relay and v2-live-radar. Next retrieve jobs discovered in the last 30 minutes, inspect ≥55% true matches and validate a fresh notification through dashboard → persisted ledger → Telegram. Do not requeue old v9 migration suppressions. Promote to main only after fresh-alert proof, with a reviewed PR; keep V2 CI, retire obsolete V1 workflows, and replace main's old private Naukri relay URL before removing its workflow/branch. No LinkedIn limit evasion; prefer permitted free ATS/career sources.”
+
+## Temporary documentation branch cleanup
+
+After PR #28 merges, delete only the temporary docs branch (production/topic cleanup is complete):
 
 ```bash
-git push origin --delete \
-  fix/prevent-posted-after-discovered \
-  fix/linkedin-rate-limit-backoff \
-  fix/linkedin-lower-pressure-cooldown \
-  docs/current-handover-rule-20261011 \
-  fix/dashboard-telegram-alert-consistency \
-  docs/record-alert-consistency-merge-20261011 \
-  fix/linkedin-free-first-request-budget \
-  chore/remove-legacy-v1-workflows \
-  docs/record-free-first-and-workflow-cleanup-20261011 \
-  optimize/behavior-preserving-pr12 \
-  docs/free-first-rate-limits-and-release-cleanup-20261011 \
-  docs/record-v10-deployment-20261012 \
-  docs/main-workflow-audit-20261012 \
-  docs/record-workflow-audit-merge-20261012
+git push origin --delete docs/record-linkedin-v10-observation-20261012
 git fetch --prune origin
 git branch -r
 ```
 
-Expected remote branches after cleanup: `origin/main`, `origin/naukri-relay`, and `origin/v2-live-radar` (plus `origin/HEAD`). Do not delete these three. The private `naukri-relay` branch is deliberately retained until main's old URL reference is replaced during promotion. Deleting a branch is not a deployment.
+Expected branches: `origin/main`, `origin/naukri-relay`, `origin/v2-live-radar` (and `origin/HEAD`).
