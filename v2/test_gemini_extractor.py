@@ -16,6 +16,7 @@ class GeminiValidationTests(unittest.TestCase):
             "experience_min_years": 4,
             "experience_max_years": 6,
             "experience_type": "required",
+            "experience_scope": "total_professional",
             "experience_evidence": "4-6 years of professional experience",
             "required_skills": ["Python", "FastAPI", "Python"],
             "preferred_skills": ["Kubernetes"],
