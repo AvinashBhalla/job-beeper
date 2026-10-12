@@ -434,3 +434,10 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 - No source scan, Gemini API call, source activation, or production change was made. Keep Gemini disabled, notifications off in dev, PR #35 unmerged, and production untouched.
 - Next: check V2 CI. If green, update/rebuild only the dev checkout and run full tests plus health/source-status checks. Confirm a simulated/persisted error appears and clears after a successful run. Then choose the next source roadmap item one at a time.
 - Continuation: Read both handovers and JOBBEEPER_REFERENCE.md on v2-live-radar. Update both handovers after every prompt. Source status now exposes persisted last_error and dashboard displays it; tests were added but CI was still running. Do not scan sources or call Gemini; production untouched.
+
+
+## 2026-10-12 — Source-error visibility CI result
+- Follow-up to the previous entry: V2 CI run #459 (run ID 38233473677) completed successfully for code commit c3f64c684d47045bcc334e77213d913ad912f67b. PR #35 remains draft/open/unmerged; this is not production approval.
+- Documentation updates are on v2-live-radar: knowledge transfer commit da4b0fb42773c2effd6af8b4e6dfed1f3d1dfcf9 and detailed handover commit 65d6825034115cdba8ac183692de37ba8ed80027. Latest branch head after these updates is expected to be 65d6825.
+- Next action: in /home/ubuntu/job-beeper-dev, verify clean tree and correct branch, fast-forward only, rebuild only job-radar-dev, run full tests and health/source-status checks. Do not run manual scans, enable Gemini, turn on notifications, or touch production.
+- Continuation: Source-error visibility patch passed V2 CI #459. Validate in isolated dev, then continue roadmap one item at a time. Keep production untouched and PR #35 unmerged.
