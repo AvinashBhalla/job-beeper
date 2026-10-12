@@ -2932,3 +2932,12 @@ HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_conf
 - Validation is pending: local focused/full tests and the new GitHub Actions run have not yet been confirmed green. PR #36 remains open/unmerged; do not merge/deploy until checks pass. No production impact.
 - Next user action: in `/home/ubuntu/job-beeper-parser-fix`, fast-forward the local branch to the new commit, run the focused pagination test and the full suite in the same isolated `--network none` container, then inspect PR #36 CI. If CI remains red, use the new exact failure/log sequence rather than assuming this fully resolved all failures.
 - Safety unchanged: production port 8000 untouched; dev LinkedIn disabled, notifications off, Gemini shadow disabled; PR #35 separate/unmerged.
+
+
+## Validation received: hermetic test fix passes locally — 2026-10-12
+- User fast-forwarded `/home/ubuntu/job-beeper-parser-fix` cleanly to `572f56573fa8f66a532ee676c2aa66b25a843d0a` (`test: prevent live LinkedIn enrichment in scan pagination test`); the shown `git status --short` produced no changes before the pull.
+- Focused test passed in the disposable `job-radar-dev-radar` container with `--network none`: `v2.test_radar.MatcherTests.test_linkedin_fast_lane_and_periodic_deep_scan` (1/1).
+- Full suite passed in that same network-disabled container: `python -m unittest discover -s v2 -p "test_*.py" -v`, 78/78 in 37.205s. Output confirms the previously affected scan tests and JD enrichment test pass without live LinkedIn requests.
+- GitHub Actions run #592 (ID `38284476851`) for this head is completed/success, but the connected job listing exposes only a successful job named `syntax`. Do **not** describe the complete CI test suite as green based on that run alone; local full suite is green, prior run #543 had failed, and CI coverage needs confirmation if a dedicated test job is expected.
+- PR #36 is still OPEN and UNMERGED, head `572f56573fa8f66a532ee676c2aa66b25a843d0a`, base `main`. No merge/deploy authorized or performed.
+- Next: inspect PR checks/workflow configuration to establish whether the successful `syntax` job is the only configured check or whether the test job did not run. If the test job is absent, verify why before considering merge. Keep production port 8000 untouched; dev LinkedIn disabled, notifications off, Gemini shadow disabled; PR #35 remains separate.
