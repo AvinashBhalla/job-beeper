@@ -1933,7 +1933,13 @@ class MatcherTests(unittest.TestCase):
             return Response()
 
         try:
-            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+            with (
+                patch.object(radar, "_linkedin_request", side_effect=fake_request),
+                # This test covers search pagination, not JD enrichment. Keep it
+                # hermetic so the new enrichment policy cannot make live requests
+                # and leak a real LinkedIn 429 cooldown into later tests.
+                patch.object(radar, "enrich_linkedin_job", side_effect=lambda job: job),
+            ):
                 first = radar.linkedin_collect(config)
                 first_starts = sorted(calls)
                 calls.clear()
@@ -1965,6 +1971,88 @@ class MatcherTests(unittest.TestCase):
             radar.extract_jd_experience(jd),
             (5.0, 7.0),
         )
+
+    def test_linkedin_structured_experience_metadata_outside_description_is_captured(self):
+        job = radar.normalize_job(
+            "linkedin",
+            "li-cloud-ai-experience-band",
+            "Cvali",
+            "Cloud & AI Engineer",
+            "Bengaluru, Karnataka, India",
+            "https://www.linkedin.com/jobs/view/cloud-ai-engineer-at-cvali-4475684372",
+            None,
+            "unknown",
+            "Cloud & AI Engineer Cvali Bengaluru",
+        )
+
+        class Response:
+            status_code = 200
+            text = """
+            <html><body>
+              <div class="job-details-jobs-unified-top-card__job-insight">
+                <span>Experience: 4.00-6.00 Years</span>
+              </div>
+              <div class="description__text">
+                Build cloud AI services using Python and deep learning.
+              </div>
+            </body></html>
+            """
+
+        with patch.object(radar, "_linkedin_http_get", return_value=Response()):
+            enriched = radar.enrich_linkedin_job(job)
+
+        self.assertEqual(enriched["jd_experience_min_years"], 4.0)
+        self.assertEqual(enriched["jd_experience_max_years"], 6.0)
+        result = match_details(enriched, BASE_CONFIG)
+        self.assertFalse(result["match"])
+        self.assertIn("experience minimum 4 exceeds candidate 2 years", result["reasons"][0])
+
+    def test_linkedin_generic_experience_snippet_does_not_skip_jd_enrichment(self):
+        original_deep_scan = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_target_cursor
+        try:
+            radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
+            radar.linkedin_fast_target_cursor = 0
+            job = radar.normalize_job(
+                "linkedin",
+                "li-generic-experience-snippet",
+                "Cvali",
+                "Cloud & AI Engineer",
+                "Bengaluru, Karnataka, India",
+                "https://www.linkedin.com/jobs/view/cloud-ai-engineer-1234567890",
+                None,
+                "unknown",
+                "Cloud & AI Engineer Cvali. 2 years experience building AI services.",
+            )
+            job["needs_jd_enrichment"] = True
+            enriched_ids = []
+
+            def fake_enrich(candidate):
+                enriched_ids.append(candidate["source_job_id"])
+                candidate["jd_experience_min_years"] = 4.0
+                candidate["jd_experience_max_years"] = 6.0
+                candidate.pop("needs_jd_enrichment", None)
+                return candidate
+
+            config = {
+                **BASE_CONFIG,
+                "linkedin_queries": ["ai engineer"],
+                "locations": ["Bengaluru, Karnataka, India"],
+            }
+            with (
+                patch.object(radar, "_linkedin_cooldown_remaining", return_value=0),
+                patch.object(radar, "_linkedin_search_page", return_value=[job]),
+                patch.object(radar, "enrich_linkedin_job", side_effect=fake_enrich),
+            ):
+                result = radar.linkedin_collect(config)
+
+            self.assertEqual(enriched_ids, ["li-generic-experience-snippet"])
+            self.assertEqual(result[0]["jd_experience_min_years"], 4.0)
+            self.assertEqual(result[0]["jd_experience_max_years"], 6.0)
+        finally:
+            radar.linkedin_last_deep_scan_at = original_deep_scan
+            radar.linkedin_fast_target_cursor = original_cursor
+
 
     def test_linkedin_detail_prefers_experience_bearing_candidate(self):
         class Response:
