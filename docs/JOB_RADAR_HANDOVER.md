@@ -3303,3 +3303,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Rechecked GitHub Actions run #746 for commit `fdf9654eddec287ac8b5f32a4d227b57ddafcd55`: it failed one test, `test_linkedin_fast_lane_rotates_two_targets_and_covers_all_locations`, because the process-wide `linkedin_fast_target_cursor` could be left at a nonzero value by earlier tests. This is test-state leakage; the failure was `second_cycle` length 0 rather than 2.
 - Fixed the test to save, reset to zero, and restore `linkedin_fast_target_cursor` in commit `82d1082df84f7028822692a739949d65c879d8e2`. CI for this fix must pass before canary execution.
 - Do not run the Greenhouse canary yet. Confirm the new commit's latest-head CI passes, and establish VM checkout/image identity before any canary. Production container/database untouched; Greenhouse remains disabled in config/scheduler; notifications remain off.
+
+
+## Latest-head CI green; VM checkout needs safe fast-forward — 2026-10-13
+
+- Verified current GitHub branch head `60c337f964f4b7b040d33c4f0c23773fc4c0a788`; latest-head Actions run #749 (`38365552304`) completed successfully. Run #747 for the test-cursor isolation fix (`82d1082df84f7028822692a739949d65c879d8e2`) also passed the full suite.
+- User-provided VM output shows checkout `fdf9654eddec287ac8b5f32a4d227b57ddafcd55` and dev image `sha256:57a6a204922201f70e226116bb107ef0a82ac9b3da428b50f542e55809668364`, created at `2026-10-13T07:49:32Z`. This is behind current GitHub head; prior reported 92-test success therefore does not validate the latest commit.
+- Next: on the VM fetch latest branch, confirm working tree clean and fast-forward ancestry, fast-forward only, then rebuild only the dedicated dev image, inspect its image ID, and rerun the full suite in a disposable `--network none` container. Do not run canary until that passes. No production container/database touched; Greenhouse remains disabled and notifications remain off.
