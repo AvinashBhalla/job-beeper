@@ -3846,3 +3846,9 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 ## 2026-10-13: Explicit matcher rollout gate added
 - Gemini-to-matcher integration is now guarded by `GEMINI_MATCHER_ENABLED` (must be `1`, `true`, or `yes`). It defaults off, so deploying the code alone does not change eligibility or alerts. When enabled, only fresh exact-JD cache results that pass evidence/type/scope/confidence checks are applied.
 - Regression tests now set `GEMINI_MATCHER_ENABLED=true` for trusted-cache integration cases. Latest code/test commits: `14516a0` and `0b74444`; run tests in VM before considering release. Production environment has not been changed.
+
+
+## 2026-10-13: Gemini matcher tests passed
+- User ran `python -m unittest -v v2.test_gemini_extractor`: 11 tests passed. Full `python -m unittest v2.test_radar`: 88 tests passed. No failures reported.
+- Trusted cached Gemini experience integration is now regression-tested. `GEMINI_MATCHER_ENABLED` defaults off, so production matcher behavior does not change unless explicitly enabled.
+- Next: verify production deployment target, extraction enablement/auth, current cache quality, database backup/persistent volume, and notification-ledger safety. Deploy with matcher flag off first; health-check and inspect cache before explicit controlled enablement. Never replay historical alerts. User's local `v2/config.json` and `.venv/` must be preserved.
