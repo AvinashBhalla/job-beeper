@@ -1217,3 +1217,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - User fast-forwarded local `~/job-beeper-dev` from `48e921a` to `cab194b1c62dc2cbe07e0c1673813000b67b2601`, matching `origin/v2-live-radar` at the time of verification.
 - `git status -sb` shows branch aligned with origin and only `?? .venv/`; retain the virtual environment locally and do not commit it.
 - Next safe step: run a read-only check of `v2/config.dev.json` source flags and notification setting, plus JSON syntax validation. Do not start services, poll sources, run matching, write to the DB, or send notifications.
+
+
+## Read-only config validation confirmed — 2026-10-13
+- User ran the sync successfully; local `v2-live-radar` was aligned with `origin/v2-live-radar` at `cc98d62be1fd78a3266dd813f6a8029ae64f0d7a`. `git status -sb` showed only `?? .venv/`; keep it local and uncommitted.
+- User's Python check confirmed both `v2/config.json` and `v2/config.dev.json` are valid JSON. Development config is version 11 with LinkedIn=false, Naukri=true, Instahyre=false, Greenhouse=false, Ashby=false, and `notifications_enabled=false`.
+- No application/service was started; no source polling, matching, DB writes, or notifications were run. Combined commit status lookup for `cc98d62` returned no status checks, so do not describe that commit as CI-verified.
+- Next: if continuing, inspect the existing read-only Greenhouse canary utility and its usage/tests, without executing network polling or starting the radar service. Preserve disabled sources/notifications and production isolation.
