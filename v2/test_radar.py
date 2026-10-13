@@ -2298,3 +2298,82 @@ class SourceStatusPersistenceTests(unittest.TestCase):
         self.assertIsNone(naukri["last_error"])
         self.assertEqual(naukri["jobs_seen"], 18)
         self.assertEqual(naukri["new_jobs"], 2)
+
+
+class AshbyCollectorTests(unittest.TestCase):
+    def _response(self, payload):
+        class Response:
+            def raise_for_status(self): return None
+            def json(self): return payload
+        return Response()
+
+    def _job(self, **overrides):
+        item={"id":"role-123","title":"Software Engineer","location":{"name":"Remote - India"},
+              "jobUrl":"https://jobs.ashbyhq.com/openai/role-123","descriptionHtml":"<p>Build Python systems.</p>",
+              "publishedAt":"2026-10-12T10:20:30.123Z"}
+        item.update(overrides)
+        return item
+
+    def test_valid_job_normalizes_id_url_and_description(self):
+        with patch.object(radar.requests,"get",return_value=self._response({"jobs":[self._job()]})) as req:
+            jobs=radar.ashby_collect({"ashby_boards":[{"board":"openai","company":"OpenAI"}]})
+        self.assertEqual(len(jobs),1)
+        self.assertEqual(jobs[0]["source"],"ashby")
+        self.assertEqual(jobs[0]["source_job_id"],"ashby-openai-role-123")
+        self.assertEqual(jobs[0]["company"],"OpenAI")
+        self.assertEqual(jobs[0]["title"],"Software Engineer")
+        self.assertEqual(jobs[0]["location"],"Remote - India")
+        self.assertEqual(jobs[0]["url"],"https://jobs.ashbyhq.com/openai/role-123")
+        self.assertIn("Build Python systems.",jobs[0]["description"])
+        self.assertEqual(jobs[0]["posted_precision"],"minute")
+        self.assertEqual(req.call_args.kwargs["timeout"],15)
+
+    def test_empty_jobs_list_returns_empty(self):
+        with patch.object(radar.requests,"get",return_value=self._response({"jobs":[]})):
+            self.assertEqual(radar.ashby_collect({"ashby_boards":[{"board":"openai","company":"OpenAI"}]}),[])
+
+    def test_malformed_board_payload_does_not_discard_good_board(self):
+        cfg={"ashby_boards":[{"board":"bad","company":"Bad"},{"board":"good","company":"Good"}]}
+        def get(url,**kwargs):
+            return self._response({"bad":True}) if "/bad" in url else self._response({"jobs":[self._job(id="ok")]})
+        with patch.object(radar.requests,"get",side_effect=get):
+            jobs=radar.ashby_collect(cfg)
+        self.assertEqual([x["source_job_id"] for x in jobs],["ashby-good-ok"])
+
+    def test_duplicate_ids_are_skipped(self):
+        item=self._job()
+        with patch.object(radar.requests,"get",return_value=self._response({"jobs":[item,item]})):
+            jobs=radar.ashby_collect({"ashby_boards":[{"board":"openai","company":"OpenAI"}]})
+        self.assertEqual(len(jobs),1)
+
+    def test_missing_or_invalid_published_at_stays_unknown(self):
+        self.assertEqual(radar._parse_ashby_published_at(None),(None,"unknown"))
+        self.assertEqual(radar._parse_ashby_published_at("bad"),(None,"unknown"))
+        item=self._job(publishedAt=None,updatedAt="2026-10-12T10:20:30Z")
+        with patch.object(radar.requests,"get",return_value=self._response({"jobs":[item]})):
+            jobs=radar.ashby_collect({"ashby_boards":[{"board":"openai","company":"OpenAI"}]})
+        self.assertIsNone(jobs[0]["source_posted_at"])
+        self.assertEqual(jobs[0]["posted_precision"],"unknown")
+
+    def test_all_boards_failed_raises_source_error(self):
+        with patch.object(radar.requests,"get",side_effect=RuntimeError("fixture failure")):
+            with self.assertRaisesRegex(RuntimeError,"All configured Ashby boards failed"):
+                radar.ashby_collect({"ashby_boards":[{"board":"bad","company":"Bad"}]})
+
+    def test_v11_migration_forces_ashby_off(self):
+        defaults={"config_version":11,"source_enabled":{"linkedin":True,"naukri":True,"instahyre":False,"greenhouse":False,"ashby":False},
+                  "poll_seconds":{"linkedin":180,"naukri":300,"instahyre":600,"greenhouse":900,"ashby":1800},
+                  "ashby_boards":[{"board":"openai","company":"OpenAI"}]}
+        old={"config_version":10,"source_enabled":{"linkedin":True,"naukri":True,"instahyre":False,"greenhouse":False,"ashby":True},
+             "poll_seconds":{"ashby":90}}
+        migrated=_merge_config(defaults,old)
+        self.assertEqual(migrated["config_version"],11)
+        self.assertFalse(migrated["source_enabled"]["ashby"])
+        self.assertEqual(migrated["ashby_boards"],defaults["ashby_boards"])
+
+    def test_board_allowlist_rejects_duplicate_or_unsafe_names(self):
+        base={**BASE_CONFIG,"source_enabled":{"linkedin":True,"naukri":True,"instahyre":False,"greenhouse":False,"ashby":False},
+              "ashby_boards":[{"board":"safe","company":"OpenAI"},{"board":"SAFE","company":"Duplicate"}]}
+        with self.assertRaises(radar.HTTPException): radar.validate_config(base)
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config({**BASE_CONFIG,"ashby_boards":[{"board":"../unsafe","company":"Bad"}]})
