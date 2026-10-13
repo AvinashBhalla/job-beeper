@@ -47,6 +47,32 @@ def make_job(title, description="", location="Bengaluru, India"):
 
 class MatcherTests(unittest.TestCase):
 
+    def setUp(self):
+        # These module-level values model a process-wide LinkedIn 429 cooldown.
+        # Reset them between tests so a rate-limit test cannot make unrelated
+        # collector tests order-dependent or flaky.
+        self._linkedin_rate_state = (
+            radar.linkedin_last_http_request_monotonic,
+            radar.linkedin_rate_limited_until_monotonic,
+            radar.linkedin_last_rate_limit_monotonic,
+            radar.linkedin_rate_limit_streak,
+            radar.linkedin_rate_limit_generation,
+        )
+        radar.linkedin_last_http_request_monotonic = 0.0
+        radar.linkedin_rate_limited_until_monotonic = 0.0
+        radar.linkedin_last_rate_limit_monotonic = 0.0
+        radar.linkedin_rate_limit_streak = 0
+        radar.linkedin_rate_limit_generation = 0
+
+    def tearDown(self):
+        (
+            radar.linkedin_last_http_request_monotonic,
+            radar.linkedin_rate_limited_until_monotonic,
+            radar.linkedin_last_rate_limit_monotonic,
+            radar.linkedin_rate_limit_streak,
+            radar.linkedin_rate_limit_generation,
+        ) = self._linkedin_rate_state
+
     def test_remote_india_location_does_not_match_remote_jobs_in_other_countries(self):
         self.assertTrue(radar.location_allowed("Remote - India", BASE_CONFIG))
         self.assertTrue(radar.location_allowed("Remote, Bengaluru, Karnataka, India", BASE_CONFIG))
