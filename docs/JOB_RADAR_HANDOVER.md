@@ -3588,3 +3588,9 @@ Recommended next validation is a disposable one-off container from the dev image
 - User confirmed the updated docs were pulled. This task verifies a launch requirement; unrelated work is deferred under the MVP decision rule.
 - Current `.github/workflows/v2-ci.yml` specifies: `python -m py_compile v2/radar.py v2/test_radar.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py`, then `python -m unittest discover -s v2 -p 'test_*.py' -v` after dependencies are installed. Agent has not run these commands on the VM.
 - Next action: from `~/job-beeper-dev` in the active `.venv`, run both commands in that order and paste complete output, especially any traceback/failing test. Do not restart services, alter config, activate sources, send notifications, or touch production. Preserve `.venv/` untracked.
+
+
+## Existing test suite passed — 2026-10-13
+- User reports `python -m unittest discover -s v2 -p 'test_*.py' -v` completed with `Ran 100 tests in 19.302s` and `OK`. This is user-supplied evidence; the agent did not execute the suite on the VM and has not seen the full output.
+- This verifies the existing unit-test suite only; it does not prove live source relevance/freshness, end-to-end matching/deduplication, notification idempotency, or production readiness. No code/config/service/production changes were made in this turn.
+- Next exact action: confirm the preceding CI compile check also passed: `python -m py_compile v2/radar.py v2/test_radar.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py`. If not yet run, execute it from `~/job-beeper-dev` with `.venv` active and report output. Then continue with a bounded safe review of MVP acceptance gates, not feature expansion. Keep experimental sources and dev notifications disabled; preserve `.venv/` untracked; do not touch `main` or production.
