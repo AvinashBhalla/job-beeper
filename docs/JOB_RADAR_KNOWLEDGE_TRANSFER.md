@@ -1406,3 +1406,10 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - Caution: `rebuild_canonical_opportunities` deletes `notification_ledger` rows while resetting canonical IDs. Do not run it as a diagnostic.
 - Experience evaluation min/max values are stored in `job_evaluations` and mapped from API query aliases. Compatibility reasons alongside null fields remain unexplained; stale evaluations or persistence/mapping mismatch are hypotheses only.
 - No app/runtime/database/notification changes. Next inspect `v2/dedupe.py` and full canonical opportunity helper / evaluation write and API projection using read-only grep/sed. Pull latest docs before the next local command: `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar`.
+
+
+## 2026-10-13 — Same-source dedupe restriction
+- Confirmed from source: same-source candidate records are skipped when canonical URLs differ. Auto-link threshold is 95; exact canonical URL scores 100, metadata-description 93, metadata-probable 88. Thus metadata similarity cannot link same-source jobs with different URLs under the current loop. This plausibly explains repeated Naukri company/title/location groups, but duplicates versus genuinely distinct postings are not yet distinguished.
+- Do not alter matching thresholds or merge/rebuild canonical groups until a privacy-safe sample establishes identity. `rebuild_canonical_opportunities` is especially risky because it deletes notification ledger rows.
+- Experience fields may be null while the reason references candidate/configured-profile compatibility because the job's explicit range can be unknown; investigate matcher semantics before calling it a bug.
+- Next: inspect full `v2/dedupe.py` and `match_details` around 1790–1895, then perform read-only identity audit. No app/runtime/database/notification/production changes. Pull latest docs before the next local command.
