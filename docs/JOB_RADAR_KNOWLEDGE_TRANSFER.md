@@ -1049,3 +1049,9 @@ Recommended next validation is a disposable one-off container from the dev image
 - User reports the dev VM checkout is `c15c40b699a89a78d4440d86eecd5ef8b4eff8f8`, clean on `v2-live-radar`; dev image is `sha256:10587b0403ade778c5f0bc844d6984da2a251789b0ae7545512a03e68d1febb5`, created `2026-10-13T07:57:37Z`; disposable image test suite passed `Ran 92 tests in 17.992s / OK`. The reported checkout matches GitHub branch head.
 - Verified latest GitHub Actions run #751 for this head succeeded: https://github.com/AvinashBhalla/job-beeper/actions/runs/38365680132. Reviewed current `v2/config.dev.json` and `v2/greenhouse_canary.py`: notifications are false, Greenhouse source is disabled, and the canary makes two public-board polls without DB writes, matching, or notifications.
 - Next action: run a disposable canary for one existing dev-config board (Coinbase) with 900 seconds between polls, using the rebuilt dev image and a network-enabled disposable container. Capture the JSON report and review ID stability, timestamp coverage, request errors, and job yield. This is a dev-only observation, not permission to enable Greenhouse or deploy. Production Compose/container and persistent database remain untouched.
+
+
+## Coinbase canary first poll confirmed; waiting for second snapshot — 2026-10-13
+
+- User screenshot shows the disposable canary command running on the verified dev image and log `boards=1 successful=1 failed=0 jobs=225`. This confirms the first Coinbase Greenhouse poll succeeded with 225 jobs; the final report is expected only after the configured 900-second interval and second poll.
+- Advise the user not to interrupt the process yet; wait for the final JSON report. No production Compose/container or persistent DB touched; Greenhouse remains disabled in scheduler config and notifications remain off.
