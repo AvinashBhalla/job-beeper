@@ -1291,3 +1291,7 @@ Recommended next validation is a disposable one-off container from the dev image
 - No code/config change, matcher, DB write, scheduler, notification, CI, or deployment occurred. Preserve local .venv untracked.
 - Overall status: V2 core architecture and integrations exist; remaining acceptance includes fresh/relevant yield, verified end-to-end normalization/deduplication/matching/alert correctness, dev runtime checks, safe production rollout, and observation. No completion percentage claimed without a full acceptance audit.
 - Next: prioritize measurable fresh India/Remote-India software/AI yield; pull the updated handover before the next local command.
+
+
+## MVP fast-track — 2026-10-13
+User prioritizes an early MVP. Freeze scope; defer experimental sources and nonessential features. Keep Greenhouse/Ashby/Instahyre and dev notifications disabled. Next, collect read-only dev health/status/log diagnostics before tests or any deployment. No code/config/runtime changes or production actions in this turn. Preserve .venv untracked.
