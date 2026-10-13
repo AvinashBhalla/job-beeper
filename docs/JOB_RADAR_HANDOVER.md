@@ -3272,3 +3272,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - Latest-head CI recheck: run #730 / `38354820920` on `b58c2acc603d412d8bcfda18365046655e139c38` failed full unit discovery (92 tests; 5 LinkedIn scan/enrichment failures). Run #731 / `38354814782` on the same head succeeded. CI is therefore mixed, not cleanly green; investigate the failed run/test behavior before proceeding. Greenhouse canary tests themselves passed in the failed run's log.
 - The live canary remains NOT RUN: host `python` was unavailable. No report, polls, or acceptance decision exist. Greenhouse stays disabled, notifications remain off; no production restart/deploy, persistent DB access, or migration was performed in this step.
 - Next: investigate why same-head CI runs disagree and get reliable passing full-suite evidence. Then, if safe, fast-forward only (never reset/force); build only via `sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml build`; verify resulting image ID; run full tests in a network-isolated disposable container; only then run the network-enabled two-poll canary in a disposable container with no persistent DB volume. Keep production untouched and record/review the complete JSON.
+
+
+## LinkedIn unit-test isolation fix — 2026-10-13
+
+- Investigated CI run #735 on commit `5a71fc18060d5eb790b202e20ef5e339482ebf7b`: five failures were clustered around LinkedIn scans being skipped by a shared ~300-second 429 cooldown; JD enrichment also did not execute, consistent with the same cooldown short-circuit.
+- Committed test-only isolation in `v2/test_radar.py` as `a3ae210a099576717913aa6aec7a7c1dae8bd6c7`: `MatcherTests.setUp/tearDown` now resets and restores the module-level LinkedIn request/cooldown/streak/generation values so one test's synthetic rate limit cannot contaminate another test.
+- Latest-head CI run #736 (`38355269626`) was still in progress at the time of this note; this change is NOT yet confirmed by a completed green full suite. Review its final result and, if necessary, diagnose remaining failures before any dev VM build or canary.
+- No canary was run, no production container/database was touched, Greenhouse remains disabled, and notifications remain off.
