@@ -3361,3 +3361,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Correction to the prior note: `git show origin/main:v2/radar.py | grep ... extract_linkedin_labeled_experience` returned no match. Main has general overall-experience extraction tests, but not the new LinkedIn-labeled metadata parser or the two focused regression tests shown in the v2 diff. The v2 patch also contains unrelated Gemini shadow extraction and source-status observability changes, which must not be promoted with it.
 - Decision: do not merge/cherry-pick the diverged v2 branch wholesale. Next step is a narrowly scoped promotion branch from current main containing only the LinkedIn labeled-experience parser/enrichment/collector fix and its focused regression tests; inspect dependencies and run CI before opening a PR. No production or VM runtime changes made. Greenhouse remains disabled; notifications remain off; persistent production database untouched.
 - Expected evidence: focused diff against current main, PR/CI result, then only if CI passes provide VM commands for dev-only validation. Never deploy directly from v2-live-radar.
+
+
+## Recheck after user asked next step — 2026-10-13
+
+- Re-fetched the three required docs and compared current GitHub refs. Current GitHub compare now reports `main=58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, `v2-live-radar` 240 commits ahead and 8 behind. This differs from earlier VM-reported refs, so those earlier conclusions must not be applied without a fresh fetch.
+- Current fetched `main:v2/radar.py` contains `extract_linkedin_labeled_experience`; current `main:v2/test_radar.py` also contains the LinkedIn structured-metadata and generic-snippet regression tests. Thus a parser promotion branch is not justified yet. Next action is to fetch refs on the VM and inspect the current exact diff; do not create a promotion branch, merge, or deploy based on stale refs.
+- No code or runtime changes made. Greenhouse stays disabled, notifications off, production and persistent database untouched.
