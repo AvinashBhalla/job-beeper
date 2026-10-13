@@ -3764,3 +3764,10 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 
 - User's latest read-only diagnostics show `v2/radar.py` defines `DB_PATH = Path(os.getenv("JOB_RADAR_DB", ROOT / "jobs.db"))`; no `.db`, `.sqlite`, or `.sqlite3` files were found within five levels of the checkout. Two Uvicorn processes run `/usr/local/bin/python3.12 /usr/local/bin/uvicorn v2.radar:app --host 0.0.0.0 --port 8000` (PIDs reported as 157883 and 165424). Docker API access returned permission denied for the current user.
 - This supports the conclusion that the prior diagnostic targeted a missing checkout-relative database; it does not identify the live DB path or establish whether the service uses `JOB_RADAR_DB`. Next safe step is to inspect each process's `/proc/<pid>/cwd`, command line, and only the `JOB_RADAR_DB` environment entry, then request the local `/health` endpoint on port 8000. Do not dump full process environments, use sudo, alter permissions, restart services, create/copy a DB, or guess the database location.
+
+
+## 2026-10-13 follow-up: live health confirms container DB path
+
+- User's latest `/health` output from `http://127.0.0.1:8000/health` reports `status=ok`, `version=2.0.0`, and DB path `/data/jobs.db`. It reports Naukri last success `2026-10-13T17:46:27.677899+00:00`, 355 jobs seen, 0 new, no error; LinkedIn is not running and has a rate-limit cooldown. Treat these as user-provided runtime observations, not independently verified.
+- Reading `/proc/<pid>/cwd` yielded no path, and process environments were not readable for the current user, so `JOB_RADAR_DB` remains unconfirmed. Do not access `/data/jobs.db` as a host path or assume it is available in the checkout. Docker socket access remains denied.
+- Next safe step: inspect repository runtime manifests and `/api/jobs` route parameters to determine whether the intended isolated dev service exposes enough persisted evaluation data through its local API, and how the container volume maps to host storage. Keep reads bounded and redact job URLs/descriptions. Do not use sudo, restart, rebuild, create/copy databases, or write to the DB.
