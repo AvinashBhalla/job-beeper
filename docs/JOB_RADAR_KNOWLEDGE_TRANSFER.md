@@ -1413,3 +1413,10 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - Do not alter matching thresholds or merge/rebuild canonical groups until a privacy-safe sample establishes identity. `rebuild_canonical_opportunities` is especially risky because it deletes notification ledger rows.
 - Experience fields may be null while the reason references candidate/configured-profile compatibility because the job's explicit range can be unknown; investigate matcher semantics before calling it a bug.
 - Next: inspect full `v2/dedupe.py` and `match_details` around 1790–1895, then perform read-only identity audit. No app/runtime/database/notification/production changes. Pull latest docs before the next local command.
+
+
+## 2026-10-13 — Full dedupe and experience semantics
+- Confirmed same-source candidates with differing canonical URLs are skipped. Match score rules: URL exact=100; identical experience plus high title similarity=98 or 95; title plus description similarity can be 97/93; probable metadata=88; auto-link threshold >=95. Explicitly differing experience signatures block metadata linking.
+- Next inspect candidate group selection and job-to-canonical data; perform a privacy-safe, read-only sample audit of repeated groups. Do not merge groups or rebuild canonical identities before proving vacancy identity.
+- Experience reasons and min/max are generated in the same matcher result and persisted together. “Experience compatible” plus null min/max may indicate stale/inconsistent evaluation lifecycle, but not yet proven. Inspect evaluation timestamps/fingerprints and stored rows read-only.
+- No application or runtime changes. Avoid canonical rebuild because it deletes notification ledger rows. Pull latest docs before next local command.
