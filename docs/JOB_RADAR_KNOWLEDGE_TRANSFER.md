@@ -1100,3 +1100,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Current GitHub compare reports `main=58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, with `v2-live-radar` 240 commits ahead and 8 behind. These refs differ from earlier VM output; do not act on stale SHAs.
 - The current fetched `main:v2/radar.py` and `main:v2/test_radar.py` already contain the LinkedIn labeled-experience parser and focused regression tests. A parser promotion branch is not justified until a fresh VM fetch and exact diff establish a remaining fix.
 - No code/runtime changes or deployment. Greenhouse disabled, notifications off, production and persistent database untouched.
+
+
+## VM ref comparison: refresh remote-tracking main explicitly — 2026-10-13
+
+- User's VM diff confirms the LinkedIn labeled-experience parser and focused tests exist on the fetched v2 branch relative to its reported `origin/main=a1db74f...`. However, `git fetch origin main v2-live-radar` reported main only as `FETCH_HEAD`; it advanced `origin/v2-live-radar` but did not refresh `origin/main`. Thus the displayed main SHA is likely a stale remote-tracking ref and is not valid evidence for promotion.
+- Current GitHub API compare reports main `58fdff19...`, v2-live-radar 242 commits ahead and 8 behind; fetching current GitHub main confirms it already contains `extract_linkedin_labeled_experience` and the structured-metadata regression test. Do not promote parser code or merge the diverged branch.
+- Next VM step is read-only: explicitly fetch `refs/heads/main:refs/remotes/origin/main` and `refs/heads/v2-live-radar:refs/remotes/origin/v2-live-radar`, then compare the updated refs. No code/runtime changes. Greenhouse remains disabled, notifications off, production and persistent database untouched.
