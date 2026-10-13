@@ -3,7 +3,8 @@
     "linkedin": 180,
     "naukri": 300,
     "instahyre": 600,
-    "greenhouse": 900
+    "greenhouse": 900,
+    "ashby": 1800
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -104,9 +105,10 @@
     "linkedin": false,
     "naukri": true,
     "instahyre": false,
-    "greenhouse": false
+    "greenhouse": false,
+    "ashby": false
   },
-  "config_version": 10,
+  "config_version": 11,
   "greenhouse_boards": [
     {
       "token": "coinbase",
@@ -119,6 +121,16 @@
     {
       "token": "zocdoc",
       "company": "Zocdoc"
+    }
+  ],
+  "ashby_boards": [
+    {
+      "board": "openai",
+      "company": "OpenAI"
+    },
+    {
+      "board": "posthog",
+      "company": "PostHog"
     }
   ]
 }
