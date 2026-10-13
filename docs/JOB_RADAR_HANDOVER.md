@@ -3841,3 +3841,8 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - `_job_for_canonical()` now adds accepted Gemini values as `jd_experience_min_years`/`jd_experience_max_years` before `match_details()` evaluates persisted jobs. Existing deterministic parsing remains the fallback; the extractor still stores cache results separately and no API request is made from the matcher.
 - Added three regression tests covering accepted cached values, rejection of unsafe results, and the persisted-job loading bridge. These tests have been committed but not yet run in the VM; next run the targeted Gemini tests and full radar suite.
 - Commits on `v2-live-radar`: extractor bridge `1b667e489f9ebfee808ada8601e39fdee1df6c59`, matcher integration `c3cc27640b6ddf044e2d776f148bbc15ab7b2361`, regression tests `ce69cecc67d2bbb19c694cbb7be79628caa0f931`. This is code-only development, not a production deployment. Protect local `v2/config.json` and `.venv/`; do not replay historical notifications.
+
+
+## 2026-10-13: Explicit matcher rollout gate added
+- Gemini-to-matcher integration is now guarded by `GEMINI_MATCHER_ENABLED` (must be `1`, `true`, or `yes`). It defaults off, so deploying the code alone does not change eligibility or alerts. When enabled, only fresh exact-JD cache results that pass evidence/type/scope/confidence checks are applied.
+- Regression tests now set `GEMINI_MATCHER_ENABLED=true` for trusted-cache integration cases. Latest code/test commits: `14516a0` and `0b74444`; run tests in VM before considering release. Production environment has not been changed.
