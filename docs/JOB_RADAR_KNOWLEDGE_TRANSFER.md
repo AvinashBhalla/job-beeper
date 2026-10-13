@@ -1188,3 +1188,12 @@ Recommended next validation is a disposable one-off container from the dev image
 - Re-fetched and verified both handover documents and V2 config files. Both docs include today's dated entries. Config version 11 in both files; Ashby disabled and set to a 1800-second poll target; development notifications disabled.
 - No deployment, VM commands, production access, matching, notifications, or repeated live source probes. `main`, root config, Greenhouse and Instahyre activation unchanged.
 - Next: request the user's local checkout status/path only if needed to run read-only development validation; keep sources/notifications disabled. Then inspect historical-listing replay protections and assess a separate Ashby activation review only after measured eligibility and relevance results.
+
+
+## Development checkout test verification — 2026-10-13
+- User ran the test suite from `/home/ubuntu/job-beeper-dev` after fast-forwarding branch `v2-live-radar` to `a9dd83953d06f360ca707ba207387961818241d9`.
+- The project runtime dependencies installed from `v2/requirements.txt`; that requirements file did not install pytest, so the user installed pytest into the checkout-local `.venv` only. No repository dependency files were changed.
+- Verified user-reported command: `python -m pytest -q v2/test_radar.py v2/test_greenhouse_canary.py v2/test_gemini_extractor.py` → **100 passed, 4 warnings, 2 subtests passed in 12.56s**.
+- The four warnings are FastAPI `on_event` startup/shutdown deprecations in `v2/radar.py` / FastAPI; they did not fail tests. This is unit-test evidence only, not a runtime/deployment check.
+- No service was started; no matching, source polling, database writes, or notifications were run. Ashby, Greenhouse, and Instahyre remain disabled; notifications must remain disabled in dev.
+- Next: verify the local checkout branch/HEAD/working tree and inspect `v2/config.dev.json` to confirm source flags and notification state. If safe, proceed only with explicitly read-only validation; do not run the service or change source enablement as part of this step. Record the exact output before planning the next canary.
