@@ -1093,3 +1093,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Correction to the prior note: `git show origin/main:v2/radar.py | grep ... extract_linkedin_labeled_experience` returned no match. Main has general overall-experience extraction tests, but not the new LinkedIn-labeled metadata parser or the two focused regression tests shown in the v2 diff. The v2 patch also contains unrelated Gemini shadow extraction and source-status observability changes, which must not be promoted with it.
 - Decision: do not merge/cherry-pick the diverged v2 branch wholesale. Next step is a narrowly scoped promotion branch from current main containing only the LinkedIn labeled-experience parser/enrichment/collector fix and its focused regression tests; inspect dependencies and run CI before opening a PR. No production or VM runtime changes made. Greenhouse remains disabled; notifications remain off; persistent production database untouched.
 - Expected evidence: focused diff against current main, PR/CI result, then only if CI passes provide VM commands for dev-only validation. Never deploy directly from v2-live-radar.
+
+
+## Current refs rechecked before parser promotion — 2026-10-13
+
+- Current GitHub compare reports `main=58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, with `v2-live-radar` 240 commits ahead and 8 behind. These refs differ from earlier VM output; do not act on stale SHAs.
+- The current fetched `main:v2/radar.py` and `main:v2/test_radar.py` already contain the LinkedIn labeled-experience parser and focused regression tests. A parser promotion branch is not justified until a fresh VM fetch and exact diff establish a remaining fix.
+- No code/runtime changes or deployment. Greenhouse disabled, notifications off, production and persistent database untouched.
