@@ -1910,7 +1910,12 @@ class MatcherTests(unittest.TestCase):
             ("Remote, India", 0),
         ])
         try:
-            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+            # This test targets round-robin coverage, not the global rate-limit
+            # mechanism; isolate it so a process-level cooldown cannot hide
+            # whether the cursor advances to the next two targets.
+            with patch.object(radar, "_linkedin_cooldown_remaining", return_value=0), patch.object(
+                radar, "_linkedin_request", side_effect=fake_request
+            ):
                 radar.linkedin_collect(config)
                 first_cycle = sorted(calls)
                 calls.clear()
