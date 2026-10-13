@@ -3567,3 +3567,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - No code/config changes, matching, DB writes, scheduler startup, notifications, CI, or deployment occurred in this evaluation. Preserve local `.venv/` untracked.
 - Next: stop evaluating low-yield boards by raw count alone; inspect source-posted timestamps and matcher eligibility for candidates using bounded read-only analysis, then prioritize sources/boards with demonstrable fresh India/Remote-India software/AI roles. Before the next local command, sync these docs with `git pull --ff-only origin v2-live-radar`. Keep all source toggles and notifications disabled unless separately approved.
 - Continuation: reread this handover, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`; review the overall acceptance checklist and decide the next evidence-gathering step without touching production or `main`.
+
+
+## MVP fast-track plan — 2026-10-13
+- User wants to launch the MVP soon and prefers focused, efficient delivery. Freeze scope around the existing core pipeline; defer experimental ATS expansion and non-blocking features. Keep Greenhouse, Ashby, and Instahyre disabled; keep development notifications disabled.
+- Release gates: verify isolated dev runtime/health; run existing tests; inspect Naukri and source health; verify freshness, normalization, deduplication, match explanations, and notification idempotency through safe tests; verify production backups and persistent volume before any cutover; smoke-test and observe after an approved release.
+- No code/config/runtime changes, service starts, DB writes, notifications, CI, or deployment occurred. Production and main untouched; preserve local .venv untracked.
+- Next action: user runs read-only dev diagnostics from ~/job-beeper-dev: git status -sb; git log -1 --oneline; sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml ps; curl -fsS http://127.0.0.1:8001/health; sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml logs --tail=60 radar. This diagnostic does not start/rebuild services or change toggles. Review results before choosing the next step.
