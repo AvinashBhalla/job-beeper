@@ -1302,3 +1302,9 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - User-provided read-only diagnostics: dev branch `v2-live-radar`, HEAD `8992ac8`, aligned with origin; `.venv/` remains the only untracked item. Isolated container `job-radar-dev` is up on loopback port 8001; health is OK, version 2.0.0, DB `/data/jobs.db`. Naukri last success 2026-10-13T16:04:43Z, 351 jobs seen, 0 new in latest poll, no reported error; recent logs show repeated polls and some new jobs. Zero new jobs in one poll is not a failure by itself.
 - Verified: basic dev health and active Naukri polling. Not yet verified: fresh/relevant yield, matcher/dedupe, alert-ledger idempotency, full test suite, production readiness. No tests, DB inspection, matching, notifications, config changes, restart, CI or deployment occurred. Production and main untouched; preserve `.venv/` untracked.
 - Next: run the existing dev test suite, address only real launch blockers, then verify matching/freshness/dedupe/notification safety through existing tests or read-only checks. Keep experimental sources and notifications disabled. Pull updated docs before the next local command.
+
+
+## Next MVP gate: existing CI checks — 2026-10-13
+- User has pulled the updated handover docs. Next action verifies a launch requirement; defer unrelated work under the MVP decision rule.
+- Current `.github/workflows/v2-ci.yml` specifies these checks after dependencies are installed: `python -m py_compile v2/radar.py v2/test_radar.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py`, then `python -m unittest discover -s v2 -p 'test_*.py' -v`. Agent has not run these commands on the VM.
+- Ask user to run both from `~/job-beeper-dev` in the active `.venv` and paste complete output. No service restart, config/source changes, notifications, or production actions. Preserve `.venv/` untracked.
