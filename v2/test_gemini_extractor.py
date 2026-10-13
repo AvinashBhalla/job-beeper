@@ -115,7 +115,7 @@ class GeminiValidationTests(unittest.TestCase):
                 "title": "Software Engineer", "company": "Example",
                 "description": self.description,
             }
-            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test"}):
+            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test", "GEMINI_MATCHER_ENABLED": "true"}):
                 with sqlite3.connect(db_path) as conn:
                     gemini._ensure_cache(conn)
                     conn.execute(
@@ -143,7 +143,7 @@ class GeminiValidationTests(unittest.TestCase):
         ]
         with TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "jobs.db"
-            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test"}):
+            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test", "GEMINI_MATCHER_ENABLED": "true"}):
                 for index, payload in enumerate(unsafe_payloads):
                     job = {
                         "source": "naukri", "source_job_id": f"unsafe-{index}",
@@ -181,7 +181,7 @@ class GeminiValidationTests(unittest.TestCase):
                 "canonical_opportunity_id": None, "canonical_match_method": None,
                 "canonical_match_confidence": None,
             }
-            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test"}):
+            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test", "GEMINI_MATCHER_ENABLED": "true"}):
                 with sqlite3.connect(db_path) as conn:
                     conn.execute("""CREATE TABLE jobs (
                         id INTEGER PRIMARY KEY, source TEXT, source_job_id TEXT, company TEXT,
