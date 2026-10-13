@@ -1457,3 +1457,10 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 
 - User pulled the latest branch successfully, but the read-only diagnostic stopped immediately because Ubuntu has no `python` command (`python3` is available per the shell hint). The Python diagnostic itself did not execute, so no result was produced and no database mutation occurred.
 - Next attempt should prefer the already-existing project interpreter at `.venv/bin/python` if executable; otherwise use `python3`. Do not install packages or change the environment solely to address the command alias. Preserve `.venv/` as untracked and never delete or commit it.
+
+
+## 2026-10-13 follow-up: read-only SQLite diagnostic could not open DB
+
+- User successfully ran the diagnostic with the existing project interpreter at /home/ubuntu/job-beeper-dev/.venv/bin/python.
+- The app reports DB_PATH as /home/ubuntu/job-beeper-dev/v2/jobs.db, but sqlite3.connect(file:...jobs.db?mode=ro, uri=True) failed immediately with OperationalError: unable to open database file. No rows were read, the fresh matcher comparison did not run, and no database writes occurred.
+- Next step is filesystem-only verification: check whether the DB path exists and is a regular file, inspect parent directory permissions and the configured DB_PATH source. Do not create the DB, change permissions, copy databases, or fall back to a different DB until the path/runtime setup is understood. Keep the next diagnostic read-only.
