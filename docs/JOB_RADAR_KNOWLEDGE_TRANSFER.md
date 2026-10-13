@@ -967,3 +967,13 @@ Recommended next validation is a disposable one-off container from the dev image
 - CI run #708 for the test commit was observed in progress at handover time; do not record it as passed until checked. No live Greenhouse poll has been run yet, so no canary yield/timestamp result is claimed.
 - Next: confirm CI #708 result; then pull the branch in the development checkout and build only the development Compose image. Run the CLI against one selected configured board with notifications still disabled, retain the JSON output, and evaluate two-poll acceptance before any scheduler activation.
 - Production was not changed. Do not build/deploy production or enable Greenhouse in production as part of this task.
+
+
+## Greenhouse canary quality metrics and CI compilation — 2026-10-13
+
+- User authorized direct GitHub development on `v2-live-radar` and requested VM pull/build commands plus handover updates.
+- Updated `v2/greenhouse_canary.py` to report per-poll missing source IDs, duplicate source IDs, and published-timestamp coverage for both polls, in addition to stable/new/missing IDs. The utility remains GET-only and does not activate Greenhouse, write the radar DB, run matching, or send notifications.
+- Expanded `v2/test_greenhouse_canary.py` assertions for duplicate IDs and timestamp coverage; updated `.github/workflows/v2-ci.yml` py_compile step to include the canary utility and its tests.
+- Commits on `v2-live-radar`: canary `7966ae423a44ff04cbf2bc26a6f417a52365fc4b`; tests `030adf62fe0cdc913d977c7e52e182c94dc11c9f`; CI workflow `aff4fd7e5dc6bd6be536c491bf46d2bfd059f4b6`. Workflow status must be checked before VM build; these edits have not been deployed.
+- Next: wait for/check V2 CI on the latest branch head. On the VM, first verify clean status and branch; fetch and fast-forward only (no force reset). Build only the isolated development image using `docker compose -f v2/docker-compose.dev.yml build`. Do not restart production or activate Greenhouse. For the actual canary, keep dev `source_enabled.greenhouse=false`, choose one already-configured public board, and run `python -m v2.greenhouse_canary --board-token <board-slug> --company "<company>" --interval-seconds 900` from the repo root; this requires outbound network and takes at least 15 minutes. Save the JSON report and review yield, IDs, timestamps and errors before any scheduler activation.
+- Production source/image provenance, backup and rollback are still unverified; no deployment, service restart, source activation, or database mutation occurred.
