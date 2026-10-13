@@ -369,6 +369,8 @@ def cached_matcher_experience(
     persisted evaluation. Preferred, skill-specific, ambiguous, low-confidence,
     unverifiable, expired, or wrong-model results never become matcher inputs.
     """
+    if os.getenv("GEMINI_MATCHER_ENABLED", "").strip().lower() not in {"1", "true", "yes"}:
+        return None
     model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     try:
         cached = _cache_lookup(conn, _input_hash(job), model)
