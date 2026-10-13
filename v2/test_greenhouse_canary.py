@@ -28,9 +28,17 @@ class GreenhouseCanaryTests(unittest.TestCase):
         self.assertEqual(report["second_poll_jobs"], 3)
         self.assertEqual(report["first_poll_unique_ids"], 2)
         self.assertEqual(report["second_poll_unique_ids"], 2)
+        self.assertEqual(report["first_poll_jobs_without_source_id"], 0)
+        self.assertEqual(report["second_poll_jobs_without_source_id"], 0)
+        self.assertEqual(report["first_poll_duplicate_source_ids"], 0)
+        self.assertEqual(report["second_poll_duplicate_source_ids"], 1)
         self.assertEqual(report["stable_ids"], 1)
         self.assertEqual(report["new_ids_on_second_poll"], 1)
         self.assertEqual(report["missing_ids_on_second_poll"], 1)
+        self.assertEqual(
+            report["first_poll_published_timestamp_coverage"],
+            {"with_timestamp": 1, "unknown_timestamp": 1},
+        )
         self.assertEqual(
             report["second_poll_published_timestamp_coverage"],
             {"with_timestamp": 1, "unknown_timestamp": 2},
