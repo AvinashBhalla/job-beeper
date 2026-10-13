@@ -3458,3 +3458,12 @@ Recommended next validation is a disposable one-off container from the dev image
 - Re-fetched both handover docs and both V2 configs from the branch. Both docs contain dated updates. Both configs are version 11, Ashby is false, Ashby poll target is 1800 seconds, and development notifications remain false.
 - No deployment, VM command, production interaction, matching run, notification send, or live Ashby probe was performed. Root `config.json`, `main`, Greenhouse and Instahyre activation were not changed.
 - Next action: prepare a read-only development-checkout validation command only after the user confirms their local checkout path/state; keep all sources and notifications disabled during validation. After that, inspect the results and separately review historical-listing/notification replay safeguards before proposing any Ashby activation.
+
+
+## Development checkout test verification — 2026-10-13
+- User ran the test suite from `/home/ubuntu/job-beeper-dev` after fast-forwarding branch `v2-live-radar` to `a9dd83953d06f360ca707ba207387961818241d9`.
+- The project runtime dependencies installed from `v2/requirements.txt`; that requirements file did not install pytest, so the user installed pytest into the checkout-local `.venv` only. No repository dependency files were changed.
+- Verified user-reported command: `python -m pytest -q v2/test_radar.py v2/test_greenhouse_canary.py v2/test_gemini_extractor.py` → **100 passed, 4 warnings, 2 subtests passed in 12.56s**.
+- The four warnings are FastAPI `on_event` startup/shutdown deprecations in `v2/radar.py` / FastAPI; they did not fail tests. This is unit-test evidence only, not a runtime/deployment check.
+- No service was started; no matching, source polling, database writes, or notifications were run. Ashby, Greenhouse, and Instahyre remain disabled; notifications must remain disabled in dev.
+- Next: verify the local checkout branch/HEAD/working tree and inspect `v2/config.dev.json` to confirm source flags and notification state. If safe, proceed only with explicitly read-only validation; do not run the service or change source enablement as part of this step. Record the exact output before planning the next canary.
