@@ -1370,3 +1370,10 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - Source code review confirms Naukri adapter parses relay `posted` and labels it `posted_precision="date"` when present (otherwise unknown); discovery time uses relay `updated_at`. Midnight UTC posted values are consistent with date-only precision, not sufficient proof of fabricated times or broken freshness.
 - Next safe action after pulling docs: aggregate read-only `/api/jobs?today_only=true&limit=500` fields `posted_precision`, `alertability_reasons`, `notification_decision_reasons`, `notification_status`, especially among matched rows. Do not print URLs, re-run matcher, mutate DB, enable sources, send notifications, or restart services.
 - Guardrails unchanged: keep Greenhouse/Ashby/Instahyre and dev notifications disabled; preserve `.venv/` untracked; no production/main changes or cutover without explicit approval. Pull branch docs before the next local command.
+
+
+## 2026-10-13 — Alertability and posting precision diagnostic
+- User-provided read-only diagnostic on today's first 500 rows: `posted_precision` is `date` for all 500; exact posting-time freshness cannot be inferred from these records. Midnight UTC is consistent with date-only precision.
+- Alertability reasons: 484 `not a profile match`, 16 `Telegram notifications disabled`. Notification decision reasons: 484 `no profile-matching observation`, 16 `Telegram notifications disabled; awaiting future re-evaluation`. The 16 matched records are pending as expected while Telegram is disabled; no sent alerts are indicated.
+- Next diagnostic should print a privacy-safe summary of the 16 matched jobs only: title, company, location, score/reasons, experience fields, discovered_at, posted_precision, alertability and notification reasons. Exclude URLs and full descriptions. No matcher/config/DB/notification changes.
+- Guardrails unchanged: keep Greenhouse/Ashby/Instahyre and development notifications disabled; preserve `.venv/` untracked; no production/main changes or cutover without explicit approval. Pull branch docs before next local command.
