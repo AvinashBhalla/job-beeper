@@ -3295,3 +3295,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - Also verified runs #742 (`6aa2e020a0898d660abb57fc5488203738dc3444`) and #743 (`dc9d8f2335d1d380d287b1634baa7bafce209051`) completed successfully with the full-suite step passing.
 - GitHub branch head matched the SHA tested by run #744 at verification time. This proves CI on GitHub only; no SSH/remote-shell tool is available in this session, so VM checkout fast-forward, dedicated dev-image rebuild, isolated container suite, and canary have NOT been executed or verified.
 - Next action when on the VM: confirm clean checkout and ancestry; fast-forward only if safe; build only `job-radar-dev` using `v2/docker-compose.dev.yml`; verify exact image ID; run the full test suite in a `--network none` disposable container; only if that passes, run the read-only disposable two-poll Greenhouse canary. Do not touch production Compose/container or persistent database; keep Greenhouse disabled in config/scheduler and notifications off.
+
+
+## VM isolated suite passed; CI found cursor-isolation issue — 2026-10-13
+
+- User reported the VM disposable-container suite completed with `Ran 92 tests in 18.255s` and `OK`. The exact VM checkout SHA and image ID used for that run were not included, so do not yet treat it as validation of current branch head/image identity.
+- Rechecked GitHub Actions run #746 for commit `fdf9654eddec287ac8b5f32a4d227b57ddafcd55`: it failed one test, `test_linkedin_fast_lane_rotates_two_targets_and_covers_all_locations`, because the process-wide `linkedin_fast_target_cursor` could be left at a nonzero value by earlier tests. This is test-state leakage; the failure was `second_cycle` length 0 rather than 2.
+- Fixed the test to save, reset to zero, and restore `linkedin_fast_target_cursor` in commit `82d1082df84f7028822692a739949d65c879d8e2`. CI for this fix must pass before canary execution.
+- Do not run the Greenhouse canary yet. Confirm the new commit's latest-head CI passes, and establish VM checkout/image identity before any canary. Production container/database untouched; Greenhouse remains disabled in config/scheduler; notifications remain off.
