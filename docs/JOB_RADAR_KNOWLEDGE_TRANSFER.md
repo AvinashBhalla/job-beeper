@@ -1181,3 +1181,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - GitHub Actions runs `38413031061`, `38413124663`, and `38413220587` ran 100 tests and reported one failure: existing LinkedIn round-robin rotation test had zero mocked calls on the second cycle because the test did not isolate the global rate-limit cooldown. These runs are failures, not passing CI.
 - Added an isolation patch in `v2/test_radar.py` so the rotation test stubs `_linkedin_cooldown_remaining` at zero and tests the cursor only. Commit `7d6c3d3df76b9c269608a83173b08e331077b67e`. The corresponding CI run `38413635868` was queued at the time of this note; do not assume its outcome.
 - Ashby stays disabled in both v11 configs; development notifications remain off. No local tests, VM commands, deployment, matching or notifications occurred. Next: inspect the run result and re-fetch both handover files to verify these notes. Production and main remain untouched.
+
+
+## Final verification — 2026-10-13
+- Verified branch head before this documentation commit: `83a2de2a042209f4267fc98e22f859c4e9d7c899`. GitHub Actions run `38413707935` succeeded; job `syntax` passed and log states 100 tests ran, `OK`: https://github.com/AvinashBhalla/job-beeper/actions/runs/38413707935
+- Re-fetched and verified both handover documents and V2 config files. Both docs include today's dated entries. Config version 11 in both files; Ashby disabled and set to a 1800-second poll target; development notifications disabled.
+- No deployment, VM commands, production access, matching, notifications, or repeated live source probes. `main`, root config, Greenhouse and Instahyre activation unchanged.
+- Next: request the user's local checkout status/path only if needed to run read-only development validation; keep sources/notifications disabled. Then inspect historical-listing replay protections and assess a separate Ashby activation review only after measured eligibility and relevance results.
