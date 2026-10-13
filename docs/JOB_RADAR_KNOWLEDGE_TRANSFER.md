@@ -1502,3 +1502,10 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 
 - User's latest `git status --short --branch` shows `v2/config.json` modified and `.venv/` untracked; neither is an experience-parser code change. Preserve both, especially `.venv/`, and do not stage or commit config. `git diff -- v2/radar.py v2/test_radar.py` is empty.
 - Existing `v2/test_radar.py` contains experience-related tests around lines 1754-2200, but this output alone does not prove the production fix is present or passed. The recent commit list is dominated by handover-document commits, so inspect `git log --oneline -- v2/radar.py v2/test_radar.py`, identify the test class names, and run targeted parser/matcher tests before deciding whether any code change is needed. Do not push docs-only commits as if they were the parser fix; no production deployment yet.
+
+
+## 2026-10-13 follow-up: full test suite passed; verify exact parser fix
+
+- User reports `python -m unittest v2.test_radar` completed successfully: 88 tests in 10.552s, `OK`. This is current branch test evidence, but does not alone prove the intended experience-parser fix is included.
+- `git status --short --branch` showed only user-local `v2/config.json` modification and untracked `.venv/`; preserve both and never stage either. No diff for `v2/radar.py` or `v2/test_radar.py`. Recent code history includes commit `cd3a8a6` titled `Detect more skill-specific experience phrases for shadowing`, whose relevance to the user-requested production experience-parser fix must be checked before claiming readiness.
+- Next fast path: inspect `git log --all --oneline --grep='experience\|parser'` and `git show --stat`/diff for `cd3a8a6`, then identify whether the exact matcher/parser fix and a regression test exist. Do not create a docs-only release commit or deploy production without verifying the intended code change. No production cutover or database changes.
