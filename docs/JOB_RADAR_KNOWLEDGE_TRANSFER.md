@@ -1114,3 +1114,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - User refreshed both remote-tracking refs correctly: `origin/main=58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, `origin/v2-live-radar=55c3a3adf76c5fa39ba99f59c8e379ceec0dc8fa`. The exact diff shows no LinkedIn parser/enrichment change missing from main; v2-only `radar.py` hunks are Gemini shadow extraction and persisted source-error observability. Test diff is mostly rate-limit isolation and source-status error tests. Do not merge or promote the diverged branch.
 - Main's Instahyre collector currently calls `https://www.instahyre.com/api/v1/job_search/`, uses a location and limit 35, accepts several possible payload shapes, and normalizes IDs/URLs/timestamps. Instahyre remains disabled by default. Next roadmap step is a bounded, read-only dev validation of its live response/schema/freshness and useful yield, without database writes, matching, notifications, or changing source enablement; only then decide whether adapter fixes are needed.
 - No code, runtime, production container, or persistent database changes. Greenhouse remains disabled and notifications remain off.
+
+
+## Instahyre validation preparation — 2026-10-13
+
+- User VM output confirms `extract_linkedin_labeled_experience` is already present on `origin/main`; both inspected configs keep `instahyre` and `greenhouse` disabled. The local `v2-live-radar` checkout is clean but 18 commits behind its remote; do not run app code from this stale checkout or merge branches.
+- Next step is a bounded direct GET-only probe of Instahyre's public search endpoint using `curl` and `jq`, saving only a temporary response under `/tmp` and summarizing payload shape, available fields, IDs, posting timestamps, and result count. This avoids importing the app, touching any database, matching jobs, changing source enablement, or sending notifications.
+- No runtime/code/config/production changes. Greenhouse remains disabled and notifications remain off.
