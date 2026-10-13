@@ -152,6 +152,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         merged.setdefault("poll_seconds", {})["linkedin"] = max(
             180, int(defaults.get("poll_seconds", {}).get("linkedin", 180) or 180)
         )
+    # Version 11 introduces Ashby; never enable a new source via migration.
+    if current_version < 11 <= default_version:
+        merged.setdefault("source_enabled", {})["ashby"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -164,6 +167,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             merged["source_enabled"]["instahyre"] = False
         if current_version < 7 <= default_version:
             merged["source_enabled"]["greenhouse"] = False
+        if current_version < 11 <= default_version:
+            merged["source_enabled"]["ashby"] = False
     return merged
 
 
@@ -246,6 +251,29 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_boards.append({"token": token, "company": company.strip()})
     config["greenhouse_boards"] = normalized_boards
 
+    ashby_boards = config.get("ashby_boards", [])
+    if not isinstance(ashby_boards, list):
+        raise HTTPException(status_code=422, detail="ashby_boards must be a list.")
+    if len(ashby_boards) > 20:
+        raise HTTPException(status_code=422, detail="ashby_boards cannot contain more than 20 boards.")
+    normalized_ashby_boards: list[dict[str, str]] = []
+    seen_ashby_board_names: set[str] = set()
+    for board in ashby_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Ashby board must be an object.")
+        name = board.get("board")
+        company = board.get("company")
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", name.strip()):
+            raise HTTPException(status_code=422, detail="Each Ashby board requires a valid public board name.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Ashby board requires a company label of at most 120 characters.")
+        name = name.strip()
+        if name.lower() in seen_ashby_board_names:
+            raise HTTPException(status_code=422, detail=f"Duplicate Ashby board name: {name}.")
+        seen_ashby_board_names.add(name.lower())
+        normalized_ashby_boards.append({"board": name, "company": company.strip()})
+    config["ashby_boards"] = normalized_ashby_boards
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -254,6 +282,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "naukri": bool(source_enabled.get("naukri", True)),
         "instahyre": bool(source_enabled.get("instahyre", True)),
         "greenhouse": bool(source_enabled.get("greenhouse", False)),
+        "ashby": bool(source_enabled.get("ashby", False)),
     }
 
     poll_seconds = config.get("poll_seconds", {})
@@ -266,6 +295,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "naukri": 300,
             "instahyre": 600,
             "greenhouse": 900,
+            "ashby": 1800,
         }.items()
     }
 
@@ -2505,11 +2535,119 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _parse_ashby_published_at(value: Any) -> tuple[dt.datetime | None, str]:
+    """Parse Ashby's publishedAt field; missing or malformed values stay unknown."""
+    if not isinstance(value, str) or not value.strip():
+        return None, "unknown"
+    raw = value.strip()
+    try:
+        parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        parsed = parsed.astimezone(UTC)
+    except (OverflowError, OSError, TypeError, ValueError):
+        return None, "unknown"
+    precision = "minute" if re.search(r"\d{2}:\d{2}", raw) else "date"
+    return parsed, precision
+
+
+def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect an explicit allowlist of public Ashby boards with bounded requests."""
+    boards = config.get("ashby_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Ashby is enabled but no public ashby_boards are configured")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+
+    for board in boards:
+        name = str(board.get("board") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not name or not company or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", name):
+            failures.append(f"{name or '<missing-board>'}: invalid board configuration")
+            continue
+
+        endpoint = f"https://api.ashbyhq.com/posting-api/job-board/{name}"
+        try:
+            response = requests.get(endpoint, headers={**UA, "Accept": "application/json"}, timeout=15)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
+                raise ValueError("Ashby response did not contain a jobs list")
+            successful_boards += 1
+        except Exception as exc:
+            failures.append(f"{name}: {type(exc).__name__}")
+            log.warning("ashby: board=%s failed error_type=%s", name, type(exc).__name__)
+            continue
+
+        for item in payload["jobs"]:
+            if not isinstance(item, dict):
+                continue
+            raw_id = item.get("id")
+            title = item.get("title")
+            url = item.get("jobUrl") or item.get("applyUrl")
+            if raw_id in (None, "") or not isinstance(title, str) or not title.strip():
+                continue
+            if not isinstance(url, str) or not url.strip():
+                continue
+            direct_url = url.strip()
+            if not re.match(r"^https://", direct_url, re.I):
+                continue
+
+            source_id = f"ashby-{name}-{raw_id}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            location_value = item.get("location")
+            if isinstance(location_value, dict):
+                location = str(location_value.get("name") or "").strip()
+            elif isinstance(location_value, str):
+                location = location_value.strip()
+            else:
+                location = ""
+            if not location:
+                location = str(item.get("locationName") or "").strip()
+
+            html_description = item.get("descriptionHtml")
+            plain_description = item.get("descriptionPlain")
+            if isinstance(html_description, str) and html_description.strip():
+                description = BeautifulSoup(html_lib.unescape(html_description), "html.parser").get_text(" ", strip=True)
+            elif isinstance(plain_description, str):
+                description = re.sub(r"\s+", " ", plain_description).strip()
+            else:
+                description = ""
+
+            published_at, posted_precision = _parse_ashby_published_at(item.get("publishedAt"))
+            try:
+                jobs.append(normalize_job(
+                    "ashby", source_id, company, title.strip(), location,
+                    direct_url, published_at, posted_precision, description,
+                ))
+            except (TypeError, ValueError) as exc:
+                log.warning("ashby: board=%s skipped malformed job error_type=%s", name, type(exc).__name__)
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Ashby boards failed: {details}")
+    if failures:
+        log.warning("ashby: partial board failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info(
+        "ashby: boards=%s successful=%s failed=%s jobs=%s timestamped=%s",
+        len(boards), successful_boards, len(failures), len(jobs),
+        sum(1 for job in jobs if job.get("source_posted_at")),
+    )
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
     "instahyre": instahyre_collect,
     "greenhouse": greenhouse_collect,
+    "ashby": ashby_collect,
 }
 
 
