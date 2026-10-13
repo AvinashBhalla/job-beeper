@@ -1464,3 +1464,9 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - User successfully ran the diagnostic with the existing project interpreter at /home/ubuntu/job-beeper-dev/.venv/bin/python.
 - The app reports DB_PATH as /home/ubuntu/job-beeper-dev/v2/jobs.db, but sqlite3.connect(file:...jobs.db?mode=ro, uri=True) failed immediately with OperationalError: unable to open database file. No rows were read, the fresh matcher comparison did not run, and no database writes occurred.
 - Next step is filesystem-only verification: check whether the DB path exists and is a regular file, inspect parent directory permissions and the configured DB_PATH source. Do not create the DB, change permissions, copy databases, or fall back to a different DB until the path/runtime setup is understood. Keep the next diagnostic read-only.
+
+
+## 2026-10-13 follow-up: expected DB file absent from checkout
+
+- User ran the filesystem diagnostic after pulling the latest branch. The repository checkout directory and v2/ directory are accessible, but `v2/jobs.db` does not exist in the checkout. Because the command used `&&`, `stat` and the DB_PATH grep did not run. The earlier import printed `radar.DB_PATH` as `/home/ubuntu/job-beeper-dev/v2/jobs.db`; SQLite's read-only open error is consistent with that file being absent, though the intended live DB may be elsewhere (for example, in a container-mounted path).
+- Do not create a DB, change permissions, or point diagnostics at a guessed file. Next step: read the DB_PATH definition, search only the checkout for SQLite files, inspect running app/container process metadata, and check whether Docker is available. Avoid environment dumps or printing secrets. Only after locating the actual isolated dev DB should the read-only evaluation comparison be retried.
