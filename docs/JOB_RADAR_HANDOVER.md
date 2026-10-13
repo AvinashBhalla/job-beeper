@@ -3368,3 +3368,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Re-fetched the three required docs and compared current GitHub refs. Current GitHub compare now reports `main=58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, `v2-live-radar` 240 commits ahead and 8 behind. This differs from earlier VM-reported refs, so those earlier conclusions must not be applied without a fresh fetch.
 - Current fetched `main:v2/radar.py` contains `extract_linkedin_labeled_experience`; current `main:v2/test_radar.py` also contains the LinkedIn structured-metadata and generic-snippet regression tests. Thus a parser promotion branch is not justified yet. Next action is to fetch refs on the VM and inspect the current exact diff; do not create a promotion branch, merge, or deploy based on stale refs.
 - No code or runtime changes made. Greenhouse stays disabled, notifications off, production and persistent database untouched.
+
+
+## VM ref comparison: refresh remote-tracking main explicitly — 2026-10-13
+
+- User's VM diff confirms the LinkedIn labeled-experience parser and focused tests exist on the fetched v2 branch relative to its reported `origin/main=a1db74f...`. However, `git fetch origin main v2-live-radar` reported main only as `FETCH_HEAD`; it advanced `origin/v2-live-radar` but did not refresh `origin/main`. Thus the displayed main SHA is likely a stale remote-tracking ref and is not valid evidence for promotion.
+- Current GitHub API compare reports main `58fdff19...`, v2-live-radar 242 commits ahead and 8 behind; fetching current GitHub main confirms it already contains `extract_linkedin_labeled_experience` and the structured-metadata regression test. Do not promote parser code or merge the diverged branch.
+- Next VM step is read-only: explicitly fetch `refs/heads/main:refs/remotes/origin/main` and `refs/heads/v2-live-radar:refs/remotes/origin/v2-live-radar`, then compare the updated refs. No code/runtime changes. Greenhouse remains disabled, notifications off, production and persistent database untouched.
