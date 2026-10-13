@@ -1557,3 +1557,9 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 ## 2026-10-13: Gemini matcher rollout gate
 - `GEMINI_MATCHER_ENABLED` must be explicitly set to `1`, `true`, or `yes` before validated Gemini cache results can affect matching. Default off means code deployment alone will not change matcher outcomes or alerts.
 - Integration tests set the gate on for test cases. Latest code/test commits `14516a0` / `0b74444`; run tests in VM before release. No production environment was changed.
+
+
+## 2026-10-13: Gemini matcher tests passed
+- User reports 11/11 `v2.test_gemini_extractor` tests passed and 88/88 `v2.test_radar` tests passed.
+- Matcher integration remains gated by `GEMINI_MATCHER_ENABLED`, default off. Passing tests do not equal production deployment.
+- Next release checks: identify actual production target and deployment mechanism; verify Gemini extraction enablement/auth and cache quality; back up and confirm persistent production DB; preserve notification ledger and avoid historical replay. Deploy with matcher gate off, verify health/cache, then enable only as an explicit controlled step. Protect local `v2/config.json` and `.venv/`.
