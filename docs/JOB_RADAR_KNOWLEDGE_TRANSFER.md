@@ -1552,3 +1552,8 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - `_job_for_canonical()` attaches trusted values to the in-memory job dict before the normal matcher runs. Existing regex parsing remains fallback; matcher does not make Gemini network calls.
 - Three regression tests added for accepted values, unsafe-result rejection, and the persisted job loading bridge. Not yet executed on the VM; run targeted Gemini tests and then full suite.
 - Commits: `1b667e4`, `c3cc276`, `ce69cec`. No production deployment has occurred. Preserve local `v2/config.json` and `.venv/`; no historical notification replay.
+
+
+## 2026-10-13: Gemini matcher rollout gate
+- `GEMINI_MATCHER_ENABLED` must be explicitly set to `1`, `true`, or `yes` before validated Gemini cache results can affect matching. Default off means code deployment alone will not change matcher outcomes or alerts.
+- Integration tests set the gate on for test cases. Latest code/test commits `14516a0` / `0b74444`; run tests in VM before release. No production environment was changed.
