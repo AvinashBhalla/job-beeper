@@ -1496,3 +1496,9 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 
 - User explicitly asks to move quickly and ship the experience-parser fix to production, preferring a minimal/smart path over extended investigation.
 - Current evidence only establishes the runtime DB path and that `/api/jobs` returns persisted evaluations. It does not establish the exact code diff, whether the parser fix is committed/pushed, whether targeted tests pass, or whether production deployment is approved. Keep the path short: inspect `git status` and diff for parser/matcher/test files, run the narrow relevant tests, push only the verified fix to `v2-live-radar`, and report the exact commit. Do not deploy/cut over production without explicit approval; do not touch production DB or trigger historical notification replay. Note dev Compose uses port 8001 and a separate `radar-dev-data` volume; prior health response on port 8000 is not proof of the dev instance.
+
+
+## 2026-10-13 follow-up: worktree check for experience parser release
+
+- User's latest `git status --short --branch` shows `v2/config.json` modified and `.venv/` untracked; neither is an experience-parser code change. Preserve both, especially `.venv/`, and do not stage or commit config. `git diff -- v2/radar.py v2/test_radar.py` is empty.
+- Existing `v2/test_radar.py` contains experience-related tests around lines 1754-2200, but this output alone does not prove the production fix is present or passed. The recent commit list is dominated by handover-document commits, so inspect `git log --oneline -- v2/radar.py v2/test_radar.py`, identify the test class names, and run targeted parser/matcher tests before deciding whether any code change is needed. Do not push docs-only commits as if they were the parser fix; no production deployment yet.
