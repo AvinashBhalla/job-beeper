@@ -1175,3 +1175,9 @@ Recommended next validation is a disposable one-off container from the dev image
 - Tests added cover valid, empty, malformed/partial and total failures, duplicate IDs, no-update-time fallback, migration and allowlist validation. No local execution is claimed; CI must be checked for the final branch head. No deployment or VM validation occurred.
 - Ashby is false in both V2 configs; development notifications remain false. Production services/DB/volume, root config, `main`, Greenhouse, Instahyre and matching/notification code paths were not altered. No repeated Ashby/Greenhouse/Instahyre probes; no matching or notifications ran.
 - Remaining risks: live payload variation, timestamp completeness, India/remote eligibility, relevant role yield and historical alert replay. Next: finish docs, re-fetch both docs and changed files to verify, then inspect CI. If CI is green, plan a separate read-only dev validation with notifications disabled and Ashby still off. Do not merge the diverged branch wholesale into main.
+
+
+## Follow-up validation — 2026-10-13
+- GitHub Actions runs `38413031061`, `38413124663`, and `38413220587` ran 100 tests and reported one failure: existing LinkedIn round-robin rotation test had zero mocked calls on the second cycle because the test did not isolate the global rate-limit cooldown. These runs are failures, not passing CI.
+- Added an isolation patch in `v2/test_radar.py` so the rotation test stubs `_linkedin_cooldown_remaining` at zero and tests the cursor only. Commit `7d6c3d3df76b9c269608a83173b08e331077b67e`. The corresponding CI run `38413635868` was queued at the time of this note; do not assume its outcome.
+- Ashby stays disabled in both v11 configs; development notifications remain off. No local tests, VM commands, deployment, matching or notifications occurred. Next: inspect the run result and re-fetch both handover files to verify these notes. Production and main remain untouched.
