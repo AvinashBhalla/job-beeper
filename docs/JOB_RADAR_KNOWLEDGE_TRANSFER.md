@@ -1308,3 +1308,9 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - User has pulled the updated handover docs. Next action verifies a launch requirement; defer unrelated work under the MVP decision rule.
 - Current `.github/workflows/v2-ci.yml` specifies these checks after dependencies are installed: `python -m py_compile v2/radar.py v2/test_radar.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py`, then `python -m unittest discover -s v2 -p 'test_*.py' -v`. Agent has not run these commands on the VM.
 - Ask user to run both from `~/job-beeper-dev` in the active `.venv` and paste complete output. No service restart, config/source changes, notifications, or production actions. Preserve `.venv/` untracked.
+
+
+## Existing test suite passed — 2026-10-13
+- User reports the existing unittest discovery completed: `Ran 100 tests in 19.302s`, `OK`. This is user-reported output; agent has not run the tests directly on the VM.
+- Unit tests passed, but source yield/freshness, live matcher/dedupe correctness, notification-ledger idempotency, and production readiness remain unverified. No code/config/service changes and no production actions.
+- Next: confirm `python -m py_compile v2/radar.py v2/test_radar.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py` also passed; if not, run it in `~/job-beeper-dev` with `.venv` active. Then review only remaining MVP acceptance gates. Keep experimental sources and dev notifications disabled; preserve `.venv/`; do not touch `main` or production.
