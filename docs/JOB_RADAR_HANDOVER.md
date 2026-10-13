@@ -3827,3 +3827,10 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - Branch check `git merge-base --is-ancestor 58fdff1 HEAD` returned exit code 1: the `main` merge containing LinkedIn labeled-experience fix `9b9cbf1` is not an ancestor of `v2-live-radar`. Do not merge `main` wholesale as a shortcut.
 - Next implementation focus: inspect the remainder of `run_source`, matcher/evaluation persistence, and existing Gemini tests; add a tested, bounded path that applies only validated, evidence-backed Gemini overall-experience values to matcher inputs before evaluations/alerts, with deterministic parser fallback on Gemini error/low-confidence/ambiguous scope. Keep dev notifications disabled and do not replay historical alerts.
 - No parser code has been changed or promoted by this inspection. Preserve local `v2/config.json` changes and `.venv/`; never stage/reset/clean them. Before any production cutover, test the normal matcher path and request explicit approval.
+
+
+## 2026-10-13: Matcher integration points confirmed
+- VM output confirms `match_details()` reads `jd_experience_min_years`/`jd_experience_max_years`, then regex parsers; it does not read `gemini_shadow_cache`.
+- `run_source()` currently invokes `shadow_extract_jobs()` before `upsert_jobs()`, `refresh_job_evaluations()`, and `refresh_notification_decisions()`. That ordering provides an integration point, but the current shadow function returns stats only and intentionally leaves each job unchanged.
+- Existing VM test grep did not reveal a Gemini-to-matcher regression test in `v2/test_radar.py`; inspect `v2/test_gemini_extractor.py` and cache result samples before wiring this into the hard matcher. Only apply Gemini experience when schema validation and verbatim evidence pass, scope is `total_professional`, type is `required`, and confidence meets an explicit threshold; avoid turning skill-specific or preferred years into hard eligibility rules.
+- Worktree safety confirmed: local `v2/config.json` is modified and `.venv/` is untracked; preserve both. No production changes, notification replay, or parser deployment performed.
