@@ -1959,7 +1959,13 @@ class MatcherTests(unittest.TestCase):
             return Response()
 
         try:
-            with patch.object(radar, "_linkedin_request", side_effect=fake_request):
+            # Keep this collector test hermetic: parsed LinkedIn cards are marked
+            # for JD enrichment, which must not make real network requests here.
+            with patch.object(radar, "_linkedin_request", side_effect=fake_request), patch.object(
+                radar,
+                "enrich_linkedin_job",
+                side_effect=lambda job: {**job, "needs_jd_enrichment": False},
+            ):
                 first = radar.linkedin_collect(config)
                 first_starts = sorted(calls)
                 calls.clear()
