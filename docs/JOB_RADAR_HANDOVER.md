@@ -3727,3 +3727,15 @@ Recommended next validation is a disposable one-off container from the dev image
 
 ### User-provided terminal evidence
 The user supplied grep output from the dev checkout showing _persist_job_evaluation() upserts reasons_json, experience_min_years, and experience_max_years together; refresh_job_evaluations() compares config_fingerprint; and canonical assignment includes the same-source/different-URL skip described above. These are terminal excerpts, not independently executed tests by the assistant.
+
+
+## 2026-10-13 follow-up: full candidate query and API evaluation fields
+
+### Additional user-provided source excerpts
+- _candidate_canonical_groups() first queries canonical_opportunities by exact normalized canonical URL and returns those rows if found. If none are found, it falls back to groups with matching company_norm and location_norm, ordered by last_seen_at descending, limited to 100.
+- _assign_canonical() then skips any candidate whose representative source matches the incoming job source unless canonical URLs match. This means the company/location fallback does not enable same-source metadata matching when URLs differ. This strengthens the hypothesis that same-source query-variant Naukri results may form separate groups, but does not establish that every repeated listing is the same vacancy.
+- /api/jobs selects persisted job_evaluations fields and maps evaluation_experience_min_years / evaluation_experience_max_years to the response. The handler explicitly documents that it returns the persisted matcher/ledger decisions rather than independently running the matcher at request time.
+- The displayed matcher excerpt returns experience_min_years and experience_max_years alongside reasons. _persist_job_evaluation() upserts those values and reasons_json together. Thus a saved reason naming a specific range with null saved bounds warrants a record-level comparison between the stored evaluation and a fresh in-memory match_details() result.
+
+### Next safe step
+Use a read-only SQLite/Python diagnostic against the isolated dev database. For a small sample of suspicious job IDs, print only job ID, source, company/title/location, URL host/path (not query strings or full URLs), evaluation timestamp, fingerprint prefix, saved reasons, and saved experience bounds; then compute match_details() in memory using the same loaded config and compare results without calling _persist_job_evaluation(). Do not update evaluations, rebuild canonical groups, or alter the notification ledger during this diagnostic.
