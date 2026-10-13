@@ -1545,3 +1545,10 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - `run_source()` calls shadow extraction before upsert/evaluation/notification refresh, but shadow extraction currently only persists cache results and does not annotate job dictionaries.
 - Before hard-matcher integration, inspect `v2/test_gemini_extractor.py` and cache samples. Treat only validated, exact-evidence, required total-professional experience at an explicit confidence threshold as an overall experience requirement. Do not hard-reject on preferred or skill-specific years.
 - Preserve local `v2/config.json` and untracked `.venv/`; no parser code has been changed or deployed.
+
+
+## 2026-10-13: Gemini matcher bridge committed; validation pending
+- `cached_matcher_experience(job, conn)` now reads only a fresh cache entry matching the current JD hash and configured model, revalidates it, and accepts only required total-professional experience with exact evidence and confidence >= 0.85.
+- `_job_for_canonical()` attaches trusted values to the in-memory job dict before the normal matcher runs. Existing regex parsing remains fallback; matcher does not make Gemini network calls.
+- Three regression tests added for accepted values, unsafe-result rejection, and the persisted job loading bridge. Not yet executed on the VM; run targeted Gemini tests and then full suite.
+- Commits: `1b667e4`, `c3cc276`, `ce69cec`. No production deployment has occurred. Preserve local `v2/config.json` and `.venv/`; no historical notification replay.
