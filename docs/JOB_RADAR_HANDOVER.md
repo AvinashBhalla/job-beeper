@@ -3407,3 +3407,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - User-provided read-only VM output for the public Ashby OpenAI board shows 808 listed jobs, 808 unique IDs, and no missing IDs, titles, job URLs, or published timestamps. The payload is structurally promising, but the sample contains postings dated as far back as 2023 and is globally distributed; structure alone does not establish freshness or useful India/remote yield.
 - Next step: summarize the already-downloaded /tmp/ashby_openai_probe.json locally by publication-age buckets and India/remote locations; do not repeat the network request, run app code from the stale checkout, enable Ashby, change scheduler/config, run matching, send notifications, or touch production/database volumes.
 - No repository code, config, runtime, production, or database changes. Greenhouse and Instahyre remain disabled; notifications stay disabled for all validation work.
+
+
+## Ashby OpenAI timestamp parsing correction — 2026-10-13
+
+- The first local summary command failed because jq `fromdateiso8601` rejected fractional seconds with a `+00:00` timezone suffix (example: `2026-03-12T16:38:15.322+00:00`). The corrected read-only jq command strips fractional seconds, normalizes `+00:00` to `Z`, and safely counts unparseable timestamps.
+- Next step remains local analysis of the already-downloaded `/tmp/ashby_openai_probe.json`; do not repeat the network request, run app code from the stale checkout, enable Ashby, alter scheduler/config, run matching, send notifications, or touch production/database volumes.
+- No repository code, config, runtime, production, or database changes. Greenhouse and Instahyre remain disabled; notifications stay disabled for this validation.
