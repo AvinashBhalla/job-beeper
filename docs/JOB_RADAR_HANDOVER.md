@@ -3323,3 +3323,10 @@ Recommended next validation is a disposable one-off container from the dev image
 
 - User screenshot shows the disposable canary command running on the verified dev image and log `boards=1 successful=1 failed=0 jobs=225`. This confirms the first Coinbase Greenhouse poll succeeded with 225 jobs; the final report is expected only after the configured 900-second interval and second poll.
 - Advise the user not to interrupt the process yet; wait for the final JSON report. No production Compose/container or persistent DB touched; Greenhouse remains disabled in scheduler config and notifications remain off.
+
+
+## Coinbase Greenhouse two-poll canary passed — 2026-10-13
+
+- User supplied the final JSON report from the disposable two-poll canary on the verified dev image. Both polls completed with 225 jobs and 225 unique source IDs each; `stable_ids=225`, `new_ids_on_second_poll=0`, `missing_ids_on_second_poll=0`, duplicate IDs 0, and jobs without source IDs 0.
+- Publication timestamps were present for all 225 jobs in both snapshots (unknown timestamp count 0). Report explicitly confirms `database_writes=0`, `matching_executed=false`, `notifications_sent=false`, `status=completed`.
+- Conclusion: successful two-snapshot validation for the existing Coinbase board only. Do not enable Greenhouse in the scheduler or production based on this single-board canary. Any next step requires separate review of scope, board coverage, and operational acceptance. Production Compose/container and persistent database remain untouched; notifications remain disabled.
