@@ -1393,3 +1393,9 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - No code/config/database/runtime/notification/CI/deployment/main/production changes. Experimental sources and dev notifications remain disabled; preserve `.venv/` untracked.
 - Next: after pulling docs, inspect existing source adapter, canonicalization inputs and API/schema projection, then run a privacy-safe read-only diagnostic to establish whether repeated rows share stable upstream requisition identity. Do not change matcher or dedupe logic until confirmed.
 - User must run `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar` before the next local command. Every subsequent turn must update both handover docs sequentially and verify.
+
+
+## 2026-10-13 — Source inspection fallback
+- User pulled latest docs successfully, but source inspection stopped because `rg` is not installed. No source inspection or app changes occurred.
+- Next: use standard `grep -n -E -C 3` to inspect canonical identity/dedupe and experience extraction/matching in `v2/radar.py`; then review evidence before any fix. No DB writes, polling, notification/source changes, restarts, or production/main changes.
+- Pull docs before the next local command: `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar`.
