@@ -1420,3 +1420,22 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - Next inspect candidate group selection and job-to-canonical data; perform a privacy-safe, read-only sample audit of repeated groups. Do not merge groups or rebuild canonical identities before proving vacancy identity.
 - Experience reasons and min/max are generated in the same matcher result and persisted together. “Experience compatible” plus null min/max may indicate stale/inconsistent evaluation lifecycle, but not yet proven. Inspect evaluation timestamps/fingerprints and stored rows read-only.
 - No application or runtime changes. Avoid canonical rebuild because it deletes notification ledger rows. Pull latest docs before next local command.
+
+
+## 2026-10-13 follow-up: canonical candidate selection and evaluation lifecycle
+
+### Evidence received
+- The displayed excerpt of _candidate_canonical_groups() shows candidate selection using canonical URL when the incoming job has a normalized URL; the excerpt does not include the complete fallback/query logic.
+- _assign_canonical() skips a candidate when it has the same source as the incoming job and a different canonical URL. Therefore same-source listings cannot be linked by metadata similarity alone in that branch. This is a confirmed code limitation and a plausible contributor to repeated Naukri company/title/location groups, but it does not prove those rows are the same real vacancy.
+- _persist_job_evaluation() calculates match_details() and alertability_details(), then persists reasons and experience bounds in the same upsert. refresh_job_evaluations() re-evaluates only rows with no evaluation or a different config fingerprint. backfill_job_evaluations() fills only missing evaluations.
+- A persisted match reason that states a specific experience range while the same evaluation row has null experience bounds needs record-level verification; do not assume API mapping is the root cause.
+- Do not run rebuild_canonical_opportunities() as a diagnostic: the inspected implementation deletes notification-ledger rows while rebuilding canonical groups.
+
+### Next read-only verification
+1. Inspect the full _candidate_canonical_groups() implementation (around lines 527–575) to understand URL and metadata candidate selection.
+2. Inspect representative persisted job/evaluation rows together: job ID, source, company/title/location, source URL host/path only (avoid printing full URLs), evaluation timestamp, config fingerprint, reasons JSON, and persisted experience bounds.
+3. Compare each suspicious record's stored evaluation with a fresh in-memory match_details(job, config) result without persisting it. If the stored row and fresh result differ, investigate evaluation refresh/config lifecycle; if both are null but reasons claim a range, inspect parsing and the exact job payload.
+4. No code fix or dedupe rebuild until candidate query semantics and real-vacancy evidence are understood. Keep Naukri/other canaries and notifications disabled as currently guarded.
+
+### User-provided terminal evidence
+The user supplied grep output from the dev checkout showing _persist_job_evaluation() upserts reasons_json, experience_min_years, and experience_max_years together; refresh_job_evaluations() compares config_fingerprint; and canonical assignment includes the same-source/different-URL skip described above. These are terminal excerpts, not independently executed tests by the assistant.
