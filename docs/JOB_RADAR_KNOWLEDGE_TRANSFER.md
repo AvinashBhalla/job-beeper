@@ -995,3 +995,12 @@ Recommended next validation is a disposable one-off container from the dev image
 - Latest V2 CI runs #727 and #726 failed in full unittest discovery. py_compile and the displayed Greenhouse canary tests passed; failures were 5–6 LinkedIn scan/enrichment tests. Earlier run #718 passed on commit `aff4fd7e5dc6bd6be536c491bf46d2bfd059f4b6`. Current CI is not green; diagnose and get a passing run before any development image build or live canary.
 - The host `python` invocation failed before execution; no Greenhouse HTTP polls or JSON report exist. Prior build label `v2-radar` is ambiguous, and running-container impact is unverified. No source activation, notification change, DB mutation, restart, or deployment is evidenced.
 - No code/config change in this review. Keep Greenhouse disabled and notifications off. Next: fix/verify CI; then request read-only VM git/image/container identity checks before considering safe fast-forward, dedicated dev build, isolated tests, and only then the disposable network-enabled two-poll canary. Never expose environment values or touch production/persistent DB volumes.
+
+
+## VM identity check and latest CI recheck — 2026-10-13
+
+- VM reports clean checkout at `eeb59eb4cbe3cc9771572b5bd73c69e3245124bf`; remote branch is `b58c2acc603d412d8bcfda18365046655e139c38`. Remote is a descendant of local; fast-forward is possible but deferred because latest-head CI results conflict.
+- Docker identity: `v2-radar:latest` image ID `sha256:6300862b5d8071221343dc5c95006d73a90a22db42983aecf3b6e0215cc9fee3`; running `v2-radar-1` uses different ID `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`. `job-radar-dev-radar:latest` and running `job-radar-dev` both use `sha256:13b233998d70787483762a563484aad8a38a6e21ecac49917f3ca913557f4c9f`. Keep image tags distinct; build only dedicated dev Compose after CI is resolved.
+- CI at remote head `b58c2acc603d412d8bcfda18365046655e139c38` is inconsistent: run #730 failed 5 LinkedIn scan/enrichment tests among 92, while run #731 passed. Canary tests displayed as passing; full-suite reliability still needs investigation.
+- Live canary has not run; no JSON report or two-poll results. Greenhouse remains disabled; notifications off; no production action or persistent DB changes were performed.
+- Next: resolve/reproduce same-head CI disagreement, then safe fast-forward, dedicated dev image build, isolated full test suite, and only after passing tests the network-enabled disposable canary. Never mount a persistent DB volume or modify production.
