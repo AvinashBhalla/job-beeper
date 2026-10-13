@@ -39,9 +39,22 @@ def build_report(
     """Summarize two snapshots without persisting job data."""
     first_ids = job_ids(first)
     second_ids = job_ids(second)
-    second_with_published_time = sum(
-        1 for job in second if job.get("source_posted_at") not in (None, "")
-    )
+    def timestamp_coverage(jobs: list[dict[str, Any]]) -> dict[str, int]:
+        with_timestamp = sum(
+            1 for job in jobs if job.get("source_posted_at") not in (None, "")
+        )
+        return {
+            "with_timestamp": with_timestamp,
+            "unknown_timestamp": len(jobs) - with_timestamp,
+        }
+
+    def duplicate_id_count(jobs: list[dict[str, Any]]) -> int:
+        ids = [
+            str(job["source_job_id"])
+            for job in jobs
+            if job.get("source_job_id") not in (None, "")
+        ]
+        return len(ids) - len(set(ids))
     return {
         "status": "completed",
         "source": "greenhouse",
@@ -50,13 +63,19 @@ def build_report(
         "second_poll_jobs": len(second),
         "first_poll_unique_ids": len(first_ids),
         "second_poll_unique_ids": len(second_ids),
+        "first_poll_jobs_without_source_id": sum(
+            1 for job in first if job.get("source_job_id") in (None, "")
+        ),
+        "second_poll_jobs_without_source_id": sum(
+            1 for job in second if job.get("source_job_id") in (None, "")
+        ),
+        "first_poll_duplicate_source_ids": duplicate_id_count(first),
+        "second_poll_duplicate_source_ids": duplicate_id_count(second),
         "stable_ids": len(first_ids & second_ids),
         "new_ids_on_second_poll": len(second_ids - first_ids),
         "missing_ids_on_second_poll": len(first_ids - second_ids),
-        "second_poll_published_timestamp_coverage": {
-            "with_timestamp": second_with_published_time,
-            "unknown_timestamp": len(second) - second_with_published_time,
-        },
+        "first_poll_published_timestamp_coverage": timestamp_coverage(first),
+        "second_poll_published_timestamp_coverage": timestamp_coverage(second),
         "database_writes": 0,
         "matching_executed": False,
         "notifications_sent": False,
