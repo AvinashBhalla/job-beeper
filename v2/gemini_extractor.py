@@ -360,6 +360,48 @@ def shadow_extract_jobs(
     return stats
 
 
+def cached_matcher_experience(
+    job: dict[str, Any], conn: sqlite3.Connection
+) -> dict[str, Any] | None:
+    """Return only fresh, evidence-backed overall experience safe for hard matching.
+
+    Gemini output remains cached separately; this read-only bridge is used during
+    persisted evaluation. Preferred, skill-specific, ambiguous, low-confidence,
+    unverifiable, expired, or wrong-model results never become matcher inputs.
+    """
+    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    try:
+        cached = _cache_lookup(conn, _input_hash(job), model)
+    except sqlite3.Error:
+        return None
+    if cached is None or cached[0] != "ok":
+        return None
+
+    description = str(job.get("description") or "")[:MAX_DESCRIPTION_CHARS]
+    try:
+        result = _validate_result(cached[1], description)
+    except (TypeError, ValueError):
+        return None
+
+    if (
+        result.get("experience_type") != "required"
+        or result.get("experience_scope") != "total_professional"
+        or result.get("experience_evidence") is None
+        or result.get("confidence", 0) < 0.85
+    ):
+        return None
+    low = result.get("experience_min_years")
+    high = result.get("experience_max_years")
+    if low is None and high is None:
+        return None
+    return {
+        "experience_min_years": low,
+        "experience_max_years": high,
+        "experience_evidence": result["experience_evidence"],
+        "confidence": result["confidence"],
+    }
+
+
 def shadow_status(db_path: str | Path) -> dict[str, Any]:
     enabled = os.getenv("GEMINI_EXTRACTION_ENABLED", "").strip().lower() in {"1", "true", "yes"}
     model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
