@@ -1004,3 +1004,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - CI at remote head `b58c2acc603d412d8bcfda18365046655e139c38` is inconsistent: run #730 failed 5 LinkedIn scan/enrichment tests among 92, while run #731 passed. Canary tests displayed as passing; full-suite reliability still needs investigation.
 - Live canary has not run; no JSON report or two-poll results. Greenhouse remains disabled; notifications off; no production action or persistent DB changes were performed.
 - Next: resolve/reproduce same-head CI disagreement, then safe fast-forward, dedicated dev image build, isolated full test suite, and only after passing tests the network-enabled disposable canary. Never mount a persistent DB volume or modify production.
+
+
+## LinkedIn unit-test isolation fix — 2026-10-13
+
+- Investigated CI run #735 on commit `5a71fc18060d5eb790b202e20ef5e339482ebf7b`: five failures were clustered around LinkedIn scans being skipped by a shared ~300-second 429 cooldown; JD enrichment also did not execute, consistent with the same cooldown short-circuit.
+- Committed test-only isolation in `v2/test_radar.py` as `a3ae210a099576717913aa6aec7a7c1dae8bd6c7`: `MatcherTests.setUp/tearDown` now resets and restores the module-level LinkedIn request/cooldown/streak/generation values so one test's synthetic rate limit cannot contaminate another test.
+- Latest-head CI run #736 (`38355269626`) was still in progress at the time of this note; this change is NOT yet confirmed by a completed green full suite. Review its final result and, if necessary, diagnose remaining failures before any dev VM build or canary.
+- No canary was run, no production container/database was touched, Greenhouse remains disabled, and notifications remain off.
