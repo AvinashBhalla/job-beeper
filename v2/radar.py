@@ -27,7 +27,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
-from v2.gemini_extractor import shadow_extract_jobs, shadow_status
+from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -521,7 +521,16 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
     row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
     if not row:
         return None
-    return dict(row)
+    job = dict(row)
+    # Reuse only a fresh, exact-JD Gemini cache result that has validated
+    # verbatim evidence for required total-professional experience. The regex
+    # parser remains the fallback whenever Gemini is unavailable or ambiguous.
+    trusted_experience = cached_matcher_experience(job, conn)
+    if trusted_experience:
+        job["jd_experience_min_years"] = trusted_experience["experience_min_years"]
+        job["jd_experience_max_years"] = trusted_experience["experience_max_years"]
+        job["jd_experience_source"] = "gemini_verified"
+    return job
 
 
 def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -> list[dict[str, Any]]:
