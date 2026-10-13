@@ -3280,3 +3280,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Committed test-only isolation in `v2/test_radar.py` as `a3ae210a099576717913aa6aec7a7c1dae8bd6c7`: `MatcherTests.setUp/tearDown` now resets and restores the module-level LinkedIn request/cooldown/streak/generation values so one test's synthetic rate limit cannot contaminate another test.
 - Latest-head CI run #736 (`38355269626`) was still in progress at the time of this note; this change is NOT yet confirmed by a completed green full suite. Review its final result and, if necessary, diagnose remaining failures before any dev VM build or canary.
 - No canary was run, no production container/database was touched, Greenhouse remains disabled, and notifications remain off.
+
+
+## Hermetic LinkedIn collector test follow-up — 2026-10-13
+
+- CI run #736 after the rate-state isolation change reduced the suite from five failures to one. The remaining failure was `test_linkedin_fast_lane_and_periodic_deep_scan`: its parsed listing triggered JD enrichment that was not mocked, and the CI log showed a real HTTP 429 during the second scan, which activated the process-wide cooldown and caused the test to fail.
+- Follow-up commit `6aa2e020a0898d660abb57fc5488203738dc3444` mocks `radar.enrich_linkedin_job` in that test so it remains offline/hermetic; the test's purpose is scan cadence, not JD extraction or live LinkedIn behavior.
+- Full-suite confirmation for this latest code is still pending. Do not fast-forward/build/run the canary until latest-head CI is green and the VM safety checks are revalidated. Greenhouse remains disabled, notifications off, and production/persistent DB untouched.
