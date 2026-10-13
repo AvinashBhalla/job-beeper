@@ -1250,3 +1250,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - No code/config change. Existing local `.venv/` remains local and must not be committed.
 - Next: record this canary as passed for the two-poll stability gate; before any scheduler activation, separately review relevant/new-job yield and source health strategy, then obtain explicit approval for any config activation. Do not enable Greenhouse merely because this canary passed.
 - Continuation: start by reading this handover, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; inspect only evidence relevant to the next explicitly approved step.
+
+
+## Local handover sync reported — 2026-10-13
+- User confirmed they completed the requested `git pull --ff-only origin v2-live-radar` after the Zocdoc canary. Pull output/HEAD was not pasted, so this is user-reported rather than independently verified local-state evidence.
+- Read the latest handover, knowledge-transfer, and JobBeeper reference documents from `v2-live-radar`; no repository code/config changes were made in this turn.
+- Zocdoc two-poll canary evidence remains: 58 jobs in each poll; all 58 IDs stable; no duplicates, missing IDs, missing source IDs, or unknown published timestamps. The test did not establish relevant-job yield.
+- Next exact action: run one additional read-only Zocdoc public-board sample and print only a compact summary of job titles, locations, publication timestamps, and source URLs (no descriptions), so useful yield can be assessed. Do not start the app/scheduler, change source toggles, write the database, run matching, or send notifications. Keep Greenhouse and notifications disabled; leave production and `main` untouched. Preserve local `.venv/` untracked.
+- Continuation: review the compact sample for relevant/new-job yield before proposing any source activation; this does not itself authorize activation.
