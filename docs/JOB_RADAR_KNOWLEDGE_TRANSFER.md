@@ -1205,3 +1205,9 @@ Recommended next validation is a disposable one-off container from the dev image
 - Parsed `v2/config.dev.json`: `config_version=11`; LinkedIn=false, Naukri=true, Instahyre=false, Greenhouse=false, Ashby=false; `notifications_enabled=false`.
 - User-reported unit tests on this checkout passed: 100 passed, 4 FastAPI deprecation warnings, 2 subtests passed in 12.56s. No service, matching, polling, database writes or notifications were run.
 - Next exact action: from `~/job-beeper-dev`, run `git diff -- v2/config.json` and `git diff --stat`; inspect output before deciding whether the local config modification is an intentional local-only change. Do not include `.venv/` in commits. Keep production, `main`, services, source flags and notification settings untouched.
+
+
+## Local checkout fast-forward — 2026-10-13
+- User restored only the formatting-only changes in `v2/config.json`; `git status --short` showed only the local untracked `.venv/`, which must remain uncommitted.
+- User fetched `origin/v2-live-radar`; local branch was reported four commits behind, then `git pull --ff-only origin v2-live-radar` completed successfully as a fast-forward from `a9dd839` to `48e921a`, updating only `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` (17 lines each).
+- Next: verify with `git status -sb` and `git rev-parse HEAD`. No services, polling, matching, DB writes, or notifications were run; keep source flags and notifications unchanged.
