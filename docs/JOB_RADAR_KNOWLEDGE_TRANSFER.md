@@ -1399,3 +1399,10 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - User pulled latest docs successfully, but source inspection stopped because `rg` is not installed. No source inspection or app changes occurred.
 - Next: use standard `grep -n -E -C 3` to inspect canonical identity/dedupe and experience extraction/matching in `v2/radar.py`; then review evidence before any fix. No DB writes, polling, notification/source changes, restarts, or production/main changes.
 - Pull docs before the next local command: `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar`.
+
+
+## 2026-10-13 — Canonical and experience inspection findings
+- Grep output confirms canonical matching is implemented in `v2/dedupe.py`, imported by `v2/radar.py`. Existing linked jobs return their current canonical ID; unlinked jobs are candidate-scored and linked only if `auto_link_allowed` passes. Inspect score thresholds and canonical identity inputs before fixing repeated same-title/company/location groups.
+- Caution: `rebuild_canonical_opportunities` deletes `notification_ledger` rows while resetting canonical IDs. Do not run it as a diagnostic.
+- Experience evaluation min/max values are stored in `job_evaluations` and mapped from API query aliases. Compatibility reasons alongside null fields remain unexplained; stale evaluations or persistence/mapping mismatch are hypotheses only.
+- No app/runtime/database/notification changes. Next inspect `v2/dedupe.py` and full canonical opportunity helper / evaluation write and API projection using read-only grep/sed. Pull latest docs before the next local command: `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar`.
