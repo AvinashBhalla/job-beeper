@@ -3346,3 +3346,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - Re-read the three source-of-truth docs before acting. Coinbase canary is accepted as complete; no additional Greenhouse board tests. Keep Greenhouse disabled, notifications off, production container and persistent database untouched.
 - GitHub compare confirms `main...v2-live-radar` is diverged (v2 ahead by 234 and behind by 8); never merge or promote the branch wholesale. The current `v2/radar.py` parser patch adds `extract_linkedin_labeled_experience` and metadata parsing, while main has a different `v2/radar.py` blob. Next action is read-only local inspection on the VM of branch SHAs, relevant parser diff, parser-focused tests, and CI before deciding on a narrow cherry-pick/patch. Do not modify branches or deploy until the diff and target main state are established.
 - User command requested: run the read-only Git inspection block supplied in chat and return all output. This is not a deployment command and does not touch runtime state.
+
+
+## Inspection update: parser logic already exists on main — 2026-10-13
+
+- Re-read handover, knowledge transfer, and reference docs. The user's VM output confirms the local checkout is clean but behind the latest remote v2 branch; remote heads are main `a1db74f...` and v2 `4e70f9c...`, with divergence reported as 4 main-only commits and 236 v2-only commits at that fetch.
+- GitHub read-only review shows current `main` already contains `extract_linkedin_labeled_experience` and the focused LinkedIn structured-experience tests (`test_linkedin_structured_experience_metadata_outside_description_is_captured`, `test_linkedin_generic_experience_snippet_does_not_skip_jd_enrichment`, and overall-experience extraction tests). Therefore, do not cherry-pick the entire v2 branch or assume the parser is absent from main. Next step is compare the exact parser/enrichment/collector sections on both refs and inspect main CI to establish whether any small missing fix remains.
+- No code changes or VM runtime changes made. Greenhouse remains disabled, notifications off, production container and persistent database untouched.
