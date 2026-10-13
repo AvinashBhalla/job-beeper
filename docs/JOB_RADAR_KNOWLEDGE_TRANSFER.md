@@ -1377,3 +1377,11 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - Alertability reasons: 484 `not a profile match`, 16 `Telegram notifications disabled`. Notification decision reasons: 484 `no profile-matching observation`, 16 `Telegram notifications disabled; awaiting future re-evaluation`. The 16 matched records are pending as expected while Telegram is disabled; no sent alerts are indicated.
 - Next diagnostic should print a privacy-safe summary of the 16 matched jobs only: title, company, location, score/reasons, experience fields, discovered_at, posted_precision, alertability and notification reasons. Exclude URLs and full descriptions. No matcher/config/DB/notification changes.
 - Guardrails unchanged: keep Greenhouse/Ashby/Instahyre and development notifications disabled; preserve `.venv/` untracked; no production/main changes or cutover without explicit approval. Pull branch docs before next local command.
+
+
+## 2026-10-13 — Matched-job quality review
+- User-provided matched-job output contains 16 matches scoring 70–100; each is pending/non-alertable because Telegram is disabled. All 500 audited rows had date-only posting precision, so exact posting-time freshness remains unknown.
+- Four distinct rows share `Accenture / Custom Software Engineer / Bengaluru, India` with scores 70, 76, 76, 82 and differing discovery timestamps. Could be distinct roles or duplicate listings; IDs/canonical grouping are required before calling this a dedupe defect.
+- API response shows experience fields `experience_min`, `experience_max`, `experience_text` null while match reasons mention a 2-year candidate and compatible ranges. Investigate field mapping/projection read-only.
+- Next safe command: group rows by normalized company/title/location and print stable source IDs, canonical opportunity IDs, canonical match method/confidence, scores/reasons and experience fields only. Exclude URLs and full descriptions. No code/config/DB/notification changes absent evidence and approval.
+- Guardrails unchanged: keep Greenhouse/Ashby/Instahyre and development notifications disabled; preserve `.venv/` untracked; no production/main changes or cutover without explicit approval. Pull docs before next local command.
