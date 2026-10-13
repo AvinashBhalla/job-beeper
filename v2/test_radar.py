@@ -1868,7 +1868,9 @@ class MatcherTests(unittest.TestCase):
     def test_linkedin_fast_lane_rotates_two_targets_and_covers_all_locations(self):
         original_state = radar.source_state
         original_deep = radar.linkedin_last_deep_scan_at
+        original_cursor = radar.linkedin_fast_target_cursor
         radar.source_state = {}
+        radar.linkedin_fast_target_cursor = 0
         radar.linkedin_last_deep_scan_at = radar.iso(radar.now())
         config = {
             **BASE_CONFIG,
@@ -1925,6 +1927,7 @@ class MatcherTests(unittest.TestCase):
         finally:
             radar.source_state = original_state
             radar.linkedin_last_deep_scan_at = original_deep
+            radar.linkedin_fast_target_cursor = original_cursor
 
 
     def test_linkedin_fast_lane_and_periodic_deep_scan(self):
