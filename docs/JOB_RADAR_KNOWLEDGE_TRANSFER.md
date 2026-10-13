@@ -1538,3 +1538,10 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - `git merge-base --is-ancestor 58fdff1 HEAD` returned 1, so `v2-live-radar` does not contain the `main` merge that includes LinkedIn labeled experience fix `9b9cbf1`. Avoid wholesale merging `main`.
 - Follow-up: inspect `run_source` order and evaluation fields, then implement/test the smallest safe Gemini-to-matcher integration before `refresh_job_evaluations` and notification decisions. Only use validated evidence-backed total-professional experience; retain deterministic fallback for Gemini failures, low confidence, and unclear scope. Keep dev notifications off; no historical replay.
 - Status is diagnosis only; no parser implementation or production release has occurred. Protect local `v2/config.json` and untracked `.venv/`. Production cutover still needs regression tests and explicit approval.
+
+
+## 2026-10-13: Gemini matcher integration points confirmed
+- Normal matching uses `jd_experience_min_years`/`jd_experience_max_years` followed by regex parsing; it never consults `gemini_shadow_cache`.
+- `run_source()` calls shadow extraction before upsert/evaluation/notification refresh, but shadow extraction currently only persists cache results and does not annotate job dictionaries.
+- Before hard-matcher integration, inspect `v2/test_gemini_extractor.py` and cache samples. Treat only validated, exact-evidence, required total-professional experience at an explicit confidence threshold as an overall experience requirement. Do not hard-reject on preferred or skill-specific years.
+- Preserve local `v2/config.json` and untracked `.venv/`; no parser code has been changed or deployed.
