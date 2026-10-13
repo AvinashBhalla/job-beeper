@@ -3582,3 +3582,9 @@ Recommended next validation is a disposable one-off container from the dev image
 - This verifies basic dev process/health and Naukri poll activity only; it does not prove freshness/relevance quality, matcher/dedupe correctness, notification idempotency, test-suite status, or production readiness. No tests, DB inspection, matching, notification, config changes, service restart, CI, or deployment occurred in this turn. Production and `main` remain untouched. Preserve `.venv/` as untracked.
 - Next task under the decision rule: run the existing automated test suite in the dev checkout (launch requirement verification), then fix only actual test blockers. Keep source toggles and notifications unchanged/off in dev. After tests, verify one bounded path from stored jobs through freshness/eligibility/match explanations and notification-ledger safeguards using safe tests or read-only checks; then plan production backup/volume verification and cutover gates.
 - Before the next local command, sync updated docs with `git pull --ff-only origin v2-live-radar`. Never start or alter production, enable Greenhouse/Ashby/Instahyre, or activate notifications without separate approval.
+
+
+## Next MVP gate: run existing CI checks — 2026-10-13
+- User confirmed the updated docs were pulled. This task verifies a launch requirement; unrelated work is deferred under the MVP decision rule.
+- Current `.github/workflows/v2-ci.yml` specifies: `python -m py_compile v2/radar.py v2/test_radar.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py`, then `python -m unittest discover -s v2 -p 'test_*.py' -v` after dependencies are installed. Agent has not run these commands on the VM.
+- Next action: from `~/job-beeper-dev` in the active `.venv`, run both commands in that order and paste complete output, especially any traceback/failing test. Do not restart services, alter config, activate sources, send notifications, or touch production. Preserve `.venv/` untracked.
