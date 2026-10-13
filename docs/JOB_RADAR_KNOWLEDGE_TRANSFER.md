@@ -1121,3 +1121,9 @@ Recommended next validation is a disposable one-off container from the dev image
 - User VM output confirms `extract_linkedin_labeled_experience` is already present on `origin/main`; both inspected configs keep `instahyre` and `greenhouse` disabled. The local `v2-live-radar` checkout is clean but 18 commits behind its remote; do not run app code from this stale checkout or merge branches.
 - Next step is a bounded direct GET-only probe of Instahyre's public search endpoint using `curl` and `jq`, saving only a temporary response under `/tmp` and summarizing payload shape, available fields, IDs, posting timestamps, and result count. This avoids importing the app, touching any database, matching jobs, changing source enablement, or sending notifications.
 - No runtime/code/config/production changes. Greenhouse remains disabled and notifications remain off.
+
+
+## Instahyre probe returned HTTP 400 — 2026-10-13
+
+- User's bounded direct GET to `https://www.instahyre.com/api/v1/job_search/?jobLocations=Bengaluru&limit=35` returned HTTP 400, so no response JSON/schema, IDs, timestamps, or useful-yield evidence was obtained. Treat the endpoint as unvalidated; do not enable Instahyre or repeat broad probing. A single bounded diagnostic may inspect status/body only if needed; otherwise move to the next documented public ATS source.
+- The command failed before writing `/tmp/instahyre_probe.json`; VM `git status` remains clean on `v2-live-radar`, 18 commits behind `origin/v2-live-radar`. No code/config/runtime/database changes; notifications remain off and Greenhouse remains disabled.
