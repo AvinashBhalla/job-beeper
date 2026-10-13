@@ -3338,3 +3338,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - No code/config change this turn. Greenhouse stays disabled in scheduler config; notifications remain disabled; production Compose/container and persistent DB remain untouched.
 - Reviewed docs/JOBBEEPER_REFERENCE.md: next implementation priority is the LinkedIn experience-parser patch validation/promotion, followed by the broader source roadmap. However, GitHub compare reports main...v2-live-radar as diverged (v2 ahead by 232 commits and behind by 8); v2/radar.py has different blob SHAs on the two branches. Do not merge or promote the diverged branch wholesale. Before the next code change, inspect the existing parser patch and isolate its minimal intended diff against current main, then use a safe focused promotion path with CI.
 - Next action: inspect parser-specific changes/tests and branch history, determine whether the parser patch is already present on main, and propose/prepare a narrow change only if still needed. Preserve all existing production safety constraints.
+
+
+## Next action: inspect isolated LinkedIn parser diff before safe promotion — 2026-10-13
+
+- User asked to proceed with minimal explanation and wants only VM commands; assistant handles GitHub-side review. No code/config changes or VM mutations in this turn.
+- Re-read the three source-of-truth docs before acting. Coinbase canary is accepted as complete; no additional Greenhouse board tests. Keep Greenhouse disabled, notifications off, production container and persistent database untouched.
+- GitHub compare confirms `main...v2-live-radar` is diverged (v2 ahead by 234 and behind by 8); never merge or promote the branch wholesale. The current `v2/radar.py` parser patch adds `extract_linkedin_labeled_experience` and metadata parsing, while main has a different `v2/radar.py` blob. Next action is read-only local inspection on the VM of branch SHAs, relevant parser diff, parser-focused tests, and CI before deciding on a narrow cherry-pick/patch. Do not modify branches or deploy until the diff and target main state are established.
+- User command requested: run the read-only Git inspection block supplied in chat and return all output. This is not a deployment command and does not touch runtime state.
