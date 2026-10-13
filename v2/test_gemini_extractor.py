@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from v2 import gemini_extractor as gemini
+from v2 import radar
 
 
 class GeminiValidationTests(unittest.TestCase):
@@ -104,6 +105,114 @@ class GeminiValidationTests(unittest.TestCase):
                 row = conn.execute("SELECT status, result_json FROM gemini_shadow_cache").fetchone()
             self.assertEqual(row[0], "ok")
             self.assertEqual(json.loads(row[1])["experience_max_years"], 6.0)
+
+
+    def test_cached_matcher_experience_requires_required_overall_evidence(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            job = {
+                "source": "naukri", "source_job_id": "safe-1",
+                "title": "Software Engineer", "company": "Example",
+                "description": self.description,
+            }
+            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test"}):
+                with sqlite3.connect(db_path) as conn:
+                    gemini._ensure_cache(conn)
+                    conn.execute(
+                        """INSERT INTO gemini_shadow_cache
+                        (input_hash, source, source_job_id, title, status, result_json,
+                         model, created_at, error_code)
+                        VALUES (?, ?, ?, ?, 'ok', ?, ?, ?, NULL)""",
+                        (
+                            gemini._input_hash(job), job["source"], job["source_job_id"],
+                            job["title"], json.dumps(gemini._validate_result(self.payload, self.description)),
+                            "gemini-test", gemini._iso(gemini._utc_now()),
+                        ),
+                    )
+                    result = gemini.cached_matcher_experience(job, conn)
+            self.assertEqual(result["experience_min_years"], 4.0)
+            self.assertEqual(result["experience_max_years"], 6.0)
+            self.assertEqual(result["experience_evidence"], self.payload["experience_evidence"])
+
+    def test_cached_matcher_experience_rejects_unsafe_results(self):
+        unsafe_payloads = [
+            {**self.payload, "experience_type": "preferred"},
+            {**self.payload, "experience_scope": "skill_specific"},
+            {**self.payload, "confidence": 0.70},
+            {**self.payload, "experience_evidence": None},
+        ]
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test"}):
+                for index, payload in enumerate(unsafe_payloads):
+                    job = {
+                        "source": "naukri", "source_job_id": f"unsafe-{index}",
+                        "title": "Software Engineer", "company": "Example",
+                        "description": self.description,
+                    }
+                    with sqlite3.connect(db_path) as conn:
+                        gemini._ensure_cache(conn)
+                        conn.execute(
+                            """INSERT INTO gemini_shadow_cache
+                            (input_hash, source, source_job_id, title, status, result_json,
+                             model, created_at, error_code)
+                            VALUES (?, ?, ?, ?, 'ok', ?, ?, ?, NULL)""",
+                            (
+                                gemini._input_hash(job), job["source"], job["source_job_id"],
+                                job["title"], json.dumps(gemini._validate_result(payload, self.description)),
+                                "gemini-test", gemini._iso(gemini._utc_now()),
+                            ),
+                        )
+                        result = gemini.cached_matcher_experience(job, conn)
+                    self.assertIsNone(result, msg=f"unsafe payload {index} was accepted")
+
+    def test_persisted_job_evaluation_loads_trusted_gemini_experience(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            job = {
+                "source": "naukri", "source_job_id": "integration-1",
+                "company": "Example", "title": "Software Engineer",
+                "location": "India", "url": "https://example.test/job/1",
+                "source_posted_at": None, "posted_precision": "unknown",
+                "discovered_at": "2026-10-13T10:00:00+00:00",
+                "discovery_latency_seconds": None, "description": self.description,
+                "first_seen_at": "2026-10-13T10:00:00+00:00",
+                "last_seen_at": "2026-10-13T10:00:00+00:00",
+                "canonical_opportunity_id": None, "canonical_match_method": None,
+                "canonical_match_confidence": None,
+            }
+            with patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test"}):
+                with sqlite3.connect(db_path) as conn:
+                    conn.execute("""CREATE TABLE jobs (
+                        id INTEGER PRIMARY KEY, source TEXT, source_job_id TEXT, company TEXT,
+                        title TEXT, location TEXT, url TEXT, source_posted_at TEXT,
+                        posted_precision TEXT, discovered_at TEXT, discovery_latency_seconds INTEGER,
+                        description TEXT, first_seen_at TEXT, last_seen_at TEXT,
+                        canonical_opportunity_id INTEGER, canonical_match_method TEXT,
+                        canonical_match_confidence INTEGER
+                    )""")
+                    columns = ", ".join(job.keys())
+                    placeholders = ", ".join("?" for _ in job)
+                    conn.execute(
+                        f"INSERT INTO jobs (id, {columns}) VALUES (?, {placeholders})",
+                        (1, *job.values()),
+                    )
+                    gemini._ensure_cache(conn)
+                    conn.execute(
+                        """INSERT INTO gemini_shadow_cache
+                        (input_hash, source, source_job_id, title, status, result_json,
+                         model, created_at, error_code)
+                        VALUES (?, ?, ?, ?, 'ok', ?, ?, ?, NULL)""",
+                        (
+                            gemini._input_hash(job), job["source"], job["source_job_id"],
+                            job["title"], json.dumps(gemini._validate_result(self.payload, self.description)),
+                            "gemini-test", gemini._iso(gemini._utc_now()),
+                        ),
+                    )
+                    loaded = radar._job_for_canonical(conn, 1)
+            self.assertEqual(loaded["jd_experience_min_years"], 4.0)
+            self.assertEqual(loaded["jd_experience_max_years"], 6.0)
+            self.assertEqual(loaded["jd_experience_source"], "gemini_verified")
 
 
 if __name__ == "__main__":
