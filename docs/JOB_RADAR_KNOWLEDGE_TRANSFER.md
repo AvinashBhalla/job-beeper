@@ -1295,3 +1295,10 @@ Recommended next validation is a disposable one-off container from the dev image
 
 ## MVP fast-track — 2026-10-13
 User prioritizes an early MVP. Freeze scope; defer experimental sources and nonessential features. Keep Greenhouse/Ashby/Instahyre and dev notifications disabled. Next, collect read-only dev health/status/log diagnostics before tests or any deployment. No code/config/runtime changes or production actions in this turn. Preserve .venv untracked.
+
+
+## MVP decision rule and dev diagnostics — 2026-10-13
+- **Mandatory scope rule:** Every task must either remove a launch blocker, verify a launch requirement, or improve the usefulness of the MVP. If it does none of those, defer it. Classify the task against one of these outcomes before doing the work.
+- User-provided read-only diagnostics: dev branch `v2-live-radar`, HEAD `8992ac8`, aligned with origin; `.venv/` remains the only untracked item. Isolated container `job-radar-dev` is up on loopback port 8001; health is OK, version 2.0.0, DB `/data/jobs.db`. Naukri last success 2026-10-13T16:04:43Z, 351 jobs seen, 0 new in latest poll, no reported error; recent logs show repeated polls and some new jobs. Zero new jobs in one poll is not a failure by itself.
+- Verified: basic dev health and active Naukri polling. Not yet verified: fresh/relevant yield, matcher/dedupe, alert-ledger idempotency, full test suite, production readiness. No tests, DB inspection, matching, notifications, config changes, restart, CI or deployment occurred. Production and main untouched; preserve `.venv/` untracked.
+- Next: run the existing dev test suite, address only real launch blockers, then verify matching/freshness/dedupe/notification safety through existing tests or read-only checks. Keep experimental sources and notifications disabled. Pull updated docs before the next local command.
