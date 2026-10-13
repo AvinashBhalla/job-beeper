@@ -3450,3 +3450,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - GitHub Actions run `38413031061` and the subsequent documentation-triggered runs `38413124663` and `38413220587` executed the test suite: 100 tests ran, with one unrelated existing failure in `test_linkedin_fast_lane_rotates_two_targets_and_covers_all_locations` (the second cycle yielded zero calls because the rotation test did not isolate process-level cooldown state). This is not a green CI result.
 - Tightened the test isolation only: `v2/test_radar.py` now patches `_linkedin_cooldown_remaining` to zero within that rotation test, so it measures round-robin cursor behavior independently of rate-limit state. Commit: `7d6c3d3df76b9c269608a83173b08e331077b67e`. The new branch CI run `38413635868` was queued when this note was written; outcome is not yet known here.
 - Ashby remains disabled, both configs are version 11, development notifications remain disabled. No local tests, VM commands or deployment were performed. Next: inspect run `38413635868` and verify docs/config/source registry after CI completes. Do not activate Ashby or modify production.
+
+
+## Final verification — 2026-10-13
+- Verified current branch `v2-live-radar` head: `83a2de2a042209f4267fc98e22f859c4e9d7c899`.
+- GitHub Actions run `38413707935` completed with conclusion `success`; job `syntax` passed and its log reports `Ran 100 tests ... OK`. Run URL: https://github.com/AvinashBhalla/job-beeper/actions/runs/38413707935
+- Re-fetched both handover docs and both V2 configs from the branch. Both docs contain dated updates. Both configs are version 11, Ashby is false, Ashby poll target is 1800 seconds, and development notifications remain false.
+- No deployment, VM command, production interaction, matching run, notification send, or live Ashby probe was performed. Root `config.json`, `main`, Greenhouse and Instahyre activation were not changed.
+- Next action: prepare a read-only development-checkout validation command only after the user confirms their local checkout path/state; keep all sources and notifications disabled during validation. After that, inspect the results and separately review historical-listing/notification replay safeguards before proposing any Ashby activation.
