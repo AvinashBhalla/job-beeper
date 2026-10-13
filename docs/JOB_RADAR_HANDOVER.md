@@ -3677,3 +3677,10 @@ Recommended next validation is a disposable one-off container from the dev image
 - **Expected interpretation:** distinct source IDs alone are not proof of distinct vacancies. If the Naukri relay exposes the same underlying listing through multiple query variants with distinct IDs, fix identity upstream only after confirming a reliable stable source key. If IDs represent genuinely separate requisitions, preserve them.
 - **Continuation prompt:** investigate possible duplicate Naukri ingestion/canonicalization and the experience-field/API-projection discrepancy, evidence first; no code fix until root cause is established. Keep production untouched.
 - **Before next local command:** `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar`.
+
+
+## 2026-10-13 — Source inspection command fallback
+- User successfully pulled the latest `v2-live-radar` handover updates. The planned source inspection stopped immediately because `rg` (ripgrep) is not installed; no source-code inspection or application change occurred.
+- Use standard `grep -n -E -C 3` instead of installing a package. Inspect canonical identity/dedupe and experience extraction/matching in `v2/radar.py`; output should be reviewed before any proposed code changes.
+- Next exact user action: run the equivalent read-only grep command from `~/job-beeper-dev`, paste complete output, then diagnose identity inputs and API experience-field projection. Do not mutate the database, trigger polling, enable sources/notifications, restart services, or touch production/main.
+- Docs-only update; preserve `.venv/` untracked. User must pull latest docs before any later local command if another docs update occurs.
