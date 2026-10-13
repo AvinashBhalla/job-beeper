@@ -1127,3 +1127,8 @@ Recommended next validation is a disposable one-off container from the dev image
 
 - User's bounded direct GET to `https://www.instahyre.com/api/v1/job_search/?jobLocations=Bengaluru&limit=35` returned HTTP 400, so no response JSON/schema, IDs, timestamps, or useful-yield evidence was obtained. Treat the endpoint as unvalidated; do not enable Instahyre or repeat broad probing. A single bounded diagnostic may inspect status/body only if needed; otherwise move to the next documented public ATS source.
 - The command failed before writing `/tmp/instahyre_probe.json`; VM `git status` remains clean on `v2-live-radar`, 18 commits behind `origin/v2-live-radar`. No code/config/runtime/database changes; notifications remain off and Greenhouse remains disabled.
+
+
+## Ashby PostHog board probe — 2026-10-13
+
+- Read-only public Ashby endpoint returned 10 listed jobs with 10 unique IDs and no missing IDs, titles, URLs, or publication timestamps. Sample roles are mixed and many are region-specific; one board is not enough evidence to enable a source. Keep scheduler flags unchanged, notifications off, and production untouched. VM checkout remains clean but 24 commits behind `origin/v2-live-radar`; do not run app code from this stale checkout.
