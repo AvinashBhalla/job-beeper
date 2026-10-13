@@ -1385,3 +1385,11 @@ User prioritizes an early MVP. Freeze scope; defer experimental sources and none
 - API response shows experience fields `experience_min`, `experience_max`, `experience_text` null while match reasons mention a 2-year candidate and compatible ranges. Investigate field mapping/projection read-only.
 - Next safe command: group rows by normalized company/title/location and print stable source IDs, canonical opportunity IDs, canonical match method/confidence, scores/reasons and experience fields only. Exclude URLs and full descriptions. No code/config/DB/notification changes absent evidence and approval.
 - Guardrails unchanged: keep Greenhouse/Ashby/Instahyre and development notifications disabled; preserve `.venv/` untracked; no production/main changes or cutover without explicit approval. Pull docs before next local command.
+
+
+## 2026-10-13 — Repeated identity audit
+- User-provided read-only audit grouped 500 today's job rows by company/title/location and found 15 repeated groups. The largest was Accenture / Custom Software Engineer / Bengaluru (172 rows). Across the 206 rows in the reported groups, all source job IDs and canonical opportunity IDs were unique; all displayed canonical match methods were `new`, confidence 0. This suggests possible repeated Naukri query-variant ingestion or canonical identity keys that are too strict, but is not yet proof that each row is the same vacancy.
+- Experience fields `experience_min`, `experience_max`, and `experience_text` are null in the returned API rows even though matcher reasons cite specific experience requirements. The API projection/schema versus matcher inputs needs read-only inspection.
+- No code/config/database/runtime/notification/CI/deployment/main/production changes. Experimental sources and dev notifications remain disabled; preserve `.venv/` untracked.
+- Next: after pulling docs, inspect existing source adapter, canonicalization inputs and API/schema projection, then run a privacy-safe read-only diagnostic to establish whether repeated rows share stable upstream requisition identity. Do not change matcher or dedupe logic until confirmed.
+- User must run `cd ~/job-beeper-dev && git pull --ff-only origin v2-live-radar` before the next local command. Every subsequent turn must update both handover docs sequentially and verify.
