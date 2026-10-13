@@ -3467,3 +3467,11 @@ Recommended next validation is a disposable one-off container from the dev image
 - The four warnings are FastAPI `on_event` startup/shutdown deprecations in `v2/radar.py` / FastAPI; they did not fail tests. This is unit-test evidence only, not a runtime/deployment check.
 - No service was started; no matching, source polling, database writes, or notifications were run. Ashby, Greenhouse, and Instahyre remain disabled; notifications must remain disabled in dev.
 - Next: verify the local checkout branch/HEAD/working tree and inspect `v2/config.dev.json` to confirm source flags and notification state. If safe, proceed only with explicitly read-only validation; do not run the service or change source enablement as part of this step. Record the exact output before planning the next canary.
+
+
+## Dev checkout status follow-up — 2026-10-13
+- User verified the local development checkout at `/home/ubuntu/job-beeper-dev`: branch `v2-live-radar`, HEAD `a9dd83953d06f360ca707ba207387961818241d9`.
+- `git status --short` reports ` M v2/config.json` and untracked `.venv/`. The changed root V2 config is not yet inspected; preserve it and do not reset/checkout it until its diff is reviewed. The untracked virtual environment is expected local tooling and must not be committed.
+- Parsed `v2/config.dev.json`: `config_version=11`; LinkedIn=false, Naukri=true, Instahyre=false, Greenhouse=false, Ashby=false; `notifications_enabled=false`.
+- User-reported unit tests on this checkout passed: 100 passed, 4 FastAPI deprecation warnings, 2 subtests passed in 12.56s. No service, matching, polling, database writes or notifications were run.
+- Next exact action: from `~/job-beeper-dev`, run `git diff -- v2/config.json` and `git diff --stat`; inspect output before deciding whether the local config modification is an intentional local-only change. Do not include `.venv/` in commits. Keep production, `main`, services, source flags and notification settings untouched.
