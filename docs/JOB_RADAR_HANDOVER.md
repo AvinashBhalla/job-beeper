@@ -3852,3 +3852,9 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - User ran `python -m unittest -v v2.test_gemini_extractor`: 11 tests passed. Full `python -m unittest v2.test_radar`: 88 tests passed. No failures reported.
 - Trusted cached Gemini experience integration is now regression-tested. `GEMINI_MATCHER_ENABLED` defaults off, so production matcher behavior does not change unless explicitly enabled.
 - Next: verify production deployment target, extraction enablement/auth, current cache quality, database backup/persistent volume, and notification-ledger safety. Deploy with matcher flag off first; health-check and inspect cache before explicit controlled enablement. Never replay historical alerts. User's local `v2/config.json` and `.venv/` must be preserved.
+
+
+## Gemini matcher validation update (2026-10-14)
+- VM validation passed: `v2.test_gemini_extractor` (11 tests) and full `v2.test_radar` suite (88 tests), both `OK`.
+- The Gemini matcher integration remains opt-in via `GEMINI_MATCHER_ENABLED`; default is off. Passing tests do not mean production is enabled or deployed.
+- Next gate: inspect safe dev environment/config and confirm relevant fresh cache entries/model alignment before considering a controlled rollout. Preserve local `v2/config.json` and `.venv/`; do not deploy or replay notifications without explicit approval.
