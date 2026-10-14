@@ -215,5 +215,50 @@ class GeminiValidationTests(unittest.TestCase):
             self.assertEqual(loaded["jd_experience_source"], "gemini_verified")
 
 
+    def test_shadow_status_redacts_job_identity_and_raw_extraction(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            validated = gemini._validate_result(self.payload, self.description)
+            with sqlite3.connect(db_path) as conn:
+                gemini._ensure_cache(conn)
+                conn.execute(
+                    """INSERT INTO gemini_shadow_cache
+                    (input_hash, source, source_job_id, title, status, result_json,
+                     model, created_at, error_code)
+                    VALUES (?, ?, ?, ?, 'ok', ?, ?, ?, NULL)""",
+                    (
+                        "test-hash", "naukri", "private-job-id",
+                        "Private job title", json.dumps(validated), "gemini-test",
+                        gemini._iso(gemini._utc_now()),
+                    ),
+                )
+
+            with patch.dict(os.environ, {
+                "GEMINI_EXTRACTION_ENABLED": "false",
+                "GEMINI_API_KEY": "test-key",
+                "GEMINI_MODEL": "gemini-test",
+                "GEMINI_MAX_CALLS_PER_DAY": "20",
+            }):
+                status = gemini.shadow_status(db_path)
+
+        self.assertFalse(status["enabled"])
+        self.assertTrue(status["api_key_configured"])
+        self.assertEqual(len(status["recent_results"]), 1)
+        sample = status["recent_results"][0]
+        self.assertTrue(sample["experience_shape_eligible"])
+        self.assertTrue(sample["experience_evidence_present"])
+        self.assertEqual(sample["experience_min_years"], 4.0)
+        self.assertEqual(sample["experience_max_years"], 6.0)
+
+        for private_key in (
+            "source", "source_job_id", "title", "result",
+            "experience_evidence", "required_skills", "preferred_skills",
+        ):
+            self.assertNotIn(private_key, sample)
+        serialized = json.dumps(status)
+        self.assertNotIn("private-job-id", serialized)
+        self.assertNotIn("Private job title", serialized)
+        self.assertNotIn(self.payload["experience_evidence"], serialized)
+
 if __name__ == "__main__":
     unittest.main()
