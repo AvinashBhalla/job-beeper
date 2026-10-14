@@ -1569,3 +1569,11 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - Validation on the development VM passed: 11 Gemini extractor integration tests and all 88 Radar tests.
 - Test success is not production validation. The matcher rollout flag remains default-off, and no production environment change, DB mutation, or deployment has been performed.
 - Next step: inspect development environment flag/model settings and verify fresh, matching-model Gemini cache entries before deciding whether to request a controlled production rollout.
+
+
+## 2026-10-14 — Gemini matcher tests pass; runtime config remains unverified
+- User-provided VM output: v2.test_gemini_extractor passed 11/11 and v2.test_radar passed 88/88.
+- Latest VM rollout check: matcher/extraction/model env vars were unset and no Gemini API key was detected by that check; no SQLite DB file was found in the checkout search. This does not establish the running container's effective env or volume path.
+- GEMINI_MATCHER_ENABLED defaults off. No production deployment/config change, DB mutation, or notification replay occurred.
+- Next: inspect dev Compose/env wiring and secure secret source without printing values; verify fresh Gemini cache rows for the configured model while notifications remain disabled. Preserve local v2/config.json and untracked .venv/. No production enablement without explicit user approval and DB/ledger/cache checks.
+- Every turn: update both handover docs. Provide user-run commands and wait for output; make safe GitHub code/doc changes directly as needed. Do not claim unobserved runtime success or deploy production without explicit approval.
