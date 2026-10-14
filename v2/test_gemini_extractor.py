@@ -215,6 +215,46 @@ class GeminiValidationTests(unittest.TestCase):
             self.assertEqual(loaded["jd_experience_source"], "gemini_verified")
 
 
+    def test_shadow_status_handles_malformed_cached_payload(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            malformed = {
+                "experience_min_years": [],
+                "experience_max_years": None,
+                "experience_type": [],
+                "experience_scope": {},
+                "experience_evidence": ["not a quote"],
+                "confidence": "invalid",
+            }
+            with sqlite3.connect(db_path) as conn:
+                gemini._ensure_cache(conn)
+                conn.execute(
+                    """INSERT INTO gemini_shadow_cache
+                    (input_hash, source, source_job_id, title, status, result_json,
+                     model, created_at, error_code)
+                    VALUES (?, ?, ?, ?, 'ok', ?, ?, ?, NULL)""",
+                    (
+                        "malformed-hash", "naukri", "private-id",
+                        "Private title", json.dumps(malformed), "gemini-test",
+                        gemini._iso(gemini._utc_now()),
+                    ),
+                )
+
+            with patch.dict(os.environ, {
+                "GEMINI_EXTRACTION_ENABLED": "false",
+                "GEMINI_API_KEY": "test-key",
+                "GEMINI_MODEL": "gemini-test",
+            }):
+                status = gemini.shadow_status(db_path)
+
+        sample = status["recent_results"][0]
+        self.assertEqual(sample["experience_type"], "unknown")
+        self.assertEqual(sample["experience_scope"], "unknown")
+        self.assertIsNone(sample["experience_min_years"])
+        self.assertIsNone(sample["confidence"])
+        self.assertFalse(sample["experience_evidence_present"])
+        self.assertFalse(sample["experience_shape_eligible"])
+
     def test_shadow_status_redacts_job_identity_and_raw_extraction(self):
         with TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "jobs.db"
