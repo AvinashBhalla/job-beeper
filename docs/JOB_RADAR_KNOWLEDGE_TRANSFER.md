@@ -1911,3 +1911,16 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
   ./.venv/bin/python -m unittest v2.test_gemini_extractor
   Wait before asking for the separate Radar suite. If this fails, stop and diagnose actual output; don't rebuild or change flags. After a successful result, ask separately for ./.venv/bin/python -m unittest v2.test_radar.
 - Continue the same goal: a fresh exact-current-JD/hash/model/TTL, evidence-backed Gemini experience result must flow through the matcher and affect persisted experience bounds/reasons. Do not claim this end-to-end path has been proven. The current evaluation schema does not persist jd_experience_source; retain that caveat. Cross-reference docs/JOB_RADAR_HANDOVER.md and docs/JOBBEEPER_REFERENCE.md.
+
+
+## 2026-10-14 — Gemini tests passed; run Radar tests next
+
+- User's actual VM output confirms local status still contains M v2/config.json and ?? .venv/; preserve both. From ~/job-beeper-dev, ./.venv/bin/python -m unittest v2.test_gemini_extractor returned Ran 14 tests in 0.108s / OK.
+- The test's INFO shadow-extraction line is not evidence of live Gemini API use or fresh runtime cache; no runtime, DB, environment, matcher, or production changes occurred. This turn made no application-code change.
+- Next request the Radar suite separately:
+  ```bash
+  cd ~/job-beeper-dev
+  ./.venv/bin/python -m unittest v2.test_radar
+  ```
+  Wait for and inspect complete output. If it fails, do not rebuild; diagnose and fix directly on GitHub, update both handovers, fast-forward pull while preserving local files, and rerun relevant tests. If it passes, the approved next step is the isolated dev radar rebuild only; do not enable extraction or matcher yet.
+- The larger proof remains outstanding: fresh successful Gemini cache for exact current JD/hash/model within TTL, required total_professional scope with evidence/confidence/range bound, bridge consumption through _job_for_canonical, and expected persisted evaluation bounds/reasons. Existing job_evaluations schema does not persist the jd_experience_source marker.
