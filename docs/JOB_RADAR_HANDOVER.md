@@ -4563,7 +4563,7 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
       lines[matches[0]] = new_line
   else:
       lines.append(new_line)
-  p.write_text('\\n'.join(lines) + '\\n')
+  p.write_text('\n'.join(lines) + '\n')
   print('GEMINI_MATCHER_ENABLED=true; .env contents not displayed')
   PY
   sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --force-recreate radar
