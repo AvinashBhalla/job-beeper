@@ -1563,3 +1563,9 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - User reports 11/11 `v2.test_gemini_extractor` tests passed and 88/88 `v2.test_radar` tests passed.
 - Matcher integration remains gated by `GEMINI_MATCHER_ENABLED`, default off. Passing tests do not equal production deployment.
 - Next release checks: identify actual production target and deployment mechanism; verify Gemini extraction enablement/auth and cache quality; back up and confirm persistent production DB; preserve notification ledger and avoid historical replay. Deploy with matcher gate off, verify health/cache, then enable only as an explicit controlled step. Protect local `v2/config.json` and `.venv/`.
+
+
+### Gemini matcher validation update — 2026-10-14
+- Validation on the development VM passed: 11 Gemini extractor integration tests and all 88 Radar tests.
+- Test success is not production validation. The matcher rollout flag remains default-off, and no production environment change, DB mutation, or deployment has been performed.
+- Next step: inspect development environment flag/model settings and verify fresh, matching-model Gemini cache entries before deciding whether to request a controlled production rollout.
