@@ -439,17 +439,67 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
                 "SELECT COUNT(*) FROM gemini_shadow_cache WHERE status='error'"
             ).fetchone()[0]
             rows = conn.execute("""
-                SELECT source, source_job_id, title, status, result_json, model, created_at, error_code
+                SELECT status, result_json, model, created_at, error_code
                 FROM gemini_shadow_cache ORDER BY created_at DESC LIMIT 10
             """).fetchall()
-            result["recent_results"] = [
-                {
-                    "source": row[0], "source_job_id": row[1], "title": row[2],
-                    "status": row[3], "result": json.loads(row[4] or "{}"),
-                    "model": row[5], "created_at": row[6], "error_code": row[7],
-                }
-                for row in rows
-            ]
+            recent_results: list[dict[str, Any]] = []
+            for row in rows:
+                try:
+                    payload = json.loads(row[1] or "{}")
+                    if not isinstance(payload, dict):
+                        payload = {}
+                except (TypeError, ValueError):
+                    payload = {}
+
+                low = payload.get("experience_min_years")
+                high = payload.get("experience_max_years")
+                confidence = payload.get("confidence")
+                low = low if isinstance(low, (int, float)) and not isinstance(low, bool) else None
+                high = high if isinstance(high, (int, float)) and not isinstance(high, bool) else None
+                confidence = (
+                    float(confidence)
+                    if isinstance(confidence, (int, float))
+                    and not isinstance(confidence, bool)
+                    and 0 <= confidence <= 1
+                    else None
+                )
+                evidence_present = (
+                    isinstance(payload.get("experience_evidence"), str)
+                    and bool(payload["experience_evidence"].strip())
+                )
+                experience_type = payload.get("experience_type")
+                if experience_type not in {"required", "preferred", "unspecified"}:
+                    experience_type = "unknown"
+                experience_scope = payload.get("experience_scope")
+                if experience_scope not in {"total_professional", "skill_specific", "unknown"}:
+                    experience_scope = "unknown"
+
+                shape_eligible = (
+                    row[0] == "ok"
+                    and row[2] == model
+                    and experience_type == "required"
+                    and experience_scope == "total_professional"
+                    and evidence_present
+                    and confidence is not None
+                    and confidence >= 0.85
+                    and (low is not None or high is not None)
+                )
+                recent_results.append({
+                    "status": row[0],
+                    "model": row[2],
+                    "created_at": row[3],
+                    "error_code": row[4],
+                    "experience_min_years": low,
+                    "experience_max_years": high,
+                    "experience_type": experience_type,
+                    "experience_scope": experience_scope,
+                    "confidence": confidence,
+                    "experience_evidence_present": evidence_present,
+                    # This is only a payload-shape indicator. It does not prove
+                    # a fresh exact-JD hash match or that the matcher consumed it.
+                    "experience_shape_eligible": shape_eligible,
+                })
+            result["recent_results"] = recent_results
     except sqlite3.Error:
         log.warning("gemini shadow status could not read cache")
     return result
