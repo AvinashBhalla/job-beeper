@@ -4386,3 +4386,18 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - **Matcher remains a further separate approval gate:** prove a fresh successful cache record matches the exact current input/hash and configured model within TTL; is classified required and total_professional; includes verbatim evidence; confidence is at least 0.85; has at least one experience-range bound; and is consumed by _job_for_canonical with source gemini_verified. Then verify persisted job_evaluations bounds/reasons without exposing IDs, titles, descriptions, evidence, keys, tokens, or full rows. Only after that proof, ask separately for approval to set GEMINI_MATCHER_ENABLED=true in development.
 - **No scope changes:** no production actions, no source flag changes, no notification replay, Telegram remains blank/disabled, LinkedIn remains disabled, no DB schema migration. If persistent source attribution is later required, propose a separate migration and regression test first.
 - **Turn record:** documentation-only reconciliation; no application code change, no tests run here, no runtime action performed. Cross-reference: docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md (compact state) and docs/JOBBEEPER_REFERENCE.md (architecture/rollout guardrails).
+
+
+## 2026-10-14: VM fast-forward succeeded; Gemini extractor tests next
+
+- User supplied actual SSH output confirming git pull --ff-only origin v2-live-radar fast-forwarded the VM checkout from c40e5d7 to bcb8cfc without a reported conflict. The pull updated README, both handovers, v2/gemini_extractor.py, and v2/test_gemini_extractor.py.
+- The pasted output did not include the preceding git status --short lines, so do not claim from this output alone that the local M v2/config.json and ?? .venv/ were printed; continue to preserve them and never stage/reset/clean/overwrite them.
+- No test has been run or proven by this output. No rebuild, environment change, cache inspection, DB operation, or runtime change occurred this turn.
+- Immediate next action: ask the user to run only this first test, returning complete output:
+  cd ~/job-beeper-dev
+  git status --short
+  ./.venv/bin/python -m unittest v2.test_gemini_extractor
+  Wait for output before deciding whether to run the Radar suite. If the command fails because the interpreter is missing or test failures occur, stop and diagnose from the actual output; do not proceed to rebuild or enable extraction.
+- If the Gemini suite passes, request the separate command ./.venv/bin/python -m unittest v2.test_radar next and wait for its actual output. If either suite fails, fix code/tests directly on GitHub using freshly fetched blob SHAs, update/re-fetch both handovers, pull the fix, and rerun.
+- Scope remains the trusted required-total-professional-experience path. Matcher and extraction remain false; the only runtime evidence so far is the previously reported healthy dev service and stale cache samples. Do not claim fresh exact-JD cache or matcher behavior. Preserve the no-source-marker-persistence caveat for job_evaluations.
+- Cross-reference: compact status is in docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md; architecture/rollout guardrails are in docs/JOBBEEPER_REFERENCE.md.
