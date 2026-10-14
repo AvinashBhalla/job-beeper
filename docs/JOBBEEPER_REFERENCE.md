@@ -141,15 +141,16 @@ For every source: identify allowed endpoint and board discovery method; stable s
 
 Do not enable every provider simultaneously, and do not use proxy/IP rotation or CAPTCHA bypass to evade LinkedIn rate limits.
 
-## Gemini JD extraction (development shadow mode)
+## Gemini JD extraction and opt-in matcher use (development)
 
-- \`v2/gemini_extractor.py\` calls Gemini only when deterministic experience is missing/ambiguous or configured skills are absent from a sufficiently long JD.
-- Default model: \`gemini-3.5-flash-lite\`; override with \`GEMINI_MODEL\`. Current Google pricing documentation lists a free tier and 1M-token context for this model family; free-tier quotas and data-use terms apply and must be checked in AI Studio.
-- Feature is disabled by default. Enable only in the isolated dev Compose runtime with \`GEMINI_EXTRACTION_ENABLED=true\` and a VM-injected \`GEMINI_API_KEY\`.
-- Limits: at most 3 requests per source run and 20 per day by default; bounded JD length, short timeout, hash-keyed SQLite cache, temporary error cache, strict schema/semantic validation.
-- Results are stored in \`gemini_shadow_cache\` and exposed via \`GET /api/llm-shadow-status\`. They never modify the job record, matcher inputs, match score, notification decision, or Telegram delivery.
-- Treat the posting as untrusted input. Do not send candidate PII. Never log/commit the API key or raw JD. Keep notifications disabled and do not merge/deploy until dev tests and a reviewed shadow sample pass.
-
+- \`v2/gemini_extractor.py\` makes bounded Gemini requests only when deterministic extraction is missing/ambiguous or skills are missing from a sufficiently long JD. It validates structured output and exact quoted evidence before caching results keyed to a hash of the current JD inputs; raw JD text is not stored in the Gemini cache.
+- Extraction is still a separate cache-writing pass and does not mutate the source job dictionary directly. A distinct, network-free bridge, \`cached_matcher_experience(job, conn)\`, lets persisted evaluations consume a cache result only when the JD hash and configured model match, the entry is fresh (30-day success TTL), revalidation passes, the requirement is explicitly \`required\` and \`total_professional\`, exact evidence exists, confidence is at least 0.85, and at least one range bound is present. Preferred, tool-specific, ambiguous-scope, low-confidence, invalid, expired or wrong-model results fall back to the deterministic parser.
+- \`GEMINI_MATCHER_ENABLED\` is an explicit rollout gate and defaults off. The dev Compose file passes it through with a false default. The production flag must remain off until the isolated dev pipeline is runtime-verified and the user explicitly approves production enablement.
+- Extraction is also disabled by default. In dev, use \`GEMINI_EXTRACTION_ENABLED=true\` only after a VM-local \`GEMINI_API_KEY\` and the actual isolated database volume are verified. The model defaults to \`gemini-3.5-flash-lite\`; override it with \`GEMINI_MODEL\`. Never display or commit the key. Use the ignored VM-local \`.env\` or an exported environment variable; do not paste the secret into chat.
+- Limits: at most 3 calls per source run and 20 per day by default; bounded JD length, short timeout, hash-keyed SQLite cache, short-lived error cache, strict schema/semantic validation. The matcher never calls Gemini over the network.
+- \`GET /api/llm-shadow-status\` reports whether extraction and key configuration are present, the effective model, call counts, cache success/error counts and recent structured results. When sharing terminal output, sanitize it so no job title/ID, JD evidence text, API key, token or other secret is printed.
+- The development Compose project uses a separate named volume \`job-radar-dev_radar-dev-data\` mounted at \`/data\`, with SQLite at \`/data/jobs.db\`. Keep Telegram credentials empty, notifications disabled and LinkedIn disabled during this validation; dev defaults enable only the Naukri relay.
+- Passing tests does not prove extraction or matcher use in the running service. Verify the effective container variables, actual \`/data\` mount, fresh model-aligned cache result, and persisted evaluation before proposing production rollout. Do not replay historical notifications.
 
 ### Dev validation follow-up — 2026-10-12
 - User-reported Gemini synthetic API smoke test passed; dev and production health were OK; notifications were disabled; 3/20 daily calls were used with 3 successful cached results.
