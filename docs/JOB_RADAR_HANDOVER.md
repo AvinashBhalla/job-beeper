@@ -4401,3 +4401,18 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - If the Gemini suite passes, request the separate command ./.venv/bin/python -m unittest v2.test_radar next and wait for its actual output. If either suite fails, fix code/tests directly on GitHub using freshly fetched blob SHAs, update/re-fetch both handovers, pull the fix, and rerun.
 - Scope remains the trusted required-total-professional-experience path. Matcher and extraction remain false; the only runtime evidence so far is the previously reported healthy dev service and stale cache samples. Do not claim fresh exact-JD cache or matcher behavior. Preserve the no-source-marker-persistence caveat for job_evaluations.
 - Cross-reference: compact status is in docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md; architecture/rollout guardrails are in docs/JOBBEEPER_REFERENCE.md.
+
+
+## 2026-10-14: Gemini extractor unit suite passed; Radar suite next
+
+- User supplied the actual local output from ~/job-beeper-dev after fast-forward to bcb8cfc: git status showed M v2/config.json and ?? .venv/; preserve both exactly. The command ./.venv/bin/python -m unittest v2.test_gemini_extractor completed with 14 tests in 0.108s, result OK.
+- The test log included one INFO line for a shadow-extraction test case. This is unit-test output, not evidence of live Gemini API activity, current-JD cache eligibility, runtime matcher usage, or persisted evaluation. GEMINI_EXTRACTION_ENABLED and GEMINI_MATCHER_ENABLED remain false based on the last verified runtime state; no runtime change occurred this turn.
+- No code change, rebuild, cache/database read, flag change, notification replay, or production operation occurred this turn.
+- **Next action:** run only the Radar unit suite and return its complete output:
+  ```bash
+  cd ~/job-beeper-dev
+  ./.venv/bin/python -m unittest v2.test_radar
+  ```
+- If the Radar suite fails, stop before rebuilding, capture complete output, diagnose the failure, and make a justified code/test fix directly on GitHub with fresh blob SHAs; then update/re-fetch both handovers, pull safely, and rerun the affected suites. If it passes, proceed only to the previously approved development-only radar rebuild; do not enable extraction yet.
+- Continue preserving v2/config.json and .venv/: never stage either, use git add ., reset hard, clean, or overwrite. The current source-marker caveat remains: job_evaluations does not persist jd_experience_source. End-to-end fresh exact-JD/model/cache proof is still outstanding.
+- Cross-reference docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md for compact state and docs/JOBBEEPER_REFERENCE.md for matching/rollout constraints.
