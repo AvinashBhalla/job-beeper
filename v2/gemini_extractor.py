@@ -406,6 +406,7 @@ def cached_matcher_experience(
 
 def shadow_status(db_path: str | Path) -> dict[str, Any]:
     enabled = os.getenv("GEMINI_EXTRACTION_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+    matcher_enabled = os.getenv("GEMINI_MATCHER_ENABLED", "").strip().lower() in {"1", "true", "yes"}
     model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     today = _utc_now().date().isoformat()
     try:
@@ -414,6 +415,7 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
         daily_limit = DEFAULT_MAX_CALLS_PER_DAY
     result: dict[str, Any] = {
         "enabled": enabled,
+        "matcher_enabled": matcher_enabled,
         "api_key_configured": bool(os.getenv("GEMINI_API_KEY", "").strip()),
         "model": model,
         "mode": "shadow_only",
