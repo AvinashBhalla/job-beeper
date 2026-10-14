@@ -306,12 +306,14 @@ class GeminiValidationTests(unittest.TestCase):
             with patch.dict(os.environ, {
                 "GEMINI_EXTRACTION_ENABLED": "false",
                 "GEMINI_MATCHER_ENABLED": "false",
+                "GEMINI_API_KEY": "",
                 "GEMINI_MODEL": "gemini-test",
             }):
                 disabled = gemini.shadow_status(db_path)
             with patch.dict(os.environ, {
                 "GEMINI_EXTRACTION_ENABLED": "false",
                 "GEMINI_MATCHER_ENABLED": "true",
+                "GEMINI_API_KEY": "",
                 "GEMINI_MODEL": "gemini-test",
             }):
                 enabled = gemini.shadow_status(db_path)
