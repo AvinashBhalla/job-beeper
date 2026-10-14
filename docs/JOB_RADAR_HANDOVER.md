@@ -3965,7 +3965,7 @@ PY
 
 ## 2026-10-14: Architecture reference synchronized with cached matcher
 
-- Updated \`docs/JOBBEEPER_REFERENCE.md\` in commit \`8b71918468e41084f363cc1eb4a5250757e85b74\` to clarify that extraction itself only writes validated cache entries, while the separate network-free matcher bridge may consume fresh, exact-JD/model-matched results when \`GEMINI_MATCHER_ENABLED\` is explicitly on.
-- This avoids the old reference section contradicting the current gated matcher implementation. No application code, production config, database, volume or container was changed in this turn; no tests were run. The development Compose gate wiring remains commit \`7ea83e024f2da4923633c23221ea8085a3643a10\`.
+- Updated `docs/JOBBEEPER_REFERENCE.md` in commit `8b71918468e41084f363cc1eb4a5250757e85b74` to clarify that extraction itself only writes validated cache entries, while the separate network-free matcher bridge may consume fresh, exact-JD/model-matched results when `GEMINI_MATCHER_ENABLED` is explicitly on.
+- This avoids the old reference section contradicting the current gated matcher implementation. No application code, production config, database, volume or container was changed in this turn; no tests were run. The development Compose gate wiring remains commit `7ea83e024f2da4923633c23221ea8085a3643a10`.
 - CI status for these direct branch commits was not exposed by the combined commit-status query; do not claim that CI or runtime validation passed. No production deployment or historical notification replay occurred.
-- Exact next action remains the read-only/sanitized dev VM check in the preceding section. Preserve the local \`v2/config.json\` modification and untracked \`.venv/\`; do not use \`sudo\`, print any secret, restart/rebuild before the baseline is captured, or infer DB location from checkout files.
+- Exact next action remains the read-only/sanitized dev VM check in the preceding section. Preserve the local `v2/config.json` modification and untracked `.venv/`; do not use `sudo`, print any secret, restart/rebuild before the baseline is captured, or infer DB location from checkout files.
