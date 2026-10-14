@@ -4204,3 +4204,12 @@ docker inspect job-radar-dev --format 'project={{index .Config.Labels "com.docke
 ```
 
 This is read-only and prints no environment values. Do not proceed to `up`, `down`, volume creation/removal, or SQLite inspection until this proves which dev volume is mounted.
+
+## 2026-10-14: Authorized Docker access still required
+
+- Latest user output: `docker volume ls --filter name=job-radar-dev_radar-dev-data --format 'volume={{.Name}}'` returned `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock` twice. This confirms the current shell still cannot query Docker; it does not establish whether the named dev volume exists.
+- The shell prompt was `ubuntu@job-radar:~$`, not the development checkout prompt. For this read-only Docker command the working directory does not matter; the socket access denial is the blocker. Prior `id` output showed current ubuntu account not in group `docker`, socket owner/group `root:docker`, mode `660`.
+- Do not retry with sudo, chmod, group changes or privileged workarounds. No volume/container/database change was performed; do not infer volume absence and do not create a replacement volume/database.
+- Exact next action: an already-authorized Docker session/account or VM administrator runs the filtered read-only `docker ps -a`, `docker inspect job-radar-dev --format ...`, and `docker volume ls --filter name=job-radar-dev_radar-dev-data` commands already documented above, then returns only container state, Compose project/service labels and `/data` mount metadata. If the container does not exist, report that fact without creating it.
+- Compose env-file diagnosis remains established: default interpolation missed `GEMINI_API_KEY`, explicit `--env-file .env` resolved it. Keep using explicit `--env-file .env`; both Gemini gates remain false, Telegram blank, notifications off and LinkedIn disabled. Even after Docker access is resolved, verify the existing dev volume before any recreate.
+- No code changes or tests this turn. No container lifecycle action, DB mutation, production setting/deployment, notification replay, or local worktree changes. Preserve modified `v2/config.json` and untracked `.venv/`.
