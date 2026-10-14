@@ -11,6 +11,18 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 ## Current verified state — 2026-10-14 (authoritative)
 
 ### Active issue: Gemini required-experience extraction → matcher → persisted evaluation
+- Branch: `AvinashBhalla/job-beeper:v2-live-radar`; consult both handovers and `docs/JOBBEEPER_REFERENCE.md`.
+- Matcher commits: `1b667e4`, `c3cc276`, `ce69cec`, `14516a0`, `0b74444`. Earlier user-reported tests passed: 11 Gemini tests and 88 Radar tests. No tests ran this turn.
+- Dev Compose now forwards `GEMINI_MATCHER_ENABLED` with a false default (commit `7ea83e024f2da4923633c23221ea8085a3643a10`).
+- Latest host checks: `compose_config_exit=0`; API key missing; extraction false; matcher false; model `gemini-3.5-flash-lite`; Telegram credentials empty. Live API reports extraction disabled, key absent, 0 calls today, 14 cache successes and 6 errors. Recent cache shape samples do not prove current JD hash/model acceptance or persisted-evaluation consumption.
+- User's `id` does not list group `docker`. Docker socket is `root:docker` with mode `660`, and Docker API operations fail with permission denied. Do not use `sudo`, alter socket permissions or group membership. Container identity/environment and actual `/data` volume remain unverified.
+- No application-code change, test run, container recreation, DB mutation, production change or alert replay. Preserve user-local `v2/config.json` modification and untracked `.venv/`.
+- Next: when the Gemini key is available, use the hidden-input `.env` command in the latest entry of `docs/JOB_RADAR_HANDOVER.md`. It preserves unrelated entries and forces both Gemini gates false. Verify only redacted Compose status. Do not recreate the service until an already-authorized Docker session/account or VM administrator can inspect the actual data mount and effective container environment.
+- After access is safely resolved: inspect actual dev volume, recreate only isolated dev with both Gemini gates false, verify environment/mount, enable bounded extraction, then prove fresh exact-JD/model-matched cache values reach persisted evaluations. Keep Telegram blank, notifications disabled and LinkedIn off. Production rollout requires explicit approval.
+
+## Historical verified state — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher state below)
+
+### Active issue: Gemini required-experience extraction → matcher → persisted evaluation
 - Branch: `AvinashBhalla/job-beeper:v2-live-radar`. Read this file with `docs/JOB_RADAR_HANDOVER.md` and `docs/JOBBEEPER_REFERENCE.md`.
 - Matcher bridge commits already present: `1b667e4`, `c3cc276`, `ce69cec`, `14516a0`, `0b74444`. Earlier user-reported tests: 11 Gemini tests and 88 Radar tests passed; no tests were rerun in this turn.
 - Dev Compose wiring: `v2/docker-compose.dev.yml` passes `GEMINI_MATCHER_ENABLED`, default false (commit `7ea83e024f2da4923633c23221ea8085a3643a10`). Product reference synchronized in commit `6828153f485e5e247e984a2a735f813ff6ef1d84`.
@@ -1635,3 +1647,14 @@ Continue only the Gemini required-experience pipeline in `AvinashBhalla/job-beep
 ### Continuation prompt
 
 Continue the Job Radar Gemini experience issue on `v2-live-radar`. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. The live API endpoint on port 8001 reports extraction disabled, no key configured, model gemini-3.5-flash-lite, 0 calls today, 14 successful and 6 error cache records, but Docker socket access is denied; do not use sudo or change permissions. First run the final safe diagnostic command in `docs/JOB_RADAR_HANDOVER.md` and inspect host-side Compose interpolation only without printing secrets. Preserve local `v2/config.json` and `.venv/`. Once Docker access is available, verify actual volume, securely configure key only if absent, keep Telegram disabled and LinkedIn off, run targeted Gemini tests and full Radar tests after code changes, confirm fresh cache reaches persisted evaluation, and update both handovers before the turn ends. Never enable production matcher or replay historical notifications without explicit approval.
+## 2026-10-14 — Host config confirms missing Gemini key; Docker group not assigned
+
+- Latest user output: `id` does not include `docker`; socket metadata `root:docker`, mode `660`; Docker daemon commands denied. Do not use sudo or change account/group/socket permissions.
+- Compose-resolved configuration (which does not require Docker daemon access) confirms no Gemini key, both Gemini flags false, default model `gemini-3.5-flash-lite`, and empty Telegram credentials. Live API continues to report extraction disabled, no key, zero calls today, 14 successes and 6 errors.
+- Actual running container environment, service identity and `/data` volume mapping remain unverified. Recent cache structural screens are not enough to prove that current job evaluations use those rows.
+- No code changes, tests, Docker lifecycle commands, DB changes, production rollout or historical notification replay occurred. Existing user-local configuration and `.venv/` must remain untouched.
+- If a key is available, store it using the hidden-input command in the detailed handover's newest section; the ignored VM-local `.env` preserves unrelated values and leaves both Gemini gates off. Do not paste the key into chat. Then ask an already-authorized VM account/administrator to inspect the dev mount and running env; the current `ubuntu` account cannot do that through Docker.
+
+### Continuation prompt
+
+Continue the Job Radar Gemini JD-experience issue on `v2-live-radar`. Read both handovers and `docs/JOBBEEPER_REFERENCE.md`. Latest host Compose status: API key absent, both Gemini flags false, model `gemini-3.5-flash-lite`, Telegram credentials empty. Live API on port 8001 reports extraction false, key absent, zero calls today, 14 cache successes and 6 errors. `ubuntu` is not in Docker group; socket is `root:docker` mode 660; do not use sudo or change permissions. If a key is available, save it through the hidden-input ignored `.env` command in the handover, preserving unrelated entries and keeping both flags false. Do not recreate the service until an authorized Docker session/account can verify the actual `/data` mount and running container environment. Preserve local `v2/config.json` and `.venv/`; don't deploy production or replay notifications without explicit approval. Once runtime access is available, verify fresh cache values reach persisted evaluation, run relevant tests after any code changes, and update both handovers each turn.
