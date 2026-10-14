@@ -308,7 +308,6 @@ def diagnose_database(
         "source_db_modified": False,
         "gemini_api_calls_made": 0,
         "notifications_triggered": False,
-        "source_marker_in_job_evaluations_schema": False,
     }
     if not db_path.is_file():
         summary["reason_code"] = "database_not_found"
@@ -317,6 +316,12 @@ def diagnose_database(
     uri = db_path.resolve().as_uri() + "?mode=ro"
     with closing(sqlite3.connect(uri, uri=True, timeout=5)) as conn:
         conn.row_factory = sqlite3.Row
+        evaluation_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(job_evaluations)")
+        }
+        summary["source_marker_in_job_evaluations_schema"] = (
+            "jd_experience_source" in evaluation_columns
+        )
         candidate = _find_candidate(conn, model, current)
         if candidate is None:
             summary["reason_code"] = "no_fresh_trusted_exact_hash_candidate"
