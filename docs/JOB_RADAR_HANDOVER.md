@@ -14,6 +14,17 @@
 > Each update must connect the work to the overarching goal (reliable, fresh, multi-source job discovery → normalization/deduplication → one consistent preference/match decision → explainable dashboard and Telegram delivery), and record: evidence received; diagnosis and confidence; code/config/docs paths; PR/commit and CI results; whether deployed (with actual runtime proof, not assumption); what changed and deliberately did not change; remaining risks; the exact next action; copyable commands/output expected from the user; and a continuation prompt for the next chat. Cross-link the detailed chronological handover, the compact knowledge transfer, and `docs/JOBBEEPER_REFERENCE.md` where relevant. **The latest dated handoff supersedes older instructions/checklists**; label superseded entries historical rather than leaving conflicting “next task” instructions active. Never expose secrets. One issue at a time, evidence first, verify after deploy.
 >
 > ## Current handoff — 2026-10-14 (authoritative; supersedes prior next-task lists)
+- **Goal:** verify the Gemini required-experience pipeline in isolated dev: extraction → validation → fresh model/JD-matched cache → matcher → persisted evaluation → notification decision.
+- **Matcher integration:** code commits `1b667e4`, `c3cc276`, `ce69cec`, `14516a0`, and `0b74444` are present. User previously reported 11 Gemini tests and 88 Radar tests passing; no tests ran this turn.
+- **Dev Compose gate:** commit `7ea83e024f2da4923633c23221ea8085a3643a10` passes `GEMINI_MATCHER_ENABLED` default false. Reference synchronization is in `6828153f485e5e247e984a2a735f813ff6ef1d84`.
+- **Latest user VM evidence:** checkout pulled to `e3ea9fa` while preserving `M v2/config.json` and `?? .venv/`; Compose syntax check passed. Current user `ubuntu` is not in the `docker` group (`id` groups do not list it); `/var/run/docker.sock` owner/group/mode is `root:docker 660`. Docker API commands fail with permission denied. Do not use `sudo`, change socket mode, or modify group membership.
+- **Host-side Compose result:** `compose_config_exit=0`; API key absent; `GEMINI_EXTRACTION_ENABLED=false`; `GEMINI_MATCHER_ENABLED=false`; model `gemini-3.5-flash-lite`; Telegram credentials empty. The running API at `127.0.0.1:8001` separately reports extraction disabled, no key configured, 0 calls today, 14 successful and 6 error cache entries. A few recent rows pass a preliminary shape screen only; this is not proof of current JD hash alignment or persisted evaluation.
+- **Unknowns:** actual running container environment, dev service identity, `/data` mount/volume and effective matcher gate remain unverified due Docker socket access. Do not assume the database is in the checkout or create a replacement.
+- **Exact next action:** if a valid API key is available, use the hidden-input local `.env` command in the latest chronological section below. It preserves other `.env` entries and enforces both Gemini flags false. Then verify only the redacted host-side Compose status. Do not restart/recreate any container until Docker access is available through an already-authorized account/session or an administrator handles it. No secret values should be pasted into chat.
+- **Secure configuration:** the root `.gitignore` ignores `.env`. The command checks that ignore rule before writing, prompts without echoing, and does not print the key. If the key is not yet available, obtain it from the project's authorized Gemini credential source; do not invent or share credentials.
+- **Status:** no code change, no test rerun, no Docker lifecycle action, no database mutation, no production configuration/deployment, no notification replay. Keep notifications disabled, Telegram credentials empty and LinkedIn off. Production matcher flag stays off pending explicit user approval.
+- **Cross-reference:** `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` is compact status and `docs/JOBBEEPER_REFERENCE.md` documents architecture and rollout guardrails.
+## Historical handoff — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher follow-up)
 - **Goal:** verify Gemini JD experience end-to-end in isolated development: extraction → evidence validation → fresh/model-matched cache → opt-in matcher → persisted evaluation → notification decision.
 - **Matcher code:** cached integration is already on this branch in commits `1b667e4`, `c3cc276`, `ce69cec`, `14516a0`, `0b74444`. User previously reported 11 targeted Gemini tests and 88 Radar tests passing; neither suite was rerun this turn.
 - **New config wiring:** `v2/docker-compose.dev.yml` passes `GEMINI_MATCHER_ENABLED`, default false, in commit `7ea83e024f2da4923633c23221ea8085a3643a10`. The product reference was synchronized in `6828153f485e5e247e984a2a735f813ff6ef1d84`. No application code, production Compose, or production settings were changed.
@@ -4030,3 +4041,62 @@ PY
 ```
 
 Compose interpolation reports what a new container would receive, not the running container's current environment. It is a safe prerequisite while the Docker API is inaccessible. Return the output verbatim; it contains no secret values.
+
+## 2026-10-14: Compose input confirms missing key; Docker group is absent
+
+- Latest VM output: `id` lists `ubuntu` and standard groups but not `docker`. Socket metadata is `root:docker` mode `660`; Compose commands requiring the Docker API are denied. Do not use `sudo`, change permissions, or modify group membership; use an already-authorized account/session or ask the VM administrator to run Docker-dependent inspections.
+- Host-side `docker compose ... config --format json` succeeded without printing secret values and showed `compose_api_key_configured=false`, `gemini_extraction_enabled=false`, `gemini_matcher_enabled=false`, model `gemini-3.5-flash-lite`, and `telegram_credentials_empty=true`. The API also reports `enabled=false`, `api_key_configured=false`, calls today zero, 14 successful cache records and 6 errors.
+- Historical recent-cache shape checks do not establish that any result belongs to the current JD hash or is consumed by a persisted evaluation. Actual container environment, current data-volume mount and service identity remain unverified.
+- No application-code change and no tests run this turn. No restart/rebuild, DB mutation, production change, or historical alert replay.
+
+### Configure the key locally without displaying it (only when you have the key)
+
+Run from `~/job-beeper-dev`. It verifies `.env` is ignored, preserves all other existing entries, prompts with input hidden, stores the key, and forces both Gemini gates off. It does not contact Docker or recreate the service.
+
+```bash
+cd ~/job-beeper-dev || exit 1
+git check-ignore -q .env || { echo '.env is not ignored; refusing to write'; exit 1; }
+python3 - <<'PY'
+from getpass import getpass
+from pathlib import Path
+
+path = Path('.env')
+lines = path.read_text(encoding='utf-8').splitlines() if path.exists() else []
+key = getpass('Gemini API key (input hidden): ').strip()
+if not key or any(ch.isspace() for ch in key):
+    print('No valid key entered; file unchanged.')
+    raise SystemExit(1)
+
+managed = {'GEMINI_API_KEY', 'GEMINI_EXTRACTION_ENABLED', 'GEMINI_MATCHER_ENABLED'}
+kept = [line for line in lines if line.partition('=')[0].strip() not in managed]
+kept.extend([
+    'GEMINI_API_KEY=' + key,
+    'GEMINI_EXTRACTION_ENABLED=false',
+    'GEMINI_MATCHER_ENABLED=false',
+])
+path.write_text('\n'.join(kept) + '\n', encoding='utf-8')
+path.chmod(0o600)
+print('dev_gemini_key_saved=true')
+print('gemini_extraction_enabled=false')
+print('gemini_matcher_enabled=false')
+PY
+
+python3 - <<'PY'
+import json, subprocess
+p = subprocess.run([
+    'docker', 'compose', '-p', 'job-radar-dev',
+    '-f', 'v2/docker-compose.dev.yml', 'config', '--format', 'json'
+], capture_output=True, text=True)
+print('compose_config_exit=' + str(p.returncode))
+if p.returncode:
+    print('compose_config_error_type=ComposeConfigError')
+    raise SystemExit(0)
+env = json.loads(p.stdout)['services']['radar'].get('environment', {})
+print('compose_api_key_configured=' + str(bool(str(env.get('GEMINI_API_KEY') or '').strip())).lower())
+print('gemini_extraction_enabled=' + str(env.get('GEMINI_EXTRACTION_ENABLED', '<unset>')).lower())
+print('gemini_matcher_enabled=' + str(env.get('GEMINI_MATCHER_ENABLED', '<unset>')).lower())
+print('telegram_credentials_empty=' + str(not any(str(env.get(k) or '').strip() for k in ('JOB_RADAR_TELEGRAM_BOT_TOKEN', 'JOB_RADAR_TELEGRAM_CHAT_ID'))).lower())
+PY
+```
+
+Do not run `docker compose up` until the actual mount and container environment can be checked through an authorized Docker session. A VM administrator/authorized account must handle the container inspection; no permissions should be weakened. After the mount is verified, recreate only the isolated dev service with the gates still false, inspect its actual environment/mount, then enable bounded extraction for testing. Enable matcher later only after fresh cache eligibility is proved. No production change without explicit approval.
