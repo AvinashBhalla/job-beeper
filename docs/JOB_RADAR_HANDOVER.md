@@ -4133,3 +4133,55 @@ PY
 ```
 
 Expected: `compose_api_key_configured=true`, both flags false, and `telegram_credentials_empty=true`. This still says nothing about the running container. After returning that redacted output, arrange an already-authorized Docker session/administrator to inspect the actual dev mount and current container environment before any recreate. Production remains approval-gated.
+
+## 2026-10-14: Explicit key write reported, but default Compose interpolation still false
+
+- User ran the hidden-input `.env` writer and got `dev_gemini_key_saved=true`, both Gemini gates false. Subsequent default `docker compose ... config --format json` succeeded but reported `compose_api_key_configured=false`; extraction/matcher remained false and Telegram credentials empty.
+- This means the successful file-write output and Compose's default environment resolution disagree. Do not infer the key is loaded or recreate the service yet. Potential causes include Compose env-file discovery/override settings or the key line not being interpreted as expected; distinguish them using a direct `.env` presence check and a side-by-side, redacted comparison of default Compose interpolation versus explicit `--env-file .env`.
+- The diagnostic must never print key text or full Compose output. It may print only whether the local file has exactly one non-empty `GEMINI_API_KEY` line; whether Compose recognizes a key with default discovery; whether it recognizes one with an explicit env-file; whether `COMPOSE_DISABLE_ENV_FILE` / `COMPOSE_ENV_FILES` are set; the two gate values; and Telegram-credential emptiness.
+- Docker daemon access is still denied for the current account; the user is not in group `docker`, and the socket is `root:docker` mode 660. Do not use sudo or change permissions/groups. Even if explicit Compose interpolation sees the key, the actual running container and `/data` mount remain unverified and must be inspected by an authorized session/account or VM administrator before recreate.
+- No code change, tests, service lifecycle action, DB mutation, production change or alert replay. Preserve the modified `v2/config.json` and untracked `.venv/`. Both Gemini gates stay false; notifications/Telegram remain off.
+
+### Next safe env-resolution diagnostic
+
+```bash
+cd ~/job-beeper-dev || exit 1
+python3 - <<'PY'
+import json, os, subprocess
+from pathlib import Path
+
+path = Path('.env')
+lines = path.read_text(encoding='utf-8').splitlines() if path.exists() else []
+key_lines = [line for line in lines if line.partition('=')[0].strip() == 'GEMINI_API_KEY']
+nonempty_key_lines = [line for line in key_lines if line.partition('=')[2].strip()]
+print('dotenv_file_exists=' + str(path.is_file()).lower())
+print('dotenv_ignored_by_git=' + str(subprocess.run(['git','check-ignore','-q','.env']).returncode == 0).lower())
+print('dotenv_key_line_count=' + str(len(key_lines)))
+print('dotenv_nonempty_key_line_count=' + str(len(nonempty_key_lines)))
+print('compose_disable_env_file_set=' + str(bool(os.getenv('COMPOSE_DISABLE_ENV_FILE'))).lower())
+print('compose_env_files_set=' + str(bool(os.getenv('COMPOSE_ENV_FILES'))).lower())
+
+def check(extra):
+    cmd = ['docker','compose', *extra, '-p','job-radar-dev','-f','v2/docker-compose.dev.yml','config','--format','json']
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    label = 'explicit_env_file' if extra else 'default_discovery'
+    print(label + '_config_exit=' + str(proc.returncode))
+    if proc.returncode:
+        print(label + '_config_error_type=ComposeConfigError')
+        return
+    try:
+        env = json.loads(proc.stdout)['services']['radar'].get('environment', {})
+    except (ValueError, KeyError, TypeError):
+        print(label + '_config_json=unavailable')
+        return
+    print(label + '_api_key_configured=' + str(bool(str(env.get('GEMINI_API_KEY') or '').strip())).lower())
+    print(label + '_extraction_enabled=' + str(env.get('GEMINI_EXTRACTION_ENABLED','<unset>')).lower())
+    print(label + '_matcher_enabled=' + str(env.get('GEMINI_MATCHER_ENABLED','<unset>')).lower())
+    print(label + '_telegram_credentials_empty=' + str(not any(str(env.get(k) or '').strip() for k in ('JOB_RADAR_TELEGRAM_BOT_TOKEN','JOB_RADAR_TELEGRAM_CHAT_ID'))).lower())
+
+check([])
+check(['--env-file','.env'])
+PY
+```
+
+Expected file check: `.env` exists, is ignored, one non-empty key line. If default says false but explicit env file says true, use `--env-file .env` consistently for the isolated dev Compose commands after an authorized operator verifies the volume/container; do not silently restart. If both say false, stop and inspect only dotenv line syntax/count without exposing its value; re-enter key hidden if needed. Never paste or print the credential.
