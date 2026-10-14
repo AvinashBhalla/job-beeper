@@ -25,6 +25,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sse_starlette import EventSourceResponse
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -59,6 +60,25 @@ LINKEDIN_DEEP_TPR = "r21600"
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
+@app.get("/api/events")
+async def sse_events():
+    async def event_generator():
+        queue = await manager.connect()
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield {"data": data}
+                except asyncio.TimeoutError:
+                    yield {"event": "heartbeat", "data": "ping"}
+        except asyncio.CancelledError:
+            manager.disconnect(queue)
+            raise
+        finally:
+            manager.disconnect(queue)
+
+    return EventSourceResponse(event_generator())
+
 cors_origins = [
     origin.strip()
     for origin in os.getenv("JOB_RADAR_CORS_ORIGINS", "*").split(",")
@@ -74,6 +94,25 @@ app.add_middleware(
 )
 db_lock = threading.Lock()
 started = time.monotonic()
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[asyncio.Queue] = []
+        self.loop = asyncio.get_event_loop()
+
+    async def connect(self):
+        queue = asyncio.Queue()
+        self.active_connections.append(queue)
+        return queue
+
+    def disconnect(self, queue):
+        self.active_connections.remove(queue)
+
+    def broadcast(self, message: str):
+        for queue in self.active_connections:
+            self.loop.call_soon_threadsafe(queue.put_nowait, message)
+
+manager = ConnectionManager()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
 linkedin_fast_target_cursor = 0

@@ -1791,6 +1791,25 @@
     await loadJobsFeed();
     await loadSourceStatusTelemetry();
 
+    // Initialize SSE Connection
+    const eventSource = new EventSource(`${API}/events`);
+    eventSource.onmessage = (e) => {
+      try {
+        const jobData = JSON.parse(e.data);
+        const normalized = normalizeJob(jobData);
+        if (normalized && !state.jobs.some(j => j.id === normalized.id)) {
+          state.jobs.unshift(normalized);
+          renderFeed();
+          showToast(`New opportunity discovered: ${normalized.title}`, 'info');
+        }
+      } catch (err) {
+        console.error('SSE message error:', err);
+      }
+    };
+    eventSource.onerror = () => {
+      console.warn('SSE connection lost. Attempting reconnect...');
+    };
+
     setInterval(loadJobsFeed, 10000);
     setInterval(loadSourceStatusTelemetry, 30000);
   }

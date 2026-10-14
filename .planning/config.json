@@ -1,0 +1,9 @@
+{
+  "project_name": "Job Radar",
+  "version": "2.1.0",
+  "preferences": {
+    "auto_mode": false,
+    "research_enabled": true,
+    "real_time_notifications": true
+  }
+}
