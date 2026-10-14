@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-14 (dev matcher-gate wiring fixed; runtime verification pending)**
+**Last updated: 2026-10-14 (dev container healthy; shadow extractor still disabled; diagnostics redaction committed, tests pending on VM)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -4298,3 +4298,39 @@ This is read-only and prints no environment values. Do not proceed to `up`, `dow
 - `/api/llm-shadow-status` is reachable and reports `enabled=false`, API key configured, model `gemini-3.5-flash-lite`, `mode=shadow_only`, `daily_limit=20`, `calls_today=0`, `cache_successes=14`, `cache_errors=6`. The returned examples are dated 2026-10-12, before this 2026-10-14 rebuild; they do not prove a fresh post-rebuild extraction, current exact-JD hash match, or persisted evaluation consumption. Do not copy raw job titles/IDs/description/evidence into handovers or share full raw status JSON again.
 - Existing reference workflow says enable bounded extraction only after key and actual isolated `/data` volume are verified. Both preconditions are now satisfied. The next step requires an explicit user decision to change the dev-only ignored `.env` setting `GEMINI_EXTRACTION_ENABLED=true` and recreate only dev `radar` to apply it. Leave `GEMINI_MATCHER_ENABLED=false`, Telegram blank, notifications disabled, LinkedIn disabled. This uses the Gemini API (bounded by existing `GEMINI_MAX_CALLS_PER_RUN=3` and `GEMINI_MAX_CALLS_PER_DAY=20`) and writes shadow cache rows to the existing dev DB; do not perform without approval. No production, volume lifecycle, or historical notification replay.
 - After approved extraction-only enablement, validate with sanitized `/api/llm-shadow-status` indicators (do not dump raw `recent_results` because it exposes source IDs/titles/evidence), and then inspect exact-JD/model/hash cache eligibility and persisted evaluation via a carefully read-only, redacted check. Do not enable matcher until fresh cache eligibility is demonstrated and a separate explicit approval is received. Preserve `v2/config.json` and `.venv/`.
+
+## 2026-10-14: Runtime healthy; sanitized Gemini diagnostics committed; next step is fresh shadow extraction
+
+### Current runtime evidence from user
+
+- The approved command `sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build radar` completed successfully: 14/14 build steps, image `job-radar-dev-radar` built, development container started.
+- User verified container `job-radar-dev` Up for 4 minutes. Safe environment output: `gemini_key=configured`, `model=gemini-3.5-flash-lite`, `extraction=false`, `matcher=false`.
+- `curl -fsS http://127.0.0.1:8001/health` returned status `ok`, version `2.0.0`, database `/data/jobs.db`. Naukri showed `running=false`, prior `last_success=2026-10-14T08:40:46.188540+00:00`, `jobs_seen=366`, `new_jobs=1`, `error=null`. Do not infer scheduler failure only from `running=false`; it describes the instant of the status call.
+- `/api/llm-shadow-status` returned `enabled=false`, `api_key_configured=true`, model `gemini-3.5-flash-lite`, mode `shadow_only`, daily limit 20, calls_today 0, cache successes 14, cache errors 6. All visible recent cache timestamps were 2026-10-12, before today's run. This is stale historical cache and does not prove fresh exact-JD/model cache eligibility or persisted matcher consumption. The old endpoint response included source job IDs, titles, and verbatim JD evidence; do not copy or share those raw records again.
+- Isolated persistence is verified: Compose project `job-radar-dev`, service `radar`, named volume `job-radar-dev_radar-dev-data` mounted at `/data`. No production changes, database inspection/writes, or alert replay occurred. Keep `v2/config.json` modified and `.venv/` untracked exactly as they are.
+
+### Direct GitHub code changes in this continuation
+
+- Commit `10d9c49d08d050c5639902166f697961328ab81b` updates `v2/gemini_extractor.py`: `/api/llm-shadow-status` recent samples no longer expose source, source job ID, job title, raw extraction JSON, raw evidence quotation, or extracted skills. It instead returns a summary of status/model/time/error code plus validated experience bounds/type/scope/confidence, an evidence-present boolean, and an `experience_shape_eligible` boolean. The latter is a shape-only indicator, not proof of an exact current JD hash or matcher consumption.
+- Commit `872bae496d3df7e501b7e5179c0a76376c42ea93` adds `test_shadow_status_redacts_job_identity_and_raw_extraction` in `v2/test_gemini_extractor.py`.
+- These GitHub changes are committed directly on `v2-live-radar`. Automated tests have NOT been run after these new commits yet. The running dev container was built before these diagnostic-redaction commits and therefore does not yet serve the sanitized response. Do not claim this code is VM-validated until user pulls and runs tests.
+
+### Next steps for the next chat/model
+
+1. Start by reading this file, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`. Continue this single task; do not start a new implementation from scratch. Make code/document changes directly on GitHub branch `v2-live-radar` using the installed GitHub tools and current file blob SHA values; do not ask the user to manually edit Python files.
+2. Give the user these commands and wait for their actual output:
+```bash
+cd ~/job-beeper-dev
+git status --short
+git pull --ff-only
+printf 'branch=' && git branch --show-current
+printf 'head=' && git rev-parse --short HEAD
+git status --short
+./.venv/bin/python -m unittest v2.test_gemini_extractor
+./.venv/bin/python -m unittest v2.test_radar
+```
+Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage either, use `git add .`, reset hard, or clean. If pull refuses due to conflict or local Python path is absent, stop and inspect the error rather than overwriting local data.
+3. The core matcher bridge is already implemented and gated by `GEMINI_MATCHER_ENABLED=false`. Do NOT enable matcher. Fresh cache cannot be validated while `GEMINI_EXTRACTION_ENABLED=false`. Ask user for explicit approval before changing VM-local ignored `.env` to turn on only `GEMINI_EXTRACTION_ENABLED=true`. Explain this makes at most 3 Gemini calls per source run and up to 20/day and persists structured shadow-cache rows in dev DB. It does not change match decisions while matcher remains false, but it calls Gemini API and writes dev DB.
+4. After approval, set extraction true and matcher false in `.env` without printing the API key or any `.env` lines. Then recreate only development `radar` with `sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build radar`; never use `down`, change volume, or touch production. After startup, verify status/key-presence/model/flags with a sanitized command, check `/health`, and inspect only redacted `/api/llm-shadow-status`. Ensure at least one fresh cache record is created with matching configured model and successful status.
+5. Verify exact-job cache eligibility using a narrowly scoped read-only/redacted diagnostic based on `_input_hash(job)`, active model, cache age and the `job_evaluations` row. Do not print JD body, source IDs, titles, evidence text, API key, config token, or complete SQLite rows. Require a fresh exact-JD/model result with required total-professional experience, verbatim evidence, confidence >= 0.85, and a range bound, then confirm persisted evaluation has `jd_experience_source=gemini_verified` and expected experience bounds.
+6. Only after all evidence, ask separately whether to enable `GEMINI_MATCHER_ENABLED=true` in development. Keep Telegram blank, notifications off, LinkedIn disabled, and production untouched. No historical notification replay or deployment without separate explicit approval.
