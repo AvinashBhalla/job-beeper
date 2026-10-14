@@ -70,6 +70,14 @@ def _bounds_match(row: Any, low: Any, high: Any) -> bool:
     )
 
 
+def _reason_count(value: Any) -> int:
+    try:
+        reasons = json.loads(value or "[]")
+    except (TypeError, ValueError):
+        return 0
+    return sum(1 for reason in reasons if isinstance(reason, str)) if isinstance(reasons, list) else 0
+
+
 def _has_experience_reason(value: Any) -> bool:
     try:
         reasons = json.loads(value or "[]")
@@ -284,8 +292,21 @@ def _evaluate_in_sandbox(
                 "sandbox_bridge_source_verified": bool(bridge_verified),
                 "sandbox_bridge_bounds_match_cache": bool(bridge_bounds_match),
                 "sandbox_evaluation_row_written": bool(evaluation_written),
+                "sandbox_evaluation_min_years": (
+                    persisted["experience_min_years"] if evaluation_written else None
+                ),
+                "sandbox_evaluation_max_years": (
+                    persisted["experience_max_years"] if evaluation_written else None
+                ),
                 "sandbox_evaluation_bounds_match_cache": bool(bounds_match),
+                "sandbox_evaluation_reason_count": (
+                    _reason_count(persisted["reasons_json"]) if evaluation_written else 0
+                ),
                 "sandbox_evaluation_experience_reason_present": bool(reason_present),
+                "sandbox_alertability_reason_count": (
+                    _reason_count(persisted["alertability_reasons_json"])
+                    if evaluation_written else 0
+                ),
                 "sandbox_alertability_experience_reason_present": bool(alert_reason_present),
             }
 
@@ -342,7 +363,10 @@ def diagnose_database(
             "cache_status": candidate["cache_row"]["status"],
             "cache_model_matches": candidate["cache_row"]["model"] == model,
             "cache_age_seconds": candidate["cache_age_seconds"],
+            "cache_ttl_days": gemini.CACHE_TTL_DAYS,
+            "cache_age_within_ttl": True,
             "job_last_seen_age_seconds": candidate["job_last_seen_age_seconds"],
+            "job_record_last_seen_within_24h": True,
             "experience_type": result["experience_type"],
             "experience_scope": result["experience_scope"],
             "experience_min_years": result["experience_min_years"],
@@ -354,6 +378,15 @@ def diagnose_database(
                 or result.get("experience_max_years") is not None
             ),
             "live_evaluation_row_present": real_eval is not None,
+            "live_evaluation_min_years": (
+                real_eval["experience_min_years"] if real_eval is not None else None
+            ),
+            "live_evaluation_max_years": (
+                real_eval["experience_max_years"] if real_eval is not None else None
+            ),
+            "live_evaluation_reason_count": (
+                _reason_count(real_eval["reasons_json"]) if real_eval is not None else 0
+            ),
             "live_evaluation_bounds_match_cache": _bounds_match(
                 real_eval,
                 result.get("experience_min_years"),
