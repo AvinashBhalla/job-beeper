@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-12 — experience parser patch verified in dev (78 tests pass); LLM extraction proposed, not implemented
+**Snapshot:** 2026-10-14 — Gemini cached matcher is committed and opt-in; dev Compose now wires its gate; live credentials/cache/mount verification pending
 **Active release branch:** `v2-live-radar`  
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
@@ -8,7 +8,7 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 
 
-## Current verified state — 2026-10-12 (authoritative)
+## Historical verified state — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher state below)
 
 ### Release/runtime status
 - PR #30 promoted V2 to `main` (`b384b8d6…`); main CI passed. PR #31 synchronized handover docs, PR #33 roadmap, and PR #34 corrected branch audit; docs/CI changes passed. Main and v2 have identical GitHub blob SHAs for `v2/radar.py`, `v2/config.json`, `v2/docker-compose.yml`, `v2/Dockerfile`, `v2/requirements.txt`, `dashboard/index.html`, and `.github/workflows/v2-ci.yml`.
@@ -1577,3 +1577,16 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 - GEMINI_MATCHER_ENABLED defaults off. No production deployment/config change, DB mutation, or notification replay occurred.
 - Next: inspect dev Compose/env wiring and secure secret source without printing values; verify fresh Gemini cache rows for the configured model while notifications remain disabled. Preserve local v2/config.json and untracked .venv/. No production enablement without explicit user approval and DB/ledger/cache checks.
 - Every turn: update both handover docs. Provide user-run commands and wait for output; make safe GitHub code/doc changes directly as needed. Do not claim unobserved runtime success or deploy production without explicit approval.
+
+
+## 2026-10-14 — Gemini development-runtime configuration gate
+
+- **No application-code change.** Added the previously missing \`GEMINI_MATCHER_ENABLED\` variable to the dev Compose environment map with default \`false\` (commit \`7ea83e024f2da4923633c23221ea8085a3643a10\`). No production settings changed.
+- Prior reported tests remain 11/11 \`v2.test_gemini_extractor\` and 88/88 \`v2.test_radar\`; no tests were rerun for the Compose-only change. CI status for the new commit remains unverified.
+- The previous shell check did not detect a Gemini key; actual container environment and the mounted database are still unverified. Do not inspect or mutate an assumed checkout-relative SQLite path. Verify the live \`/data\` mount using the detailed handover's filtered container-inspection command.
+- Next: fetch/pull the dev branch with \`git pull --ff-only origin v2-live-radar\`, checking that the local \`v2/config.json\` modification and \`.venv/\` remain untouched; run the handover's sanitized container/API checks; then report the terminal output. Do not start/recreate the container or enable extraction until that baseline is understood.
+- Once runtime wiring/key status is known, use the ignored VM-local \`.env\` or exported environment to set only the required dev variables, keeping Telegram empty and LinkedIn disabled. Verify bounded Gemini calls, fresh/model-aligned validated cache entries, and persisted evaluation via read-only DB/API checks. No production matcher enablement, deployment, DB mutation, or historical alert replay without explicit approval.
+
+### Continuation prompt
+
+Continue only the Gemini required-experience pipeline in \`AvinashBhalla/job-beeper\` on \`v2-live-radar\`. Read both handovers plus \`docs/JOBBEEPER_REFERENCE.md\`. First run the detailed handover's sanitized dev-runtime commands and wait for the actual terminal output. Preserve local \`v2/config.json\` and \`.venv/\`; never use \`sudo\`, print secrets, alter production, or replay alerts. Keep extraction/matcher defaults false and Telegram disabled while verifying configuration and the actual \`/data\` volume. After any change, run the targeted Gemini tests and full Radar suite, report only results actually observed, and update both handover documents before ending the turn.
