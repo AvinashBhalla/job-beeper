@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-14 (authoritative exact-hash diagnostic: cache and sandbox bridge verified; matcher remains off pending explicit approval)**
+**Last updated: 2026-10-15 (standing autonomy granted for routine scoped Job Radar work; isolated-dev matcher activation approved)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -21,8 +21,9 @@
 - **Schema/reason caveats:** `job_evaluations` does not contain `jd_experience_source`; only the transient bridge object exposes `gemini_verified`. The sandbox evaluation's regular match reasons include an experience reason. `sandbox_alertability_experience_reason_present=False` is not itself a failure: the current alertability policy returns notification-disabled/not-profile-match reasons, and experience reasons are stored in the separate match-reasons list. Notifications remain disabled.
 - **Code/tests:** `v2/gemini_experience_diagnostic.py` and `v2/test_gemini_experience_diagnostic.py`; user previously reported 4 diagnostic unit tests passing in 0.336s, plus 14 extractor and 88 Radar tests passing. No tests were run in this turn; no application/config change, rebuild, schema change, production change or live DB write occurred. CI has not been independently verified for this diagnostic.
 - **Safety/current runtime:** isolated development container is up; Gemini extraction is enabled with its existing bounded limits, matcher remains false, Gemini key configured (value hidden), model is `gemini-3.5-flash-lite`; dev Telegram credentials are blank/notifications disabled and LinkedIn remains disabled. Production was not touched. Preserve VM-local `M v2/config.json` and untracked `.venv/`; never stage, overwrite, reset, or clean them.
-- **Next action:** ask for the user's explicit approval before enabling `GEMINI_MATCHER_ENABLED=true` in the isolated dev service only. If approved, use the existing `job-radar-dev` project and `--env-file .env`, keep notifications off, preserve the named volume, and verify the flag and a newly persisted 3–5-year evaluation/reasons for this exact job. Do not enable production matcher, alter schema, replay notifications, or make volume changes. If not approved, leave matcher false.
-- **Continuation prompt:** “Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`. Exact current-hash/model/TTL Gemini result verified (required total_professional 3–5 years; confidence 0.95); isolated real bridge + persistence writer succeeded on a temporary copy. Live evaluation is still 1.0/no maximum because matcher is off; schema has no source marker. Ask before enabling matcher in isolated dev only. Keep Telegram/notifications off, production unchanged, preserve local config and .venv, and update both handovers every turn.” 
+- **Standing autonomy instruction (user directive, 2026-10-15):** proceed with routine, reversible work inside the established Job Radar V2 scope without step-by-step confirmation, including code/docs/tests and isolated-dev configuration/restarts required for this validated Gemini matcher task. User has explicitly approved enabling `GEMINI_MATCHER_ENABLED=true` in isolated dev. Do not repeatedly ask permission for these scoped steps. Hard boundaries remain: keep production matcher/deployment unchanged, never send/replay notifications, never expose or commit secrets, never delete/recreate volumes or reset/clean local files, and do not perform destructive DB/schema or other irreversible/security-sensitive changes without a clearly scoped safe plan. If no tool can reach the VM, say so plainly and provide an exact narrow command rather than claiming completion.
+- **Exact next action:** in `~/job-beeper-dev`, set only `GEMINI_MATCHER_ENABLED=true` in ignored `.env` without printing the file, then recreate only the existing `radar` service under project `job-radar-dev` with `--env-file .env` (no build needed; matcher code is already deployed). Preserve existing volume, `M v2/config.json`, and `.venv/`. Verify effective matcher/extraction flags, health, notifications remain off, then prove a new live persisted evaluation adopts eligible Gemini 3–5-year bounds and experience match reasons. Production stays untouched.
+- **Continuation prompt:** “Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`. Exact current-hash/model/TTL Gemini result verified (required total_professional 3–5 years; confidence 0.95); isolated real bridge + persistence writer succeeded on a temporary copy. User granted standing autonomy for routine scoped project work and approved the isolated development matcher. Enable it without another confirmation, keep Telegram/notifications off, production unchanged, preserve local config and .venv, verify live persisted bounds/reasons, and update both handovers every turn.” 
 - **Cross-reference:** `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` is the compact state; `docs/JOBBEEPER_REFERENCE.md` remains the architecture/rollout guardrail.
 ## Historical handoff — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher follow-up)
 - **Goal:** verify Gemini JD experience end-to-end in isolated development: extraction → evidence validation → fresh/model-matched cache → opt-in matcher → persisted evaluation → notification decision.
@@ -4535,3 +4536,40 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - No application code, config, database schema, or runtime flag was changed in this turn; no tests were run this turn. Previously reported unit results remain 14 extractor tests, 88 Radar tests, and 4 diagnostic tests passing. CI status for the diagnostic was not independently checked. No production changes or notification replay.
 - Next step requires separate explicit user approval to enable `GEMINI_MATCHER_ENABLED=true` **in isolated dev only**. After approval, reconfigure/recreate only `job-radar-dev` with `--env-file .env`, leave notifications off, preserve the existing named volume, verify effective matcher flag, and inspect only sanitized values to prove a new live evaluation adopts 3–5 years. Do not activate production matcher, change schema, or perform volume operations without separate scope/approval. Preserve `M v2/config.json` and `.venv/` on VM.
 - Continuation: read both handovers and `docs/JOBBEEPER_REFERENCE.md`; use this exact-cache finding as the latest state, ask before enabling the development matcher, and update both handovers after every user prompt.
+
+
+## 2026-10-15 — Standing autonomy granted; isolated development matcher approved
+
+- User directive: “do whatever required without my permission, save context and put this rule in handover doc also.” Treat this as standing authorization to proceed without step-by-step confirmation for routine, reversible work inside the established Job Radar V2 scope, including commits on `v2-live-radar`, testing, read-only diagnostics, and isolated-dev configuration/recreation needed to validate the approved Gemini matcher path. Avoid repeated permission prompts for the same scoped operational steps.
+- Specific authorization: enable `GEMINI_MATCHER_ENABLED=true` in the isolated `job-radar-dev` container. Keep Gemini extraction bounded (existing maximum 3 calls/source run and 20/day), model `gemini-3.5-flash-lite`, notification/Telegram disabled, LinkedIn disabled, and production unchanged. Preserve user-local `M v2/config.json` and untracked `.venv/`; never expose or commit credentials, raw JDs, verbatim evidence, skills, or raw IDs.
+- Autonomy does not justify broad destructive or out-of-scope actions: no production rollout/matcher activation, notification sends/replay, volume deletion, broad reset/clean, schema migration, credential rotation, or OS/Docker permission changes absent a scoped safe reason. Prefer reversible changes and evidence-first verification. If remote VM execution is not available, be transparent and supply the narrowest safe command rather than claiming the action was performed.
+- Evidence before activation: user reported exact current-input-hash/model/TTL match and trusted required `total_professional` experience of 3–5 years, confidence 0.95, evidence present. Actual matcher bridge and persistence writer succeeded on a temporary DB copy and output `gemini_verified`, 3–5 bounds and experience match reason. Existing live evaluation remained 1.0/no maximum with matcher false. Schema has no `jd_experience_source` column. Current runtime did not change in this assistant turn because no SSH/VM command tool is connected here.
+- Exact VM operation, from `~/job-beeper-dev`, edits only the matcher boolean in ignored `.env`; it never prints the file. Then it recreates only the dev app service and checks safe flags/health. It does not rebuild or remove the named volume:
+
+  ```bash
+  cd ~/job-beeper-dev
+  python3 - <<'PY'
+  from pathlib import Path
+  p = Path('.env')
+  if not p.is_file():
+      raise SystemExit('STOP: .env not found; no changes made')
+  lines = p.read_text().splitlines()
+  key = 'GEMINI_MATCHER_ENABLED'
+  matches = [i for i, value in enumerate(lines) if value.split('=', 1)[0].strip() == key]
+  if len(matches) > 1:
+      raise SystemExit('STOP: duplicate matcher settings; no changes made')
+  new_line = f'{key}=true'
+  if matches:
+      lines[matches[0]] = new_line
+  else:
+      lines.append(new_line)
+  p.write_text('\\n'.join(lines) + '\\n')
+  print('GEMINI_MATCHER_ENABLED=true; .env contents not displayed')
+  PY
+  sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --force-recreate radar
+  sudo docker exec job-radar-dev sh -lc 'printf "matcher="; printenv GEMINI_MATCHER_ENABLED; printf "extraction="; printenv GEMINI_EXTRACTION_ENABLED; printf "telegram_token_present="; test -n "$JOB_RADAR_TELEGRAM_BOT_TOKEN" && echo true || echo false; printf "telegram_chat_present="; test -n "$JOB_RADAR_TELEGRAM_CHAT_ID" && echo true || echo false'
+  curl -fsS http://127.0.0.1:8001/health
+  ```
+
+- After safe config/health checks, continue without asking again: inspect allowlisted/sanitized LLM status and verify the actual live evaluation for the eligible candidate using only booleans/bounds/reason presence. If normal source scheduling must recompute evaluation, identify the lowest-risk existing path first; do not trigger extra Gemini calls unnecessarily, and do not infer success from the flag alone. Require persisted 3–5 bounds/reason proof. If verification fails, roll back only the dev matcher flag while preserving extraction and the existing volume; record the observed failure category without exposing sensitive content.
+- Change in this turn: documentation only; no VM or app/runtime change performed here, no tests run, and CI was not independently verified. Cross-reference `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md`.
