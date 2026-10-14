@@ -8,6 +8,19 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 
 
+## Current verified state — 2026-10-14 (authoritative)
+
+### Active issue: Gemini required-experience extraction → matcher → persisted evaluation
+- Repository/branch: `AvinashBhalla/job-beeper`, `v2-live-radar`. Read this file together with `docs/JOB_RADAR_HANDOVER.md` and `docs/JOBBEEPER_REFERENCE.md`.
+- Matcher bridge commits already present: `1b667e4`, `c3cc276`, `ce69cec`, `14516a0`, `0b74444`. It reads a fresh cache entry for the exact current JD hash and configured model, revalidates evidence, and only trusts required `total_professional` experience with verbatim evidence and confidence ≥ 0.85. The matcher makes no Gemini network calls; deterministic parsing remains fallback.
+- User previously reported 11 Gemini extractor tests and 88 Radar tests passing. These are earlier test results, not live runtime proof. No tests ran this turn.
+- Dev Compose wiring fix: commit `7ea83e024f2da4923633c23221ea8085a3643a10` adds `GEMINI_MATCHER_ENABLED` to `v2/docker-compose.dev.yml`, defaulting to false. Before this, the dev Compose environment map omitted the matcher flag. Production Compose and application code are unchanged by this fix.
+- Prior VM check reported matcher/extraction/model variables unset, no key detected in the checked environment, and no SQLite file found in the searched checkout depth. Do not infer current container configuration or DB location from that. The dev service declares `JOB_RADAR_DB=/data/jobs.db` on named volume `radar-dev-data`; with project `job-radar-dev`, expected volume name is `job-radar-dev_radar-dev-data`.
+- Keep dev notifications disabled; dev Compose forces Telegram token/chat ID to empty. Keep LinkedIn disabled; dev config enables Naukri relay only. Matcher and extraction remain off until runtime config, credentials and volume are verified.
+- Commits this turn: Compose wiring `7ea83e0`; detailed handover update/formatting fix is now at `74c4cb89c9726fc45941e887eb40445f80d466f1`. This knowledge-transfer update is committed directly to `v2-live-radar`; its resulting SHA is available in the current GitHub commit history.
+- CI result for `7ea83e0` has not been independently verified. No dev container restart/rebuild, production rollout, database write, or notification replay occurred. Preserve the user's local `v2/config.json` modification and untracked `.venv/`; never stage, reset, clean, overwrite, or delete them.
+- Exact next action: run the sanitized VM commands in the latest dated section of `docs/JOB_RADAR_HANDOVER.md`. Return only that output. If the API key is absent, configure it through the VM-local ignored `.env` or exported environment without printing/pasting the value.
+
 ## Historical verified state — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher state below)
 
 ### Release/runtime status
@@ -1581,12 +1594,12 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 
 ## 2026-10-14 — Gemini development-runtime configuration gate
 
-- **No application-code change.** Added the previously missing \`GEMINI_MATCHER_ENABLED\` variable to the dev Compose environment map with default \`false\` (commit \`7ea83e024f2da4923633c23221ea8085a3643a10\`). No production settings changed.
-- Prior reported tests remain 11/11 \`v2.test_gemini_extractor\` and 88/88 \`v2.test_radar\`; no tests were rerun for the Compose-only change. CI status for the new commit remains unverified.
-- The previous shell check did not detect a Gemini key; actual container environment and the mounted database are still unverified. Do not inspect or mutate an assumed checkout-relative SQLite path. Verify the live \`/data\` mount using the detailed handover's filtered container-inspection command.
-- Next: fetch/pull the dev branch with \`git pull --ff-only origin v2-live-radar\`, checking that the local \`v2/config.json\` modification and \`.venv/\` remain untouched; run the handover's sanitized container/API checks; then report the terminal output. Do not start/recreate the container or enable extraction until that baseline is understood.
-- Once runtime wiring/key status is known, use the ignored VM-local \`.env\` or exported environment to set only the required dev variables, keeping Telegram empty and LinkedIn disabled. Verify bounded Gemini calls, fresh/model-aligned validated cache entries, and persisted evaluation via read-only DB/API checks. No production matcher enablement, deployment, DB mutation, or historical alert replay without explicit approval.
+- **No application-code change.** Added the previously missing `GEMINI_MATCHER_ENABLED` variable to the dev Compose environment map with default `false` (commit `7ea83e024f2da4923633c23221ea8085a3643a10`). No production settings changed.
+- Prior reported tests remain 11/11 `v2.test_gemini_extractor` and 88/88 `v2.test_radar`; no tests were rerun for the Compose-only change. CI status for the new commit remains unverified.
+- The previous shell check did not detect a Gemini key; actual container environment and the mounted database are still unverified. Do not inspect or mutate an assumed checkout-relative SQLite path. Verify the live `/data` mount using the detailed handover's filtered container-inspection command.
+- Next: fetch/pull the dev branch with `git pull --ff-only origin v2-live-radar`, checking that the local `v2/config.json` modification and `.venv/` remain untouched; run the handover's sanitized container/API checks; then report the terminal output. Do not start/recreate the container or enable extraction until that baseline is understood.
+- Once runtime wiring/key status is known, use the ignored VM-local `.env` or exported environment to set only the required dev variables, keeping Telegram empty and LinkedIn disabled. Verify bounded Gemini calls, fresh/model-aligned validated cache entries, and persisted evaluation via read-only DB/API checks. No production matcher enablement, deployment, DB mutation, or historical alert replay without explicit approval.
 
 ### Continuation prompt
 
-Continue only the Gemini required-experience pipeline in \`AvinashBhalla/job-beeper\` on \`v2-live-radar\`. Read both handovers plus \`docs/JOBBEEPER_REFERENCE.md\`. First run the detailed handover's sanitized dev-runtime commands and wait for the actual terminal output. Preserve local \`v2/config.json\` and \`.venv/\`; never use \`sudo\`, print secrets, alter production, or replay alerts. Keep extraction/matcher defaults false and Telegram disabled while verifying configuration and the actual \`/data\` volume. After any change, run the targeted Gemini tests and full Radar suite, report only results actually observed, and update both handover documents before ending the turn.
+Continue only the Gemini required-experience pipeline in `AvinashBhalla/job-beeper` on `v2-live-radar`. Read both handovers plus `docs/JOBBEEPER_REFERENCE.md`. First run the detailed handover's sanitized dev-runtime commands and wait for the actual terminal output. Preserve local `v2/config.json` and `.venv/`; never use `sudo`, print secrets, alter production, or replay alerts. Keep extraction/matcher defaults false and Telegram disabled while verifying configuration and the actual `/data` volume. After any change, run the targeted Gemini tests and full Radar suite, report only results actually observed, and update both handover documents before ending the turn.
