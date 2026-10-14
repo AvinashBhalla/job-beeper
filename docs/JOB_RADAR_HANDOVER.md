@@ -20,7 +20,8 @@
 - **Latest user VM evidence:** checkout pulled to `e3ea9fa` while preserving `M v2/config.json` and `?? .venv/`; Compose syntax check passed. Current user `ubuntu` is not in the `docker` group (`id` groups do not list it); `/var/run/docker.sock` owner/group/mode is `root:docker 660`. Docker API commands fail with permission denied. Do not use `sudo`, change socket mode, or modify group membership.
 - **Host-side Compose result:** `compose_config_exit=0`; API key absent; `GEMINI_EXTRACTION_ENABLED=false`; `GEMINI_MATCHER_ENABLED=false`; model `gemini-3.5-flash-lite`; Telegram credentials empty. The running API at `127.0.0.1:8001` separately reports extraction disabled, no key configured, 0 calls today, 14 successful and 6 error cache entries. A few recent rows pass a preliminary shape screen only; this is not proof of current JD hash alignment or persisted evaluation.
 - **Unknowns:** actual running container environment, dev service identity, `/data` mount/volume and effective matcher gate remain unverified due Docker socket access. Do not assume the database is in the checkout or create a replacement.
-- **Exact next action:** if a valid API key is available, use the hidden-input local `.env` command in the latest chronological section below. It preserves other `.env` entries and enforces both Gemini flags false. Then verify only the redacted host-side Compose status. Do not restart/recreate any container until Docker access is available through an already-authorized account/session or an administrator handles it. No secret values should be pasted into chat.
+- **Latest follow-up from user:** the hidden-input prompt completed and printed `dev_gemini_key_saved=true`, `gemini_extraction_enabled=false`, `gemini_matcher_enabled=false`. The key value was not exposed. This establishes that the local `.env` write command completed, but Compose resolution after that write has not yet been checked and the running container has not been updated.
+- **Exact next action:** run the compact redacted Compose verification below to establish whether the local `.env` key is picked up and that extraction/matcher remain false and Telegram credentials empty. Do not restart/recreate any container until Docker access is available through an already-authorized session/account or an administrator. No secret values should be pasted into chat.
 - **Secure configuration:** the root `.gitignore` ignores `.env`. The command checks that ignore rule before writing, prompts without echoing, and does not print the key. If the key is not yet available, obtain it from the project's authorized Gemini credential source; do not invent or share credentials.
 - **Status:** no code change, no test rerun, no Docker lifecycle action, no database mutation, no production configuration/deployment, no notification replay. Keep notifications disabled, Telegram credentials empty and LinkedIn off. Production matcher flag stays off pending explicit user approval.
 - **Cross-reference:** `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` is compact status and `docs/JOBBEEPER_REFERENCE.md` documents architecture and rollout guardrails.
@@ -4100,3 +4101,35 @@ PY
 ```
 
 Do not run `docker compose up` until the actual mount and container environment can be checked through an authorized Docker session. A VM administrator/authorized account must handle the container inspection; no permissions should be weakened. After the mount is verified, recreate only the isolated dev service with the gates still false, inspect its actual environment/mount, then enable bounded extraction for testing. Enable matcher later only after fresh cache eligibility is proved. No production change without explicit approval.
+
+## 2026-10-14: Gemini key saved locally; rollout remains gated
+
+- User ran the ignored `.env` hidden-input command and received `dev_gemini_key_saved=true`, `gemini_extraction_enabled=false`, and `gemini_matcher_enabled=false`. The secret was not included in the output. No value was printed or requested in chat.
+- This confirms the local config write script ran, not that Compose resolves the key or that the running service has received it. Verify Compose interpolation next with a redacted `docker compose config --format json` check only; it does not require access to Docker daemon.
+- Docker socket remains `root:docker` mode 660 and the user's `id` omitted the `docker` group. Do not use sudo or change groups/permissions. The container/volume must be checked by an already-authorized Docker session/account or VM administrator before any recreate/restart.
+- No code change, tests, container lifecycle action, database mutation, production change or notification replay. Preserve modified `v2/config.json` and untracked `.venv/`. Keep both Gemini gates false and Telegram disabled.
+
+### Next safe verification command
+
+```bash
+cd ~/job-beeper-dev || exit 1
+git check-ignore -q .env || { echo '.env is not ignored; refusing to inspect config'; exit 1; }
+python3 - <<'PY'
+import json, subprocess
+p = subprocess.run([
+    'docker', 'compose', '-p', 'job-radar-dev',
+    '-f', 'v2/docker-compose.dev.yml', 'config', '--format', 'json'
+], capture_output=True, text=True)
+print('compose_config_exit=' + str(p.returncode))
+if p.returncode:
+    print('compose_config_error_type=ComposeConfigError')
+    raise SystemExit(0)
+env = json.loads(p.stdout)['services']['radar'].get('environment', {})
+print('compose_api_key_configured=' + str(bool(str(env.get('GEMINI_API_KEY') or '').strip())).lower())
+for k in ('GEMINI_EXTRACTION_ENABLED', 'GEMINI_MATCHER_ENABLED'):
+    print(k.lower() + '=' + str(env.get(k, '<unset>')).lower())
+print('telegram_credentials_empty=' + str(not any(str(env.get(k) or '').strip() for k in ('JOB_RADAR_TELEGRAM_BOT_TOKEN', 'JOB_RADAR_TELEGRAM_CHAT_ID'))).lower())
+PY
+```
+
+Expected: `compose_api_key_configured=true`, both flags false, and `telegram_credentials_empty=true`. This still says nothing about the running container. After returning that redacted output, arrange an already-authorized Docker session/administrator to inspect the actual dev mount and current container environment before any recreate. Production remains approval-gated.
