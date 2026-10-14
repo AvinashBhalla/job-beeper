@@ -4547,7 +4547,9 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - Exact VM operation, from `~/job-beeper-dev`, edits only the matcher boolean in ignored `.env`; it never prints the file. Then it recreates only the dev app service and checks safe flags/health. It does not rebuild or remove the named volume:
 
   ```bash
+  set -e
   cd ~/job-beeper-dev
+  git check-ignore -q .env || { echo 'STOP: .env is not git-ignored; no changes made'; exit 1; }
   python3 - <<'PY'
   from pathlib import Path
   p = Path('.env')
@@ -4568,7 +4570,9 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
   PY
   sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --force-recreate radar
   sudo docker exec job-radar-dev sh -lc 'printf "matcher="; printenv GEMINI_MATCHER_ENABLED; printf "extraction="; printenv GEMINI_EXTRACTION_ENABLED; printf "telegram_token_present="; test -n "$JOB_RADAR_TELEGRAM_BOT_TOKEN" && echo true || echo false; printf "telegram_chat_present="; test -n "$JOB_RADAR_TELEGRAM_CHAT_ID" && echo true || echo false'
+  sudo docker exec job-radar-dev python -c "import json; d=json.load(open('/data/config.json')); print('notifications_enabled='+str(bool(d.get('notifications_enabled', True))).lower()); print('linkedin_enabled='+str(bool(d.get('source_enabled',{}).get('linkedin',False))).lower())"
   curl -fsS http://127.0.0.1:8001/health
+  sudo docker exec -i -w /app job-radar-dev python - < v2/gemini_experience_diagnostic.py
   ```
 
 - After safe config/health checks, continue without asking again: inspect allowlisted/sanitized LLM status and verify the actual live evaluation for the eligible candidate using only booleans/bounds/reason presence. If normal source scheduling must recompute evaluation, identify the lowest-risk existing path first; do not trigger extra Gemini calls unnecessarily, and do not infer success from the flag alone. Require persisted 3–5 bounds/reason proof. If verification fails, roll back only the dev matcher flag while preserving extraction and the existing volume; record the observed failure category without exposing sensitive content.
