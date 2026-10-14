@@ -1898,3 +1898,16 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 - After rebuild, verify container/health, key presence without printing value, model and both false flags, and sanitized /api/llm-shadow-status (no IDs, titles, raw extraction, evidence quotes, or skill lists). Extraction must remain false until the user separately approves setting only GEMINI_EXTRACTION_ENABLED=true in VM-local ignored .env. This makes up to 3 Gemini calls/source run and 20/day and persists shadow-cache entries in dev DB; matcher stays false.
 - Before asking for matcher approval, prove a fresh success for exact current input/hash and configured model within TTL; requirement type required, scope total_professional, verbatim evidence present, confidence >= 0.85, at least one experience bound; bridge consumption by _job_for_canonical has source gemini_verified; persisted evaluation has the intended bounds/reasons. Use redacted read-only diagnostics only. Ask separately before enabling GEMINI_MATCHER_ENABLED=true; never change production or replay historical notifications.
 - Keep Telegram blank/notifications off and LinkedIn disabled. No volume lifecycle/SQLite broad access or schema change without separate approval. Documentation was reconciled this turn; no application code/runtime/test change was made.
+
+
+## 2026-10-14 — VM fast-forward confirmed; run Gemini test first
+
+- User's SSH output confirms git pull --ff-only origin v2-live-radar fast-forwarded from c40e5d7 to bcb8cfc, with no reported conflict. The updated paths included README, both handovers, v2/gemini_extractor.py, and v2/test_gemini_extractor.py.
+- The shared output omitted visible lines from the preceding git status --short, so do not claim this output confirms the local config/venv status. Preserve v2/config.json and .venv/ absolutely; never stage, overwrite, reset, or clean either.
+- No tests have run in this turn and the pull output is not test evidence. No rebuild or environment/DB/runtime change was made. Gemini extraction and matcher remain disabled.
+- Next request only the Gemini extractor suite and complete output:
+  cd ~/job-beeper-dev
+  git status --short
+  ./.venv/bin/python -m unittest v2.test_gemini_extractor
+  Wait before asking for the separate Radar suite. If this fails, stop and diagnose actual output; don't rebuild or change flags. After a successful result, ask separately for ./.venv/bin/python -m unittest v2.test_radar.
+- Continue the same goal: a fresh exact-current-JD/hash/model/TTL, evidence-backed Gemini experience result must flow through the matcher and affect persisted experience bounds/reasons. Do not claim this end-to-end path has been proven. The current evaluation schema does not persist jd_experience_source; retain that caveat. Cross-reference docs/JOB_RADAR_HANDOVER.md and docs/JOBBEEPER_REFERENCE.md.
