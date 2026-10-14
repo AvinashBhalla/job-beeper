@@ -300,5 +300,28 @@ class GeminiValidationTests(unittest.TestCase):
         self.assertNotIn("Private job title", serialized)
         self.assertNotIn(self.payload["experience_evidence"], serialized)
 
+    def test_shadow_status_reports_matcher_gate_without_database(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "missing.db"
+            with patch.dict(os.environ, {
+                "GEMINI_EXTRACTION_ENABLED": "false",
+                "GEMINI_MATCHER_ENABLED": "false",
+                "GEMINI_MODEL": "gemini-test",
+            }):
+                disabled = gemini.shadow_status(db_path)
+            with patch.dict(os.environ, {
+                "GEMINI_EXTRACTION_ENABLED": "false",
+                "GEMINI_MATCHER_ENABLED": "true",
+                "GEMINI_MODEL": "gemini-test",
+            }):
+                enabled = gemini.shadow_status(db_path)
+
+        self.assertFalse(disabled["enabled"])
+        self.assertFalse(disabled["matcher_enabled"])
+        self.assertFalse(enabled["enabled"])
+        self.assertTrue(enabled["matcher_enabled"])
+        self.assertFalse(disabled["api_key_configured"] or enabled["api_key_configured"])
+
+
 if __name__ == "__main__":
     unittest.main()
