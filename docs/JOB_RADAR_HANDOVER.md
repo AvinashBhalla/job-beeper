@@ -4597,12 +4597,12 @@ Do not run another Compose lifecycle command yet. Reconnect to SSH, enter `~/job
 cd ~/job-beeper-dev
 echo '=== container status ==='
 sudo docker ps -a --filter name=job-radar-dev --format 'container={{.Names}} status={{.Status}} image={{.Image}}'
-sudo docker inspect job-radar-dev --format 'state={{.State.Status}} restarting={{.State.Restarting}} restart_count={{.RestartCount}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} error={{.State.Error}} started={{.State.StartedAt}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
+sudo docker inspect job-radar-dev --format 'state={{.State.Status}} restarting={{.State.Restarting}} restart_count={{.RestartCount}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} error_present={{if .State.Error}}true{{else}}false{{end}} started={{.State.StartedAt}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
 sudo docker inspect job-radar-dev --format 'mounts={{range .Mounts}}{{.Name}}:{{.Destination}};{{end}}'
 echo '=== safe effective flags ==='
 sudo docker exec job-radar-dev sh -lc 'printf "matcher="; printenv GEMINI_MATCHER_ENABLED; printf "extraction="; printenv GEMINI_EXTRACTION_ENABLED; printf "telegram_token_present="; test -n "$JOB_RADAR_TELEGRAM_BOT_TOKEN" && echo true || echo false; printf "telegram_chat_present="; test -n "$JOB_RADAR_TELEGRAM_CHAT_ID" && echo true || echo false' || echo 'effective_flag_check=unavailable_container_not_running'
 echo '=== sanitized recent log indicators ==='
-sudo docker logs --since 10m --tail 200 job-radar-dev 2>&1 | python3 -c 'import re,sys; s=sys.stdin.read(); print("recent_log_lines="+str(len(s.splitlines()))); pats={"traceback_present":r"Traceback \\(most recent call last\\)","error_marker_present":r"\\bERROR\\b","startup_complete_present":r"Application startup complete|Uvicorn running","sqlite_error_present":r"sqlite3?\\.(?:OperationalError|DatabaseError)|database is locked|no such table","import_error_present":r"ModuleNotFoundError|ImportError","oom_marker_present":r"OOM|Killed process|out of memory"}; [print(k+"="+str(bool(re.search(p,v,re.I))).lower()) for k,v in pats.items()]; types=sorted(set(re.findall(r"\\b[A-Za-z][A-Za-z0-9_]*(?:Error|Exception)\\b",s))); print("exception_types="+(",".join(types[:10]) if types else "none"))'
+sudo docker logs --since 10m --tail 200 job-radar-dev 2>&1 | python3 -c 'import re,sys; s=sys.stdin.read(); print("recent_log_lines="+str(len(s.splitlines()))); pats={"traceback_present":r"Traceback \(most recent call last\)","error_marker_present":r"\bERROR\b","startup_complete_present":r"Application startup complete|Uvicorn running","sqlite_error_present":r"sqlite3?\.(?:OperationalError|DatabaseError)|database is locked|no such table","import_error_present":r"ModuleNotFoundError|ImportError","oom_marker_present":r"OOM|Killed process|out of memory"}; [print(k+"="+str(bool(re.search(p,s,re.I))).lower()) for k,v in pats.items()]; types=sorted(set(re.findall(r"\b[A-Za-z][A-Za-z0-9_]*(?:Error|Exception)\b",s))); print("exception_types="+(",".join(types[:10]) if types else "none"))'
 echo '=== health retry (bounded; no shell-wide exit on failure) ==='
 health_ok=0
 for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
@@ -4624,3 +4624,6 @@ rm -f /tmp/job-radar-health.json
 ```
 
 Return the state summary, sanitized log indicators, health result and diagnostic output. If container is restarting/OOM-killed/stopped, stop before any further restart and use the observed indicators to choose the smallest reversible recovery. If the health probe succeeds, the diagnostic will tell us whether the live evaluation now adopts 3–5 bounds and matching reasons. Never paste `.env`, raw logs, raw JSON endpoint payloads, job IDs/titles/JDs/evidence, or credentials.
+
+
+- Command safety note: the current follow-up block reports only the presence (not contents) of Docker state errors and only boolean/count/exception-type log indicators; it never emits raw application log lines. It uses bounded health retries and deliberately has no `set -e`.
