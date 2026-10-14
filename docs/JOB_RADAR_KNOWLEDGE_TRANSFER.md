@@ -1986,3 +1986,17 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 - Next: pull latest branch with status check and fast-forward only, preserving M v2/config.json and ?? .venv/, then run ./.venv/bin/python -m unittest v2.test_gemini_experience_diagnostic. Stop on any failure/conflict. After tests pass, run the script inside the existing container without rebuild using sudo docker exec -i -w /app job-radar-dev python - < v2/gemini_experience_diagnostic.py; the script source is piped from checkout while imports use already-deployed app code. It reads live /data/jobs.db read-only and writes only a temporary clone. Return redacted output.
 - Require exact current hash, current model, TTL, required total_professional evidence, confidence >=0.85, one range bound, sandbox gemini_verified bridge, sandbox evaluation row with matching bounds and experience reason. Check existing live evaluation-bound/reason booleans separately; don't claim real persisted evaluation has been updated if those are false. Source marker remains absent from the current job_evaluations schema; no schema change.
 - Matcher remains false. Do not enable it without separate explicit approval after proof. Keep production and notifications untouched, no DB/volume actions; preserve local config and virtualenv.
+
+
+## 2026-10-14 — Diagnostic unit tests passed; run read-only live probe next
+
+- User's actual output confirms VM fast-forward from bcb8cfc to b427bab and `v2.test_gemini_experience_diagnostic` passed: 4 tests in 0.336s, OK. Fixtures exercise fresh exact hash plus trusted experience, reject mismatched description hash, expired cache and skill-specific scope. This does not establish that a qualifying current job is present in the live database.
+- No live DB diagnostic has run yet. Preserve any local `M v2/config.json` and `?? .venv/`; do not stage/reset/clean/overwrite them.
+- Next run the checked-out diagnostic source within the already-running container:
+  
+      cd ~/job-beeper-dev
+      sudo docker exec -i -w /app job-radar-dev python - < v2/gemini_experience_diagnostic.py
+
+  This invokes only the new script from stdin, imports the deployed app's core modules, opens /data/jobs.db read-only, recomputes candidate hashes, validates model/status/TTL and required total-professional evidence, checks live persisted evaluation summaries, and runs actual matcher bridge plus persistence writer in a temporary database copy of one candidate. Temp DB is deleted. No Gemini network request, live DB write, global feature flag change or notification action.
+- Return complete output. It reports sanitized status/booleans and numeric bounds only. A no-candidate result is useful negative evidence but not proof no fresh extraction occurred; do not enable matcher.
+- Require exact hash/model/freshness and trusted experience fields, sandbox source marker gemini_verified, matching sandbox evaluation bounds/reasons; separately assess existing live evaluation booleans. Existing schema does not persist jd_experience_source. Matcher remains false and a separate explicit approval is still required.
