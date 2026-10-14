@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from v2 import gemini_experience_diagnostic as diagnostic
@@ -87,9 +88,11 @@ class GeminiExperienceDiagnosticTests(unittest.TestCase):
     def test_exact_fresh_trusted_result_uses_bridge_and_sandbox_persistence(self):
         self._insert_cache()
 
-        result = diagnostic.diagnose_database(
-            self.db_path, self.config, model="gemini-test"
-        )
+        with patch.object(gemini.requests, "post") as request:
+            result = diagnostic.diagnose_database(
+                self.db_path, self.config, model="gemini-test"
+            )
+            request.assert_not_called()
 
         self.assertEqual(result["diagnostic_status"], "candidate_verified")
         self.assertTrue(result["source_db_read_only"])
