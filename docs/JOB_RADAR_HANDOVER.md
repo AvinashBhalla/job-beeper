@@ -15,13 +15,13 @@
 >
 > ## Current handoff — 2026-10-14 (authoritative; supersedes prior next-task lists)
 - **Goal:** verify the Gemini JD experience path end-to-end in the isolated dev runtime: extraction → evidence validation → fresh/model-matched cache → opt-in matcher → persisted evaluation → notification decision. Keep this scoped to experience matching; do not widen into collectors or UI.
-- **Code state:** commits already present on \`v2-live-radar\`: \`1b667e4\`, \`c3cc276\`, \`ce69cec\`, \`14516a0\`, \`0b74444\`. User previously reported 11 Gemini tests and 88 Radar tests passing. This turn made no application-code change and ran no tests.
-- **Configuration fix:** \`v2/docker-compose.dev.yml\` now forwards \`GEMINI_MATCHER_ENABLED\` with a default of \`false\`, commit \`7ea83e024f2da4923633c23221ea8085a3643a10\`. Previously this rollout gate was absent from the dev container environment map. Extraction still defaults off; Telegram token/chat ID remain forced blank.
+- **Code state:** commits already present on `v2-live-radar`: `1b667e4`, `c3cc276`, `ce69cec`, `14516a0`, `0b74444`. User previously reported 11 Gemini tests and 88 Radar tests passing. This turn made no application-code change and ran no tests.
+- **Configuration fix:** `v2/docker-compose.dev.yml` now forwards `GEMINI_MATCHER_ENABLED` with a default of `false`, commit `7ea83e024f2da4923633c23221ea8085a3643a10`. Previously this rollout gate was absent from the dev container environment map. Extraction still defaults off; Telegram token/chat ID remain forced blank.
 - **Runtime evidence remains incomplete:** previous VM checks found extraction/matcher/model vars unset, no key detected by the checked environment, and no SQLite file in the searched checkout. These are not proof of the running container env or data-volume location. Do not state that extraction, fresh-cache use, or persisted Gemini-backed evaluation has been runtime-verified until output is received.
-- **Storage/config path:** the dev Compose service declares \`JOB_RADAR_DB=/data/jobs.db\` and \`radar-dev-data:/data\`; with project \`job-radar-dev\`, the expected volume name is \`job-radar-dev_radar-dev-data\`. Verify the actual container mount before inspecting any database. Never create a replacement database.
-- **Exact next action:** run the safe VM checks under the latest chronological entry at the bottom of this file. Confirm effective container flags/key-presence/model, dev health/API status, and the actual \`/data\` mount. If the API key is absent, ask the user to set it through the local VM-only \`.env\`/environment mechanism; never request or display its value. Then enable extraction only in dev, keep notifications disabled, and verify a fresh accepted cache result and persisted evaluation before considering the matcher gate in dev.
-- **CI/deployment:** no CI result for commit \`7ea83e0\` has been independently verified here. No dev restart/rebuild or runtime change was performed in this turn. No production checkout, flag, DB, volume, or notification state was changed. Production remains approval-gated; matcher flag must stay off there.
-- **Cross-reference:** \`docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md\` is the compact current state; \`docs/JOBBEEPER_REFERENCE.md\` remains the product/architecture guardrail.
+- **Storage/config path:** the dev Compose service declares `JOB_RADAR_DB=/data/jobs.db` and `radar-dev-data:/data`; with project `job-radar-dev`, the expected volume name is `job-radar-dev_radar-dev-data`. Verify the actual container mount before inspecting any database. Never create a replacement database.
+- **Exact next action:** run the safe VM checks under the latest chronological entry at the bottom of this file. Confirm effective container flags/key-presence/model, dev health/API status, and the actual `/data` mount. If the API key is absent, ask the user to set it through the local VM-only `.env`/environment mechanism; never request or display its value. Then enable extraction only in dev, keep notifications disabled, and verify a fresh accepted cache result and persisted evaluation before considering the matcher gate in dev.
+- **CI/deployment:** no CI result for commit `7ea83e0` has been independently verified here. No dev restart/rebuild or runtime change was performed in this turn. No production checkout, flag, DB, volume, or notification state was changed. Production remains approval-gated; matcher flag must stay off there.
+- **Cross-reference:** `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` is the compact current state; `docs/JOBBEEPER_REFERENCE.md` remains the product/architecture guardrail.
 
 ## Historical handoff — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher follow-up)
 > - **Goal:** dependable fresh multi-source discovery → truthful timestamps/stable IDs → canonical dedupe → deterministic matching → one persisted notification decision → consistent dashboard and Telegram delivery. Grow useful coverage without sacrificing accuracy or rate-limit safety. Architecture reference: `docs/JOBBEEPER_REFERENCE.md`.
@@ -3887,12 +3887,12 @@ Use a read-only SQLite/Python diagnostic against the isolated dev database. For 
 
 ## 2026-10-14: Dev Compose matcher-gate wiring; runtime checks pending
 
-- **No application code changed.** Fixed the isolated development Compose manifest so \`GEMINI_MATCHER_ENABLED\` is explicitly passed through, defaulting to false. Commit: \`7ea83e024f2da4923633c23221ea8085a3643a10\`. Production Compose is unchanged.
-- Existing user-reported test evidence remains 11/11 \`v2.test_gemini_extractor\` and 88/88 \`v2.test_radar\`; neither suite was rerun for this Compose-only edit. GitHub Actions result for the new commit has not been independently checked.
-- Dev extraction credentials and runtime flags remain unverified. Earlier checks found env variables unset and no key detected in the checked shell; that does not establish the actual container environment. The running container's DB must be confirmed from the actual \`/data\` mount, not by searching the checkout.
+- **No application code changed.** Fixed the isolated development Compose manifest so `GEMINI_MATCHER_ENABLED` is explicitly passed through, defaulting to false. Commit: `7ea83e024f2da4923633c23221ea8085a3643a10`. Production Compose is unchanged.
+- Existing user-reported test evidence remains 11/11 `v2.test_gemini_extractor` and 88/88 `v2.test_radar`; neither suite was rerun for this Compose-only edit. GitHub Actions result for the new commit has not been independently checked.
+- Dev extraction credentials and runtime flags remain unverified. Earlier checks found env variables unset and no key detected in the checked shell; that does not establish the actual container environment. The running container's DB must be confirmed from the actual `/data` mount, not by searching the checkout.
 - **Do not start or recreate the service yet.** First pull the documentation/Compose fix and capture read-only runtime output using the commands below. They print only whether a key is configured, never its value; the API summary script intentionally omits raw job titles, identifiers and evidence quotes.
 
-\`\`\`bash
+```bash
 cd ~/job-beeper-dev || exit 1
 printf '%s\\n' '--- worktree before pull ---'
 git status --short --branch
@@ -3909,11 +3909,11 @@ printf '%s\\n' '--- actual /data mount on dev container ---'
 docker inspect job-radar-dev --format 'data_mount={{range .Mounts}}{{if eq .Destination "/data"}}type={{.Type}} name={{.Name}} source={{.Source}} destination={{.Destination}}{{end}}{{end}}' 2>&1 || true
 printf '%s\\n' '--- actual environment inside running dev container (no secrets printed) ---'
 docker compose -p job-radar-dev -f v2/docker-compose.dev.yml exec -T radar python -c 'import os; yes={"1","true","yes"}; flag=lambda n: str(os.getenv(n,"").strip().lower() in yes).lower(); print("db_path="+os.getenv("JOB_RADAR_DB","<unset>")); print("gemini_api_key_configured="+str(bool(os.getenv("GEMINI_API_KEY","").strip())).lower()); print("gemini_model="+os.getenv("GEMINI_MODEL","gemini-3.5-flash-lite").strip()); print("gemini_extraction_enabled="+flag("GEMINI_EXTRACTION_ENABLED")); print("gemini_matcher_enabled="+flag("GEMINI_MATCHER_ENABLED")); print("telegram_credentials_empty="+str(not any(os.getenv(n,"").strip() for n in ("JOB_RADAR_TELEGRAM_BOT_TOKEN","JOB_RADAR_TELEGRAM_CHAT_ID"))).lower())' 2>&1 || true
-\`\`\`
+```
 
 Then run this read-only API check. It reports flags, cache counts and sanitized cache eligibility indicators only; it does not print secrets, titles, source IDs, raw descriptions or evidence text.
 
-\`\`\`bash
+```bash
 python3 - <<'PY'
 import datetime as dt
 import json
@@ -3956,8 +3956,8 @@ for index, row in enumerate(status.get("recent_results", [])[:10], 1):
     )
     print(f"cache_sample_{index}: status={row.get('status')} model_match={row.get('model') == status.get('model')} fresh_30d={fresh} trusted_shape={candidate_shape}")
 PY
-\`\`\`
+```
 
-**Expected output to return:** branch/HEAD and worktree status (the local \`v2/config.json\` modification and \`.venv/\` must remain); dev container status; volume name and mount destination; DB path; booleans for key configured, extraction flag, matcher flag and empty Telegram credentials; API enabled/model/cache counts; sanitized per-cache-row indicators. Docker permission errors can be returned as-is; do not use \`sudo\`, print \`.env\`, run \`docker inspect\` without the format filter, or paste any key/token.
+**Expected output to return:** branch/HEAD and worktree status (the local `v2/config.json` modification and `.venv/` must remain); dev container status; volume name and mount destination; DB path; booleans for key configured, extraction flag, matcher flag and empty Telegram credentials; API enabled/model/cache counts; sanitized per-cache-row indicators. Docker permission errors can be returned as-is; do not use `sudo`, print `.env`, run `docker inspect` without the format filter, or paste any key/token.
 
-**Next step after evidence:** if the key is absent, configure it only on the dev VM through the existing ignored \`.env\` or exported-environment mechanism without showing the value. Keep extraction and matcher disabled until the container's config and mount are confirmed. Then enable bounded extraction in dev, keep Telegram disabled, let at most the configured request budget run, and inspect cache/evaluation through read-only operations. Never switch/enable production or replay old alerts without explicit approval.
+**Next step after evidence:** if the key is absent, configure it only on the dev VM through the existing ignored `.env` or exported-environment mechanism without showing the value. Keep extraction and matcher disabled until the container's config and mount are confirmed. Then enable bounded extraction in dev, keep Telegram disabled, let at most the configured request budget run, and inspect cache/evaluation through read-only operations. Never switch/enable production or replay old alerts without explicit approval.
