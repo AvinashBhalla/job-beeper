@@ -8,7 +8,7 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 
 
-## Current verified state — 2026-10-14 (authoritative exact-hash diagnostic)
+## Current verified state — 2026-10-15 (authoritative exact-hash diagnostic and autonomy directive)
 
 ### Active issue: Gemini required-experience cache → bridge → live persisted evaluation
 - Branch: `AvinashBhalla/job-beeper:v2-live-radar`; consult both handovers and `docs/JOBBEEPER_REFERENCE.md`.
