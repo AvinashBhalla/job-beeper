@@ -4416,3 +4416,19 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - If the Radar suite fails, stop before rebuilding, capture complete output, diagnose the failure, and make a justified code/test fix directly on GitHub with fresh blob SHAs; then update/re-fetch both handovers, pull safely, and rerun the affected suites. If it passes, proceed only to the previously approved development-only radar rebuild; do not enable extraction yet.
 - Continue preserving v2/config.json and .venv/: never stage either, use git add ., reset hard, clean, or overwrite. The current source-marker caveat remains: job_evaluations does not persist jd_experience_source. End-to-end fresh exact-JD/model/cache proof is still outstanding.
 - Cross-reference docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md for compact state and docs/JOBBEEPER_REFERENCE.md for matching/rollout constraints.
+
+
+## 2026-10-14: Both local target test suites passed; dev-only rebuild next
+
+- User supplied actual SSH output for the Radar suite: `./.venv/bin/python -m unittest v2.test_radar` completed with 88 tests in 18.796s, result OK. Test logs include expected warning/log paths for intentionally failed ATS-board fixtures and simulated LinkedIn 429/backoff cases; the suite's final result is successful.
+- The preceding Gemini extractor suite passed 14 tests in 0.108s with result OK. These are local unit-test results from the VM checkout after the fast-forward to bcb8cfc. Together, the two requested suites passed. The docs-only commits added after that checkout may advance the remote branch but do not affect the already-run app code; don't misstate these results as testing later application changes if new code is added.
+- User's latest visible status had `M v2/config.json` and `?? .venv/`; preserve both. No runtime rebuild, environment flag change, DB/cache inspection, schema change, or notification action has occurred in this turn.
+- **Next exact action:** run the previously approved development-only rebuild using the existing explicit environment file and named volume:
+  ```bash
+  cd ~/job-beeper-dev
+  sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build radar
+  ```
+  This approval covers only the isolated dev `radar` service and existing volume `job-radar-dev_radar-dev-data` mounted at `/data`. Do not run `docker compose down`, create/remove volumes, access or broadly mutate SQLite, change production, or replay historical notifications. If the command errors or authorization differs, stop and return the complete output.
+- After the rebuild, gather read-only evidence: container status, key presence only (never key value), model and extraction/matcher flags, health at `http://127.0.0.1:8001/health`, and a sanitized `/api/llm-shadow-status`. Do not print full status JSON or source/job identifiers, titles, descriptions, evidence quotes, skill lists, API keys, config tokens, or complete DB rows. Confirm `matcher_enabled=false` and sanitized response redaction.
+- Both feature gates remain false. Once redaction and runtime flags are verified, ask separately for explicit approval to enable only shadow extraction; do not flip either flag automatically. The goal remains fresh exact-current-JD/model/hash/TTL cache proof, accepted only for required total-professional experience with exact evidence, confidence >= 0.85, and at least one range bound, then bridge and persisted evaluation verification. Current `job_evaluations` schema does not persist `jd_experience_source`.
+- Turn record: no app code change; both requested local suites passed; handovers updated directly on GitHub. Cross-reference the compact state in `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and engineering/rollout guardrails in `docs/JOBBEEPER_REFERENCE.md`.
