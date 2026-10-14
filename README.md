@@ -28,16 +28,19 @@ Job Radar is a personal, always-on job discovery and matching service. Its pipel
 - Loopback-only host port: `8001`; use an SSH tunnel to view it from your computer.
 - Independent database volume: `job-radar-dev_radar-dev-data`; independent generated config and config token.
 - Dev defaults: Naukri relay ingestion only; LinkedIn, Instahyre and Greenhouse disabled; Telegram notifications disabled and credentials blank. This keeps dev data separate, prevents test notifications, and avoids doubling LinkedIn requests/raising its 429 risk.
-- Build/start from the dev clone root:
+- The development Compose file needs the VM-local ignored `.env` explicitly supplied: host-side checks showed that Compose's default dotenv discovery did not resolve `GEMINI_API_KEY`, while `--env-file .env` did. These commands must run only from an account/session already authorized to access the Docker socket; do not use `sudo` or weaken socket/group permissions as a workaround.
+- Before any create/recreate/restart, verify the existing dev container and actual `/data` volume mapping so the named `job-radar-dev_radar-dev-data` database is not replaced or confused with production. The current handover records the pending verification gate.
+- Build/start from the dev clone root **only after the volume and running environment have been verified by an authorized Docker operator**:
   ```bash
-  sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build
-  sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml ps
+  docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build
+  docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml ps
   curl -fsS http://127.0.0.1:8001/health
   ```
 - View logs:
   ```bash
-  sudo docker compose -p job-radar-dev -f v2/docker-compose.dev.yml logs --tail=100 radar
+  docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml logs --tail=100 radar
   ```
+- The local `.env` stores a Gemini key only if the user supplies one; never print/commit it. Keep both `GEMINI_EXTRACTION_ENABLED` and `GEMINI_MATCHER_ENABLED` false until the initial controlled checks are complete.
 - On the developer's computer, forward the port with `ssh -L 8001:127.0.0.1:8001 ubuntu@<VM_HOST>`, then open `http://127.0.0.1:8001/dashboard/`.
 - Never add production Telegram credentials to the dev Compose file. Enable source collectors in dev only deliberately; do not enable LinkedIn while production is querying it unless conducting a coordinated rate-limit test.
 
