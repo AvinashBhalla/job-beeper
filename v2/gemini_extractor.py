@@ -468,10 +468,10 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
                     and bool(payload["experience_evidence"].strip())
                 )
                 experience_type = payload.get("experience_type")
-                if experience_type not in {"required", "preferred", "unspecified"}:
+                if not isinstance(experience_type, str) or experience_type not in {"required", "preferred", "unspecified"}:
                     experience_type = "unknown"
                 experience_scope = payload.get("experience_scope")
-                if experience_scope not in {"total_professional", "skill_specific", "unknown"}:
+                if not isinstance(experience_scope, str) or experience_scope not in {"total_professional", "skill_specific", "unknown"}:
                     experience_scope = "unknown"
 
                 shape_eligible = (
