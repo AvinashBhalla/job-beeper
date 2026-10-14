@@ -1924,3 +1924,17 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
   ```
   Wait for and inspect complete output. If it fails, do not rebuild; diagnose and fix directly on GitHub, update both handovers, fast-forward pull while preserving local files, and rerun relevant tests. If it passes, the approved next step is the isolated dev radar rebuild only; do not enable extraction or matcher yet.
 - The larger proof remains outstanding: fresh successful Gemini cache for exact current JD/hash/model within TTL, required total_professional scope with evidence/confidence/range bound, bridge consumption through _job_for_canonical, and expected persisted evaluation bounds/reasons. Existing job_evaluations schema does not persist the jd_experience_source marker.
+
+
+## 2026-10-14 — Both test suites passed; approved dev rebuild next
+
+- User's actual VM output for `./.venv/bin/python -m unittest v2.test_radar`: `Ran 88 tests in 18.796s`, `OK`. The output contains exercised warnings for invalid/partial ATS board fixtures and simulated LinkedIn HTTP 429/backoff paths, but the test process completed successfully. Previous user output confirms `v2.test_gemini_extractor`: 14 tests in 0.108s, `OK`. Both requested local suites pass on the VM code pulled to bcb8cfc.
+- Preserve `M v2/config.json` and `?? .venv/`; no code/runtime/DB/flag change occurred this turn. Test results do not prove live Gemini activity or matcher use.
+- Next action is the previously approved dev-only rebuild, and nothing broader:
+  ```bash
+  cd ~/job-beeper-dev
+  sudo docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build radar
+  ```
+  This reuses the verified dev project and named volume `job-radar-dev_radar-dev-data` mounted at `/data`. No `down`, volume lifecycle, production changes, broad DB/SQLite access, or historical notification replay. If it errors, stop and share complete output.
+- Afterward, verify status/health, API-key presence without printing its value, model, both disabled feature flags, and sanitized `/api/llm-shadow-status`; ensure it does not reveal IDs, titles, raw extraction, verbatim evidence, or skill lists and that matcher is false. Do not claim fresh extraction from counters or old samples.
+- Next approval gate remains enabling only `GEMINI_EXTRACTION_ENABLED=true` after safe runtime diagnostics; keep `GEMINI_MATCHER_ENABLED=false`. Then prove a fresh exact-current-JD/model/hash/cache-TTL entry, required total-professional scope, verbatim evidence, confidence >= 0.85, one range bound, bridge consumption via `_job_for_canonical`, and evaluation bounds/reasons. Source marker is not persisted in current schema. No production or notification replay.
