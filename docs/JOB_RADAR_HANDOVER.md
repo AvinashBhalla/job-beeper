@@ -3943,7 +3943,7 @@ for index, row in enumerate(status.get("recent_results", [])[:10], 1):
     except (TypeError, ValueError):
         pass
     fresh = created is not None and dt.timedelta(0) <= now - created < dt.timedelta(days=30)
-    candidate_shape = (
+    candidate_shape_precheck = (
         row.get("status") == "ok"
         and row.get("model") == status.get("model")
         and fresh
@@ -3954,11 +3954,11 @@ for index, row in enumerate(status.get("recent_results", [])[:10], 1):
         and isinstance(result.get("confidence"), (int, float))
         and result.get("confidence", 0) >= 0.85
     )
-    print(f"cache_sample_{index}: status={row.get('status')} model_match={row.get('model') == status.get('model')} fresh_30d={fresh} trusted_shape={candidate_shape}")
+    print(f"cache_sample_{index}: status={row.get('status')} model_match={row.get('model') == status.get('model')} fresh_30d={fresh} candidate_shape_precheck={candidate_shape_precheck}")
 PY
 ```
 
-**Expected output to return:** branch/HEAD and worktree status (the local `v2/config.json` modification and `.venv/` must remain); dev container status; volume name and mount destination; DB path; booleans for key configured, extraction flag, matcher flag and empty Telegram credentials; API enabled/model/cache counts; sanitized per-cache-row indicators. Docker permission errors can be returned as-is; do not use `sudo`, print `.env`, run `docker inspect` without the format filter, or paste any key/token.
+**Interpretation caution:** `candidate_shape_precheck` is only a structural screen; it does not prove the cache input hash still matches a current JD or that a persisted evaluation consumed the cached result. That requires a separate read-only DB/evaluation check. **Expected output to return:** branch/HEAD and worktree status (the local `v2/config.json` modification and `.venv/` must remain); dev container status; volume name and mount destination; DB path; booleans for key configured, extraction flag, matcher flag and empty Telegram credentials; API enabled/model/cache counts; sanitized per-cache-row indicators. Docker permission errors can be returned as-is; do not use `sudo`, print `.env`, run `docker inspect` without the format filter, or paste any key/token.
 
 **Next step after evidence:** if the key is absent, configure it only on the dev VM through the existing ignored `.env` or exported-environment mechanism without showing the value. Keep extraction and matcher disabled until the container's config and mount are confirmed. Then enable bounded extraction in dev, keep Telegram disabled, let at most the configured request budget run, and inspect cache/evaluation through read-only operations. Never switch/enable production or replay old alerts without explicit approval.
 
