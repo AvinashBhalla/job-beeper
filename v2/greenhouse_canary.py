@@ -36,9 +36,15 @@ def job_ids(jobs: list[dict[str, Any]]) -> set[str]:
 def build_report(
     first: list[dict[str, Any]], second: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Summarize two snapshots without persisting job data."""
+    """Summarize two snapshots without persisting job data.
+
+    Timestamp quality is diagnostic only; it is not a canary pass/fail decision.
+    """
     first_ids = job_ids(first)
     second_ids = job_ids(second)
+    report_time = radar.now()
+    max_age_hours = 72
+
     def timestamp_coverage(jobs: list[dict[str, Any]]) -> dict[str, int]:
         with_timestamp = sum(
             1 for job in jobs if job.get("source_posted_at") not in (None, "")
@@ -47,6 +53,31 @@ def build_report(
             "with_timestamp": with_timestamp,
             "unknown_timestamp": len(jobs) - with_timestamp,
         }
+
+    def timestamp_quality(jobs: list[dict[str, Any]]) -> dict[str, int]:
+        counts = {
+            "within_age_window": 0,
+            "stale": 0,
+            "unknown": 0,
+            "invalid": 0,
+            "future": 0,
+        }
+        cutoff = report_time - radar.dt.timedelta(hours=max_age_hours)
+        for job in jobs:
+            raw_value = job.get("source_posted_at")
+            if raw_value in (None, ""):
+                counts["unknown"] += 1
+                continue
+            parsed = radar.parse_relative(raw_value, base=report_time)
+            if parsed is None:
+                counts["invalid"] += 1
+            elif parsed > report_time:
+                counts["future"] += 1
+            elif parsed < cutoff:
+                counts["stale"] += 1
+            else:
+                counts["within_age_window"] += 1
+        return counts
 
     def duplicate_id_count(jobs: list[dict[str, Any]]) -> int:
         ids = [
@@ -74,8 +105,11 @@ def build_report(
         "stable_ids": len(first_ids & second_ids),
         "new_ids_on_second_poll": len(second_ids - first_ids),
         "missing_ids_on_second_poll": len(first_ids - second_ids),
+        "published_timestamp_max_age_hours": max_age_hours,
         "first_poll_published_timestamp_coverage": timestamp_coverage(first),
         "second_poll_published_timestamp_coverage": timestamp_coverage(second),
+        "first_poll_published_timestamp_quality": timestamp_quality(first),
+        "second_poll_published_timestamp_quality": timestamp_quality(second),
         "database_writes": 0,
         "matching_executed": False,
         "notifications_sent": False,
