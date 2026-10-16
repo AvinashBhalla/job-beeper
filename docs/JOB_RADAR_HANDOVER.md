@@ -4,8 +4,8 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-15 (matcher enabled in dev; health recovered; live Gemini experience evaluation verified)**
-**Active branch:** `v2-live-radar`  
+**Last updated: 2026-10-16 (Phase 1 Core delivered; SSE & Base Adapter implemented; transitioning to Phase 2)**
+**Active branch:** `feature/sse-infrastructure`
 **Repository:** `AvinashBhalla/job-beeper`
 
 > ## Mandatory agent handover rule — every prompt
