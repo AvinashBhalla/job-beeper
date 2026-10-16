@@ -1475,6 +1475,10 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
     priority_patterns = (
         r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*"
         r"(?:years?|yrs?)\s+of\s+(?:overall|total)\b[^.!?]{0,160}\bexperience\b",
+        r"(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)\s+of\s+"
+        r"(?:overall|total|professional|work)\b[^.!?]{0,160}\bexperience\b",
+        r"(?:overall|total|professional|work)\b[^.!?]{0,120}\bexperience\b"
+        r"[^.!?]{0,80}?(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)\b",
         r"(?:overall|total)\s+(?:software\s+engineering|professional|work\s+)?"
         r"experience\b[^.!?]{0,120}?(\d+(?:\.\d+)?)\s*(?:-|to)\s*"
         r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b",
@@ -1513,6 +1517,34 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
             return result
 
     return None, None
+
+
+def _experience_is_reliably_known_for_shadow(job: dict[str, Any]) -> bool:
+    """Return true only when deterministic experience evidence is strong enough to skip Gemini review.
+
+    Generic regex matches are deliberately reviewable: they can select tool-specific
+    or incidental years from a longer description and should not suppress a bounded
+    Gemini check merely because a number was found.
+    """
+    description = str(job.get("description") or "")
+    source = str(job.get("source") or "").casefold()
+    labeled = extract_linkedin_labeled_experience(description)
+    if source == "linkedin" and labeled != (None, None):
+        return True
+
+    parsed = extract_jd_experience(description)
+    if parsed == (None, None):
+        return False
+
+    # Trust only explicit overall/total/professional/work context. Phrases like
+    # "3+ years of Python experience" or "5+ years of software development
+    # experience" remain reviewable because they may be skill/domain-specific.
+    return bool(re.search(
+        r"\b(?:overall|total)\b[^.!?]{0,120}\bexperience\b"
+        r"|\b(?:professional|work)\s+experience\b",
+        description,
+        re.I,
+    ))
 
 
 def extract_linkedin_labeled_experience(text: str) -> tuple[float | None, float | None]:
@@ -2701,46 +2733,11 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             )
         ]
 
-        def _experience_known_for_shadow(job: dict[str, Any]) -> bool:
-            if job.get("jd_experience_min_years") is not None or job.get("jd_experience_max_years") is not None:
-                return True
-            description = job.get("description") or ""
-            if extract_linkedin_labeled_experience(description) != (None, None):
-                return True
-            parsed_experience = extract_jd_experience(description)
-            if parsed_experience == (None, None):
-                return False
-            # A tool-specific phrase like "2 years of Python experience" is
-            # not reliable evidence of the overall experience requirement.
-            skill_specific_only = re.search(
-                r"\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+"
-                r"(?:(?!overall\b|total\b|professional\b|work\b)"
-                r"(?:experience\s+(?:with|in)\s+|[A-Za-z0-9.+#/-]{2,40}\s+)"
-                r"experience\b)",
-                description,
-                re.I,
-            )
-            if not skill_specific_only:
-                skill_specific_only = re.search(
-                    r"\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+"
-                    r"(?:of\s+)?experience\s+(?:with|in)\s+[A-Za-z0-9.+#/-]{2,40}\b",
-                    description,
-                    re.I,
-                )
-            overall_context = re.search(
-                r"\b(?:overall|total|professional|work)\s+experience\b",
-                description,
-                re.I,
-            )
-            if skill_specific_only and not overall_context:
-                return False
-            return True
-
         try:
             shadow_extract_jobs(
                 shadow_candidates,
                 DB_PATH,
-                experience_known=_experience_known_for_shadow,
+                experience_known=_experience_is_reliably_known_for_shadow,
                 configured_skills=config.get("skills", []),
             )
         except Exception as exc:
