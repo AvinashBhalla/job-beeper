@@ -994,6 +994,13 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
 
 
 def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
+    # Greenhouse first-seen time is not evidence of when the employer published
+    # the role. Unknown or malformed publication timestamps must remain unknown
+    # instead of being made to look fresh by the discovery timestamp.
+    if str(job.get("source") or "").strip().lower() == "greenhouse":
+        value = job.get("source_posted_at")
+        return parse_relative(value) if value else None
+
     for field in ("source_posted_at", "discovered_at"):
         value = job.get(field)
         if value:
