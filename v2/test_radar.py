@@ -1523,6 +1523,87 @@ class MatcherTests(unittest.TestCase):
         self.assertIsNone(jobs[0]["source_posted_at"])
         self.assertEqual(jobs[0]["posted_precision"], "unknown")
         self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+    def test_greenhouse_alert_freshness_requires_valid_recent_first_published(self):
+        from datetime import timedelta
+
+        cases = (
+            ("unknown", None, False),
+            ("stale", radar.now() - timedelta(hours=73), False),
+            ("recent", radar.now() - timedelta(minutes=30), True),
+        )
+        original_db = radar.DB_PATH
+        try:
+            for label, posted_at, should_queue in cases:
+                with self.subTest(publication_time=label), TemporaryDirectory() as tmp:
+                    radar.DB_PATH = Path(tmp) / "jobs.db"
+                    radar.init_db()
+                    job = normalize_job(
+                        "greenhouse",
+                        f"gh-freshness-{label}",
+                        "Acme",
+                        "Software Engineer",
+                        "Bengaluru, India",
+                        f"https://boards.greenhouse.io/acme/jobs/{label}",
+                        posted_at,
+                        "minute" if posted_at is not None else "unknown",
+                        "Build Python services. 2 years experience.",
+                    )
+                    self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                    if label == "malformed":
+                        with sqlite3.connect(radar.DB_PATH) as conn:
+                            conn.execute(
+                                "UPDATE jobs SET source_posted_at='not-a-timestamp'"
+                            )
+                            conn.commit()
+
+                    self.assertEqual(
+                        radar.refresh_notification_decisions(BASE_CONFIG), 1
+                    )
+                    with sqlite3.connect(radar.DB_PATH) as conn:
+                        status, reasons = conn.execute(
+                            "SELECT status, decision_reason_json FROM notification_ledger"
+                        ).fetchone()
+
+                    if should_queue:
+                        self.assertEqual(status, "queued")
+                    else:
+                        self.assertEqual(status, "suppressed")
+                        self.assertIn("no matching observation within 72 hour age window", reasons)
+        finally:
+            radar.DB_PATH = original_db
+
+    def test_greenhouse_malformed_publication_timestamp_is_not_fresh(self):
+        original_db = radar.DB_PATH
+        try:
+            with TemporaryDirectory() as tmp:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                job = normalize_job(
+                    "greenhouse", "gh-malformed-date", "Acme", "Software Engineer",
+                    "Bengaluru, India", "https://boards.greenhouse.io/acme/jobs/malformed",
+                    None, "unknown", "Build Python services. 2 years experience.",
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute(
+                        "UPDATE jobs SET source_posted_at='not-a-timestamp'"
+                    )
+                    conn.commit()
+
+                self.assertEqual(
+                    radar.refresh_notification_decisions(BASE_CONFIG), 1
+                )
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    status, reasons = conn.execute(
+                        "SELECT status, decision_reason_json FROM notification_ledger"
+                    ).fetchone()
+                self.assertEqual(status, "suppressed")
+                self.assertIn(
+                    "no matching observation within 72 hour age window", reasons
+                )
+        finally:
+            radar.DB_PATH = original_db
+
     def test_greenhouse_collector_keeps_successful_board_when_another_board_fails(self):
         class Response:
             status_code = 200
