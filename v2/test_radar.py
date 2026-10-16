@@ -2226,6 +2226,106 @@ class MatcherTests(unittest.TestCase):
                 radar.DB_PATH = original_db
 
 
+
+    def test_canonical_evaluation_ledger_and_dashboard_api_stay_consistent_when_delivery_disabled(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                config = {
+                    **BASE_CONFIG,
+                    "notifications_enabled": False,
+                    "require_explicit_experience_for_alerts": False,
+                }
+                job = normalize_job(
+                    "naukri",
+                    "naukri-consistency-1",
+                    "Acme Technologies",
+                    "Software Engineer",
+                    "Bengaluru, Karnataka, India",
+                    "https://example.test/jobs/consistency-1",
+                    None,
+                    "unknown",
+                    "Build Python services. 2 years experience.",
+                )
+
+                self.assertEqual(upsert_jobs([job], config), 1)
+                self.assertEqual(radar.refresh_notification_decisions(config), 1)
+
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.row_factory = sqlite3.Row
+                    persisted = conn.execute(
+                        """
+                        SELECT j.id, j.canonical_opportunity_id,
+                               e.match, e.score, e.reasons_json,
+                               e.experience_min_years, e.experience_max_years,
+                               nl.status, nl.candidate_job_id,
+                               nl.decision_reason_json
+                        FROM jobs j
+                        JOIN job_evaluations e ON e.job_id=j.id
+                        JOIN notification_ledger nl
+                          ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+                        WHERE j.source='naukri'
+                          AND j.source_job_id='naukri-consistency-1'
+                        """
+                    ).fetchone()
+
+                self.assertIsNotNone(persisted)
+                opportunity_id = persisted["canonical_opportunity_id"]
+                api_job = next(
+                    item for item in radar.jobs(minutes=10080, limit=500)["jobs"]
+                    if item["source_job_id"] == "naukri-consistency-1"
+                )
+                api_opportunity = next(
+                    item for item in radar.opportunities(minutes=10080, limit=500)["opportunities"]
+                    if item["id"] == opportunity_id
+                )
+                detail = radar.opportunity_detail(opportunity_id)
+                queue = radar.notification_queue(limit=500)["notifications"]
+
+                expected_match_reasons = json.loads(persisted["reasons_json"])
+                expected_decision_reasons = json.loads(persisted["decision_reason_json"])
+
+                self.assertTrue(bool(persisted["match"]))
+                self.assertEqual(api_job["canonical_opportunity_id"], opportunity_id)
+                self.assertTrue(api_job["likely_match"])
+                self.assertEqual(api_job["match_score"], persisted["score"])
+                self.assertEqual(api_job["match_reasons"], expected_match_reasons)
+                self.assertEqual(
+                    api_job["experience_min_years"],
+                    persisted["experience_min_years"],
+                )
+                self.assertEqual(
+                    api_job["experience_max_years"],
+                    persisted["experience_max_years"],
+                )
+                self.assertEqual(persisted["status"], "pending")
+                self.assertIsNone(persisted["candidate_job_id"])
+                self.assertEqual(api_job["notification_status"], "pending")
+                self.assertEqual(
+                    api_job["notification_decision_reasons"],
+                    expected_decision_reasons,
+                )
+                self.assertTrue(any(
+                    "notifications disabled" in reason.lower()
+                    for reason in expected_decision_reasons
+                ))
+                self.assertEqual(api_opportunity["id"], opportunity_id)
+                self.assertEqual(api_opportunity["observation_count"], 1)
+                self.assertEqual(detail["opportunity"]["id"], opportunity_id)
+                self.assertEqual(len(detail["observations"]), 1)
+                self.assertEqual(
+                    detail["observations"][0]["source_job_id"],
+                    "naukri-consistency-1",
+                )
+                self.assertFalse(any(
+                    item["canonical_opportunity_id"] == opportunity_id
+                    for item in queue
+                ))
+            finally:
+                radar.DB_PATH = original_db
+
 if __name__ == "__main__":
     unittest.main()
 
