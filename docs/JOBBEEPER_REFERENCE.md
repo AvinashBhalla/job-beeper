@@ -168,3 +168,10 @@ Do not enable every provider simultaneously, and do not use proxy/IP rotation or
 - It does not read or write the radar database, run matching, change source enablement, or send notifications. A successful report is evidence for that board and those two snapshots only; it does not authorize enabling Greenhouse in the scheduler or production.
 - Keep the development config's `source_enabled.greenhouse` false while using the utility. Choose one board from the existing dev config; do not add or activate boards for this test.
 - Acceptance review: check request success, stable ID behavior, duplicate counts, timestamp coverage, useful job yield, and any board errors; retain the JSON report. Repeat or investigate before considering scheduler activation.
+
+
+## Optional multi-provider LLM router
+- Runbook: [LLM_PROVIDER_ROUTER.md](LLM_PROVIDER_ROUTER.md).
+- Implementation: `v2/llm_router.py`, integrated with the shadow extractor in `v2/gemini_extractor.py`.
+- Providers supported: Groq, Gemini, OpenRouter, NVIDIA NIM. Router is opt-in with `LLM_ROUTER_ENABLED=false` by default; provider-specific model IDs and keys are supplied through the VM-local Compose environment, never committed.
+- Keep `LLM_ROUTER_MATCHER_ENABLED=false` while reviewing routed extraction output. Telegram notifications remain disabled. Mocked tests were added but have not yet been executed; verify focused and full test suites after pulling before rebuilding the development container.
