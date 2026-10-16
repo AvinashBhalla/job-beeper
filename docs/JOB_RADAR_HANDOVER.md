@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-15 (matcher enabled in dev; health recovered; live Gemini experience evaluation verified)**
+**Last updated: 2026-10-16 (authoritative Claude Code orchestration/review worksheet; Gemini live evaluation complete)
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -4640,3 +4640,116 @@ Return the state summary, sanitized log indicators, health result and diagnostic
 - This completes the specific dev acceptance target: exact-current-input trusted Gemini extraction → gated matcher → live persisted experience bounds/reason. It does NOT prove a Telegram send and no alert is to be sent: notifications and Telegram credentials are intentionally off.
 - Next: autonomously run safe tests and inspect current VM Git status/branch/HEAD without touching local `M v2/config.json` or `?? .venv/`; fast-forward only if behind and safe. Review canonical opportunity/notification-ledger/dashboard API consistency while keeping dispatch disabled; then follow `docs/JOBBEEPER_REFERENCE.md`: Greenhouse freshness guard + GET-only two-poll one-board canary, then Ashby, Lever, SmartRecruiters individually, observability. Production promotion/activation requires separate controlled review. User's standing-autonomy directive remains active for routine reversible in-scope work; never ask the user to relay routine VM output when Claude Code has direct SSH access. Preserve volumes, secrets, config and local virtualenv.
 - No source-code change or tests were run by this diagnostic turn; runtime evidence came from user output. Latest docs-only updates must be mirrored in `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`; production remains untouched.
+
+
+## 2026-10-16 — Claude Code execution plan, status, and independent review worksheet
+**This is the latest authoritative section.** It supplements, and where conflicts exist supersedes, older next-step instructions and continuation prompts below it. Keep the historical chronology; do not delete it to make the history look consistent.
+
+### Roles and working agreement
+- **Project goal:** deliver a stable, accurate, low-noise, always-on personal job radar: discover fresh roles from multiple sources → normalize and deduplicate → apply deterministic configurable matching with explainable reasons → persist canonical opportunity/evaluation/notification state → show consistent dashboard/API data → deliver only eligible, new alerts when explicitly enabled.
+- **Claude Code is the implementer/operator.** Work from the user's local Windows machine. For VM tasks use the supplied local SSH identity directly:
+  ```powershell
+  ssh -i "C:\Users\avibh\Downloads\ssh-key-2026-10-07.key" ubuntu@130.210.27.197
+  ```
+  Keep the private key on the user's machine. Never copy, print, commit, or upload it or any secret. Do not use insecure SSH bypasses. When SSH works, Claude should execute commands itself and inspect outputs rather than asking the user to relay routine commands/results.
+- **ChatGPT is the independent orchestrator/reviewer.** Check Claude's pushed handover replies, compare them with the source code, tests, GitHub commits/PRs and actual sanitized VM evidence. Flag drift, unsupported claims, unsafe actions, weak tests, or changes that undermine freshness, match correctness, dedupe, alert safety, and maintainability. Review findings and suggested fixes should be written back here (and the compact knowledge transfer) so Claude can respond in the same shared record.
+- **Standing authorization:** the user authorizes routine in-scope reversible engineering, test, documentation and dev-VM work without asking permission at every step. This specifically includes the already-approved matcher flag in isolated dev. This does not authorize production cutover, real notification sends/replay, volume deletion, broad reset/clean, secrets disclosure, bypassing host key checks, or other destructive/security-sensitive/out-of-scope changes. Keep production untouched and Telegram/notifications off unless separately reviewed and explicitly authorized. Preserve VM-local `M v2/config.json` and untracked `.venv/`; never stage/reset/clean/overwrite them.
+- **Communication rule:** do not make the user an intermediary between Claude and the VM. Surface material blockers, unsafe conditions, or genuine decision points early. Do not report an operation/test/deployment as complete without actual command output or equivalent authoritative evidence.
+- **Required documentation cadence:** before closing every task, Claude must update both `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, recording exact evidence, paths, commits/PRs, tests/CI, deployment status, risks, next action and continuation prompt. Push to `v2-live-radar`; do not promote/merge production changes as part of routine development. Re-fetch both pushed files to verify. Keep this worksheet and Claude's answers in the same detailed handover file, not a separate untracked note.
+
+### Verified current state — distinguish completed from remaining
+**Completed for the narrow Gemini experience objective (user VM output, 2026-10-15):**
+- Isolated dev container `job-radar-dev` running, existing volume `job-radar-dev_radar-dev-data:/data` retained, no restart/OOM indication in the latest supplied output.
+- `GEMINI_EXTRACTION_ENABLED=true`, `GEMINI_MATCHER_ENABLED=true`; model `gemini-3.5-flash-lite`; Telegram token/chat absent; `notifications_enabled=false`, LinkedIn disabled. Health check eventually returned OK, version 2.0.0, no source error. An earlier connection reset was transient; bounded retry recovered without a further restart.
+- The read-only live diagnostic selected a fresh exact-current-input-hash/model-matched cache entry within TTL. It was `required`, `total_professional`, 3–5 years, confidence 0.95, evidence present and had a bound. The **live** `job_evaluations` row then had min=3.0, max=5.0, bounds matched the cache and an experience reason. The diagnostic made zero Gemini API calls and no source DB changes/notifications.
+- The isolated temporary-database bridge test also passed with transient `jd_experience_source=gemini_verified`. The production DB/service was not touched. Current `job_evaluations` schema still does not persist `jd_experience_source`.
+
+**Not yet completed:**
+- A coherent end-to-end verification of canonical opportunity → evaluation → notification ledger/API/dashboard payload with all delivery disabled; no claim that a Telegram send was tested.
+- Safe verification that the current VM checkout, local development checkout and GitHub `v2-live-radar` point to known commits; preservation of local config/venv must be confirmed, not assumed.
+- Greenhouse one-board, two-poll dev canary with reliable source posting-time validation and no historical backlog alerts.
+- Ashby, Lever and SmartRecruiters adapters/canaries; source-health observability.
+- Reviewed production-promotion PR, CI, and controlled cutover. Keep these behind separate review gates; do not perform production cutover as a side effect of dev work.
+
+### Roadmap / execution order
+1. **Reconcile current reality first:** read this file, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`; inspect current GitHub branch/head/open PRs and compare with the local checkout and VM deployment. Connect via the SSH command above. Report the VM branch/HEAD/status and container/image status without secret output. Never overwrite local `v2/config.json` or `.venv/`.
+2. **Test the current baseline:** run the focused Gemini suites and full unit suite on the exact checkout; report actual commands and complete exit/result summaries. Check GitHub CI for the exact commit. Investigate failures; do not skip/falsely summarize them.
+3. **Validate decision consistency with dispatch disabled:** trace one eligible canonical opportunity through stored job → `job_evaluations` → canonical opportunity selection → notification ledger decision → API → dashboard rendering. Use dry-run/test fixtures or read-only inspection. Never add real Telegram credentials, enable dispatch, send a message or replay historical alerts to prove this path.
+4. **Greenhouse freshness guard and canary:** inspect the existing adapter, its actual upstream timestamp semantics, and current tests first. Implement a trustworthy publication-time guard only using a genuine upstream posted/published timestamp; do not use discovery/first-seen time as a substitute. If timestamp is missing/ambiguous, keep freshness unknown and do not present it as newly posted. Use only GET requests for one configured dev board, at least two polls, notifications disabled, and prove stable IDs, timestamp behavior, no duplicate/old-job alerting and useful yield. Keep the source globally disabled until the evidence-based canary gate is met.
+5. **Add ATS sources individually:** Ashby, Lever, then SmartRecruiters as a starting order, subject to documented public endpoint availability and expected value. For each adapter require fixtures/tests, stable IDs, direct URL, timestamps, pagination, rate-limit/backoff, source health, normalization, dedupe, relevance yield and a disabled-by-default/two-poll canary. Do not implement all three at once or enable them globally without separate measured acceptance.
+6. **Observability:** add source-level fetched/normalized/relevant/new/deduplicated/error/429 metrics and freshness-lag measurements before increasing polling volume. Preserve LinkedIn stop-on-429/cooldown behavior.
+7. **Schema/source attribution proposal:** decide whether storing `jd_experience_source` is materially needed for auditing/UI/debugging now that the main Gemini path is proven. Analyze migration safety, backwards compatibility, all schema/init/migration paths, current readers/writers/API/dashboard impact and tests first. Do not add a column only because it was suggested in an initial analysis; provide evidence and a design proposal in the worksheet for independent review before a schema migration.
+8. **Production promotion:** only prepare a reviewed PR after dev tests, canaries, fresh-data correctness, dashboard/ledger coherence and rollback plan pass. No production ref switch/rebuild, alert replay or real Telegram test as part of this sequence. Keep `main` and `v2-live-radar` roles explicit and confirm exact commit/CI/runtime diffs before any later controlled cutover.
+
+### Claude Code — reply to this questionnaire in this same file
+**Instructions for Claude:** fill in each `CLAUDE RESPONSE` area beneath its question. Keep the original questions and prior handover facts. Be concrete: cite file paths/functions/tests/commit hashes or PR links, quote safe output summaries, distinguish observed facts from assumptions, and list trade-offs. Then push the edited handover plus compact knowledge transfer directly to `v2-live-radar` and report the commit SHA. Do not claim ChatGPT accepted your answers; the orchestrator will independently review the pushed version. You may perform read-only checks while preparing answers, but do not start a schema migration, globally enable another source, or touch production before this review.
+
+#### Q1 — Source-of-truth and deployment alignment
+Which exact GitHub branch/head, local Windows checkout branch/head/status, and VM checkout/deployed image/commit were observed? Are there local modifications, open PRs, unpushed commits, or code differences between checkout, image and branch? How will you update safely without touching `M v2/config.json` or `.venv/`?
+- **CLAUDE RESPONSE:** Pending — answer with command summaries and SHAs; redact secrets.
+
+#### Q2 — End-to-end goal coverage
+For the pipeline `source → normalized job → canonical opportunity/dedupe → job_evaluation → notification ledger decision → API → dashboard`, which segments have real evidence today, which have only unit/sandbox evidence, and what is the smallest test plan to close gaps while notifications remain disabled? What exactly is the dashboard's freshness/ranking behavior and is it consistent with persisted state?
+- **CLAUDE RESPONSE:** Pending — cite functions, API handlers, frontend paths and tests. Do not send an alert.
+
+#### Q3 — Should `jd_experience_source` become a persisted DB field?
+What real user-facing/debugging/observability need would the column solve, given current live bounds/reasons already match Gemini but the transient source marker is not stored? Describe benefits versus migration complexity, schema/version/init/migration paths, old-database compatibility, API/dashboard consumers and rollback. Recommend one of: (a) keep the current schema, (b) add the field in a separate reviewed migration, or (c) store provenance elsewhere. Do not implement the migration before posting the analysis here.
+- **CLAUDE RESPONSE:** Pending — include a minimal migration/test design if you recommend (b).
+
+#### Q4 — Greenhouse freshness guard
+Which exact upstream Greenhouse timestamp field is available, and how do you establish its semantics from current API response/fixtures? How will old existing postings be kept from looking new when first imported? How will missing/invalid timestamps be handled without inventing freshness or dropping them into the alertable feed as new?
+- **CLAUDE RESPONSE:** Pending — cite collector function, source fields and fixtures; no live writes/alerts.
+
+#### Q5 — Two-poll one-board canary acceptance
+Define a deterministic two-poll protocol and pass/fail thresholds for stable IDs, direct URLs, posted-time coverage, duplicate prevention, older-than-72-hour filtering, unknown-date behavior, source errors, relevant/new yield and rate limits. What exactly is isolated to dev and how do we prove Telegram cannot dispatch?
+- **CLAUDE RESPONSE:** Pending — commands, metrics and sanitized output shape.
+
+#### Q6 — ATS adapter order / source feasibility
+For Ashby, Lever and SmartRecruiters, identify documented public read endpoints, required company/board identifiers, pagination, timestamp fields, stable ID/URL fields, request limits and expected maintenance burden. Why is your order best for this project's free-first relevance goals? Define one-source-at-a-time completion criteria.
+- **CLAUDE RESPONSE:** Pending — document sources/uncertainties; do not assume unauthenticated global access.
+
+#### Q7 — LinkedIn stability and experience parser changes
+What is the current status of the labeled-experience parsing fix/PR (including PR #36 if relevant), has it been tested on the actual `v2-live-radar` commit and deployed dev image, and does any change risk a live request in unit tests? How are 429 stop/cooldown semantics protected? Are dates and experience taken from true source metadata?
+- **CLAUDE RESPONSE:** Pending — list tests actually run and live-call guards.
+
+#### Q8 — Production promotion / acceptance gates
+What objective gates must pass before a PR from `v2-live-radar` to `main` is proposed? Include current tests/CI, source canaries, DB/config compatibility, dashboard, rollback, secret separation, production volume preservation and notification safety. Which steps are intentionally excluded from this phase?
+- **CLAUDE RESPONSE:** Pending — production stays unchanged; no switch/rebuild/alerts.
+
+#### Q9 — Current risks and drift check
+Compare your original analysis and plan against this authoritative handover. Which recommendations are accepted as-is, revised, or rejected (and why)? Call out any plan duplication/inconsistency, unsupported facts, stale handover claims, unnecessary scope or implementation that could cause old/stale jobs to alert as new.
+- **CLAUDE RESPONSE:** Pending — give risk ranking and exact files/functions to address.
+
+#### Q10 — Next increment
+Based on the verified state and answers above, what is the **single smallest, highest-value next development increment**? State the hypothesis, exact files, tests first, implementation, expected observable outcome, rollback, and why this comes before the remaining roadmap. Do not list multiple parallel projects.
+- **CLAUDE RESPONSE:** Pending — choose one increment only and justify it.
+
+### Orchestrator review checklist (ChatGPT fills this after Claude pushes responses)
+- **Repository/commit reviewed:** Pending
+- **Claude's answers evaluated against current source and actual VM evidence:** Pending
+- **Goal alignment:** Pending
+- **Accepted recommendations:** Pending
+- **Concerns / unsupported assumptions / drift to correct:** Pending
+- **Required changes/tests before continuing:** Pending
+- **Decision on provenance schema proposal:** Pending
+- **Decision on Greenhouse freshness/canary proposal:** Pending
+- **Approval-gated actions kept out of scope:** production cutover, real notifications/replay, volume deletion, secret/permission handling
+- **ChatGPT review response / next exact action:** Pending
+
+### Standard report Claude must append after each work unit
+```text
+Date/time:
+Goal and current phase:
+Branch / local HEAD / remote HEAD / VM checkout or image revision:
+Changes made (files + purpose):
+Commands/tests run (exact command, exit status, duration):
+CI/PR/commit:
+Dev deployment evidence (or explicitly not deployed):
+Safety evidence (volume identity; notifications/Telegram off; source flags):
+Observed outcome versus expected:
+Risks / unresolved questions / rollback:
+Handover + knowledge-transfer blob SHAs re-fetched:
+Single next action:
+```
+
+**Continuation rule:** after Claude pushes answers, the next ChatGPT session should read the latest versions of this file, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`, review Claude's exact commit against source/CI/PRs and the plan, write an independent response under the Orchestrator review checklist above, update both handovers, and flag any drift to the user. Do not rubber-stamp Claude's self-assessment.
