@@ -47,6 +47,39 @@ class GreenhouseCanaryTests(unittest.TestCase):
         self.assertFalse(report["matching_executed"])
         self.assertFalse(report["notifications_sent"])
 
+    def test_report_distinguishes_recent_stale_unknown_invalid_and_future_timestamps(self):
+        from datetime import timedelta
+
+        from v2 import radar
+
+        current = radar.now()
+        recent = radar.iso(current - timedelta(hours=2))
+        stale = radar.iso(current - timedelta(hours=80))
+        future = radar.iso(current + timedelta(hours=2))
+
+        report = build_report(
+            [
+                job("recent", recent),
+                job("stale", stale),
+                job("unknown", None),
+                job("invalid", "not-a-timestamp"),
+                job("future", future),
+            ],
+            [],
+        )
+
+        self.assertEqual(
+            report["first_poll_published_timestamp_quality"],
+            {
+                "within_age_window": 1,
+                "stale": 1,
+                "unknown": 1,
+                "invalid": 1,
+                "future": 1,
+            },
+        )
+        self.assertEqual(report["published_timestamp_max_age_hours"], 72)
+
     def test_run_canary_collects_twice_and_sleeps_between_polls(self):
         first = [job("gh-demo-1")]
         second = [job("gh-demo-1"), job("gh-demo-2")]
