@@ -1082,10 +1082,22 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                 eligible.append(item)
 
                 age_timestamp = _alert_age_timestamp(item)
+                is_greenhouse = (
+                    str(item.get("source") or "").strip().lower()
+                    == "greenhouse"
+                )
                 is_fresh = (
-                    not age_timestamp
-                    or age_timestamp >=
-                    now_value - dt.timedelta(hours=max_age)
+                    (
+                        age_timestamp is not None
+                        and age_timestamp >=
+                        now_value - dt.timedelta(hours=max_age)
+                    )
+                    if is_greenhouse
+                    else (
+                        not age_timestamp
+                        or age_timestamp >=
+                        now_value - dt.timedelta(hours=max_age)
+                    )
                 )
 
                 if not is_fresh:
