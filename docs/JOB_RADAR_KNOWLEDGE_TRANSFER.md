@@ -2074,3 +2074,11 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 
 
 - 2026-10-16 documentation verification: `docs/JOB_RADAR_HANDOVER.md` is the shared source for Claude Code's Q1–Q10 response worksheet and the ChatGPT Orchestrator review checklist. Claude should answer in place, push to `v2-live-radar`, and preserve the original prompts; next ChatGPT independently reviews the answer against live source/CI/PR/VM evidence and appends findings. Detailed handover metadata/authoritative heading were corrected in commit `6adf5a93cd1152393e6d665fb2854947b581b238`. No runtime/source-code change or test was made for that documentation correction.
+
+
+## 2026-10-16 — ChatGPT direct-GitHub workflow
+
+- Claude Code is not working; ChatGPT will make code/doc commits directly to `v2-live-radar`. User runs SSH commands in the dev VM and shares redacted output; do not claim VM access.
+- Added a temporary-DB regression test in `v2/test_radar.py`: `test_canonical_evaluation_ledger_and_dashboard_api_stay_consistent_when_delivery_disabled`. It checks one Naukri job's canonical identity, persisted evaluation/reasons/experience, notification-ledger pending decision while notifications are disabled, and API/dashboard-facing consistency without delivery.
+- Code commit: `bb88885698316b70dcb7b4319aad9d345041e710`. The test has not yet run; CI is unverified. No runtime, app logic, config, schema, production, or notification changes.
+- Next: inspect VM branch/status/local HEAD and remote HEAD, fast-forward only if clean/safe, then run the focused test plus existing canonical/ledger tests. Preserve `M v2/config.json`, untracked `.venv/`, and the existing dev data volume. Stop on divergence or overwrite risk; no reset/clean, volume deletion, production cutover, or Telegram send/replay.
