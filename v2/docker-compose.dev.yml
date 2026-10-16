@@ -28,6 +28,8 @@ services:
       GEMINI_MAX_CALLS_PER_DAY: ${GEMINI_MAX_CALLS_PER_DAY:-20}
       # Optional multi-provider router; disabled until explicitly enabled in the VM .env.
       LLM_ROUTER_ENABLED: ${LLM_ROUTER_ENABLED:-false}
+      # Keep alternate-provider results out of hard matching until explicitly validated.
+      LLM_ROUTER_MATCHER_ENABLED: ${LLM_ROUTER_MATCHER_ENABLED:-false}
       LLM_PROVIDER_ORDER: ${LLM_PROVIDER_ORDER:-groq,gemini,openrouter,nvidia}
       LLM_MAX_JOBS_PER_RUN: ${LLM_MAX_JOBS_PER_RUN:-3}
       LLM_MAX_JOBS_PER_DAY: ${LLM_MAX_JOBS_PER_DAY:-20}
