@@ -2221,3 +2221,12 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 3. Give the user safe, non-destructive VM pull commands only after confirming test results and checking how to preserve local changes.
 4. Ask the user to enter keys directly in the VM only after code/tests are ready; never request keys in chat.
 5. Keep all runtime tests development-only, shadow-only, no schema migration, no production cutover, and no Telegram sends.
+
+
+## 2026-10-16 — Multi-provider router code review and CI result
+- Re-read current branch code/docs and reviewed signatures, strict validation, provider request shapes, cache identity, log/error sanitation and rollout flags at `b635b8969247c483bdfae7c2c9d0cb9a38895a61`.
+- CI evidence: [V2 CI run 38934696862](https://github.com/AvinashBhalla/job-beeper/actions/runs/38934696862) succeeded on the exact branch head. Its full `unittest discover -s v2 -p 'test_*.py' -v` step passed. The separate focused router command was not run in this environment; there is no VM/shell execution access here.
+- Review findings: strict extractor validation is wired as the semantic fallback validator; legacy Gemini-only call path remains when router flag is false; cache identity contains ordered provider/model IDs but not keys; routed data is hard-matcher gated by default; no raw provider body is logged by the router. Provider live compatibility remains unverified.
+- Known coverage gap: add direct mocked request/response tests for native Gemini, OpenRouter and NVIDIA, malformed/empty response, request connection error, 5xx, all-provider failure, and fallback-attempt budget accounting. The run/day controls are job/cache-entry bounds, not request/token/spend quotas; fallback can produce multiple requests per job.
+- No new code commit, no VM pull/test, no environment/API/DB/volume/deployment change, no Gemini calls, and no notifications occurred during this review.
+- Next: use read-only git status/branch/HEAD/fetch on `/home/ubuntu/job-beeper-dev`, assess local diffs, fast-forward only if safe, run focused plus full tests in that checkout, then configure provider keys/model IDs only in its ignored VM-local `.env`. Keep router disabled until results are reviewed, matcher gate false, Telegram blank and notifications off. Never reset/clean or remove volumes.
