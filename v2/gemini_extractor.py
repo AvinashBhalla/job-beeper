@@ -251,10 +251,13 @@ def _call_llm_router(job: dict[str, Any]) -> dict[str, Any]:
         "company": str(job.get("company") or "")[:200],
         "description": description,
     }
-    payload, _provider_name = llm_router.generate_with_fallback(
-        PROMPT_PREFIX, job_data, RESPONSE_SCHEMA
+    result, _provider_name = llm_router.generate_with_fallback(
+        PROMPT_PREFIX,
+        job_data,
+        RESPONSE_SCHEMA,
+        validator=lambda payload: _validate_result(payload, description),
     )
-    return _validate_result(payload, description)
+    return result
 
 
 def _cache_lookup(
@@ -341,8 +344,8 @@ def shadow_extract_jobs(
 
             today = _utc_now().date().isoformat()
             calls_today = conn.execute(
-                "SELECT COUNT(*) FROM gemini_shadow_cache WHERE substr(created_at,1,10)=?",
-                (today,),
+                "SELECT COUNT(*) FROM gemini_shadow_cache WHERE substr(created_at,1,10)=? AND model=?",
+                (today, model),
             ).fetchone()[0]
             if calls_this_run >= max_per_run or calls_today >= max_per_day:
                 stats["skipped"] += 1
@@ -439,7 +442,10 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
     providers = llm_router.configured_provider_names() if llm_router.router_enabled() else (["gemini"] if os.getenv("GEMINI_API_KEY", "").strip() else [])
     today = _utc_now().date().isoformat()
     try:
-        daily_limit = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
+        if llm_router.router_enabled():
+            daily_limit = max(0, min(100, int(os.getenv("LLM_MAX_JOBS_PER_DAY", os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY)))))
+        else:
+            daily_limit = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
     except ValueError:
         daily_limit = DEFAULT_MAX_CALLS_PER_DAY
     result: dict[str, Any] = {
@@ -462,8 +468,8 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
         with sqlite3.connect(str(db_path), timeout=5) as conn:
             _ensure_cache(conn)
             result["calls_today"] = conn.execute(
-                "SELECT COUNT(*) FROM gemini_shadow_cache WHERE substr(created_at,1,10)=?",
-                (today,),
+                "SELECT COUNT(*) FROM gemini_shadow_cache WHERE substr(created_at,1,10)=? AND model=?",
+                (today, model),
             ).fetchone()[0]
             result["cache_successes"] = conn.execute(
                 "SELECT COUNT(*) FROM gemini_shadow_cache WHERE status='ok'"
