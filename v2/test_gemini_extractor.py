@@ -107,6 +107,44 @@ class GeminiValidationTests(unittest.TestCase):
             self.assertEqual(json.loads(row[1])["experience_max_years"], 6.0)
 
 
+    def test_router_mode_uses_non_gemini_provider_without_gemini_key(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            job = {
+                "source": "naukri", "source_job_id": "router-integration-1",
+                "title": "Software Engineer", "company": "Example",
+                "description": self.description,
+            }
+            validated = gemini._validate_result(self.payload, self.description)
+            with patch.dict(os.environ, {
+                "GEMINI_EXTRACTION_ENABLED": "true",
+                "GEMINI_API_KEY": "",
+                "LLM_ROUTER_ENABLED": "true",
+                "LLM_PROVIDER_ORDER": "groq",
+                "GROQ_API_KEY": "test-key",
+                "GROQ_MODEL": "groq-test-model",
+                "LLM_MAX_JOBS_PER_RUN": "3",
+                "LLM_MAX_JOBS_PER_DAY": "20",
+            }):
+                with patch.object(
+                    gemini.llm_router, "generate_with_fallback",
+                    return_value=(validated, "groq"),
+                ) as routed:
+                    stats = gemini.shadow_extract_jobs(
+                        [job], db_path,
+                        experience_known=lambda item: False,
+                        configured_skills=["Python"],
+                    )
+            routed.assert_called_once()
+            self.assertEqual(stats["called"], 1)
+            with sqlite3.connect(db_path) as conn:
+                row = conn.execute(
+                    "SELECT status, model FROM gemini_shadow_cache WHERE input_hash=?",
+                    (gemini._input_hash(job),),
+                ).fetchone()
+            self.assertEqual(row[0], "ok")
+            self.assertTrue(row[1].startswith("llm-router-v1:groq:groq-test-model"))
+
     def test_cached_matcher_experience_requires_required_overall_evidence(self):
         with TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "jobs.db"
