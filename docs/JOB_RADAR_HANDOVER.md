@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-16 (authoritative Claude Code orchestration/review worksheet; Gemini live evaluation complete)
+**Last updated: 2026-10-16 (authoritative Claude Code orchestration/review worksheet; Gemini live evaluation complete)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -13,7 +13,7 @@
 >
 > Each update must connect the work to the overarching goal (reliable, fresh, multi-source job discovery → normalization/deduplication → one consistent preference/match decision → explainable dashboard and Telegram delivery), and record: evidence received; diagnosis and confidence; code/config/docs paths; PR/commit and CI results; whether deployed (with actual runtime proof, not assumption); what changed and deliberately did not change; remaining risks; the exact next action; copyable commands/output expected from the user; and a continuation prompt for the next chat. Cross-link the detailed chronological handover, the compact knowledge transfer, and `docs/JOBBEEPER_REFERENCE.md` where relevant. **The latest dated handoff supersedes older instructions/checklists**; label superseded entries historical rather than leaving conflicting “next task” instructions active. Never expose secrets. One issue at a time, evidence first, verify after deploy.
 >
-> ## Current handoff — 2026-10-15 (authoritative; standing autonomy and dev matcher approval)
+> ## Current handoff — 2026-10-16 (authoritative; Gemini live evaluation complete; Claude review worksheet pending)
 - **Goal:** verify the isolated-dev Gemini experience path from fresh extraction through trusted cache, matcher bridge, persisted evaluation, and notification policy. Overarching product goal remains reliable multi-source job discovery, normalization/deduplication, consistent explainable matching, and low-noise delivery.
 - **Live evidence from the user's redacted diagnostic:** `diagnostic_status=candidate_verified`; configured model `gemini-3.5-flash-lite`; exact current-input hash matched; successful cache row matched model and was 538 seconds old (30-day success TTL); the job was last seen 606 seconds earlier and within the 24-hour candidate window. Trusted result: required `total_professional`, 3–5 years, confidence 0.95, verifiable evidence and at least one range bound.
 - **Isolated bridge/persistence proof:** a temporary DB copy passed through real `_job_for_canonical` with `jd_experience_source=gemini_verified`; real `_persist_job_evaluation` wrote 3–5 years, matching the cache. Diagnostic guarantees shown in user output: source DB read-only, source DB unmodified, zero Gemini API calls, and zero notifications.
@@ -4753,3 +4753,5 @@ Single next action:
 ```
 
 **Continuation rule:** after Claude pushes answers, the next ChatGPT session should read the latest versions of this file, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`, review Claude's exact commit against source/CI/PRs and the plan, write an independent response under the Orchestrator review checklist above, update both handovers, and flag any drift to the user. Do not rubber-stamp Claude's self-assessment.
+
+- Orchestrator review worksheet created/updated for the user-requested Claude Code collaboration. Claude must answer Q1–Q10 in this same handover and push it; do not erase questions. ChatGPT must independently assess the responses and write the decision into the Orchestrator review checklist. Knowledge-transfer doc points to this exact process.
