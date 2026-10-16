@@ -4945,3 +4945,31 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 3. Give the user safe, non-destructive VM pull commands only after confirming test results and checking how to preserve local changes.
 4. Ask the user to enter keys directly in the VM only after code/tests are ready; never request keys in chat.
 5. Keep all runtime tests development-only, shadow-only, no schema migration, no production cutover, and no Telegram sends.
+
+
+## 2026-10-16 — Multi-provider router review and CI evidence
+
+### Work performed in this review
+- Re-fetched the latest versions of the router, extractor, tests, development Compose file, provider runbook, handover, knowledge transfer and product reference from `v2-live-radar`. Current branch head reviewed: `b635b8969247c483bdfae7c2c9d0cb9a38895a61` (`docs: record multi-provider router implementation checkpoint`).
+- Reviewed the router/extractor signatures and the shared strict validator. `_call_llm_router(job)` matches the current call site; the router validator invokes `_validate_result(payload, description)`, so malformed experience ranges (including boolean/non-numeric/out-of-range or inverted bounds), invalid confidence, invalid type/scope, and unverifiable evidence are rejected and cause provider fallback. With `LLM_ROUTER_ENABLED=false`, the extractor continues through the legacy `_call_gemini` path.
+- Reviewed request payloads: Gemini uses native `generateContent`; Groq, OpenRouter and NVIDIA NIM use the OpenAI-compatible chat-completions shape with JSON-object response format. Provider model IDs, live account availability and request-format compatibility are not proven by mocked tests.
+- Verified the CI run attached to the exact head: V2 CI run [38934696862](https://github.com/AvinashBhalla/job-beeper/actions/runs/38934696862), job `syntax`, completed `success` on 2026-10-16. Its steps installed `v2/requirements.txt`, compiled the existing CI-listed modules, and ran `python -m unittest discover -s v2 -p 'test_*.py' -v` successfully. This is CI evidence for that revision; it is not a test run in the development VM and the CI py_compile command does not explicitly list `v2/llm_router.py`.
+- No local shell/VM access was available in this review, so the requested focused command `./.venv/bin/python -m unittest v2.test_llm_router` was not executed here. No new code was committed during this review, and no test result is claimed from a local execution.
+
+### Findings and remaining review points
+- Positive: model/cache identity consists of ordered configured provider/model names and never API keys. On router-disabled mode it returns the legacy Gemini model identity. The extractor applies shared strict validation after generation. Raw HTTP response bodies and exception text are not deliberately logged; failure logs use provider plus sanitized category. Router output remains excluded from hard matching unless both the existing Gemini matcher gate and `LLM_ROUTER_MATCHER_ENABLED` permit it.
+- Budget caveat: `LLM_MAX_JOBS_PER_RUN` / `LLM_MAX_JOBS_PER_DAY` count extraction jobs/cache rows for the active model identity, not provider requests or tokens. A job can generate several HTTP requests due to fallback. They do not implement a separate aggregate per-provider request or spend budget. Keep the caps low; provider-specific account limits and billing still apply.
+- Validation coverage is not exhaustive: focused mocked tests cover configuration, the Groq request shape, HTTP 429 fallback, semantic-invalid fallback, error-body/key redaction, and a timeout surface. There is no direct mocked router test yet for native Gemini, OpenRouter or NVIDIA payload/response variants; malformed/empty content, connection errors, 5xx, all-providers-fail, and multiple fallback attempts against the configured job budget could use dedicated assertions. Existing extractor tests cover range, confidence, evidence and safe matcher gates, and CI's full discovery passed.
+- Router fallback catches provider exceptions and continues. Request exceptions are sanitized in fallback logs. If every provider fails, the raised summary contains provider names and sanitized categories; the extractor records a generic `request_failed` for the aggregated failure, rather than persisting raw response text.
+- No runtime/API call, VM environment/config edit, container rebuild/restart, source or cache DB mutation, schema migration, volume change, Telegram notification or production action occurred.
+
+### Next safe step
+1. On the VM, inspect the development checkout before fetching: `cd /home/ubuntu/job-beeper-dev && git status --short && git branch --show-current && git rev-parse HEAD && git fetch origin v2-live-radar`. Do not proceed to merge until local status and ahead/behind state have been reviewed. Preserve `M v2/config.json`, untracked `.venv/`, `.env`, and the named volume; no reset/clean/overwrite.
+2. After a safe fast-forward, run focused router and extractor tests and full discovery from the checkout. CI succeeded on `b635b896`, but this does not replace the VM run.
+3. Keep all keys inside the VM-local `.env`, router and matcher gates off until tests finish, Telegram credentials blank, notifications disabled, and do not trigger job processing or any Gemini calls during initial validation.
+4. Only after local tests pass, inspect allowlisted environment metadata without printing values. A live provider smoke test is a separate explicitly chosen cost/rate-limit step.
+
+### Current verified references
+- Reviewed branch head: `b635b8969247c483bdfae7c2c9d0cb9a38895a61`.
+- CI: [V2 CI run 38934696862](https://github.com/AvinashBhalla/job-beeper/actions/runs/38934696862) — success on that head.
+- No change to the implementation was made in this review, so there is no new commit ID for this review entry.
