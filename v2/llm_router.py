@@ -9,7 +9,7 @@ import json
 import os
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -171,15 +171,19 @@ def generate_with_fallback(
     prompt_prefix: str,
     job_data: dict[str, Any],
     response_schema: dict[str, Any],
-) -> tuple[dict[str, Any], str]:
-    """Try configured providers in order, falling back on sanitized request/parse errors."""
+    *,
+    validator: Callable[[dict[str, Any]], Any] | None = None,
+) -> tuple[Any, str]:
+    """Try providers in order; optional semantic validation also triggers fallback."""
     providers = configured_providers()
     if not providers:
         raise RuntimeError("llm_no_provider_configured")
     failures: list[str] = []
     for provider in providers:
         try:
-            return generate_json(provider, prompt_prefix, job_data, response_schema), provider.name
+            payload = generate_json(provider, prompt_prefix, job_data, response_schema)
+            result = validator(payload) if validator is not None else payload
+            return result, provider.name
         except Exception as exc:
             if isinstance(exc, ProviderRequestError):
                 code = exc.code
@@ -187,6 +191,8 @@ def generate_with_fallback(
                 code = "timeout"
             elif isinstance(exc, requests.RequestException):
                 code = "request_failed"
+            elif isinstance(exc, ValueError):
+                code = str(exc)[:60] if str(exc).startswith("invalid_") else "invalid_result"
             else:
                 code = "provider_failed"
             failures.append(f"{provider.name}:{code}")
