@@ -175,3 +175,45 @@ Do not enable every provider simultaneously, and do not use proxy/IP rotation or
 - Implementation: `v2/llm_router.py`, integrated with the shadow extractor in `v2/gemini_extractor.py`.
 - Providers supported: Groq, Gemini, OpenRouter, NVIDIA NIM. Router is opt-in with `LLM_ROUTER_ENABLED=false` by default; provider-specific model IDs and keys are supplied through the VM-local Compose environment, never committed.
 - Keep `LLM_ROUTER_MATCHER_ENABLED=false` while reviewing routed extraction output. Telegram notifications remain disabled. Mocked tests were added but have not yet been executed; verify focused and full test suites after pulling before rebuilding the development container.
+
+
+## 2026-10-16 — Multi-provider LLM router implementation checkpoint
+
+### User request
+The user asked to implement and document a multi-provider LLM fallback for Groq, Gemini, OpenRouter, and NVIDIA, with API keys to be entered directly on the VM after the code is pulled. The user now asks for a continuation prompt and for this handover/progress record to be updated.
+
+### Changes pushed to `v2-live-radar`
+- Added `v2/llm_router.py` (initial commit `dd464720f1697602d03fca1cab417a66aa63554b`, follow-up hardening `ee20bda74ebceae15c083adb004e1e00570cb694`). Supports sequential, configurable provider fallback for Groq, Gemini, OpenRouter, and NVIDIA NIM; sanitized error categories; bounded HTTP timeouts; JSON parsing; and optional shared semantic validation before accepting a provider result.
+- Updated `v2/gemini_extractor.py` to optionally use the router when `LLM_ROUTER_ENABLED=true`; preserves legacy Gemini-only behavior when disabled. Cache identity reflects ordered provider/model IDs without keys, and daily cache-budget counting is scoped to that identity. Matcher bridge refuses router-produced cache by default unless `LLM_ROUTER_MATCHER_ENABLED=true` in addition to existing matcher gating.
+- Updated `v2/docker-compose.dev.yml` with opt-in router variables, model IDs and key environment variables for Groq/OpenRouter/NVIDIA, ordered providers, per-run/per-day job budgets, and a matcher-disabled default. Telegram token/chat ID remain explicitly blank.
+- Added `v2/test_llm_router.py` with mocked configuration, parsing, fallback, semantic-validation, timeout, and secret-redaction tests. These tests have NOT been executed in a real VM or CI as part of this work; do not claim they pass.
+- Added `docs/LLM_PROVIDER_ROUTER.md` with VM-local configuration, endpoints, safety defaults, testing/pull instructions, budget caveats, and staged rollout guidance.
+
+### Current commit trail
+- `dd464720f1697602d03fca1cab417a66aa63554b` — add router
+- `6ccd0f1578899da97674c6b79f6a4184240ced6a` — integrate router into shadow extraction
+- `1d960515122fcdba5ea4f8ce80c771083d7b6441` — Compose environment settings
+- `44b6621438ed13ebb9591d6bb74295569a85da5d` — initial router tests
+- `ee20bda74ebceae15c083adb004e1e00570cb694` — fallback on semantic validation errors
+- `87befd65b442e0443286a002f75122251c53fe76` — scope daily cache budget/status to active model identity
+- `10c20427370fa98d9eb14083dba9291644e98799` — semantic-invalid-output fallback test
+- `c9d2cfe01dbed968c9ec8fe984cfdaa5a15bc114` — keep router results out of matcher by default
+- `de700fc64cf67030174c16f99f16a6f7418e1aee` — Compose matcher gate
+- `299a6f2513f54df173c40cc74ec2c80a50408619` — router runbook
+
+### Important status and constraints
+- This is repository code, not a verified working deployment. No VM pull, test execution, Docker rebuild, live provider API call, database write, schema migration, or notification was performed in this implementation turn.
+- Current defaults are safe/off: `LLM_ROUTER_ENABLED=false`, `LLM_ROUTER_MATCHER_ENABLED=false`; the router must be explicitly enabled in the development VM environment after tests pass. Do not ask the user to share any API key in chat.
+- The current VM may have local modifications to `v2/config.json`, untracked `.venv/`, and a named volume `job-radar-dev_radar-dev-data`; preserve them. Do not use `git reset`, `git clean`, destructive checkout, or volume removal. Only update the isolated development service `job-radar-dev`, never the separate `v2-radar-1` project.
+- Keep Telegram credentials blank and notifications disabled. Do not run endpoints that process jobs just to trigger calls. No further Gemini calls should be made during initial validation; previous status showed the Gemini daily counter at 20.
+- Test quality gates before enabling: run focused tests `./.venv/bin/python -m unittest v2.test_llm_router` and relevant extractor tests, then the full suite `./.venv/bin/python -m unittest discover -s v2 -p 'test_*.py'`. First check current tree/status and fetch updates safely. If any tests fail, fix and document before rebuilding.
+- After tests pass, user can add keys/model IDs locally in `/home/ubuntu/job-beeper-dev/.env`; verify only allowlisted booleans/provider names/model IDs and key-present booleans, never echo values. Recreate only development container using `sudo docker compose --env-file /home/ubuntu/job-beeper-dev/.env -p job-radar-dev -f v2/docker-compose.dev.yml up -d --build --no-deps radar` only after confirming tests and intended config; do not run this yet.
+- The current router's daily/run budget is a job budget, not a per-provider request/token quota; fallbacks can make more than one request per job. Provider account billing/rate limits still apply. Model IDs and endpoint compatibility must be checked for the user's actual accounts before live smoke tests.
+- Follow-up review should inspect code for integration issues, run mocked tests, then verify status. Specifically ensure provider-specific errors never leak raw response content, strict extractor validation is used as the router validator, the cache model identity behaves correctly, and the existing extraction job cap cannot exceed the intended budget. Do not enable routed matcher until a separate quality review approves it.
+
+### Next actions
+1. Continue from the latest `v2-live-radar` branch and re-read the latest versions of the handover, knowledge-transfer, reference, and router runbook docs before acting.
+2. Review the router/extractor integration and run the focused mocked tests; fix any issues and record exact outcomes.
+3. Give the user safe, non-destructive VM pull commands only after confirming test results and checking how to preserve local changes.
+4. Ask the user to enter keys directly in the VM only after code/tests are ready; never request keys in chat.
+5. Keep all runtime tests development-only, shadow-only, no schema migration, no production cutover, and no Telegram sends.
