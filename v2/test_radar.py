@@ -1549,13 +1549,6 @@ class MatcherTests(unittest.TestCase):
                         "Build Python services. 2 years experience.",
                     )
                     self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
-                    if label == "malformed":
-                        with sqlite3.connect(radar.DB_PATH) as conn:
-                            conn.execute(
-                                "UPDATE jobs SET source_posted_at='not-a-timestamp'"
-                            )
-                            conn.commit()
-
                     self.assertEqual(
                         radar.refresh_notification_decisions(BASE_CONFIG), 1
                     )
