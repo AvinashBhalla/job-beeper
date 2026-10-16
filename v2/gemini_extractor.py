@@ -17,6 +17,8 @@ from typing import Any, Callable
 
 import requests
 
+from v2 import llm_router
+
 log = logging.getLogger("job-radar.gemini")
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 CACHE_TTL_DAYS = 30
@@ -240,6 +242,21 @@ def _call_gemini(
     return _validate_result(parsed, description)
 
 
+def _call_llm_router(job: dict[str, Any]) -> dict[str, Any]:
+    """Use the optional multi-provider router, then apply the same strict validator."""
+    description = str(job.get("description") or "")[:MAX_DESCRIPTION_CHARS]
+    job_data = {
+        "source": str(job.get("source") or "")[:40],
+        "title": str(job.get("title") or "")[:200],
+        "company": str(job.get("company") or "")[:200],
+        "description": description,
+    }
+    payload, _provider_name = llm_router.generate_with_fallback(
+        PROMPT_PREFIX, job_data, RESPONSE_SCHEMA
+    )
+    return _validate_result(payload, description)
+
+
 def _cache_lookup(
     conn: sqlite3.Connection, input_hash: str, model: str
 ) -> tuple[str, dict[str, Any]] | None:
@@ -275,15 +292,26 @@ def shadow_extract_jobs(
     stats = {"considered": 0, "called": 0, "cached": 0, "skipped": 0, "errors": 0}
     if os.getenv("GEMINI_EXTRACTION_ENABLED", "").strip().lower() not in {"1", "true", "yes"}:
         return stats
+    router_mode = llm_router.router_enabled()
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        log.info("gemini shadow extraction enabled but API key is not configured")
-        return stats
+    if router_mode:
+        if not llm_router.configured_providers():
+            log.info("LLM router enabled but no provider has both a key and model configured")
+            return stats
+        model = llm_router.cache_model_identity()
+    else:
+        if not api_key:
+            log.info("gemini shadow extraction enabled but API key is not configured")
+            return stats
+        model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     try:
-        max_per_run = max(0, min(10, int(os.getenv("GEMINI_MAX_CALLS_PER_RUN", DEFAULT_MAX_CALLS_PER_RUN))))
-        max_per_day = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
+        if router_mode:
+            max_per_run = max(0, min(10, int(os.getenv("LLM_MAX_JOBS_PER_RUN", os.getenv("GEMINI_MAX_CALLS_PER_RUN", DEFAULT_MAX_CALLS_PER_RUN)))))
+            max_per_day = max(0, min(100, int(os.getenv("LLM_MAX_JOBS_PER_DAY", os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY)))))
+        else:
+            max_per_run = max(0, min(10, int(os.getenv("GEMINI_MAX_CALLS_PER_RUN", DEFAULT_MAX_CALLS_PER_RUN))))
+            max_per_day = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
     except ValueError:
         max_per_run, max_per_day = DEFAULT_MAX_CALLS_PER_RUN, DEFAULT_MAX_CALLS_PER_DAY
 
@@ -321,7 +349,7 @@ def shadow_extract_jobs(
                 continue
 
             try:
-                result = _call_gemini(job, api_key, model)
+                result = _call_llm_router(job) if router_mode else _call_gemini(job, api_key, model)
                 status, error_code = "ok", None
                 stats["called"] += 1
             except Exception as exc:
@@ -371,7 +399,7 @@ def cached_matcher_experience(
     """
     if os.getenv("GEMINI_MATCHER_ENABLED", "").strip().lower() not in {"1", "true", "yes"}:
         return None
-    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    model = llm_router.cache_model_identity() if llm_router.router_enabled() else os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     try:
         cached = _cache_lookup(conn, _input_hash(job), model)
     except sqlite3.Error:
@@ -407,7 +435,8 @@ def cached_matcher_experience(
 def shadow_status(db_path: str | Path) -> dict[str, Any]:
     enabled = os.getenv("GEMINI_EXTRACTION_ENABLED", "").strip().lower() in {"1", "true", "yes"}
     matcher_enabled = os.getenv("GEMINI_MATCHER_ENABLED", "").strip().lower() in {"1", "true", "yes"}
-    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    model = llm_router.cache_model_identity() if llm_router.router_enabled() else os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    providers = llm_router.configured_provider_names() if llm_router.router_enabled() else (["gemini"] if os.getenv("GEMINI_API_KEY", "").strip() else [])
     today = _utc_now().date().isoformat()
     try:
         daily_limit = max(0, min(100, int(os.getenv("GEMINI_MAX_CALLS_PER_DAY", DEFAULT_MAX_CALLS_PER_DAY))))
@@ -416,8 +445,10 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
     result: dict[str, Any] = {
         "enabled": enabled,
         "matcher_enabled": matcher_enabled,
-        "api_key_configured": bool(os.getenv("GEMINI_API_KEY", "").strip()),
+        "api_key_configured": bool(providers) if llm_router.router_enabled() else bool(os.getenv("GEMINI_API_KEY", "").strip()),
         "model": model,
+        "provider_router_enabled": llm_router.router_enabled(),
+        "configured_providers": providers,
         "mode": "shadow_only",
         "daily_limit": daily_limit,
         "calls_today": 0,
