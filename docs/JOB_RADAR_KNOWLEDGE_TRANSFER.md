@@ -2091,3 +2091,11 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 - User fetched/fast-forwarded to `dba0736`; all four focused Greenhouse tests passed (`Ran 4 tests in 0.288s — OK`). Full suite is **pending**, so do not describe the whole test suite as passing yet.
 - No schema/config changes, Docker rebuild/restart, production cutover, real notification delivery, or volume deletion occurred. Preserve VM-local `v2/config.json`, untracked `.venv/`, and `job-radar-dev_radar-dev-data:/data`. Notifications remain disabled.
 - **Next:** run `./.venv/bin/python -m unittest discover -s v2 -p 'test_*.py'` on the VM and return its full output plus sanitized branch/HEAD/status. Then review `v2/greenhouse_canary.py` and its acceptance criteria; no canary run or source activation until that review establishes safe scope and explicit pass/fail criteria.
+
+## 2026-10-16 — Greenhouse canary timestamp-quality diagnostics (verification pending)
+
+- Added timestamp-quality diagnostics to the read-only two-poll Greenhouse canary: each snapshot counts postings with a timestamp within 72 hours, stale timestamps, missing timestamps, malformed timestamps, and future timestamps. This is a diagnostic enhancement only; it does not create an automatic pass/fail decision.
+- Test-first commit: 7f89f0f99f37bfd1cddff7eadc6a720db4d0d8c0; implementation commit: 53a799e53bcfced95c98a3cde26b49624ab1926a. Files: v2/test_greenhouse_canary.py, v2/greenhouse_canary.py.
+- Tests and CI for this increment are pending/unverified. The GitHub combined-status query returned no status entries. No canary network calls were made.
+- Greenhouse remains disabled; notifications remain disabled. No DB/schema/config change, Docker rebuild/restart, production change, volume operation, or real notification occurred.
+- Next: fetch latest branch, run python -m unittest v2.test_greenhouse_canary and the full V2 unittest discovery command, then report the exit codes and current HEAD. Preserve local v2/config.json, .venv/, and the existing named dev volume. Do not execute the live canary or rebuild Docker in this verification step.
