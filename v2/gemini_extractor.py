@@ -402,6 +402,9 @@ def cached_matcher_experience(
     """
     if os.getenv("GEMINI_MATCHER_ENABLED", "").strip().lower() not in {"1", "true", "yes"}:
         return None
+    # New providers remain shadow-only until explicitly approved for matcher use.
+    if llm_router.router_enabled() and os.getenv("LLM_ROUTER_MATCHER_ENABLED", "false").strip().lower() not in {"1", "true", "yes"}:
+        return None
     model = llm_router.cache_model_identity() if llm_router.router_enabled() else os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     try:
         cached = _cache_lookup(conn, _input_hash(job), model)
