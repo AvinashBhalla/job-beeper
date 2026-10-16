@@ -2069,6 +2069,32 @@ class MatcherTests(unittest.TestCase):
 
 
 
+    def test_jd_experience_prefers_total_requirement_over_earlier_skill_years(self):
+        jd = (
+            "3+ years of Python experience. "
+            "1+ years of AWS experience. "
+            "5+ years of total professional experience required."
+        )
+        self.assertEqual(radar.extract_jd_experience(jd), (5.0, None))
+
+    def test_shadow_requires_strong_experience_evidence_before_skipping_gemini(self):
+        self.assertFalse(radar._experience_is_reliably_known_for_shadow({
+            "source": "naukri",
+            "description": "5+ years of software development experience with Python.",
+        }))
+        self.assertFalse(radar._experience_is_reliably_known_for_shadow({
+            "source": "ashby",
+            "description": "3+ years of Python experience.",
+        }))
+        self.assertTrue(radar._experience_is_reliably_known_for_shadow({
+            "source": "greenhouse",
+            "description": "5+ years of overall professional experience required.",
+        }))
+        self.assertTrue(radar._experience_is_reliably_known_for_shadow({
+            "source": "linkedin",
+            "description": "Experience: 4-6 years",
+        }))
+
     def test_jd_experience_extraction_handles_overall_experience_range(self):
         jd = """
         What You Need to Succeed:
