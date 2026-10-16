@@ -8,6 +8,16 @@ This is the current operating summary for an engineer taking over. `docs/JOB_RAD
 
 
 
+## Independent orchestrator review — 2026-10-16
+
+- Detailed findings are recorded in `docs/JOB_RADAR_HANDOVER.md` under **Orchestrator review checklist — independent review, 2026-10-16**. The fetched worksheet still had Q1–Q10 marked `CLAUDE RESPONSE: Pending`; no pushed answers were available to assess. Do not treat this as Claude's completed response.
+- Current branch `v2-live-radar` is discoverable, but the GitHub connector result available in this review did not expose its current commit SHA. The previously observed `694c0a3b4e3b64677783414a5f6f1d49aca3f822` is not independently confirmed as the current head. Obtain the exact branch HEAD before asserting commit-level source/CI alignment.
+- Independently inspected `v2/gemini_experience_diagnostic.py`, `v2/test_gemini_experience_diagnostic.py`, `v2/greenhouse_canary.py`, and `v2/docker-compose.dev.yml`. The diagnostic's four tests cover trusted fresh exact-hash cache acceptance, mismatched hash, expiry and skill-specific scope. This supports the narrow cache/bridge/evaluation claim, not the whole product pipeline.
+- `v2/greenhouse_canary.py` is a read-only two-snapshot ID/timestamp-coverage utility. It does not implement a freshness guard, establish upstream timestamp semantics, enforce a 72-hour cutoff, set pass/fail thresholds, measure relevant/new yield or prove scheduler dispatch cannot occur. Review the collector and fixtures before any freshness claim or source enablement.
+- No VM shell was available and no tests were run by the independent reviewer. Sanitized VM results in the handover remain user-reported evidence. CI for the exact current head is unverified.
+- Decision: defer `jd_experience_source` persistence until a concrete consumer and migration/backwards-compatibility design justify it. Keep production unchanged, Telegram/notifications disabled, and preserve VM-local `M v2/config.json`, untracked `.venv/`, and the existing dev volume.
+- Single next increment: delivery-disabled integration coverage for one canonical opportunity through persisted evaluation, notification-ledger decision, API payload and dashboard-facing fields. Inspect current contracts, add a focused test, run it plus the full unit suite on the exact branch head, and record exit codes/CI. Separately, Claude must fill Q1–Q10 in the same handover and push both documents before the answers can be reviewed.
+- Review documentation commit: `6e208a8295b24ea9e2802bd86476794e87427b8e` (detailed handover). Knowledge-transfer update and post-write re-fetch are pending.
 ## Current verified state — 2026-10-15 (authoritative exact-hash diagnostic and autonomy directive)
 
 ### Active issue: Gemini required-experience cache → bridge → live persisted evaluation
