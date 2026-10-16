@@ -2082,3 +2082,12 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 - Added a temporary-DB regression test in `v2/test_radar.py`: `test_canonical_evaluation_ledger_and_dashboard_api_stay_consistent_when_delivery_disabled`. It checks one Naukri job's canonical identity, persisted evaluation/reasons/experience, notification-ledger pending decision while notifications are disabled, and API/dashboard-facing consistency without delivery.
 - Code commit: `bb88885698316b70dcb7b4319aad9d345041e710`. The test has not yet run; CI is unverified. No runtime, app logic, config, schema, production, or notification changes.
 - Next: inspect VM branch/status/local HEAD and remote HEAD, fast-forward only if clean/safe, then run the focused test plus existing canonical/ledger tests. Preserve `M v2/config.json`, untracked `.venv/`, and the existing dev data volume. Stop on divergence or overwrite risk; no reset/clean, volume deletion, production cutover, or Telegram send/replay.
+
+
+## 2026-10-16 — Greenhouse freshness regression fix (VM-confirmed focused tests)
+
+- A first fix changed `_alert_age_timestamp` to require Greenhouse `source_posted_at`, but two tests still failed because `refresh_notification_decisions` treated a missing age timestamp as fresh. This was a real defect in the downstream predicate, not a stale checkout: VM output showed both regression tests failing after commit `a977d8f`.
+- Follow-up commit `dba073683bf96c89f9f2342fd731fbee8c5daf48` updates the predicate so Greenhouse freshness requires a non-null timestamp within `max_age_hours`. Non-Greenhouse sources retain existing behavior.
+- User fetched/fast-forwarded to `dba0736`; all four focused Greenhouse tests passed (`Ran 4 tests in 0.288s — OK`). Full suite is **pending**, so do not describe the whole test suite as passing yet.
+- No schema/config changes, Docker rebuild/restart, production cutover, real notification delivery, or volume deletion occurred. Preserve VM-local `v2/config.json`, untracked `.venv/`, and `job-radar-dev_radar-dev-data:/data`. Notifications remain disabled.
+- **Next:** run `./.venv/bin/python -m unittest discover -s v2 -p 'test_*.py'` on the VM and return its full output plus sanitized branch/HEAD/status. Then review `v2/greenhouse_canary.py` and its acceptance criteria; no canary run or source activation until that review establishes safe scope and explicit pass/fail criteria.
