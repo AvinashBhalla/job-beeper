@@ -93,6 +93,28 @@ class LLMRouterRequestTests(unittest.TestCase):
         self.assertEqual(provider_name, "openrouter")
         self.assertEqual(post.call_count, 2)
 
+    def test_semantically_invalid_first_result_falls_back(self):
+        with patch.dict(os.environ, {
+            "LLM_PROVIDER_ORDER": "groq,openrouter",
+            "GROQ_API_KEY": "groq-key",
+            "GROQ_MODEL": "groq-model",
+            "OPENROUTER_API_KEY": "router-key",
+            "OPENROUTER_MODEL": "router-model",
+        }, clear=True):
+            invalid = self.response(200, {"choices": [{"message": {"content": '{"ok": "not-a-boolean"}'}}]})
+            valid = self.response(200, {"choices": [{"message": {"content": '{"ok": true}'}}]})
+            with patch.object(llm_router.requests, "post", side_effect=[invalid, valid]) as post:
+                result, provider_name = llm_router.generate_with_fallback(
+                    "Extract: ", self.job_data, self.schema,
+                    validator=lambda payload: (
+                        payload if isinstance(payload.get("ok"), bool)
+                        else (_ for _ in ()).throw(ValueError("invalid_result_shape"))
+                    ),
+                )
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(provider_name, "openrouter")
+        self.assertEqual(post.call_count, 2)
+
     def test_failure_does_not_expose_response_body_or_key(self):
         provider = llm_router.ProviderConfig("groq", "super-secret", "test-model")
         response = self.response(401, {"error": {"message": "response-body-secret"}})
