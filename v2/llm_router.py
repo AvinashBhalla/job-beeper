@@ -29,6 +29,19 @@ ENV_KEYS = {
 }
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
+# Keep only fixed, reviewed validator messages in logs and aggregate errors.
+# A validator may raise arbitrary ValueError text that must never be echoed.
+SAFE_VALIDATOR_ERROR_CODES = frozenset({
+    "response_not_object",
+    "invalid_experience_value",
+    "invalid_experience_range",
+    "invalid_experience_type",
+    "invalid_experience_scope",
+    "invalid_skill_list",
+    "invalid_confidence",
+    "invalid_evidence",
+})
+
 
 @dataclass(frozen=True)
 class ProviderConfig:
@@ -192,7 +205,8 @@ def generate_with_fallback(
             elif isinstance(exc, requests.RequestException):
                 code = "request_failed"
             elif isinstance(exc, ValueError):
-                code = str(exc)[:60] if str(exc).startswith("invalid_") else "invalid_result"
+                message = str(exc)
+                code = message if message in SAFE_VALIDATOR_ERROR_CODES else "invalid_result"
             else:
                 code = "provider_failed"
             failures.append(f"{provider.name}:{code}")

@@ -363,5 +363,66 @@ class GeminiValidationTests(unittest.TestCase):
         self.assertFalse(disabled["api_key_configured"] or enabled["api_key_configured"])
 
 
+    def test_router_job_budget_allows_multiple_fallback_requests_for_one_job(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            jobs = [
+                {
+                    "source": "naukri", "source_job_id": "router-budget-1",
+                    "title": "Software Engineer", "company": "Example",
+                    "description": self.description,
+                },
+                {
+                    "source": "naukri", "source_job_id": "router-budget-2",
+                    "title": "Software Engineer", "company": "Example",
+                    "description": self.description,
+                },
+            ]
+
+            def response(status, payload):
+                return type("Response", (), {
+                    "status_code": status,
+                    "json": lambda self: payload,
+                })()
+
+            responses = [
+                response(503, {"error": {"message": "private provider body"}}),
+                response(200, {"choices": [{"message": {"content": "malformed private response"}}]}),
+                response(200, {"choices": [{"message": {"content": json.dumps(self.payload)}}]}),
+            ]
+            with patch.dict(os.environ, {
+                "GEMINI_EXTRACTION_ENABLED": "true",
+                "GEMINI_API_KEY": "",
+                "LLM_ROUTER_ENABLED": "true",
+                "LLM_PROVIDER_ORDER": "groq,openrouter,nvidia",
+                "GROQ_API_KEY": "groq-key",
+                "GROQ_MODEL": "groq-test-model",
+                "OPENROUTER_API_KEY": "router-key",
+                "OPENROUTER_MODEL": "router-test-model",
+                "NVIDIA_API_KEY": "nvidia-key",
+                "NVIDIA_MODEL": "nvidia-test-model",
+                "LLM_MAX_JOBS_PER_RUN": "1",
+                "LLM_MAX_JOBS_PER_DAY": "20",
+            }, clear=True):
+                with patch.object(
+                    gemini.llm_router.requests, "post", side_effect=responses
+                ) as provider_post:
+                    stats = gemini.shadow_extract_jobs(
+                        jobs, db_path,
+                        experience_known=lambda item: False,
+                        configured_skills=["Python"],
+                    )
+
+            self.assertEqual(provider_post.call_count, 3)
+            self.assertEqual(stats["called"], 1)
+            self.assertEqual(stats["errors"], 0)
+            self.assertEqual(stats["skipped"], 1)
+            with sqlite3.connect(db_path) as conn:
+                rows = conn.execute(
+                    "SELECT status FROM gemini_shadow_cache ORDER BY source_job_id"
+                ).fetchall()
+            self.assertEqual(rows, [("ok",)])
+
+
 if __name__ == "__main__":
     unittest.main()
