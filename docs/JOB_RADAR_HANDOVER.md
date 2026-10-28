@@ -4,7 +4,7 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-10-16 (authoritative Claude Code orchestration/review worksheet; Gemini live evaluation complete)**
+**Last updated: 2026-10-28 (multi-provider router hardening and CI verification; see latest handoff at end)**
 **Active branch:** `v2-live-radar`  
 **Repository:** `AvinashBhalla/job-beeper`
 
@@ -13,7 +13,7 @@
 >
 > Each update must connect the work to the overarching goal (reliable, fresh, multi-source job discovery → normalization/deduplication → one consistent preference/match decision → explainable dashboard and Telegram delivery), and record: evidence received; diagnosis and confidence; code/config/docs paths; PR/commit and CI results; whether deployed (with actual runtime proof, not assumption); what changed and deliberately did not change; remaining risks; the exact next action; copyable commands/output expected from the user; and a continuation prompt for the next chat. Cross-link the detailed chronological handover, the compact knowledge transfer, and `docs/JOBBEEPER_REFERENCE.md` where relevant. **The latest dated handoff supersedes older instructions/checklists**; label superseded entries historical rather than leaving conflicting “next task” instructions active. Never expose secrets. One issue at a time, evidence first, verify after deploy.
 >
-> ## Current handoff — 2026-10-16 (authoritative; Gemini live evaluation complete; Claude review worksheet pending)
+> ## Historical handoff — 2026-10-16 (superseded by the 2026-10-28 multi-provider router review appended below)
 - **Goal:** verify the isolated-dev Gemini experience path from fresh extraction through trusted cache, matcher bridge, persisted evaluation, and notification policy. Overarching product goal remains reliable multi-source job discovery, normalization/deduplication, consistent explainable matching, and low-noise delivery.
 - **Live evidence from the user's redacted diagnostic:** `diagnostic_status=candidate_verified`; configured model `gemini-3.5-flash-lite`; exact current-input hash matched; successful cache row matched model and was 538 seconds old (30-day success TTL); the job was last seen 606 seconds earlier and within the 24-hour candidate window. Trusted result: required `total_professional`, 3–5 years, confidence 0.95, verifiable evidence and at least one range bound.
 - **Isolated bridge/persistence proof:** a temporary DB copy passed through real `_job_for_canonical` with `jd_experience_source=gemini_verified`; real `_persist_job_evaluation` wrote 3–5 years, matching the cache. Diagnostic guarantees shown in user output: source DB read-only, source DB unmodified, zero Gemini API calls, and zero notifications.
@@ -4983,3 +4983,27 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Remaining coverage gaps documented by review: direct mocked native Gemini, OpenRouter and NVIDIA response variants; malformed/empty response; connection error; 5xx; all-provider failure; and fallback attempts versus job budget. The next model should inspect latest files and run/review CI or local mocked tests before giving VM instructions, then fix issues and update these docs with exact test results.
 - Safe next VM step, after reviewing current status: read-only `git status --short`, branch, HEAD and fetch for `origin/v2-live-radar` from `/home/ubuntu/job-beeper-dev`. Preserve VM-local modified `v2/config.json`, untracked `.venv/`, ignored `.env`, and named volume `job-radar-dev_radar-dev-data`. Do not reset/clean/stash blindly or touch the separate production-ish Compose project. Only use `git pull --ff-only` if the tree/branch/ahead-behind state proves it is safe.
 - Do not ask the user to paste keys in chat. Do not enable the router, run job-processing endpoints, trigger Gemini/provider requests, rebuild/restart containers, change DB/volume state, enable matcher use, or send notifications until test results and an explicit staged rollout are agreed. If safe to proceed after tests, give exact VM-local secret-entry steps and verify only allowlisted booleans/provider names/model IDs, never secret values.
+
+ 
+## Current handoff — 2026-10-28 — Multi-provider router hardening and CI verification
+
+- **Goal:** continue the existing Job Radar V2 multi-provider shadow-extraction router safely, preserving fresh multi-source discovery, strict experience validation, explainable matching and low-noise delivery.
+- **Code/test commit:** db331cac992a0d433bad119ae3b1fe483831f71e updated v2/llm_router.py, v2/test_llm_router.py and v2/test_gemini_extractor.py. Commit edc5b92404f94c2de84381407c7ed103bdda5f60 added a dedicated focused-test step to .github/workflows/v2-ci.yml.
+- **Finding and fix:** generate_with_fallback previously accepted any ValueError message starting with invalid_ as a safe code. A generic caller could append job text or evidence to such a message, causing it to appear in warnings and the aggregated failure. The router now logs/aggregates only an explicit allowlist of stable validation codes; any other validator message becomes invalid_result. No credentials, job descriptions, model response bodies or evidence are logged by this path.
+- **Mocked coverage added:** direct native Gemini, OpenRouter and NVIDIA request/response tests; malformed, empty and missing response content; HTTP 5xx and connection-error fallback; all-provider exhaustion with error/body redaction assertions; unsafe validator-exception redaction; and extractor integration showing one job may trigger three provider HTTP attempts while consuming one per-run job slot.
+- **CI evidence:** [run #40651350087](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651350087), code/test commit db331cac992a0d433bad119ae3b1fe483831f71e, passed full V2 discovery: 134 tests in 12.864 seconds. The focused-first pipeline at [run #40651562286](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651562286), commit edc5b92404f94c2de84381407c7ed103bdda5f60, passed the focused router/extractor step (32 tests in 0.061 seconds) and the full V2 suite (134 tests in 17.009 seconds); both reported OK. These are GitHub Actions results, not VM-local test results.
+- **Configuration/doc correction:** docs/LLM_PROVIDER_ROUTER.md now keeps LLM_ROUTER_ENABLED=false in its example environment block so an example cannot accidentally enable the router before the rollout is approved. The existing GEMINI_EXTRACTION_ENABLED gate must also be enabled for extraction to run; no feature flag was changed in the VM.
+- **What did not change:** provider requests remained mocked; no live provider API calls or API keys were used. The router and routed matcher remain disabled by default; Telegram stays blank/disabled; no VM pull, Docker operation, DB write, schema migration, volume change, production-like service change or notification occurred.
+- **Remaining risks:** CI does not prove account-specific model IDs, live API compatibility, quotas, cost, data-handling terms or output quality. LLM_MAX_JOBS_PER_RUN and LLM_MAX_JOBS_PER_DAY bound processed cache/job entries, not total HTTP requests, tokens or spend; fallback attempts can multiply requests. No live smoke test is authorized by these CI passes.
+- **Exact next safe action:** on /home/ubuntu/job-beeper-dev, run only the read-only checkout review and fetch below; return the output for assessment before any pull. Preserve the modified v2/config.json, untracked .venv/ and ignored .env; never print .env or use reset/clean/blind-stash operations.
+    cd /home/ubuntu/job-beeper-dev
+    git status --short
+    git branch --show-current
+    git rev-parse HEAD
+    git fetch origin v2-live-radar
+    git status -sb
+    git rev-list --left-right --count HEAD...origin/v2-live-radar
+    git diff --name-only HEAD..origin/v2-live-radar
+  Decide whether a fast-forward is safe only after reviewing the branch, ahead/behind counts, local changes and changed path list. Do not pull yet based solely on this note.
+- **Tests to run on the VM after a verified safe fast-forward:** ./.venv/bin/python -m unittest v2.test_llm_router -v, then ./.venv/bin/python -m unittest v2.test_gemini_extractor -v, then ./.venv/bin/python -m unittest discover -s v2 -p 'test_*.py' -v. No live provider request is needed.
+- **Cross-links:** architecture/rollout constraints remain in docs/JOBBEEPER_REFERENCE.md; provider-specific setup and test commands are in docs/LLM_PROVIDER_ROUTER.md; compact transfer is docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md.

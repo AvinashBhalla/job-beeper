@@ -219,8 +219,17 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 5. Keep all runtime tests development-only, shadow-only, no schema migration, no production cutover, and no Telegram sends.
 
 
-## 2026-10-16 — Router review / rollout update
+## Historical handoff — 2026-10-16 — Router review / rollout update (superseded by the 2026-10-28 validation below)
 - Multi-provider router code reviewed on `v2-live-radar` head `b635b8969247c483bdfae7c2c9d0cb9a38895a61`. CI run [38934696862](https://github.com/AvinashBhalla/job-beeper/actions/runs/38934696862) succeeded with full V2 unittest discovery. This is not a VM-local execution and does not prove live provider/model/account compatibility.
 - Legacy Gemini-only behavior is retained when `LLM_ROUTER_ENABLED=false`; router mode uses the strict extractor validator for each provider attempt. Cache identity excludes secrets and routes are still hard-matcher gated by default.
 - Keep run/day LLM limits described as **job** limits, not total HTTP/token/cost limits. Fallbacks can attempt multiple providers for one job. No live requests, secrets, database schema change, container restart or production change is authorized by the CI result alone.
 - Review limitation: direct request/response mocks are missing for Gemini/OpenRouter/NVIDIA and some aggregate error/budget cases. VM focused and full-suite test execution remains a required next step before rebuilding dev.
+
+ 
+## 2026-10-28 — Multi-provider router hardening and CI validation
+
+- Router error logging now accepts only allowlisted, stable validation error codes; arbitrary validator exception text is mapped to invalid_result to avoid leaking job descriptions, evidence or private content.
+- Added mocked provider parsing/fallback/error-redaction tests and a per-run job-budget integration test. The test workflow now runs the focused router/extractor modules before full V2 discovery.
+- [CI #40651562286](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651562286): focused tests 32 passed in 0.061 seconds; full V2 suite 134 passed in 17.009 seconds. This is CI evidence only, not VM or live-provider validation.
+- Keep LLM_ROUTER_ENABLED=false and LLM_ROUTER_MATCHER_ENABLED=false until a separate rollout is approved. Keep Telegram credentials blank and notifications disabled; no VM, DB, named volume or production-like service was changed.
+- Next: read-only inspect/fetch of /home/ubuntu/job-beeper-dev and explicit ahead/behind/path assessment before any fast-forward. Preserve local v2/config.json, .venv/, .env, and job-radar-dev_radar-dev-data.
