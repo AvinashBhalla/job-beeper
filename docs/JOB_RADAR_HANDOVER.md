@@ -5640,3 +5640,50 @@ done
 ### Clarification — LinkedIn latency sample precision
 - Static code review of `normalize_job` confirms `discovery_latency_seconds` is calculated only when `posted_precision == "minute"`. The reported 363 production samples therefore represent minute-precision LinkedIn posting timestamps, not date-only values. The p50/p90 figures are suitable as a baseline for this subset, while still subject to correctness of the source's relative/minute posting label.
 - Do not attribute all of the gap to our scheduler: source indexing/publication delay and the 16-target rotation may both contribute. Per-target attempt/success timestamps and request outcome counts are needed to separate them.
+
+
+## Docker and SQLite audit completed with sudo — 2026-11-05 (latest user output)
+
+### OBSERVED — containers, ports and persistent volumes
+The user reran container inspection with `sudo docker`; Docker access succeeded. Two independent containers are running:
+- `job-radar-dev`: image reported by inspect as `job-radar-dev-radar`; status running, up 2 weeks; host bind `127.0.0.1:8001 -> container 8000`.
+- `v2-radar-1`: image reported by inspect as `v2-radar` (the `docker ps` table abbreviated image ID as `97368934ed14`); status running, up 3 weeks; host bind `0.0.0.0:8000 -> container 8000`.
+- Two distinct named Docker data volumes were listed:
+  - Dev: `job-radar-dev_radar-dev-data`, mounted at `/data` inside `job-radar-dev`.
+  - Prod: `v2_radar-data`, mounted at `/data` inside `v2-radar-1`.
+- Dev container also has a second mount at `/app/v2/config.json`; the command formatted `.Name` (empty for bind mount), so the host-side source path/type was not shown. The exact config bind source remains unknown; a narrowly scoped read-only `sudo docker inspect ... --format '{{range .Mounts}}{{println .Type .Source .Destination}}{{end}}'` can confirm it if needed.
+- The separate named data volumes establish Docker-level separation of dev and production SQLite data. Do not merge or copy these volumes.
+
+### OBSERVED — SQLite contents
+The user pasted two consecutive sets of DB results for the same two containers in one message. The values differ slightly; do not silently reconcile them. Treat the second/later set as the latest reported snapshot for planning, while retaining the first set as a preceding observation. Repeat a read-only count only if exact current counts matter.
+
+**First reported snapshot:**
+- Dev `job-radar-dev`: DB 33,128,448 bytes; jobs 7,152; canonical opportunities 7,152; evaluations 7,152; notification ledger 7,152; source runs 7,052; Gemini shadow cache 500; jobs by source: Naukri 7,152; notification states: pending 18, suppressed 7,134.
+- Prod `v2-radar-1`: DB 67,866,624 bytes; jobs 19,795; canonical opportunities 19,486; evaluations 19,795; notification ledger 19,486; source runs 20,564; jobs by source: LinkedIn 11,785; Naukri 8,010; notification states: failed 10, sent 1,379, suppressed 18,097.
+
+**Second/later reported snapshot (latest visible values):**
+- Dev `job-radar-dev`: DB 33,046,528 bytes; jobs 7,134; canonical opportunities 7,134; evaluations 7,134; notification ledger 7,134; source runs 7,026; Gemini shadow cache 500; jobs by source: Naukri 7,134; notification states: pending 18, suppressed 7,116.
+- Prod `v2-radar-1`: DB 67,719,168 bytes; jobs 19,751; canonical opportunities 19,442; evaluations 19,751; notification ledger 19,442; source runs 20,495; jobs by source: LinkedIn 11,759; Naukri 7,992; notification states: failed 10, sent 1,378, suppressed 18,054.
+
+The counts and DB byte sizes decreased between the two pasted snapshots. The capture timestamps are not included, so it is unknown whether the cause was retention/cleanup, two different query runs, or other timing. Do not infer data loss or pruning from the pasted values alone.
+
+### Combined runtime understanding (previous API audit + Docker audit)
+- Production port 8000 API reported healthy, config v10, LinkedIn and Naukri enabled, notifications enabled, with 180s/300s targets. Production DB contains only LinkedIn and Naukri observations, consistent with that config.
+- Dev port 8001 API reported healthy, config v11, Naukri only enabled, notifications disabled. Dev DB contains only Naukri observations.
+- Production notification ledger contains 1,378 sent, 10 failed and 18,054 suppressed in the later snapshot. Dev contains 18 pending and 7,116 suppressed; notifications are disabled in its runtime config, so do not enable them or use production credentials in dev.
+- Separate Docker volumes plus separate ports support the interpretation that development and production data stores are isolated. Dev's `/app/v2/config.json` bind source is still to be confirmed if it affects safe rollout.
+
+### Remaining safety blockers
+- Prod checkout remains clean but 19 commits behind remote at `61d8271480eaf48b0a6442b62b1b0bb9a032df34`.
+- Dev checkout remains 8 commits behind remote at `296c1a4d261d4a6fe7b3dc2c791c7d159f9cb135` and dirty: modified `v2/config.json`, untracked `.env.save`, untracked `.venv/`. Preserve all.
+- Do not pull, reset, clean, switch branches in those checkouts, rebuild/restart containers, alter configs, trigger scans, or deploy.
+- The Docker permission issue was resolved for this read-only inspection by using `sudo docker`. Do not change Docker socket permissions or add users to the docker group.
+
+### Next agent's immediate priorities
+1. Read `docs/INGESTION_ARCHITECTURE.md`, `docs/JOB_INTELLIGENCE_AGENT_PRD.md`, `docs/SOURCE_INVENTORY.md` and this handover before any action.
+2. Work only in the GitHub foundation branch `work/job-intelligence-foundation`; preserve production and dev VM checkouts and existing runtime.
+3. Inspect latest PR #37/head/CI and confirm the Ashby registry-observability fix remains isolated and tested.
+4. If required, run only the read-only mount-source inspection above; do not make any deployment change.
+5. Prepare the next implementation slice as a separate dev/testable PR: source/run telemetry and source registry consistency. Do not increase LinkedIn requests. Add per-query target attempt/success/error/429 and stage-latency metrics before tuning cadence.
+6. Choose one additional ATS adapter only after validating its documented public API/access terms and usefulness to target employers. Dev only, notifications off, small board allowlist.
+7. Keep PR #35 (Gemini shadow validation) separate from PR #37 and this new work.
