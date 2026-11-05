@@ -2505,6 +2505,106 @@ class SourceStatusPersistenceTests(unittest.TestCase):
         self.assertEqual(naukri["new_jobs"], 2)
 
 
+class SourceRegistryApiCoverageTests(unittest.TestCase):
+    def test_source_status_includes_every_registered_collector(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE source_runs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            source TEXT NOT NULL,
+                            started_at TEXT NOT NULL,
+                            finished_at TEXT NOT NULL,
+                            jobs_seen INTEGER NOT NULL,
+                            new_jobs INTEGER NOT NULL,
+                            error TEXT
+                        )
+                    """)
+                with patch.object(
+                    radar,
+                    "get_config",
+                    return_value={"source_enabled": {}},
+                ), patch.object(radar, "source_state", {}):
+                    payload = radar.source_status()
+                self.assertEqual(
+                    {item["source"] for item in payload["sources"]},
+                    set(radar.COLLECTORS),
+                )
+                self.assertIn("ashby", {item["source"] for item in payload["sources"]})
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_latency_summary_includes_ashby(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE jobs (
+                            source TEXT NOT NULL,
+                            discovery_latency_seconds INTEGER,
+                            discovered_at TEXT NOT NULL
+                        )
+                    """)
+                    conn.execute(
+                        "INSERT INTO jobs (source, discovery_latency_seconds, discovered_at) "
+                        "VALUES (?, ?, ?)",
+                        ("ashby", 125, radar.iso(radar.now())),
+                    )
+                payload = radar.latency_summary(hours=24)
+                self.assertIn("ashby", payload["sources"])
+                self.assertEqual(payload["sources"]["ashby"]["samples"], 1)
+                self.assertEqual(payload["sources"]["ashby"]["p50_seconds"], 125)
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_dedupe_candidates_includes_ashby_observations(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE jobs (
+                            id INTEGER PRIMARY KEY,
+                            source TEXT NOT NULL,
+                            source_job_id TEXT NOT NULL,
+                            company TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            location TEXT NOT NULL,
+                            url TEXT NOT NULL,
+                            description TEXT NOT NULL
+                        )
+                    """)
+                    conn.executemany(
+                        """
+                        INSERT INTO jobs
+                        (id, source, source_job_id, company, title, location, url, description)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        [
+                            (
+                                1, "linkedin", "li-123", "Example Corp",
+                                "Backend Engineer", "Bengaluru, India",
+                                "https://www.linkedin.com/jobs/view/123", "Python backend role",
+                            ),
+                            (
+                                2, "ashby", "ashby-example-123", "Example Corp",
+                                "Backend Engineer", "Bengaluru, India",
+                                "https://jobs.example.com/backend-engineer", "Python backend role",
+                            ),
+                        ],
+                    )
+                payload = radar.dedupe_candidates(limit=100)
+                self.assertEqual(payload["jobs_considered"], 2)
+            finally:
+                radar.DB_PATH = original_db
+
+
 class AshbyCollectorTests(unittest.TestCase):
     def _response(self, payload):
         class Response:
