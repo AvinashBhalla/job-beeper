@@ -882,7 +882,7 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
-MATCHER_RULES_VERSION = 2
+MATCHER_RULES_VERSION = 3
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
