@@ -2903,16 +2903,18 @@ def latency_summary(hours: int = 24):
     hours = max(1, min(hours, 168))
     cutoff = iso(now() - dt.timedelta(hours=hours))
 
+    source_names = tuple(COLLECTORS)
+    placeholders = ",".join("?" for _ in source_names)
     with sqlite3.connect(DB_PATH) as conn:
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT source, discovery_latency_seconds
             FROM jobs
             WHERE discovered_at >= ?
               AND discovery_latency_seconds IS NOT NULL
               AND discovery_latency_seconds >= 0
-              AND source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
+              AND source IN ({placeholders})
             ORDER BY source, discovery_latency_seconds ASC
-        """, (cutoff,)).fetchall()
+        """, (cutoff, *source_names)).fetchall()
 
     by_source: dict[str, list[int]] = {}
     for source, latency in rows:
@@ -2925,7 +2927,7 @@ def latency_summary(hours: int = 24):
         return values[index]
 
     summary = {}
-    for source in ("linkedin", "naukri", "instahyre", "greenhouse"):
+    for source in source_names:
         values = by_source.get(source, [])
         under_60 = sum(1 for value in values if value <= 60)
         under_120 = sum(1 for value in values if value <= 120)
@@ -2971,7 +2973,7 @@ def source_status():
     }
 
     sources = []
-    for source in ("linkedin", "naukri", "instahyre", "greenhouse"):
+    for source in COLLECTORS:
         item = history.get(source, {})
         sources.append({
             "source": source,
@@ -2989,14 +2991,16 @@ def source_status():
 @app.get("/api/dedupe-candidates")
 def dedupe_candidates(limit: int = 100):
     limit = max(1, min(limit, 500))
+    source_names = tuple(COLLECTORS)
+    placeholders = ",".join("?" for _ in source_names)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT id, source, source_job_id, company, title, location, url, description
             FROM jobs
-            WHERE source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
+            WHERE source IN ({placeholders})
             ORDER BY id ASC
-        """).fetchall()
+        """, source_names).fetchall()
 
     by_identity: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in rows:
