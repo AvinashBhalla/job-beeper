@@ -5554,3 +5554,22 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - The missing-bs4 import blocker from the prior attempt is resolved in the isolated test environment; the full suite now ran. Do not infer which installation method was used unless the user supplies that command.
 - Goal remains reliable multi-source discovery → normalization/deduplication → explainable matching → dashboard and Telegram delivery. This test closes the code-level Ashby dedupe endpoint coverage check, but does not enable Ashby or establish collector/runtime health.
 - Next exact action: confirm the isolated worktree's current HEAD and status, then inspect the code/test diff and CI workflow behavior if needed. Preserve all production gates. Before any release, prepare backup/rollback and isolated runtime validation; separate explicit production deployment approval remains mandatory.
+## User prompt follow-through — 2026-11-06 — Ashby dedupe patch review and worktree verification pending
+
+- Reviewed the two code commits directly: 0a09162d06fcd2ca6880bfbc9eb012132c0b2582 changes /api/dedupe-candidates to build parameter placeholders from SOURCE_NAMES and bind the registry tuple as SQLite parameters; 6dc6ac8c5e96938c7a39bf10b3fb3ba4359d5cf4 adds a temporary-SQLite regression test with matching LinkedIn and Ashby rows.
+- Read the current v2/radar.py source around COLLECTORS and dedupe_candidates: SOURCE_NAMES = tuple(COLLECTORS), and Ashby is registered in COLLECTORS. The parameterized query is consistent with the existing registry-driven latency-summary query. No source values are interpolated into SQL; only placeholder count is generated, and source values are bound.
+- Read the regression test: it patches radar.DB_PATH to a TemporaryDirectory DB, creates a minimal jobs table, inserts LinkedIn/Ashby same-company/title rows, asserts jobs_considered=2 and asserts a cross-source pair. User's full suite output confirms this test passed.
+- Test class is currently placed after the module's if __name__ == '__main__': unittest.main() guard. Discovery/import-based test execution (the reported full suite) still discovers and runs it, but direct execution of test_radar.py would call unittest.main before defining this class. This is a test-file organization nit, not a failure in the tested discovery path; consider moving the class above the main guard in a later tidy-up only if useful.
+- The user-created detached worktree was last confirmed at c93f041. Current local HEAD and uncommitted status cannot be read through GitHub; no VM shell access is available to the assistant. Exact next action for user, from /tmp/job-beeper-ashby-dedupe-test:
+
+  git status --short
+  git rev-parse HEAD
+  git branch --show-current
+  git diff --stat
+  git diff -- v2/radar.py v2/test_radar.py
+
+- Expected branch output is empty because the worktree was created detached. Confirm HEAD remains c93f0414e8f99540d6004f012e8cb286e32bf1f6 and that the code/test diff is clean; if status/diff shows local changes, stop and inspect rather than reset/clean. The branch has since received documentation-only follow-through commits; do not assume the old detached worktree includes those docs updates.
+- User-provided full V2 suite result: 137 tests in 18.998s, OK. GitHub CI lookup for c93f041 returned no status rows and no PR-triggered workflow runs; CI is unverified. No separate focused-only output or py_compile exit code was supplied in the attachment.
+- No application code was changed in this review. No production pull/build/restart, config/DB/volume mutation, source activation, provider call or Telegram send. Production /home/ubuntu/job-beeper, port 8000, v2-radar-1 and v2_radar-data:/data remain untouched.
+- Goal remains reliable multi-source discovery → normalization/deduplication → explainable matching → dashboard and Telegram delivery. The endpoint code fix and regression are validated by the local full suite, but no runtime/deployment claim follows. Keep production approval-gated.
+- Continuation: verify the isolated worktree status/HEAD/diff with the exact commands above. Then review CI availability and prepare an isolated runtime/release plan only after the code state is clean. Do not deploy or send notifications.
