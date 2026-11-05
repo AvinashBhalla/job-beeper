@@ -2527,3 +2527,36 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 ### Next action
 - Inspect the live Backend page's accessibility tree with REA and compare its visible job cards and controls against the hiring-this-week feed. Then test one public route/control only if it is visible. No app code, deployment, database, collectors, or Telegram settings were changed.
+
+
+## Backend category DOM — public controls and 200-result cap (2026-11-05)
+
+### Observed
+- REA evidence ID: `ev_c220ac81730bb00fc4720d535b3e1f69a40f858cb7c423e0d63ba7a6933a04a0`. Route `/browse/role/backend`; title `Latest Backend jobs | JobBeeper`.
+- DOM: 3,797 nodes; accessibility tree: 2,057 nodes.
+- Page text: `Fresh Backend roles, without the noise.`; `Latest Backend openings`; shortlist stated to be ordered by freshness.
+- Page shows `200 found`, `200 roles`, and explains `Showing the latest 200 public results, up to 200. Search filters this displayed list.`
+- Exactly 200 accessible job-card links in the list. Accessible job names combine title, company, and location, with Remote/Hybrid/On-site where exposed. Each links to a `/j/{id}-{slug}` detail page.
+- Search field `Search Backend roles` has DOM attribute `data-filter-input`. All 200 job anchors have `data-filter-item` and `data-filter-text`.
+- Separate location form includes `City, country, or remote` searchbox and `Filter location` button; form action is the same Backend URL.
+- No accessible sort selector or pagination/load-more control. Accessible buttons are Filter location and Color theme: System.
+- Category relevance is noisy in this snapshot: visible examples include Actuarial Internship Program 2027, DSRD Global Pathology Quality Control Scientist, Frontend Software Developer, Chemistry Expert, Mathematics Specialist, Biology Researcher, and Population Health Informaticist.
+- Public card labels do not expose salary, experience, source/ATS or posting age; hidden canonical fields remain unknown.
+- Contrast: hiring-this-week public route showed Latest 20 and no visible in-page search/location filter. Backend category shows 200 public results and the two search fields.
+- The one-second REA capture started after load; its zero network requests do not represent the initial page load. Earlier sanitized HAR bounded evidence of the HTML route and shared scripts, without observed first-party JSON/XHR/API calls.
+
+### Inference
+- Client-side search over the loaded 200 cards is strongly suggested by the markup and explicit page statement; verify with one controlled search term before treating it as confirmed behavior.
+- The location form likely submits a separate route-level filter, but its behavior is untested.
+- Treat 200 as a public preview cap, not the total available job corpus. No pagination was visible.
+- The category label is a noisy bucket; do not assume every listed role is truly a backend job.
+
+### Unknowns
+- Search match fields, debounce, URL mutation, reset behavior, and network effects.
+- Location autocomplete, valid values, query parameters and resulting set.
+- Selection/ranking logic, access to older results, and authenticated/public differences.
+- Category assignment and relevance precision.
+
+### Next controlled interaction
+- Search for a visible unique employer, e.g. `Cognizant`, using DevTools Network Preserve log. Record count, matching cards, URL change, and any request to distinguish front-end filtering from a backend search call.
+- Then separately test location form if needed. Do not create an alert, account or application. No app code, server, DB, collectors, notifications, or deployment changed.
