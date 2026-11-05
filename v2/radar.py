@@ -13,6 +13,7 @@ import secrets
 import sqlite3
 import threading
 import time
+import uuid
 import warnings
 from pathlib import Path
 from typing import Any
@@ -767,7 +768,14 @@ def init_db() -> None:
             finished_at TEXT NOT NULL,
             jobs_seen INTEGER NOT NULL,
             new_jobs INTEGER NOT NULL,
-            error TEXT
+            error TEXT,
+            run_id TEXT,
+            outcome TEXT,
+            duration_seconds REAL,
+            error_type TEXT,
+            http_status INTEGER,
+            retry_after_seconds REAL,
+            cooldown_seconds INTEGER
         )
         """)
         conn.execute("""
@@ -790,6 +798,13 @@ def init_db() -> None:
         _ensure_column(conn, "notification_ledger", "next_attempt_at", "TEXT")
         _ensure_column(conn, "notification_ledger", "claimed_at", "TEXT")
         _ensure_column(conn, "jobs", "canonical_match_confidence", "INTEGER")
+        _ensure_column(conn, "source_runs", "run_id", "TEXT")
+        _ensure_column(conn, "source_runs", "outcome", "TEXT")
+        _ensure_column(conn, "source_runs", "duration_seconds", "REAL")
+        _ensure_column(conn, "source_runs", "error_type", "TEXT")
+        _ensure_column(conn, "source_runs", "http_status", "INTEGER")
+        _ensure_column(conn, "source_runs", "retry_after_seconds", "REAL")
+        _ensure_column(conn, "source_runs", "cooldown_seconds", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
         conn.execute("UPDATE jobs SET discovery_latency_seconds=NULL WHERE discovery_latency_seconds < 0")
         # Repair records written by older builds where source metadata placed
@@ -1339,12 +1354,41 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
 
     return changed
 
-def record_run(source: str, started_at: dt.datetime, finished: dt.datetime,
-               jobs_seen: int, new_jobs: int, error: str | None = None) -> None:
+def record_run(
+    source: str,
+    started_at: dt.datetime,
+    finished: dt.datetime,
+    jobs_seen: int,
+    new_jobs: int,
+    error: str | None = None,
+    *,
+    run_id: str | None = None,
+    outcome: str | None = None,
+    duration_seconds: float | None = None,
+    error_type: str | None = None,
+    http_status: int | None = None,
+    retry_after_seconds: float | None = None,
+    cooldown_seconds: int | None = None,
+) -> None:
+    run_id = run_id or uuid.uuid4().hex
+    if outcome is None:
+        outcome = "failed" if error else "success"
+    if duration_seconds is None:
+        duration_seconds = max(0.0, (finished - started_at).total_seconds())
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            "INSERT INTO source_runs(source,started_at,finished_at,jobs_seen,new_jobs,error) VALUES(?,?,?,?,?,?)",
-            (source, iso(started_at), iso(finished), jobs_seen, new_jobs, error)
+            """
+            INSERT INTO source_runs(
+                source, started_at, finished_at, jobs_seen, new_jobs, error,
+                run_id, outcome, duration_seconds, error_type, http_status,
+                retry_after_seconds, cooldown_seconds
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                source, iso(started_at), iso(finished), jobs_seen, new_jobs, error,
+                run_id, outcome, max(0.0, float(duration_seconds)), error_type,
+                http_status, retry_after_seconds, cooldown_seconds,
+            ),
         )
         conn.commit()
 
@@ -1996,6 +2040,30 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
             return None
 
 
+
+def _source_run_error_metadata(exc: Exception) -> dict[str, Any]:
+    """Return safe, structured error details without persisting exception URLs or secrets."""
+    response = getattr(exc, "response", None)
+    raw_status = getattr(response, "status_code", None)
+    try:
+        http_status = int(raw_status) if raw_status is not None else None
+    except (TypeError, ValueError):
+        http_status = None
+    retry_after_seconds = _retry_after_seconds(response) if response is not None else None
+    rate_limited = http_status == 429 or isinstance(exc, LinkedInRateLimitCooldown)
+    if http_status is not None:
+        safe_error = f"HTTP {http_status}"
+    else:
+        safe_error = type(exc).__name__
+    return {
+        "error": safe_error,
+        "error_type": type(exc).__name__,
+        "http_status": http_status,
+        "retry_after_seconds": retry_after_seconds,
+        "rate_limited": rate_limited,
+    }
+
+
 def _activate_linkedin_rate_limit(response: requests.Response) -> float:
     """Back off globally when any LinkedIn endpoint returns HTTP 429."""
     global linkedin_rate_limited_until_monotonic
@@ -2030,6 +2098,8 @@ def _activate_linkedin_rate_limit(response: requests.Response) -> float:
     source_runtime = source_state.setdefault("linkedin", {})
     source_runtime["rate_limited_until"] = iso(until_utc)
     source_runtime["rate_limit_cooldown_seconds"] = int(cooldown)
+    source_runtime["rate_limit_retry_after_seconds"] = retry_after
+    source_runtime["rate_limit_detected_at"] = iso(until_utc - dt.timedelta(seconds=cooldown))
     log.warning(
         "linkedin: HTTP 429; pausing all LinkedIn HTTP requests for %ss "
         "(streak=%s, retry_after=%s)",
@@ -2717,7 +2787,16 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         return
 
     started_at = now()
-    source_state.setdefault(source, {})["running"] = True
+    started_monotonic = time.monotonic()
+    run_id = uuid.uuid4().hex
+    rate_limit_generation_at_start = (
+        linkedin_rate_limit_generation if source == "linkedin" else None
+    )
+    runtime_at_start = source_state.setdefault(source, {})
+    runtime_at_start["running"] = True
+    runtime_at_start["current_run_id"] = run_id
+    jobs: list[dict[str, Any]] = []
+    new_jobs = 0
     try:
         jobs = COLLECTORS[source](config)
 
@@ -2764,35 +2843,128 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             log.exception("telegram immediate delivery failed source=%s", source)
 
         finished = now()
-        record_run(source, started_at, finished, len(jobs), new_jobs)
-        runtime = {
-            "running": False,
-            "last_success": iso(finished),
-            "jobs_seen": len(jobs),
-            "new_jobs": new_jobs,
-            "error": None,
-        }
+        duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         cooldown_remaining = (
             _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
         )
+        rate_limit_seen = (
+            source == "linkedin"
+            and linkedin_rate_limit_generation != rate_limit_generation_at_start
+        )
+        outcome = (
+            "partial_rate_limited" if jobs and rate_limit_seen
+            else "rate_limited" if rate_limit_seen
+            else "success"
+        )
+        current_runtime = source_state.get(source, {})
+        retry_after_seconds = (
+            current_runtime.get("rate_limit_retry_after_seconds")
+            if rate_limit_seen else None
+        )
+        http_status = 429 if rate_limit_seen else None
+        error = "HTTP 429" if rate_limit_seen else None
+        error_type = "HTTPError" if rate_limit_seen else None
+        cooldown_seconds = (
+            int(max(0.0, cooldown_remaining)) if rate_limit_seen else None
+        )
+        record_run(
+            source, started_at, finished, len(jobs), new_jobs, error,
+            run_id=run_id,
+            outcome=outcome,
+            duration_seconds=duration_seconds,
+            error_type=error_type,
+            http_status=http_status,
+            retry_after_seconds=retry_after_seconds,
+            cooldown_seconds=cooldown_seconds,
+        )
+        runtime = dict(source_state.get(source, {}))
+        runtime.update({
+            "running": False,
+            "current_run_id": None,
+            "run_id": run_id,
+            "last_run": iso(finished),
+            "last_run_outcome": outcome,
+            "last_run_duration_seconds": round(duration_seconds, 3),
+            "jobs_seen": len(jobs),
+            "new_jobs": new_jobs,
+            "error": error,
+            "http_status": http_status,
+            "retry_after_seconds": retry_after_seconds,
+            "cooldown_seconds": cooldown_seconds,
+        })
+        if outcome == "success":
+            runtime["last_success"] = iso(finished)
         if cooldown_remaining > 0:
             runtime["rate_limited_until"] = iso(
                 now() + dt.timedelta(seconds=cooldown_remaining)
             )
             runtime["rate_limit_cooldown_seconds"] = int(cooldown_remaining)
+        elif not rate_limit_seen:
+            runtime.pop("rate_limited_until", None)
+            runtime.pop("rate_limit_cooldown_seconds", None)
+            runtime.pop("rate_limit_retry_after_seconds", None)
+            runtime.pop("rate_limit_detected_at", None)
         source_state[source] = runtime
-        log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
+        log.info(
+            "%s: seen=%s new=%s outcome=%s run_id=%s",
+            source, len(jobs), new_jobs, outcome, run_id,
+        )
     except Exception as exc:
         finished = now()
-        record_run(source, started_at, finished, 0, 0, str(exc))
-        source_state[source] = {
+        duration_seconds = max(0.0, time.monotonic() - started_monotonic)
+        metadata = _source_run_error_metadata(exc)
+        cooldown_remaining = (
+            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
+        )
+        if source == "linkedin" and cooldown_remaining > 0:
+            metadata["rate_limited"] = True
+        if metadata["rate_limited"]:
+            outcome = "rate_limited"
+        else:
+            outcome = "failed"
+        retry_after_seconds = metadata["retry_after_seconds"]
+        if retry_after_seconds is None and source == "linkedin":
+            retry_after_seconds = source_state.get(source, {}).get(
+                "rate_limit_retry_after_seconds"
+            )
+        cooldown_seconds = None
+        if cooldown_remaining > 0:
+            cooldown_seconds = int(cooldown_remaining)
+        elif metadata["http_status"] == 429 and retry_after_seconds is not None:
+            cooldown_seconds = int(retry_after_seconds)
+        record_run(
+            source, started_at, finished, len(jobs), new_jobs, metadata["error"],
+            run_id=run_id,
+            outcome=outcome,
+            duration_seconds=duration_seconds,
+            error_type=metadata["error_type"],
+            http_status=metadata["http_status"],
+            retry_after_seconds=retry_after_seconds,
+            cooldown_seconds=cooldown_seconds,
+        )
+        runtime = dict(source_state.get(source, {}))
+        runtime.update({
             "running": False,
-            "last_success": source_state.get(source, {}).get("last_success"),
-            "jobs_seen": 0,
-            "new_jobs": 0,
-            "error": repr(exc),
-        }
-        log.exception("%s collector failed", source)
+            "current_run_id": None,
+            "run_id": run_id,
+            "last_run": iso(finished),
+            "last_run_outcome": outcome,
+            "last_run_duration_seconds": round(duration_seconds, 3),
+            "last_success": runtime.get("last_success"),
+            "jobs_seen": len(jobs),
+            "new_jobs": new_jobs,
+            "error": metadata["error"],
+            "http_status": metadata["http_status"],
+            "retry_after_seconds": retry_after_seconds,
+            "cooldown_seconds": cooldown_seconds,
+        })
+        if cooldown_remaining > 0:
+            runtime["rate_limited_until"] = iso(
+                now() + dt.timedelta(seconds=cooldown_remaining)
+            )
+            runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+        source_state[source] = runtime
+        log.exception("%s collector failed run_id=%s outcome=%s", source, run_id, outcome)
 
 
 async def notification_worker() -> None:
@@ -2950,7 +3122,10 @@ def source_status():
     config = get_config()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
-            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs, sr.error
+            SELECT
+                sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs, sr.error,
+                sr.run_id, sr.outcome, sr.duration_seconds, sr.error_type,
+                sr.http_status, sr.retry_after_seconds, sr.cooldown_seconds
             FROM source_runs sr
             JOIN (
                 SELECT source, MAX(finished_at) AS latest_finished_at
@@ -2968,6 +3143,13 @@ def source_status():
             "jobs_seen": row[2] or 0,
             "new_jobs": row[3] or 0,
             "last_error": row[4],
+            "last_run_id": row[5],
+            "last_run_outcome": row[6],
+            "last_run_duration_seconds": row[7],
+            "last_error_type": row[8],
+            "last_http_status": row[9],
+            "last_retry_after_seconds": row[10],
+            "last_cooldown_seconds": row[11],
         }
         for row in rows
     }
@@ -2982,6 +3164,13 @@ def source_status():
             "jobs_seen": item.get("jobs_seen", 0),
             "new_jobs": item.get("new_jobs", 0),
             "last_error": item.get("last_error"),
+            "last_run_id": item.get("last_run_id"),
+            "last_run_outcome": item.get("last_run_outcome"),
+            "last_run_duration_seconds": item.get("last_run_duration_seconds"),
+            "last_error_type": item.get("last_error_type"),
+            "last_http_status": item.get("last_http_status"),
+            "last_retry_after_seconds": item.get("last_retry_after_seconds"),
+            "last_cooldown_seconds": item.get("last_cooldown_seconds"),
             "runtime": source_state.get(source, {}),
         })
 
