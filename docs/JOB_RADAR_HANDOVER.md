@@ -5564,3 +5564,74 @@ Expected result: this diagnostic output only. Do not paste .env, docker inspect 
 5. Only then make behavior-changing code edits; run CI and the dev test suite before any release.
 
 No code or production configuration is permitted to auto-deploy from this branch.
+
+
+## Oracle read-only runtime snapshot received — 2026-11-05
+
+### OBSERVED — Git checkouts
+- Production checkout `/home/ubuntu/job-beeper`: branch `v2-live-radar`, clean worktree, commit `61d8271480eaf48b0a6442b62b1b0bb9a032df34` (2026-10-12), reported 19 commits behind `origin/v2-live-radar`.
+- Development checkout `/home/ubuntu/job-beeper-dev`: branch `v2-live-radar`, commit `296c1a4d261d4a6fe7b3dc2c791c7d159f9cb135` (2026-10-16), reported 8 commits behind remote. Worktree is DIRTY: tracked `v2/config.json` modified; untracked `.env.save` and `.venv/`.
+- Hard stop: do not pull, reset, checkout over, clean, rebuild or replace either checkout/config. Preserve the dev config changes, .env.save and .venv exactly. Do not inspect/cat .env.save in chat or commit it.
+
+### OBSERVED — API snapshots
+- Port 8000 (production) and port 8001 (development) both returned `status=ok`, version `2.0.0`, and responded to read-only API requests.
+- Production uptime reported 2,114,466 seconds. Production active sources: LinkedIn and Naukri.
+- Production runtime config version 10: LinkedIn enabled, Naukri enabled, Instahyre disabled, Greenhouse disabled; notifications enabled; poll targets LinkedIn 180s, Naukri 300s, Instahyre 600s, Greenhouse 900s. This runtime API has no Ashby field, consistent with old deployed code.
+- Production latest in-memory/source-status snapshot: LinkedIn last success `2026-11-05T15:05:53.893304+00:00`, 10 seen, 0 new, not running, no reported error and no active cooldown timestamp. Naukri last success `2026-11-05T15:05:54.012385+00:00`, 341 seen, 0 new, not running, no reported error.
+- Production source history API enumerates LinkedIn, Naukri, Instahyre and Greenhouse; it omits Ashby. This is expected from the old deployed code and is the defect PR #37 fixes in the current foundation branch; PR #37 has not been deployed.
+- Production latency summary (24h): LinkedIn 363 valid timestamped samples; p50 1,740 sec (29 min), p90 14,400 sec (4 h), max 21,600 sec (6 h); 17 samples ≤60 sec, 25 ≤120 sec, 57 ≤300 sec. This shows observed publish-to-discovery latency among records with usable timestamps, not request latency and not a complete measure of all LinkedIn jobs.
+- Naukri latency sample count is 0. The relay adapter deliberately does not invent second-level discovery latency from date-only posting fields; zero samples must not be interpreted as a failed collector.
+- Production daily summary for `2026-11-05` Asia/Kolkata: 450 discovered, 30 matched, 30 alertable, 30 alerts sent. These are API-reported daily counts.
+- Development uptime reported 1,716,648 seconds. Its current runtime has Naukri enabled only; LinkedIn, Instahyre and Greenhouse disabled; notifications disabled; config version 11.
+- Development Naukri latest success: `2026-11-05T15:03:18.507654+00:00`, 339 seen, 0 new, no error. Development daily summary: 153 discovered, 4 matched, 0 alertable, 0 sent.
+- Development latency endpoint reported zero samples across its legacy source view; this does not mean no Naukri ingestion, as the relay uses date-only precision.
+- No active cooldown timestamp was returned in production health at snapshot time. This is not proof that no historical HTTP 429 occurred: current app does not provide a reliable persistent 429 event counter/history.
+
+### OBSERVED — Docker/SQLite audit incomplete
+- User ran Docker commands without sudo; both `docker ps` and `docker volume ls` returned permission denied for `/var/run/docker.sock`.
+- Therefore container-to-volume mappings and SQLite table/job/notification counts were not retrieved. The API snapshots remain valid read-only evidence, but DB-level count audit and physical volume isolation remain unverified.
+- Do not advise weakening Docker socket permissions or adding the user to the docker group as part of this audit. Use narrowly scoped `sudo docker` read-only commands if authorized.
+
+### Diagnosis / implications
+- Production is still running an old October 12 checkout, not the current GitHub foundation tip. Do not treat new PR #37 code as deployed.
+- Development is also behind and has user-local state that must be preserved. It is not safe to fast-forward or rebuild until the modified config and ignored/untracked state are understood and backed up by the user with a controlled procedure.
+- The measured LinkedIn p50 of 29 minutes and p90 of 4 hours indicate that freshness is materially slower than a three-minute scan interval. A 180-second poll target is not a 180-second full-query coverage guarantee. The 16-query/location rotation and source-side indexing delays can both contribute; we cannot apportion latency without better run/target telemetry.
+- Do not increase LinkedIn request volume. No historical 429 metrics exist in this snapshot. The next step is to measure query/target coverage and request outcomes safely; do not infer that LinkedIn is "rate-limit free."
+- Naukri has healthy recent collector runs but 0 new jobs in the latest reported run on both environments. This is not by itself a failure; check relay freshness and new-vs-seen trends before changing cadence.
+- Production sent 30 Telegram alerts today according to the API. Do not point development notifications at production chat.
+
+### Next manual action — narrow Docker read-only inspection
+The user appears to have sudo access but Docker socket is not directly readable. Run this minimal, read-only command from the same SSH session to retrieve container mount mappings and SQLite counts. It does not print environment variables or secrets, and does not modify data.
+
+```bash
+echo "========== RUNNING CONTAINERS AND MOUNTS =========="
+for c in $(sudo docker ps --format '{{.Names}}' | grep -i radar); do
+  echo "--- $c ---"
+  sudo docker inspect "$c" --format 'name={{.Name}} image={{.Config.Image}} status={{.State.Status}} mounts={{range .Mounts}}{{.Name}}:{{.Destination}};{{end}}'
+  sudo docker exec -i "$c" python3 - <<'PY'
+import os, sqlite3, json
+p="/data/jobs.db"
+if not os.path.exists(p):
+    print("DB not found")
+    raise SystemExit
+con=sqlite3.connect("file:"+p+"?mode=ro", uri=True)
+con.execute("PRAGMA query_only=ON")
+tables={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+out={"db_bytes":os.path.getsize(p),"tables":sorted(tables)}
+for t in ("jobs","canonical_opportunities","job_evaluations","notification_ledger","source_runs","gemini_shadow_cache"):
+    if t in tables:
+        out[t+"_count"]=con.execute("SELECT COUNT(*) FROM "+t).fetchone()[0]
+if "jobs" in tables:
+    out["jobs_by_source"]=dict(con.execute("SELECT source,COUNT(*) FROM jobs GROUP BY source").fetchall())
+if "notification_ledger" in tables:
+    out["notification_counts"]=dict(con.execute("SELECT status,COUNT(*) FROM notification_ledger GROUP BY status").fetchall())
+print(json.dumps(out,indent=2))
+con.close()
+PY
+done
+```
+
+### Stop conditions
+- Do not run `git pull`, `git reset`, `git clean`, checkout, compose up/down/rebuild/restart, or source scans.
+- Do not modify `/home/ubuntu/job-beeper-dev/v2/config.json`, delete `.env.save` or `.venv/`, or expose any secrets.
+- PR #37 remains draft; PR #35 remains draft. No code deployment has occurred.
