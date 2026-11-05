@@ -5131,3 +5131,63 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Then inspect `/static/jobpage.js` and `/static/publicpage-ui.js` as public, loaded scripts using REA bundle/source observation. Avoid executing unknown page code outside the site's normal browser context.
 - After page content is understood, test public filtering and pagination manually in Chrome while recording a sanitized HAR. Record which controls were used and compare URL/query changes and network requests. Do not sign in, submit applications, create alerts, or access private data.
 - No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed during this capture or its analysis.
+
+
+## 2026-11-05 — Public Domino's job-detail page inspection
+
+### Capture identity and completeness
+- User supplied REA `inspect-web-page` capture for target `545C6994ACD1807FE62AFF719D41E56C`, URL `https://jobbeeper.com/j/28752345-delivery-driver-02202-1027-w-hunter-st-domino-s`, page title `Delivery Driver(02202) - 1027 W Hunter St at Domino's — JobBeeper`.
+- Observation window: 2026-11-05T11:10:21.605Z through 11:10:22.672Z (about 1 second). Accessibility capture enabled; network requests and script source capture were not included, and observation begins after REA attaches.
+- DOM contains 623 nodes; accessibility tree contains 313 nodes. Three first-party scripts were observed: `/static/publicpage-theme.js` (2,842 bytes), `/static/jobpage.js` (2,651 bytes by script metadata; resource size 2,653 bytes), and `/static/publicpage-ui.js` (5,259 bytes). No source maps reported.
+- DOM URL metadata exposes public internal links and login/signup redirect paths. Four URLs were excluded because destination origins were outside the approved origin policy; their actual destinations were not disclosed. Do not infer or attempt to recover excluded external destinations.
+- Network request list was empty due attach-limited timing; this does not mean page has no network activity.
+
+### OBSERVED — job-detail content and fields
+- Public listing title: `Delivery Driver(02202) - 1027 W Hunter St`.
+- Company: Domino's.
+- Location: Logan, OH, United States.
+- Summary metadata:
+  - Work mode: `No` (retain literal source value; field semantics require further interpretation).
+  - Employment: `Full-time`.
+  - Listed: `Posted 9 hours ago`.
+  - Source: `Smartrecruiters`.
+- Role description section says: `Only a short excerpt is available here.` and `The full responsibilities and requirements may be missing.`
+- A public link says `Sign in to open the original listing` and another page message says to sign in to open the employer's application link and track the application.
+- Application panel has CTA `Log in to apply` plus `Create free account`. Public href for login includes redirect to `/user/job/28752345` and UTM attribution. Signup href includes `next=/user/job/28752345` and UTM attribution.
+- No salary or explicit experience requirement was exposed in the captured public accessibility tree. This does not prove the original employer listing has no such information.
+- Public page contains a `Copy job link` button and `Browse openings` link.
+- Related section `More openings worth a look` says `6 roles` and lists six other Domino's public job pages. Examples include Assistant Manager, Customer Service Rep and Delivery Driver roles in US locations.
+- Footer/header include Create an alert, Sign in, Get App, JobBeeper home, How it works and Pricing navigation.
+
+### OBSERVED — promotional metrics displayed on this individual page
+- `31 min`: from SmartRecruiters publishing this role to JobBeeper finding it.
+- `14 min`: median time from a role going live to a subscriber being told.
+- `6 hours`: subscribers had this role before this page existed.
+- `76,954`: roles found in the last 24 hours.
+- These are page-displayed claims / a captured snapshot, not independently verified measurements; the 24-hour count is dynamic and differs from the homepage HAR snapshot.
+
+### INFERRED — public preview and conversion model
+- Public detail page is deliberately incomplete: it exposes title, company, location, a few normalized fields, listing age/source and a short description excerpt, but directs unauthenticated visitors to sign in to view the original listing and employer application URL.
+- The `/user/job/28752345` redirect path suggests authentication gates a user-specific job/application view, but authenticated behavior has not been tested.
+- The related-jobs module appears to connect opportunities within the same company and includes six alternative postings on the detail page.
+- The metric labels distinguish source publishing -> JobBeeper discovery -> subscriber notification -> public-page availability. These should be separate timestamps/stages in our own latency model; definitions and measurement methodology remain unverified.
+- The page uses a separate public-page rendering path from the homepage SPA, based on server-delivered HTML and three standalone public-page scripts; exact backend implementation remains unknown.
+
+### UNKNOWN / not established
+- Full employer description, original application URL, pay, benefits, skills, experience requirements, qualifications and complete canonical job object are unavailable from this public preview.
+- Values `Work mode = No` and exact field semantics need inspection in more job examples before defining enum mappings.
+- No evidence whether job detail data is embedded in HTML, retrieved by hidden/lazy scripts, or assembled by a server-side template; response body was not captured in HAR.
+- No actual click behavior for Copy job link, sign-in, create account, apply, create alert or related-job links was tested. No account was created and no application submitted.
+- No logged-in private listing, subscriber alert, tracking workflow, or original employer ATS redirect was observed.
+- Four external DOM destinations were policy-excluded. Their targets remain unknown and will not be bypassed.
+
+### Implications for our own canonical job model
+- Public/basic fields to model: title, company, normalized location, employment type, work-mode source value, source/ATS label, listed_at or source-listed display, discovered_at, description_excerpt, description_completeness/visibility, public_detail_url, canonical job ID, related-company jobs.
+- Keep separate source-posted, discovered, subscriber-notified and public-release timestamps; don't substitute page display claims for system timestamps.
+- Preserve unknown/null values explicitly; don't map `Work mode = No` to onsite or remote until validated.
+- Keep source application URL separately from our own application redirect/tracking. Decide access policy independently; no need to replicate JobBeeper's account gate.
+
+### Next exact investigation step
+- Run REA `analyze-web-bundle` on the current public job-detail target (and then, separately, on a browse target) to capture/analyze the three first-party public-page scripts. Focus on jobpage.js and publicpage-ui.js. Record any data-field names, outbound URL handling, analytics events and UI behavior as static-code evidence, distinct from runtime observations.
+- Next, inspect the `/browse/hiring-this-week` page accessibility tree to identify visible filters, cards, sort controls, pagination and empty states; then manually exercise one public filter or pagination control while recording a sanitized HAR. Do not access the original employer application URL or private account data.
+- No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed.
