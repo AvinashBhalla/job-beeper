@@ -1431,20 +1431,20 @@ def extract_explicit_work_location(description: str) -> str | None:
     "Work Location:" label; do not infer a city from an address or interview
     venue.
     """
-    raw = re.sub(r"\\s+", " ", str(description or "")).strip()
+    raw = re.sub(r"\s+", " ", str(description or "")).strip()
     if not raw:
         return None
     match = re.search(
-        r"\\bwork\\s+location\\s*[:\\-]\\s*(?P<location>.+?)"
-        r"(?=\\s+\\b(?:interview\\s+venue|work\\s+mode|employment\\s+type|"
-        r"job\\s+type|qualification|experience|key\\s+responsibilities|"
-        r"responsibilities|job\\s+summary|job\\s+description)\\b\\s*:|[;|\\n]|$)",
+        r"\bwork\s+location\s*[:\-]\s*(?P<location>.+?)"
+        r"(?=\s+\b(?:interview\s+venue|work\s+mode|employment\s+type|"
+        r"job\s+type|qualification|experience|key\s+responsibilities|"
+        r"responsibilities|job\s+summary|job\s+description)\b\s*:|[;|\n]|\.(?=\s|$)|$)",
         raw,
         flags=re.IGNORECASE,
     )
     if not match:
         return None
-    value = re.sub(r"\\s+", " ", match.group("location")).strip(" ,;|.-")
+    value = re.sub(r"\s+", " ", match.group("location")).strip(" ,;|.-")
     if not value or len(value) > 80 or len(value.split()) > 8:
         return None
     return value
