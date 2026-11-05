@@ -340,6 +340,40 @@ class MatcherTests(unittest.TestCase):
         self.assertGreaterEqual(details["score"], 55)
         self.assertIn("javascript", " ".join(details["reasons"]).lower())
 
+    def test_description_role_mention_does_not_match_non_engineering_title(self):
+        config = {
+            **BASE_CONFIG,
+            "target_roles": ["software engineer", "forward deployed engineer"],
+            "skills": ["llm", "ai"],
+        }
+        details = match_details(
+            make_job(
+                "Conversation Quality Analyst",
+                "Verify LLM evaluations and collaborate with forward deployed engineers.",
+                "Bengaluru, India",
+            ),
+            config,
+        )
+        self.assertFalse(details["match"])
+        self.assertIn("no configured target-role match", details["reasons"])
+
+    def test_description_role_fallback_is_kept_for_engineering_title(self):
+        config = {
+            **BASE_CONFIG,
+            "target_roles": ["software engineer"],
+            "skills": ["python"],
+        }
+        details = match_details(
+            make_job(
+                "Product Engineer",
+                "Work with software engineers to build Python services.",
+                "Bengaluru, India",
+            ),
+            config,
+        )
+        self.assertTrue(details["match"])
+        self.assertIn("role (description): software engineer", details["reasons"])
+
     def test_unknown_experience_does_not_block_direct_role_match(self):
         config = {
             **BASE_CONFIG,
