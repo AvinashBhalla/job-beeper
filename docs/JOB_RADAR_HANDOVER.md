@@ -5228,3 +5228,36 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Then manually use one public browse control (prefer a filter that changes the URL) with Network Preserve log enabled and export a sanitized HAR. Do not submit forms that create accounts, alerts or applications.
 - If additional source analysis is needed, inspect public-page script source only within the normal page scope, and focus next on the hiring-this-week page's loaded scripts rather than re-running the detail-page bundle analysis.
 - No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed.
+
+
+## JobBeeper hiring-this-week feed inspection — 2026-11-05
+
+### OBSERVED — passive REA accessibility/DOM capture
+- Page: `https://jobbeeper.com/browse/hiring-this-week`; title: `Who is hiring this week — JobBeeper`.
+- REA evidence ID: `ev_ab4ed5862048380655d9421dbfeccd63eb35f12e9a877546a181ada8e6a1635a`; capture window: `2026-11-05T11:17:48.745Z` to `11:17:49.814Z` (1-second observation).
+- Captured DOM: 1,175 nodes. Accessibility tree: 545 nodes. 61 anchor elements in DOM; 13 BUTTON elements in raw DOM, but only one accessible button exposed in the captured tree: `Color theme: System`. No INPUT, SELECT, or FORM elements were present.
+- Public browse navigation links: Companies, Hiring this week, Backend, Frontend, Data. These are route links, not evidence of an interactive in-page filter control.
+- Sections: `Top hiring companies` (20 company links with live-opening counts) and `Freshest openings` (label `Latest 20`, with 20 job links).
+- Snapshot metrics shown in the page: 5,873 active companies and 20,000 recent public openings. The page explicitly says this is a sample of the latest 20,000 public openings and that counts describe the sample, not the whole job market. Treat all such counts as dynamic, time-bound marketing/page data, not durable platform totals.
+- Example top-company counts in this capture: Domino's 844; Accenture India 413; jobgether 263; CVS Health 194; Winners Merchants International, L.P. 166. All 20 company entries have `/browse/company/{slug}` links.
+- Each of the 20 freshest job links follows `/j/{job-id}-{slug}`. The captured accessibility labels consistently expose title, company, and location. Examples: Senior Product Manager, Growth — Motive — Hybrid - Bangalore; Senior Product Designer — Motive — Bangalore, India; Software Engineer 1 — New Relic — Hyderabad, India; Mechanical Engineer – HVAC/Building Systems — Farnsworth Group — Phoenix, AZ; Mission Designer — Absurd Ventures — Santa Monica.
+- The observed job IDs in this one snapshot range from 28757581 down through 28757562. This is a single page sample, not proof of a permanent ID or pagination scheme.
+- No visible keyword search, location filter, experience filter, employment-type filter, sorting selector, or pagination/load-more control was present in this capture. No pay, experience, source/ATS label, or posted-age field appeared in the accessible job-card labels. This only establishes what the public cards expose in this capture; it does not establish that the underlying job records lack those fields.
+- The same three first-party scripts were loaded on this browse page: `/static/jobpage.js` (2,653 bytes), `/static/publicpage-theme.js` (2,842 bytes), and `/static/publicpage-ui.js` (5,259 bytes). Source text was not included in this inspection.
+- Capture was policy-filtered and attach-limited. REA began observation after page load; it reports zero network requests in its short observation window and explicitly says prior network activity is unavailable. Do not interpret that as proof of no requests during page load.
+- Separate earlier sanitized HAR across hiring feed, company page, and job detail recorded no same-origin JSON API calls for those page loads. That is a bounded observation only, not proof that no other public/interactive page state uses APIs.
+
+### INFERRED — keep separate from observed facts
+- The public feed appears to be delivered as HTML with lightweight shared public-page scripts, consistent with earlier browse/company/detail HAR observations. Server-side rendering is plausible but not proven from this capture alone.
+- The visible Backend, Frontend, and Data links are the best next candidate for testing category-specific browse routes. They should not be described as query filters until a route transition and its resulting content are compared.
+- The `Latest 20` label and 20 visible job links suggest a fixed-size public preview on this route; they do not establish whether authenticated pages expose more jobs or whether pagination exists elsewhere.
+
+### UNKNOWN / not established
+- Whether the Backend/Frontend/Data routes accept query parameters, how they select jobs, and whether they share the same template.
+- Whether any filter, sorting, or pagination controls exist on authenticated browse pages or other routes.
+- Whether job-card metadata such as salary, experience, ATS/source, or posted time is available only on the detail page or behind authentication.
+- The feed's ranking algorithm and exact relationship between job IDs, discovery times, and ordering.
+
+### Next exact investigation step
+- Test one public category route only: click the visible `Backend` link (`/browse/role/backend`) while Chrome DevTools Network has Preserve log enabled. Compare the URL, page title, visible job count, card fields, and page navigation with the hiring-this-week capture; export a sanitized HAR with cookies, authorization headers, and personal data removed.
+- Do not create an alert, account, or application. No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls, or deployment were changed by this inspection.
