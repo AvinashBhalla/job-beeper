@@ -5864,3 +5864,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Applied Jobs currently lives in browser `localStorage` key `job_beeper_applied_jobs_v1`, not server DB; multi-device use and future referral workflow require a server-side user-owned `applications` table and import/export migration.
 - Current API route inventory and a recommended first implementation cut are recorded in section 11 of `MULTI_USER_AND_REFERRAL_ROADMAP.md`. Operational routes such as source health, latency, dedupe and LLM status should be admin-only or sanitized for ordinary users.
 - Audit was read-only: no DB writes, source runs, notification sends, config changes, container restarts or production operations.
+
+## 2026-11-06 — Production checkout drift observed during read-only audit
+- Read-only host audit found `/home/ubuntu/job-beeper` (the production checkout) on `v2-live-radar` at `61d8271480eaf48b0a6442b62b1b0bb9a032df34`, reported **613 commits behind** its fetched `origin/v2-live-radar` ref. This checkout was not pulled or modified.
+- The running production container `v2-radar-1` remains on its prior image ID `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`, port 8000, Compose project `v2`, restart count 0. This is a runtime observation; it does not mean the production checkout is safe to update.
+- Treat production checkout and runtime as separate states. Do not pull, reset, rebuild, restart, migrate, switch branches or change production source/config until the user explicitly approves a reviewed release and rollback plan. Continue feature work only in `/tmp/job-radar-naukri-location-v3` and the draft PR targeting `v2-live-radar`.

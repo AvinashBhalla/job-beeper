@@ -3027,3 +3027,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Telegram delivery uses one global bot token + one global chat ID from environment; delivery claims the global ledger. Implement per-user Telegram linking and a user-scoped delivery worker.
 - Applied Jobs is currently browser localStorage (`job_beeper_applied_jobs_v1`), not server-side. Migrate to user-owned `applications` before referral intelligence.
 - Full read-only inventory, API scoping recommendations and first implementation cut are in section 11 of `docs/MULTI_USER_AND_REFERRAL_ROADMAP.md`.
+
+## 2026-11-06 — Production checkout drift warning
+- Production checkout `/home/ubuntu/job-beeper` was observed at `61d8271480eaf48b0a6442b62b1b0bb9a032df34`, **613 commits behind** its fetched `origin/v2-live-radar` ref. It was not pulled or modified.
+- Running production container `v2-radar-1` remains on image `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`, port 8000, Compose project `v2`, restart count 0. Never assume checkout and running image are synchronized. No production update is authorized.
+- Current feature PR #44 targets `v2-live-radar`; keep production `main` and port 8000 untouched.

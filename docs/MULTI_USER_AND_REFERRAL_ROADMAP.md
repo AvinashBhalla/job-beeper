@@ -289,10 +289,10 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - No HAPPPY-like people discovery, email OAuth, outreach drafting, follow-up engine or LinkedIn integration for referrals.
 
 **Operational cautions**
-- The remote `v2-live-radar` head was `9c56322c76958bceec65af3d15bd85553e30de53`; the feature branch has since been pushed to GitHub at `c1004955fb2fe394e56f01f5015634d442aa3c5a` and is under draft PR #44 targeting `v2-live-radar`. Do not merge to `main` or deploy production from this PR.
+- The remote `v2-live-radar` head was `9c56322c76958bceec65af3d15bd85553e30de53`; the feature branch has since been pushed to GitHub at `c1004955fb2fe394e56f01f5015634d442aa3c5a` and is under draft PR #44 targeting `v2-live-radar` (latest documented PR head at the time of this note: `ab1862714939ad9a51d81b93c235c70c6cae713e`). Do not merge to `main` or deploy production from this PR.
 - The ordinary development checkout `/home/ubuntu/job-beeper-dev` is behind the remote branch and has protected local changes/artifacts: `M v2/config.json`, `?? .env.save`, `?? .venv/`, and a config backup. Do not reset, clean, overwrite, or use it as the feature source.
 - The feature worktree `/tmp/job-radar-naukri-location-v3` currently has pending documentation modifications and untracked matcher benchmark files. Preserve these; inspect `git status` before staging.
-- Production remains a separate release gate. Do not pull, rebuild, restart, migrate or send production notifications as part of multi-user implementation planning.
+- Production checkout `/home/ubuntu/job-beeper` was observed at `61d8271`, 613 commits behind the fetched `origin/v2-live-radar` ref; the running production container remains on its old image. Never assume the checkout and runtime match. Production remains a separate release gate. Do not pull, rebuild, restart, migrate or send production notifications as part of multi-user implementation planning.
 - Termalin encrypted backup job remains DRAFT; local verified snapshots do not mean an off-host encrypted backup exists.
 
 ## 11. Read-only tenant-readiness audit — 2026-11-06
