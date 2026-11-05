@@ -2767,3 +2767,46 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 
 - The default `main` branch workflow filters pull requests to base branches `main` and `v2-live-radar`; a filter edit only on `work/job-intelligence-foundation` does not enable PR #38 CI. The temporary ineffective workflow edit was reverted on the foundation branch (commit `c2e27b17bfa2042045c37900e57f212c3366245a`).
 - Do not change `main` just to enable this stacked PR. Keep PR #38 as the real implementation PR into the foundation branch; create validation-only PR #39 from the exact telemetry head into `v2-live-radar`, run CI using the existing trigger, then close #39 without merging. Record the actual run. No runtime changes.
+
+
+## CI branch filter — 2026-11-05
+
+- Found why PR #38 had no workflow result: `.github/workflows/v2-ci.yml` filtered `pull_request.branches` to `main` and `v2-live-radar`, excluding its base branch `work/job-intelligence-foundation`. Empty status/workflow response was neither pass nor failure.
+- Added `work/job-intelligence-foundation` to the pull-request branch filter on the foundation branch (`84945d4049ad82df8bd355caaff3f7d81cd4e112`). Push filters are unchanged. No runtime changes.
+- Next: synchronize base changes to `work/source-run-telemetry`, push a child-head update and verify CI on PR #38. Preserve the telemetry section and do not merge/deploy.
+
+
+## Source-run telemetry phase 1 — 2026-11-05
+
+- Isolated child branch: `work/source-run-telemetry`, based on foundation commit `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`; PR #37 remains separate.
+- `v2/radar.py` now adds run ID, outcome, duration, exception type, HTTP status, Retry-After and cooldown columns to `source_runs`, with backward-compatible SQLite column migrations. `record_run` persists the fields; `run_source` retains partial job counts and records LinkedIn 429 even when caught internally after partial results. A partial result plus 429 becomes `partial_rate_limited`; runtime cooldown metadata is retained. Stored errors are sanitized. `/api/source-status` exposes the latest run metadata.
+- `v2/test_radar.py` adds migration, source-status metadata and partial-429 regression coverage. Fixture tables updated.
+- Verification is pending: tests have not yet been executed on this branch. Create a draft PR #38 into `work/job-intelligence-foundation` to trigger CI, then validate the exact head.
+- No VM output, runtime/database/Docker/Telegram change, source scan, polling change, source enablement or deployment occurred. Per-request/per-target telemetry and cooldown persistence across restarts remain future work.
+- Full record: latest dated section in `docs/JOB_RADAR_HANDOVER.md`. Fresh chat: paste `docs/AGENT_CONTINUATION_PROMPT.md` and the latest sanitized command output.
+
+
+## Telemetry CI first failure and correction — 2026-11-05
+
+- Validation PR #39 V2 CI run #1134 / ID `42077545562` on head `e60ff2529921bda6509d415fe58c530046193c29`: install, py_compile and focused router/extractor tests passed; full V2 suite ran 141 tests and failed with 1 error + 1 failure.
+- Error: one `source_runs` test fixture lacked new columns (`sr.run_id`). Failure: a cooldown test asserted a fixed UTC timestamp, but runtime correctly computes expiry relative to the actual current clock.
+- Fixed both in `v2/test_radar.py` commit `78a95a2e8b6ea42b933ccd855eda6e64036bda2d`: all manually-created source-run fixtures now include fields; cooldown assertion checks remaining seconds (598–600), not a hard-coded timestamp. This correction is not yet verified.
+- Advance validation branch to this commit and re-run V2 CI. PR #38 remains draft into foundation; PR #39 is temporary validation-only to `v2-live-radar`; no VM/runtime/deploy change.
+- Full evidence in the latest detailed handover section.
+
+
+## Telemetry CI second run — 2026-11-05
+
+- Validation PR #39 run #1135 / ID `42077890037` on head `b97a6ca0abbd450129f62f3730ab74edac19ad4f`: install, py_compile, focused tests passed; full suite 141 tests, 1 error and 0 failures. The cooldown timing fix and all new telemetry-specific tests passed.
+- One remaining error was another legacy `source_runs` fixture in `SourceRegistryApiCoverageTests`; earlier edit hit the migration fixture instead. Corrected the exact source-registry fixture in commit `701df0b2c8dc11403cd5e7a48390c4b0479c20f8`. Not yet verified.
+- Advance the validation branch and rerun. No runtime state changed. Full context in latest handover entry.
+
+
+## Telemetry phase 1 verified — 2026-11-05
+
+- V2 CI run #1136 / ID `42078168015` passed on tested code/test commit `997235c658177b17fc2f9257e039d171841e617b` through validation-only PR #39: dependency install, py_compile, focused router/extractor tests, and full V2 suite; **141 tests in 17.071s — OK**.
+- New regression cases passed: legacy `source_runs` migration, sanitized HTTP 429/cooldown persistence, partial jobs followed by 429, structured source-status metadata, and source registry coverage for all collectors.
+- Previous runs #1134 and #1135 failed on test-fixture issues; both fixes are documented in the detailed handover. Latest code/test changes were on `work/source-run-telemetry`; the successful tested SHA is `997235c658177b17fc2f9257e039d171841e617b`. Handover commits appended after it are documentation-only.
+- PR #38 remains the real implementation PR, draft, base `work/job-intelligence-foundation`. PR #39 is a temporary CI-only PR targeting `v2-live-radar`; close it unmerged after saving the evidence. No merge/deployment or runtime changes.
+- Phase 1 does not include per-request/per-target counts, board-level partial failure metrics, detailed stage latency, or cooldown persistence across restart. Next: review PR #38 and then implement per-target/request attempts and ingest processing counters test-first. Do not increase LinkedIn request volume.
+- Latest detailed record: `docs/JOB_RADAR_HANDOVER.md`; generic fresh-chat prompt: `docs/AGENT_CONTINUATION_PROMPT.md`.
