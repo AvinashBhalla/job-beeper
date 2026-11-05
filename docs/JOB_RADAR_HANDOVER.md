@@ -5584,3 +5584,11 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ## 2026-11-06 follow-through — verify isolated development Docker service
 - User asked to verify whether the isolated development Docker service on port 8001 is still running. The assistant cannot inspect the VM directly; requested read-only VM checks: `sudo docker ps -a --filter 'publish=8001' --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`, `sudo docker compose ls`, `sudo ss -ltnp | grep ':8001' || ...`, and from `/home/ubuntu/job-beeper-dev`, `git status --short` plus `git rev-parse --short HEAD`.
 - Await user-supplied command output before declaring service status. Do not start/stop/rebuild containers or change configuration. Keep production port 8000 and production checkout/container/volume untouched.
+
+
+## 2026-11-06 follow-through — isolated development service verified running
+- User supplied read-only VM output: container `job-radar-dev`, image `job-radar-dev-radar`, status `Up 2 weeks`, binding `127.0.0.1:8001->8000/tcp`. Compose project `job-radar-dev` is running from `/home/ubuntu/job-beeper-dev/v2/docker-compose.dev.yml`; production project `v2` is separate and uses `/home/ubuntu/job-beeper/v2/docker-compose.yml`.
+- `ss` confirms only `127.0.0.1:8001` listener via docker-proxy. Dev API is loopback-bound, not directly exposed on public interfaces. Service is running, but its two-week-old container is not proof it reflects current checkout code; no health endpoint or code/container parity check was performed yet.
+- Dev checkout `/home/ubuntu/job-beeper-dev` is at `7ebc38b`. Preserve local changes: modified `v2/config.json`; untracked `.env.save`, `.venv/`, and `v2/config.json.backup.20261105-183321`. Do not reset, clean, stage, overwrite, or delete these.
+- No container start/stop/rebuild/restart, config/DB/volume mutation, production operation, source activation, or notification send occurred.
+- Suggested next read-only check, if continuing: query `http://127.0.0.1:8001/health` and `/api/source-status` from the VM, then inspect dev container image/config metadata to determine runtime health and code/config parity. Do not change service state.
