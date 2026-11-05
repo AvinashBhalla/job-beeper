@@ -5592,3 +5592,9 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Dev checkout `/home/ubuntu/job-beeper-dev` is at `7ebc38b`. Preserve local changes: modified `v2/config.json`; untracked `.env.save`, `.venv/`, and `v2/config.json.backup.20261105-183321`. Do not reset, clean, stage, overwrite, or delete these.
 - No container start/stop/rebuild/restart, config/DB/volume mutation, production operation, source activation, or notification send occurred.
 - Suggested next read-only check, if continuing: query `http://127.0.0.1:8001/health` and `/api/source-status` from the VM, then inspect dev container image/config metadata to determine runtime health and code/config parity. Do not change service state.
+
+
+## 2026-11-06 follow-through — dev API health and source registry
+- User supplied read-only `GET /health` from port 8001: status `ok`, version `2.0.0`, uptime `1,732,027` seconds, DB `/data/jobs.db`. Runtime health reports only Naukri; it is not running, last success `2026-11-05T19:18:27.101126+00:00`, jobs_seen 335, new_jobs 0, error null.
+- `GET /api/source-status` reports only LinkedIn, Naukri, Instahyre and Greenhouse; LinkedIn/Instahyre/Greenhouse disabled, Naukri enabled. Ashby is absent from the response. This is evidence that the running dev API does not expose the expected current five-source registry; likely stale container/code, but confirm before concluding exact cause. Version `2.0.0` is not a commit identifier. Health `ok` does not establish Ashby readiness.
+- Do not enable sources or rebuild/restart the dev service yet. Next read-only diagnostics: inspect `job-radar-dev` image ID, container creation timestamp, working directory and Compose labels; locate the application file inside the container and compare its SHA256 with `/home/ubuntu/job-beeper-dev/v2/radar.py`. Also record the current dev checkout HEAD/status without modifying anything. Preserve dev local files/config. Production remains untouched.
