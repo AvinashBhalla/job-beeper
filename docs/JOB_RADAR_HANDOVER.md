@@ -5856,3 +5856,20 @@ Synchronize the changed CI workflow and foundation handover additions into `work
 - This is **phase 1** only: one persisted record per source run, run ID/outcome/duration and coarse HTTP 429 metadata. It does not count individual requests/targets, parse per-target success/partial failure, record stage-by-stage processing times, or persist rate-limit cooldown across restart.
 - Current LinkedIn cooldown behavior and request pacing are unchanged. No Oracle VM, production/dev runtime, DB volume, Docker, config, Telegram, source scan, secret, polling frequency or deployment change occurred.
 - Next: review PR #38 and the source-run contract; then design the next telemetry slice for per-target/request attempts and fetched/parsed/rejected/new/updated/duplicate counts, with sanitized errors and source isolation. Continue with tests first; do not increase request volume or add durable cooldown until restart semantics are explicitly designed.
+
+
+## Restacked clean telemetry PR — 2026-11-05
+
+- The original telemetry branch `work/source-run-telemetry` diverged from the latest foundation head: compare reported ahead 23 / behind 6 from merge base `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`; PR #38 metadata reported non-mergeable. To remove that merge risk, created clean branch `work/source-run-telemetry-clean` directly from the latest foundation commit `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- Copied `v2/radar.py` and `v2/test_radar.py` from the tested telemetry branch without modifying their contents. Blob SHAs match exactly: radar `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; tests `0f33aae175d69a5c59291894e351535740003651`.
+- Preserved all telemetry/CI evidence in both handover documents and the next-agent start prompt; updated the generic continuation prompt to identify `work/source-run-telemetry-clean` as active.
+- New implementation PR #40: `work/source-run-telemetry-clean` -> `work/job-intelligence-foundation`, open/draft. It is based on foundation SHA `689130ab6d39061a9a69fdd8349aeb060bf52beb`; compare reports ahead 6 / behind 0 and PR metadata reports mergeable true. It contains the six intended paths.
+- Superseded PR #38 (`work/source-run-telemetry`) is being closed unmerged; its branch remains historical. Validation-only PR #39 was closed unmerged after successful CI.
+- Validation: V2 CI run #1136 / ID `42078168015`, on tested code/test head `997235c658177b17fc2f9257e039d171841e617b`, passed all steps and 141 tests in 17.071s. New branch has identical `radar.py` and `test_radar.py` blob SHAs. PR #40's base is not in default `main` CI filter, so do not claim it has a direct PR workflow run; the exact code/test blobs are what run #1136 validated.
+
+### Current handoff state
+- Active implementation branch / PR: `work/source-run-telemetry-clean` / draft PR #40.
+- Superseded: PR #38 (close unmerged); temporary validation PR #39 (closed unmerged).
+- Foundation PR #37 remains separate, open/draft; latest CI run #1133 / ID `42077437246` passed on head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- No merge/deployment or application runtime, Oracle VM, Docker, DB, config, collectors, polling, source enablement, Telegram, secret or notification change.
+- Next: review PR #40 diff and API compatibility; then design phase 2 per-target/request telemetry and processing counters. Test first; do not increase LinkedIn request volume.
