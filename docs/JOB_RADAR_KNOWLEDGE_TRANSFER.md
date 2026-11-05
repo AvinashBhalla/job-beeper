@@ -2784,3 +2784,12 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Verification is pending: tests have not yet been executed on this branch. Create a draft PR #38 into `work/job-intelligence-foundation` to trigger CI, then validate the exact head.
 - No VM output, runtime/database/Docker/Telegram change, source scan, polling change, source enablement or deployment occurred. Per-request/per-target telemetry and cooldown persistence across restarts remain future work.
 - Full record: latest dated section in `docs/JOB_RADAR_HANDOVER.md`. Fresh chat: paste `docs/AGENT_CONTINUATION_PROMPT.md` and the latest sanitized command output.
+
+
+## Telemetry CI first failure and correction — 2026-11-05
+
+- Validation PR #39 V2 CI run #1134 / ID `42077545562` on head `e60ff2529921bda6509d415fe58c530046193c29`: install, py_compile and focused router/extractor tests passed; full V2 suite ran 141 tests and failed with 1 error + 1 failure.
+- Error: one `source_runs` test fixture lacked new columns (`sr.run_id`). Failure: a cooldown test asserted a fixed UTC timestamp, but runtime correctly computes expiry relative to the actual current clock.
+- Fixed both in `v2/test_radar.py` commit `78a95a2e8b6ea42b933ccd855eda6e64036bda2d`: all manually-created source-run fixtures now include fields; cooldown assertion checks remaining seconds (598–600), not a hard-coded timestamp. This correction is not yet verified.
+- Advance validation branch to this commit and re-run V2 CI. PR #38 remains draft into foundation; PR #39 is temporary validation-only to `v2-live-radar`; no VM/runtime/deploy change.
+- Full evidence in the latest detailed handover section.
