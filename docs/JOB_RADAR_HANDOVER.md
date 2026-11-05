@@ -5693,3 +5693,46 @@ The counts and DB byte sizes decreased between the two pasted snapshots. The cap
 - The full next-agent prompt is now saved at `docs/NEXT_AGENT_START_PROMPT.md`.
 - It includes product goal, current branch/PR state, code and collector baseline, Oracle runtime facts, Docker volumes/DB snapshot counts (including the two differing count outputs), hard safety rules and the next implementation sequence.
 - Copy that file's prompt section into the next model session; the new agent should still verify current branch/PR/CI and read the handover before editing.
+
+
+## Session continuity update — 2026-11-05 (generic next-agent prompt and current PR/CI verification)
+
+### User request / working rule
+- User asked for a generic prompt suitable for a fresh model/chat if this conversation runs out of context. The user plans to paste that prompt together with the latest command output from the previous chat/session.
+- User explicitly asked that all changes and evidence received during this conversation continue to be recorded in the handover, so context loss does not lose work.
+- This entry records the request and the GitHub metadata/CI evidence checked in this turn. It does not replace the detailed historical Oracle audit above.
+
+### Durable continuation prompt
+- Added `docs/AGENT_CONTINUATION_PROMPT.md` on `work/job-intelligence-foundation`.
+- The new prompt is intentionally reusable and instructs the next agent to:
+  - read the handover, knowledge transfer, project start prompt, architecture, PRD and source inventory first;
+  - treat the latest user-pasted command output as evidence and preserve exact values/discrepancies;
+  - append an entry to both handover documents on every turn, including evidence-only/no-code-change turns;
+  - record branch/HEAD, files, commits/PRs, tests/CI, deployment status, risks and exact next action;
+  - continue bounded engineering work instead of merely summarizing;
+  - respect the existing repository, LinkedIn, secret-handling, VM, Docker, database and notification safety boundaries.
+- The detailed project-specific prompt remains at `docs/NEXT_AGENT_START_PROMPT.md`; it is complementary rather than replaced.
+
+### Current GitHub / PR / CI evidence checked in this turn
+- Confirmed branch `work/job-intelligence-foundation` exists.
+- PR #37 is still **open, draft, unmerged**, and reported mergeable. It targets `v2-live-radar`; head branch is `work/job-intelligence-foundation`.
+- Current PR #37 head: `bbe98e33a3e131d8d63c753623d384e6ac01ced4`.
+- Base commit shown by PR metadata: `3f5b1e63ab43ca97ded73be40b05c0ce6f6e50c6`.
+- PR title: “Draft: establish job intelligence architecture and fix source observability”.
+- Latest workflow run returned for the exact current head: **V2 CI**, run number **1125**, run ID **42074147311**, status `completed`, conclusion `success`. This is newer/current-head evidence and supersedes reliance on only the earlier run #42048930099 in the older notes.
+- The separate combined-status endpoint returned an empty `statuses` array; workflow-run metadata independently reports the V2 CI run as completed/success. Do not reinterpret the empty status array as a failed CI result.
+- PR #35 remains separate; it was not inspected or changed in this specific check.
+
+### What changed / what did not
+- Documentation-only change: created `docs/AGENT_CONTINUATION_PROMPT.md`.
+- This turn did not change application code, collectors, scheduler, polling frequency, config, secrets, databases, Docker containers, Telegram settings or any Oracle VM checkout.
+- No runtime command was received from the user in this turn; the previously recorded 2026-11-05 Oracle API, Docker and SQLite observations remain the latest runtime evidence in this handover.
+- No deployment or merge occurred. PR #37 remains draft.
+
+### Next action
+1. Update the detailed project-specific prompt and compact knowledge transfer to point to `docs/AGENT_CONTINUATION_PROMPT.md` and record the current PR #37 head/CI state.
+2. Continue on `work/job-intelligence-foundation`: review current `v2/radar.py`, collector adapters, migrations, API schemas and tests to design one bounded source/run telemetry slice. Do not change polling frequency or deploy.
+3. Keep user-provided VM commands read-only unless explicitly approved; preserve the distinct volumes and dirty VM development files documented above.
+
+### Continuation
+- For a fresh chat, paste the contents of `docs/AGENT_CONTINUATION_PROMPT.md`, followed immediately by the latest sanitized command output. Then have the new agent read the latest dated entries in this handover and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` before acting.
