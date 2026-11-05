@@ -3133,7 +3133,12 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
 
 
 @app.get("/api/jobs")
-def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
+def jobs(
+    minutes: int = 60,
+    limit: int = 100,
+    today_only: bool = False,
+    q: str = "",
+):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = (
@@ -3141,6 +3146,17 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
         if today_only
         else iso(now() - dt.timedelta(minutes=minutes))
     )
+
+    # Apply text search in SQLite before LIMIT. Otherwise a relevant older
+    # posting can be hidden by the newest 500 rows and never reach the UI.
+    query = (q or "").strip()[:200]
+    escaped_query = (
+        query.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    search_pattern = f"%{escaped_query.lower()}%" if query else "%"
+
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
@@ -3163,10 +3179,18 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
             LEFT JOIN notification_ledger nl
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
             WHERE j.discovered_at >= ?
+              AND LOWER(
+                    COALESCE(j.company, '') || ' ' ||
+                    COALESCE(j.title, '') || ' ' ||
+                    COALESCE(j.location, '') || ' ' ||
+                    COALESCE(j.source, '') || ' ' ||
+                    COALESCE(j.source_job_id, '') || ' ' ||
+                    COALESCE(j.description, '')
+                  ) LIKE ? ESCAPE '\\'
             ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
                      j.discovered_at DESC
             LIMIT ?
-        """, (cutoff, limit)).fetchall()
+        """, (cutoff, search_pattern, limit)).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:

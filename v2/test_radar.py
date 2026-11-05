@@ -2329,6 +2329,121 @@ class MatcherTests(unittest.TestCase):
             enriched["description"],
         )
 
+    def test_jobs_search_runs_before_limit_and_is_case_insensitive(self):
+        from datetime import timedelta
+
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                day_start = radar.current_day_start_utc()
+
+                older_match = normalize_job(
+                    "naukri",
+                    "nk-novisync-older",
+                    "Novisync Solutions India",
+                    "Python Developer",
+                    "Bengaluru, India",
+                    "https://example.com/novisync-python",
+                    None,
+                    "unknown",
+                    "Build Python services.",
+                )
+                newer_nonmatch = normalize_job(
+                    "naukri",
+                    "nk-other-newer",
+                    "Another Company",
+                    "Software Engineer",
+                    "Bengaluru, India",
+                    "https://example.com/another-role",
+                    None,
+                    "unknown",
+                    "Build backend services.",
+                )
+                # The match is from the previous India-local calendar day,
+                # but remains inside the dashboard's advertised 72-hour window.
+                older_match["discovered_at"] = radar.iso(
+                    day_start - timedelta(hours=4)
+                )
+                newer_nonmatch["discovered_at"] = radar.iso(
+                    day_start + timedelta(minutes=20)
+                )
+
+                self.assertEqual(
+                    upsert_jobs([older_match, newer_nonmatch], BASE_CONFIG),
+                    2,
+                )
+
+                result = radar.jobs(
+                    minutes=4320,
+                    limit=1,
+                    q="NOVISYNC",
+                )
+
+                self.assertEqual(len(result["jobs"]), 1)
+                self.assertEqual(
+                    result["jobs"][0]["source_job_id"],
+                    "nk-novisync-older",
+                )
+
+                description_result = radar.jobs(
+                    minutes=4320,
+                    limit=10,
+                    q="backend services",
+                )
+                self.assertEqual(
+                    [item["source_job_id"] for item in description_result["jobs"]],
+                    ["nk-other-newer"],
+                )
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_jobs_search_treats_like_wildcards_as_literal_text(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                literal_percent = normalize_job(
+                    "naukri",
+                    "nk-percent-literal",
+                    "100% Labs",
+                    "Python Developer",
+                    "Bengaluru, India",
+                    "https://example.com/100-percent",
+                    None,
+                    "unknown",
+                    "Build Python services.",
+                )
+                no_percent = normalize_job(
+                    "naukri",
+                    "nk-percent-plain",
+                    "1000 Labs",
+                    "Python Developer",
+                    "Bengaluru, India",
+                    "https://example.com/1000",
+                    None,
+                    "unknown",
+                    "Build Python services.",
+                )
+                self.assertEqual(
+                    upsert_jobs([literal_percent, no_percent], BASE_CONFIG),
+                    2,
+                )
+
+                result = radar.jobs(
+                    minutes=4320,
+                    limit=10,
+                    q="100%",
+                )
+                self.assertEqual(
+                    [item["source_job_id"] for item in result["jobs"]],
+                    ["nk-percent-literal"],
+                )
+            finally:
+                radar.DB_PATH = original_db
+
     def test_jobs_today_only_filters_before_ist_midnight(self):
         from datetime import timedelta
 

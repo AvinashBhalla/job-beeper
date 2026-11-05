@@ -41,6 +41,7 @@
   const tagInputs = {};
   const dropdowns = {};
   const activeDropdownInstances = [];
+  let jobsFeedRequestSequence = 0;
 
   const SVG_ICONS = {
     briefcase: '<svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>',
@@ -853,6 +854,7 @@
         job.company,
         job.location,
         job.source,
+        job.description,
         ...(job.match_reasons || []),
         ...(job.skills_detected || []),
       ].join(' ').toLowerCase();
@@ -1037,6 +1039,7 @@
   }
 
   function clearAllFilters() {
+    const hadSearch = Boolean(String(state.filters.search || '').trim());
     state.filters.search = '';
     state.filters.source = '';
     state.filters.minScore = 0;
@@ -1058,7 +1061,11 @@
     $('toggleRemote').classList.remove('active');
     $('toggleRemote').setAttribute('aria-pressed', 'false');
 
-    renderFeed();
+    if (hadSearch) {
+      loadJobsFeed();
+    } else {
+      renderFeed();
+    }
   }
 
   // =========================================================================
@@ -1480,12 +1487,20 @@
   }
 
   async function loadJobsFeed() {
+    const requestId = ++jobsFeedRequestSequence;
     const refreshBtn = $('refreshFeedBtn');
     if (refreshBtn) refreshBtn.classList.add('is-loading');
 
+    const params = new URLSearchParams({
+      minutes: '4320',
+      limit: '500',
+    });
+    const searchQuery = String(state.filters.search || '').trim();
+    if (searchQuery) params.set('q', searchQuery);
+
     try {
       const [jobsRes, summaryRes] = await Promise.all([
-        fetch(API + '/jobs?today_only=true&limit=500', { cache: 'no-store' }),
+        fetch(API + '/jobs?' + params.toString(), { cache: 'no-store' }),
         fetch(API + '/daily-summary', { cache: 'no-store' }),
       ]);
 
@@ -1493,6 +1508,7 @@
 
       const jobsData = await jobsRes.json();
       const summaryData = await summaryRes.json();
+      if (requestId !== jobsFeedRequestSequence) return;
 
       state.jobs = (jobsData.jobs || []).map(normalizeJob).filter(Boolean);
       state.summary = summaryData;
@@ -1507,6 +1523,7 @@
       populateSourceFilterOptions(state.jobs);
       renderFeed();
     } catch (err) {
+      if (requestId !== jobsFeedRequestSequence) return;
       state.jobs = [];
       state.summary = null;
       state.isStaticFallback = false;
@@ -1515,7 +1532,9 @@
       renderFeed();
       showToast('Live jobs API unavailable. Dashboard is offline; no fallback feed is shown.', 'error', 5000);
     } finally {
-      if (refreshBtn) refreshBtn.classList.remove('is-loading');
+      if (requestId === jobsFeedRequestSequence && refreshBtn) {
+        refreshBtn.classList.remove('is-loading');
+      }
     }
   }
 
@@ -1582,9 +1601,9 @@
         const val = e.target.value;
         if (searchClear) searchClear.style.display = val ? 'inline-flex' : 'none';
         searchDebounceTimer = setTimeout(() => {
-          state.filters.search = val;
-          renderFeed();
-        }, 120);
+          state.filters.search = val.trim();
+          loadJobsFeed();
+        }, 250);
       });
     }
 
@@ -1593,7 +1612,7 @@
         if (searchInp) searchInp.value = '';
         searchClear.style.display = 'none';
         state.filters.search = '';
-        renderFeed();
+        loadJobsFeed();
       });
     }
 
