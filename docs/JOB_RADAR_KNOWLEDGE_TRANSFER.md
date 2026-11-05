@@ -2691,3 +2691,18 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Preserve these live settings. Expected v11 migration adds Ashby disabled and retains current source/notification flags; do not replace live config with repo defaults.
 - Code review found `/api/dedupe-candidates` hard-coded four-source SQL filter omitted Ashby. Patch now derives parameterized source placeholders from collector registry and adds a regression test for an Ashby/LinkedIn same-identity pair.
 - Patch is repository-only, not deployed. Next: run focused + full V2 tests in dev checkout; no production pull/build/restart/DB writes/notification sends. CI unverified.
+
+## User prompt follow-through — 2026-11-06 — isolated worktree uses python3
+
+- User fetched origin/v2-live-radar and created the isolated detached worktree /tmp/job-beeper-ashby-dedupe-test at commit c93f041 (the latest fetched branch tip at that moment). This worktree does not overwrite the existing /home/ubuntu/job-beeper-dev checkout or its local config/env/venv files.
+- The three attempted commands using python did not execute because this VM has no python executable; shell suggested python3. No focused tests, full-suite tests, or compilation result is available from this attempt.
+- Next exact action, from /tmp/job-beeper-ashby-dedupe-test:
+
+  python3 -m unittest v2.test_radar.DedupeCandidatesSourceCoverageTests -v
+  python3 -m unittest discover -s v2 -p 'test_*.py' -v
+  python3 -m py_compile v2/radar.py v2/test_radar.py
+
+- Record actual output before judging the Ashby dedupe registry fix. If any command fails, diagnose from its output; do not claim tests passed. Do not remove the worktree without checking whether it is still in use.
+- The patch remains repository-only. Production /home/ubuntu/job-beeper, port 8000, container v2-radar-1, and volume v2_radar-data:/data remain untouched; no deployment approval was given. No config, DB, source toggle, or notification state changed.
+- Overarching goal remains reliable multi-source discovery → normalization/deduplication → consistent explainable matching → dashboard and Telegram delivery. The Ashby endpoint fix only closes registry coverage in dedupe candidate discovery; it does not activate Ashby or prove collection/runtime health.
+- Continuation: run the three python3 commands above in the isolated worktree and return complete output. Then review failures or confirm test evidence, check CI, and update both handover documents. No production mutation or notification send.
