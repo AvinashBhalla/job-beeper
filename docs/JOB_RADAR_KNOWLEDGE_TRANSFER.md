@@ -2754,3 +2754,13 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Detailed session record: latest section of `docs/JOB_RADAR_HANDOVER.md`.
 - Next: read current `v2/radar.py`, adapters, schema/migrations and tests on the foundation branch; design a small source/run telemetry slice without increasing request volume. Keep PR #37 draft until reviewed; preserve all VM safety boundaries.
 - Fresh-chat handoff: paste `docs/AGENT_CONTINUATION_PROMPT.md` followed by the latest sanitized command output.
+
+
+## Source-run telemetry phase 1 — 2026-11-05
+
+- Isolated child branch: `work/source-run-telemetry`, based on foundation commit `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`; PR #37 remains separate.
+- `v2/radar.py` now adds run ID, outcome, duration, exception type, HTTP status, Retry-After and cooldown columns to `source_runs`, with backward-compatible SQLite column migrations. `record_run` persists the fields; `run_source` retains partial job counts and records LinkedIn 429 even when caught internally after partial results. A partial result plus 429 becomes `partial_rate_limited`; runtime cooldown metadata is retained. Stored errors are sanitized. `/api/source-status` exposes the latest run metadata.
+- `v2/test_radar.py` adds migration, source-status metadata and partial-429 regression coverage. Fixture tables updated.
+- Verification is pending: tests have not yet been executed on this branch. Create a draft PR #38 into `work/job-intelligence-foundation` to trigger CI, then validate the exact head.
+- No VM output, runtime/database/Docker/Telegram change, source scan, polling change, source enablement or deployment occurred. Per-request/per-target telemetry and cooldown persistence across restarts remain future work.
+- Full record: latest dated section in `docs/JOB_RADAR_HANDOVER.md`. Fresh chat: paste `docs/AGENT_CONTINUATION_PROMPT.md` and the latest sanitized command output.
