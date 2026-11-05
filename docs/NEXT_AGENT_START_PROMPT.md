@@ -187,3 +187,8 @@ The first source-run telemetry slice has now passed V2 CI. Validation-only PR #3
 ## Active branch replacement — 2026-11-05
 
 The earlier telemetry branch `work/source-run-telemetry` diverged from foundation and its PR #38 was superseded because GitHub reported it non-mergeable. Continue from `work/source-run-telemetry-clean` and draft PR #40 into `work/job-intelligence-foundation`; this new branch starts from the latest foundation SHA `689130ab6d39061a9a69fdd8349aeb060bf52beb` and compares ahead 6 / behind 0. PR #38 is closed unmerged; validation-only PR #39 is closed unmerged. Code/test blob hashes are identical to those verified by V2 CI #1136 / run ID `42078168015` (141 tests passed). Read the latest `docs/JOB_RADAR_HANDOVER.md` entry for full detail. Do not merge or deploy.
+
+
+## Restacked telemetry PR checkpoint — 2026-11-05
+
+Active implementation branch is now `work/source-run-telemetry-clean`, based on foundation commit `689130ab6d39061a9a69fdd8349aeb060bf52beb`. PR #40 is open/draft/unmerged and mergeable, head was `78e5b2da8ed01d4b277cad86010c2b5f86d14094` when recorded. Code/test blobs are the same versions that passed V2 CI run #1136 / ID `42078168015` (141 tests, 17.071s). PR #38 and validation PR #39 are closed unmerged; PR #37 remains separate. PR #40 has no direct CI run because default `main` branch filter only triggers pull requests to `main` or `v2-live-radar`; exact code/test files nevertheless passed through #39. Review PR #40, then plan request/target telemetry and ingest counters. Read latest handover entry before editing.
