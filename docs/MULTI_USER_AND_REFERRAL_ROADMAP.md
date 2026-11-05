@@ -289,7 +289,7 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - No HAPPPY-like people discovery, email OAuth, outreach drafting, follow-up engine or LinkedIn integration for referrals.
 
 **Operational cautions**
-- The remote `v2-live-radar` head was `9c56322c76958bceec65af3d15bd85553e30de53`; the feature worktree is local at `727bdb9fdbd96b6e759e3ccde5a04a6e29891796`. Do not assume the feature commits are already on GitHub.
+- The remote `v2-live-radar` head was `9c56322c76958bceec65af3d15bd85553e30de53`; the feature branch has since been pushed to GitHub at `c1004955fb2fe394e56f01f5015634d442aa3c5a` and is under draft PR #44 targeting `v2-live-radar`. Do not merge to `main` or deploy production from this PR.
 - The ordinary development checkout `/home/ubuntu/job-beeper-dev` is behind the remote branch and has protected local changes/artifacts: `M v2/config.json`, `?? .env.save`, `?? .venv/`, and a config backup. Do not reset, clean, overwrite, or use it as the feature source.
 - The feature worktree `/tmp/job-radar-naukri-location-v3` currently has pending documentation modifications and untracked matcher benchmark files. Preserve these; inspect `git status` before staging.
 - Production remains a separate release gate. Do not pull, rebuild, restart, migrate or send production notifications as part of multi-user implementation planning.

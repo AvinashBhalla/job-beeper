@@ -3013,3 +3013,9 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Build a small anonymized human-reviewed matcher benchmark from recent true positives and false positives (including AI Automation Engineer, QA Automation Engineer, Novisync Python Developer, Karnex explicit work-location case, and the Bolna Conversation Quality Analyst) before tuning role/skill thresholds.
 - Consider discovering a broader set of India-focused public ATS boards only after reviewing board relevance and freshness. Do not enable any ATS source or change the dev config without staged testing; production release still requires a separate explicit approval.
 - Handover for next run: read the latest versions of this handover, `JOB_RADAR_KNOWLEDGE_TRANSFER.md`, `JOBBEEPER_REFERENCE.md`, and `LLM_PROVIDER_ROUTER.md` before action.
+
+## 2026-11-06 — Feature PR publication status
+- Feature branch `feat/naukri-rich-descriptions-20261106` is now pushed to GitHub at `c1004955fb2fe394e56f01f5015634d442aa3c5a`; it includes commits `093c475` (72-hour server-side search) and `727bdb9` (Markdown/structured Naukri descriptions), plus benchmark and roadmap documentation.
+- Draft PR #44 targets `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/44. Do not merge to `main` or deploy production. GitHub `syntax` check was still in progress at the first post-create check; re-check before claiming CI pass.
+- Exact feature branch worktree remains `/tmp/job-radar-naukri-location-v3`; ordinary checkout `/home/ubuntu/job-beeper-dev` remains stale/protected and must not be reset/cleaned/overwritten. Dev image code hashes still match the feature worktree; no recreate occurred for this PR/docs operation.
+- Local verification: 149 V2 tests passed in 18.723s in a throwaway Docker container with networking disabled; benchmark-focused tests 2/2 passed; benchmark seed reports 4/4 scored examples pass and one unresolved review-only example.
