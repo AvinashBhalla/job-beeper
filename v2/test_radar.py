@@ -73,6 +73,38 @@ class MatcherTests(unittest.TestCase):
             radar.linkedin_rate_limit_generation,
         ) = self._linkedin_rate_state
 
+    def test_explicit_work_location_overrides_broad_feed_location(self):
+        job = make_job(
+            "Software Engineer",
+            "Work Location: Pune INTERVIEW VENUE: Pune, Maharashtra. "
+            "Build Python services. 2 years experience.",
+            "Pune, Chennai, Bengaluru, India",
+        )
+        details = match_details(job, BASE_CONFIG)
+        self.assertFalse(details["match"])
+        self.assertEqual(
+            details["reasons"],
+            ["location outside configured targets"],
+        )
+
+    def test_explicit_work_location_can_correct_stale_feed_location(self):
+        job = make_job(
+            "Software Engineer",
+            "Work Location: Bengaluru, Karnataka, India. "
+            "Build Python services. 2 years experience.",
+            "Pune, Chennai, India",
+        )
+        details = match_details(job, BASE_CONFIG)
+        self.assertTrue(details["match"])
+
+    def test_work_location_parser_does_not_use_interview_venue(self):
+        self.assertEqual(
+            radar.extract_explicit_work_location(
+                "Work Location: Pune INTERVIEW VENUE: Koramangala, Bengaluru"
+            ),
+            "Pune",
+        )
+
     def test_remote_india_location_does_not_match_remote_jobs_in_other_countries(self):
         self.assertTrue(radar.location_allowed("Remote - India", BASE_CONFIG))
         self.assertTrue(radar.location_allowed("Remote, Bengaluru, Karnataka, India", BASE_CONFIG))
