@@ -5261,3 +5261,29 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Next exact investigation step
 - Test one public category route only: click the visible `Backend` link (`/browse/role/backend`) while Chrome DevTools Network has Preserve log enabled. Compare the URL, page title, visible job count, card fields, and page navigation with the hiring-this-week capture; export a sanitized HAR with cookies, authorization headers, and personal data removed.
 - Do not create an alert, account, or application. No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls, or deployment were changed by this inspection.
+
+
+## Backend category-route HAR inspection — 2026-11-05
+
+### OBSERVED
+- User supplied a sanitized HAR for navigation to `https://jobbeeper.com/browse/role/backend`, from the `/browse/hiring-this-week` page. HAR page title/analytics title: `Latest Backend jobs | JobBeeper`.
+- HAR contains 10 entries: 8 to `jobbeeper.com`, one Google Tag Manager script, and one Google Analytics event. All 8 first-party requests returned 200.
+- Backend route requested `GET /browse/role/backend` as `text/html`; response was HTTP 200. There are two HAR records for the same document URL: one document request and one Fetch request initiated by `https://jobbeeper.com/sw.js` at line 57. Both record HTTP 200. The actual fetch response headers include `Cache-Control: public, max-age=3600`, `Content-Type: text/html; charset=utf-8`, `Content-Encoding: zstd`, `X-Cache-Status: MISS`, and `Date: Thu, 05 Nov 2026 11:21:58 GMT`.
+- The page's load timing in HAR: onContentLoad about 660 ms; onLoad about 859 ms. The main document request duration was about 558 ms.
+- The other first-party page resources were `/fonts/poppins.css`, `/static/jobpage.js` (2,653 bytes), `/static/publicpage-theme.js` (2,842 bytes), `/static/publicpage-ui.js` (5,259 bytes), `/fonts/poppins-700.woff2` (50,668 bytes), and `/fonts/poppins-400.woff2` (51,172 bytes). All returned 200.
+- One Google Tag Manager JS request returned 200; one Google Analytics `/g/collect` page-view POST returned 204. Google Analytics event title was `Latest Backend jobs | JobBeeper`, referrer was `/browse/hiring-this-week`, and document location was `/browse/role/backend`.
+- No first-party JSON/XHR/API endpoint appears in this 10-entry HAR capture.
+
+### INFERRED — not proof
+- The Backend route is presented as its own public HTML page, not an in-page client-side filter visible in this navigation capture.
+- The Fetch request initiated by `sw.js` is consistent with service-worker involvement in public-page navigation. The HAR's `_fetchedViaServiceWorker` fields are null, so do not claim the response was definitively served from service-worker cache or that the cache strategy is known.
+- The `Cache-Control` and `X-Cache-Status` headers indicate that the HTML response is publicly cacheable for up to one hour and that the observed origin/cache status was MISS on this request. This is only this response's cache metadata.
+
+### UNKNOWN / not established
+- The HAR does not retain response text, so job titles, company names, locations, number of visible cards, page controls, sorting, and filters on the Backend page are not available from this file.
+- It is not proven whether the Backend route is generated from a separate curated dataset, a server-side category query, or a common template with a route parameter.
+- The 10-entry capture cannot rule out API requests on other interactions, authenticated pages, or different browse routes.
+
+### Next exact investigation step
+- Keep Chrome on `https://jobbeeper.com/browse/role/backend`; rediscover its target ID with `list-browser-targets` and run `inspect-web-page` with `--include-accessibility-text --observation-ms 1000 --json`. Compare the visible Backend card count, titles, companies, locations, controls, links and ordering with the prior `/browse/hiring-this-week` capture.
+- Only after the DOM comparison, choose one clearly visible public navigation/control for a second controlled test. Do not create alerts, accounts, or applications. No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls, or deployment were changed by this investigation.
