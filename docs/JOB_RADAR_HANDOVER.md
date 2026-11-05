@@ -5687,3 +5687,9 @@ The counts and DB byte sizes decreased between the two pasted snapshots. The cap
 5. Prepare the next implementation slice as a separate dev/testable PR: source/run telemetry and source registry consistency. Do not increase LinkedIn requests. Add per-query target attempt/success/error/429 and stage-latency metrics before tuning cadence.
 6. Choose one additional ATS adapter only after validating its documented public API/access terms and usefulness to target employers. Dev only, notifications off, small board allowlist.
 7. Keep PR #35 (Gemini shadow validation) separate from PR #37 and this new work.
+
+
+### Continuation prompt
+- The full next-agent prompt is now saved at `docs/NEXT_AGENT_START_PROMPT.md`.
+- It includes product goal, current branch/PR state, code and collector baseline, Oracle runtime facts, Docker volumes/DB snapshot counts (including the two differing count outputs), hard safety rules and the next implementation sequence.
+- Copy that file's prompt section into the next model session; the new agent should still verify current branch/PR/CI and read the handover before editing.
