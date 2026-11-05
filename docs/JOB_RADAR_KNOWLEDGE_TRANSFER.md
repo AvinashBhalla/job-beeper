@@ -2667,3 +2667,32 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Existing open work that must remain isolated
 - PR #35 (Gemini shadow JD extraction) is draft and requires its own CI/dev VM validation. Do not merge or deploy it as part of PR #37.
 - PR #37 is draft; runtime audit is still required before behavior changes or merge.
+
+
+## Oracle runtime baseline received — 2026-11-05
+
+### Git state
+- Production /home/ubuntu/job-beeper: clean `v2-live-radar`, commit `61d8271480eaf48b0a6442b62b1b0bb9a032df34` dated Oct 12, 2026; 19 commits behind origin.
+- Development /home/ubuntu/job-beeper-dev: `v2-live-radar`, commit `296c1a4d261d4a6fe7b3dc2c791c7d159f9cb135` dated Oct 16, 2026; 8 commits behind origin. Dirty: tracked `v2/config.json`, untracked `.env.save`, untracked `.venv/`.
+- Do not pull/reset/clean/rebuild/checkout over either tree. Preserve all dev local state. Do not inspect or expose .env.save.
+
+### Live API observations
+- Ports 8000 and 8001 both healthy, FastAPI version 2.0.0.
+- Production runtime config v10: LinkedIn/Naukri on, Instahyre/Greenhouse off, notifications on; LinkedIn 180 seconds, Naukri 300 seconds. API source view lacks Ashby, consistent with deployed old code.
+- Production latest LinkedIn run: 10 jobs seen, zero new; last success 2026-11-05 15:05:53 UTC; no active cooldown reported. Naukri: 341 seen, zero new; last success 15:05:54 UTC.
+- Production LinkedIn latency summary, 24 hours: n=363; p50 1,740 sec (29m); p90 14,400 sec (4h); max 21,600 sec (6h); ≤60 sec 17; ≤120 sec 25; ≤300 sec 57. This is publish-to-discovery latency for records with usable timestamps, not the source poll interval.
+- Production Naukri latency samples zero because the relay does not invent second-level latency from date-only posting time. Naukri itself recently succeeded.
+- Production daily summary for Nov 5 IST: 450 discovered, 30 matched, 30 alertable, 30 sent.
+- Development config v11: Naukri only; all other sources off; notifications off. Naukri latest run 339 seen, 0 new, no error. Daily summary: 153 discovered, 4 matched, 0 alertable/sent.
+- No active cooldown is evidence only of no cooldown at capture time. The snapshot provides no persistent historical 429 count.
+
+### Docker and database limitation
+- Docker commands without sudo failed with permission denied to /var/run/docker.sock. Physical container mount mappings and SQLite counts are not yet verified.
+- No Docker permissions were changed. Next, use narrowly scoped read-only `sudo docker ps/inspect/exec` output as recorded in latest dated handover section. Do not show env variables.
+
+### Decisions
+- Existing production and dev worktrees are stale; dev is dirty. No pull, reset, rebuild, restart or deployment until the local modifications/volumes are reconciled and preserved.
+- Do not increase LinkedIn traffic. Its measured p50 and p90 freshness are materially slower than the nominal 180-second scan cadence; need target-level scan coverage and request-outcome telemetry before any tuning.
+- Naukri 0 new in last run is not proof of failure; examine feed age and trend.
+- PR #37 remains an isolated draft and fixes missing Ashby enumeration only; CI passed (137 tests). PR #35 remains separate and unverified for deployment.
+- The runtime audit did not change any app code, DB, collector, configuration, Telegram settings or containers.
