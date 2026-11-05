@@ -1786,6 +1786,53 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(jobs[0]["posted_precision"], "date")
         self.assertIsNone(jobs[0]["discovery_latency_seconds"])
 
+    def test_naukri_relay_preserves_markdown_and_structured_listing_details(self):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "updated_at": "2026-11-06T00:00:00+00:00",
+                    "jobs": [{
+                        "id": "nk-051126503145",
+                        "url": "https://www.naukri.com/job-listings-example",
+                        "company": "Novisync Solutions India",
+                        "title": "Python Developer",
+                        "location": "Bengaluru, India",
+                        "posted": "2026-11-05",
+                        "description": "* Build Python APIs.\\n\\n0-2 Yrs",
+                        "description_format": "markdown",
+                        "source_details": {
+                            "role": "Back End Developer",
+                            "role_category": "Software Development",
+                            "industry_type": "IT Services & Consulting",
+                            "department": "Engineering - Software & QA",
+                            "employment_type": "Full Time, Permanent",
+                            "education": {"ug": ["Any Graduate"], "pg": ["Any Postgraduate"], "ppg": []},
+                            "key_skills": ["python", "django", "pandas"],
+                        },
+                    }],
+                }
+
+        with patch.object(radar.requests, "get", return_value=Response()):
+            jobs = radar.naukri_collect()
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["description_format"], "markdown")
+        self.assertIn("* Build Python APIs.", jobs[0]["description"])
+        self.assertEqual(jobs[0]["source_details"]["role"], "Back End Developer")
+        self.assertEqual(
+            jobs[0]["source_details"]["education"]["ug"],
+            ["Any Graduate"],
+        )
+        self.assertEqual(
+            jobs[0]["source_details"]["key_skills"],
+            ["python", "django", "pandas"],
+        )
+
     def test_naukri_relay_does_not_retry_public_feed_404(self):
         class Response:
             status_code = 404
@@ -2441,6 +2488,76 @@ class MatcherTests(unittest.TestCase):
                     [item["source_job_id"] for item in result["jobs"]],
                     ["nk-percent-literal"],
                 )
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_jobs_preserve_markdown_and_naukri_source_details(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                source_details = {
+                    "role": "Back End Developer",
+                    "role_category": "Software Development",
+                    "industry_type": "IT Services & Consulting",
+                    "department": "Engineering - Software & QA",
+                    "employment_type": "Full Time, Permanent",
+                    "education": {
+                        "ug": ["Any Graduate"],
+                        "pg": ["Any Postgraduate"],
+                    },
+                    "key_skills": ["python", "django", "pandas"],
+                }
+                job = normalize_job(
+                    "naukri",
+                    "nk-rich-description-1",
+                    "Example Company",
+                    "Python Developer",
+                    "Bengaluru, India",
+                    "https://example.com/rich-description",
+                    None,
+                    "unknown",
+                    "### Job Description\\n\\n* Build Python APIs.",
+                    description_format="markdown",
+                    source_details=source_details,
+                )
+                self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
+
+                with patch.object(radar, "get_config", return_value=BASE_CONFIG):
+                    result = radar.jobs(minutes=10080, limit=10, q="pandas")
+
+                item = next(
+                    entry for entry in result["jobs"]
+                    if entry["source_job_id"] == "nk-rich-description-1"
+                )
+                self.assertEqual(item["description_format"], "markdown")
+                self.assertEqual(item["source_details"], source_details)
+
+                # A later legacy/plain relay record must not downgrade an
+                # already enriched Markdown description or erase metadata.
+                older_payload = normalize_job(
+                    "naukri",
+                    "nk-rich-description-1",
+                    "Example Company",
+                    "Python Developer",
+                    "Bengaluru, India",
+                    "https://example.com/rich-description",
+                    None,
+                    "unknown",
+                    "A longer plain text description that should not replace the structured Markdown body.",
+                )
+                self.assertEqual(upsert_jobs([older_payload], BASE_CONFIG), 0)
+
+                with patch.object(radar, "get_config", return_value=BASE_CONFIG):
+                    result_after = radar.jobs(minutes=10080, limit=10, q="pandas")
+                item_after = next(
+                    entry for entry in result_after["jobs"]
+                    if entry["source_job_id"] == "nk-rich-description-1"
+                )
+                self.assertEqual(item_after["description_format"], "markdown")
+                self.assertEqual(item_after["description"], job["description"])
+                self.assertEqual(item_after["source_details"], source_details)
             finally:
                 radar.DB_PATH = original_db
 

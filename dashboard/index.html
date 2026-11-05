@@ -303,7 +303,7 @@
                 <!-- Detected Skills -->
                 <div class="inspector-section">
                   <div style="display:flex;align-items:baseline;justify-content:space-between;">
-                    <span class="inspector-section-title">Detected Skills</span>
+                    <span class="inspector-section-title">Matched Skills</span>
                     <span class="meta-mono" style="font-size:11px;color:var(--text-muted);" id="inspSkillsCount">0 detected</span>
                   </div>
                   <div class="opportunity-signals-row" id="inspSkillsContainer">
@@ -315,6 +315,14 @@
                 <div class="inspector-section">
                   <span class="inspector-section-title">Job Description</span>
                   <div class="description-formatted-view" id="inspDescription">No description available.</div>
+                </div>
+
+                <!-- Structured fields supplied by the job source -->
+                <div class="inspector-section is-hidden" id="inspSourceDetailsSection">
+                  <span class="inspector-section-title">Naukri Listing Details</span>
+                  <div class="source-details-grid" id="inspSourceDetailsMeta"></div>
+                  <span class="inspector-section-title source-key-skills-heading" id="inspSourceKeySkillsHeading">Key Skills</span>
+                  <div class="opportunity-signals-row" id="inspSourceKeySkills"></div>
                 </div>
               </div>
             </aside>
