@@ -2458,7 +2458,7 @@ class SourceStatusPersistenceTests(unittest.TestCase):
                 with patch.object(
                     radar,
                     "get_config",
-                    return_value={"source_enabled": {"linkedin": False, "naukri": True}},
+                    return_value={"source_enabled": {"linkedin": False, "naukri": True, "ashby": False}},
                 ), patch.object(radar, "source_state", {}):
                     return radar.source_status()
             finally:
@@ -2503,6 +2503,56 @@ class SourceStatusPersistenceTests(unittest.TestCase):
         self.assertIsNone(naukri["last_error"])
         self.assertEqual(naukri["jobs_seen"], 18)
         self.assertEqual(naukri["new_jobs"], 2)
+
+    def test_source_status_includes_ashby_from_collector_registry(self):
+        payload = self._source_status_for_rows([
+            (
+                "ashby",
+                "2026-10-12T10:00:00+00:00",
+                "2026-10-12T10:01:00+00:00",
+                12,
+                3,
+                None,
+            )
+        ])
+        ashby = next(item for item in payload["sources"] if item["source"] == "ashby")
+        self.assertFalse(ashby["enabled"])
+        self.assertEqual(ashby["last_run"], "2026-10-12T10:01:00+00:00")
+        self.assertEqual(ashby["jobs_seen"], 12)
+        self.assertEqual(ashby["new_jobs"], 3)
+
+
+class SourceLatencySummaryTests(unittest.TestCase):
+    def test_latency_summary_includes_ashby_samples(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE jobs (
+                            source TEXT NOT NULL,
+                            discovery_latency_seconds INTEGER,
+                            discovered_at TEXT NOT NULL
+                        )
+                    """)
+                    conn.executemany(
+                        "INSERT INTO jobs (source, discovery_latency_seconds, discovered_at) VALUES (?, ?, ?)",
+                        [
+                            ("ashby", 60, "2026-10-12T10:00:00+00:00"),
+                            ("ashby", 120, "2026-10-12T10:30:00+00:00"),
+                            ("naukri", 30, "2026-10-12T10:30:00+00:00"),
+                        ],
+                    )
+                fixed_now = radar.dt.datetime(2026, 10, 12, 12, tzinfo=radar.UTC)
+                with patch.object(radar, "now", return_value=fixed_now):
+                    payload = radar.latency_summary(hours=24)
+                ashby = payload["sources"]["ashby"]
+                self.assertEqual(ashby["samples"], 2)
+                self.assertEqual(ashby["max_seconds"], 120)
+                self.assertEqual(ashby["under_60_seconds"], 1)
+            finally:
+                radar.DB_PATH = original_db
 
 
 class AshbyCollectorTests(unittest.TestCase):
