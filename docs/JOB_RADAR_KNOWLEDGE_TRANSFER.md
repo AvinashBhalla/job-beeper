@@ -2266,3 +2266,11 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - **Next actions:** (1) verify local Node/npm versions; (2) install latest REA using `npx rea-agents@latest setup`, review its exact setup plan, select the intended coding agent and restart it; (3) launch a separate Chrome profile with CDP bound to `127.0.0.1:9222`; (4) inspect JobBeeper public/accessible pages, capture passive page/script/network metadata, and export a sanitized HAR; (5) separately capture HAPPPY workflow/consent screens; (6) request read-only Oracle runtime diagnostics before any code/deploy work.
 - **Safety and scope:** inspect only publicly accessible or account-authorized product behavior. Do not attempt to access private SaaS backend source, bypass authentication/access controls, evade LinkedIn rate limits, automate prohibited LinkedIn activity, or disclose cookies/session tokens. Referral workflows should use authorized data providers and human-approved account activity.
 - **Code/config/runtime changes:** none. No collectors were triggered; no VM command, container restart, DB write, schema migration, source setting, Telegram notification, provider API call or deployment was performed.
+
+
+## 2026-11-05 — REA setup host clarification
+
+- User ran `node -v` and `npm -v` at the Oracle prompt `ubuntu@job-radar:~$`; reported Node.js `v12.22.9` and npm `8.5.1`.
+- This is the Oracle application host, not the Windows workstation selected for REA/browser investigation. Do not upgrade Node on Oracle just to install REA; the existing Job Radar V2 backend is Python/FastAPI and does not need this change for the planned investigation.
+- Next action: on the Windows development workstation, open PowerShell (not the SSH terminal) and run `node -v; npm -v`. REA requires Node.js 22.23.4+, 24.22.1+ or 26.12.1+. Then follow the reviewed local setup instructions. The previously remembered Windows Node version (26.7.0) is historical and must be rechecked.
+- No VM package installation, Node upgrade, collector run, service restart or application change was performed.
