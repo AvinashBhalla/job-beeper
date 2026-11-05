@@ -2948,3 +2948,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Production untouched. All code deployment, database reevaluation and source testing in this milestone were confined to dev port 8001 / dev volume. Do not enable Ashby scheduler or notifications without user direction.
 - Exact next step: run a short dev-only observation period with Ashby still disabled, Naukri active, notification false. Review current matcher distribution and relevance of Bolna/other candidates using aggregate safe metrics. Consider a follow-on matching test set before enabling any ATS source. Do not trigger LLM calls while daily cap remains exhausted. Keep production release gated due matcher version 2 potentially recalculating all production jobs/notification decisions.
 
+
+
+### Clarification — explicit dev refresh was already complete
+- After container startup, a separately invoked `refresh_job_evaluations(config)` returned `0` because the Naukri startup `run_source()` had already refreshed all 7,979 evaluations under matcher rules version 2. This was confirmed by identical current fingerprints across all rows and evaluation timestamps clustered between 20:25:12 and 20:25:37 UTC. `refresh_notification_decisions(config)` then changed 18 dev ledger decisions; notifications remained disabled and Telegram credentials blank, so no delivery occurred.
