@@ -12,7 +12,7 @@ You are taking over an ongoing engineering project: my **Personal Job Intelligen
 
 Repository: `AvinashBhalla/job-beeper`
 
-Current intended working branch: `work/job-intelligence-foundation` (verify it still exists and inspect its latest commit before editing).
+Current telemetry work branch: `work/source-run-telemetry` (child of `work/job-intelligence-foundation`; verify its latest commit and PR before editing). Follow the latest dated handover entry if this slice is complete.
 
 Before making decisions, read these repository documents in this order:
 
