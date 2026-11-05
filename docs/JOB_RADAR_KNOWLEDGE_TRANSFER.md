@@ -2696,3 +2696,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Naukri 0 new in last run is not proof of failure; examine feed age and trend.
 - PR #37 remains an isolated draft and fixes missing Ashby enumeration only; CI passed (137 tests). PR #35 remains separate and unverified for deployment.
 - The runtime audit did not change any app code, DB, collector, configuration, Telegram settings or containers.
+
+
+### LinkedIn latency precision clarification
+- In `normalize_job`, `discovery_latency_seconds` is only populated when `posted_precision == "minute"`. Therefore the 363 production samples in the 24-hour report are minute-precision posting timestamps, not date-only postings. They are a useful baseline subset, subject to source timestamp-label accuracy.
+- The p50/p90 delay cannot be attributed solely to polling cadence; target rotation, source indexing, and collection success each need separate telemetry.
