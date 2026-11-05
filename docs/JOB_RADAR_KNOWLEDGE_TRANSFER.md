@@ -2820,3 +2820,13 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - V2 CI run #1136 / ID `42078168015` validated those exact file contents: compilation, focused tests, full suite **141 tests in 17.071s — OK**. It ran through validation-only PR #39 targeting `v2-live-radar`; PR #40 itself has no direct run due default-main PR base filter.
 - PR #37 remains separate, open/draft; latest V2 CI run #1133 / ID `42077437246` passed on foundation head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
 - No merge/deploy/runtime/VM/DB/Docker/Telegram/polling changes. Next: review PR #40 and design phase 2 source-target telemetry; see detailed handover.
+
+
+## PR replacement and final state — 2026-11-05
+
+- PR #38: closed unmerged, replaced by clean branch/PR #40. PR #39: closed unmerged after CI run #1136.
+- Active implementation: draft PR #40, open/unmerged/mergeable=true, base `work/job-intelligence-foundation`, branch `work/source-run-telemetry-clean`; base commit `689130ab6d39061a9a69fdd8349aeb060bf52beb`, previously observed PR head `199463bbb7ac0be804d6ac24bd83636c7a1dc303` before the latest handover-only update. Recheck PR head before editing.
+- Foundation PR #37 remains separate, open/draft/unmerged; V2 CI run #1133 / ID `42077437246` passed on head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- V2 CI run #1136 / ID `42078168015` passed on the exact same `v2/radar.py` and `v2/test_radar.py` blobs now in PR #40: 141 tests in 17.071s — OK. PR #40's newest follow-up commits are documentation-only.
+- No merge/deploy/runtime/VM/DB/Docker/polling/collector/Telegram/config changes. Next: review PR #40; then design phase 2 per-target/request attempt and processing-count telemetry, without increasing requests.
+- Full chronological evidence: latest `docs/JOB_RADAR_HANDOVER.md` section. Fresh chat: paste `docs/AGENT_CONTINUATION_PROMPT.md` then the latest sanitized command output.
