@@ -5762,3 +5762,97 @@ Synchronize the changed CI workflow and foundation handover additions into `work
 1. Restore the workflow file on `work/source-run-telemetry` to match this foundation branch so PR #38 contains no dead CI-filter diff.
 2. Synchronize the latest foundation handover/knowledge-transfer entries into the child branch while preserving its telemetry additions.
 3. Create validation-only PR #39 targeting `v2-live-radar` from the exact child head; verify full CI; close #39 unmerged after recording the run. Keep PR #38 open/draft.
+
+
+## CI branch-filter discovery — 2026-11-05
+
+- PR #38 (`work/source-run-telemetry` -> `work/job-intelligence-foundation`) had no workflow run and no combined commit-status entries for head `1812fce7c483b8f04dc55585ada8cb43e9adfff2`.
+- Inspected `.github/workflows/v2-ci.yml` on the PR base. Its `pull_request.branches` filter listed only `main` and `v2-live-radar`; it did not include `work/job-intelligence-foundation`. Therefore PR #38 was excluded by the configured target-branch filter. The empty status response was not a failed run and not a passing run.
+- Updated `.github/workflows/v2-ci.yml` on this foundation branch to also include `work/job-intelligence-foundation` in the `pull_request.branches` filter. Push trigger remains unchanged (`main`, `v2-live-radar`); no production behavior changed.
+- New foundation branch commit for this CI change: `84945d4049ad82df8bd355caaff3f7d81cd4e112`.
+- This change is on the foundation branch itself. PR #37 (target `v2-live-radar`) should still be eligible under its existing base workflow filter; verify the latest PR #37 head/CI. For PR #38, the base branch now has the correct filter; push a synchronized child-head change after incorporating the base workflow change and verify that a V2 CI run actually starts.
+- No VM, container, DB, source, polling, Telegram, production or deployment state changed.
+
+### Next action
+Synchronize the changed CI workflow and foundation handover additions into `work/source-run-telemetry` without dropping its telemetry log, then update the child head to trigger PR #38 CI. Record exact resulting PR head and workflow result. Do not merge or deploy.
+
+
+## Source-run telemetry slice — 2026-11-05 (implementation; verification pending)
+
+### Scope and branch
+- Created child branch `work/source-run-telemetry` from foundation branch tip `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`, keeping PR #37's scope unchanged.
+- This slice adds durable source-run metadata without changing collector request behavior, schedules, intervals, or notification policy.
+
+### Code changes
+- `v2/radar.py`: added nullable `source_runs` fields for run ID, outcome, duration, error type, HTTP status, Retry-After seconds, and cooldown seconds, with backward-compatible `_ensure_column` migrations.
+- `record_run` now persists a run ID, outcome and monotonic duration.
+- `run_source` records UUIDs, preserves partial job counts if later processing fails, and detects LinkedIn 429 events caught inside the collector by comparing the process rate-limit generation at start/end.
+- A collector run which returns jobs and then encounters HTTP 429 is reported as `partial_rate_limited`, not a clean success.
+- LinkedIn runtime cooldown and parsed Retry-After state is preserved after failures rather than being dropped when the runtime status object is replaced.
+- Stored source-run error text is normalized to an HTTP status or exception class, not the full exception string/URL. Source status now exposes run ID, outcome, duration, error type, HTTP status, Retry-After and cooldown metadata.
+- `v2/test_radar.py`: added tests for legacy schema migration, structured source status and 429 after partial results. Updated source-run fixtures for the new columns.
+
+### Verification and boundaries
+- Static inspection completed. Tests have not yet been executed on this branch; CI is pending PR creation. Do not claim these tests pass until a run is confirmed.
+- No Oracle VM command output was received for this slice. No application runtime, database, Docker, Telegram, source scan, polling interval, source enablement or deployment was changed.
+- Per-request/per-target attempts, request counts, board-level partial-success counters and stage timing are not yet implemented. Cooldown remains in-memory; persistence across process restarts is not part of this slice.
+- PR #37 remains separate; PR #35 remains separate.
+
+### Next action
+1. Create draft PR #38 from `work/source-run-telemetry` into `work/job-intelligence-foundation` to run CI without expanding PR #37.
+2. Verify CI on the exact PR head and fix failures on this child branch.
+3. Review the migration and partial-429 tests before merging. Do not deploy or change live polling.
+
+### Continuation
+- Active feature branch: `work/source-run-telemetry`, child of `work/job-intelligence-foundation`.
+- Fresh chat: use `docs/AGENT_CONTINUATION_PROMPT.md` followed by the latest sanitized command output, then read this latest handover entry.
+
+
+## Telemetry CI failure analysis and first fixes — 2026-11-05
+
+### Validation run evidence
+- Validation-only PR #39 targeted `v2-live-radar` to use the existing default-branch workflow filter, and ran V2 CI run #1134 / ID `42077545562` on head `e60ff2529921bda6509d415fe58c530046193c29`.
+- Dependency installation, Python compilation, and focused router/extractor tests all passed. The full V2 unittest suite failed after running 141 tests: 1 error and 1 failure.
+- Error: `SourceRegistryApiCoverageTests.test_source_status_includes_every_registered_collector` failed with `sqlite3.OperationalError: no such column: sr.run_id`. One manually-created `source_runs` fixture used the old schema while the source-status API now selects the new telemetry fields.
+- Failure: `SourceStatusPersistenceTests.test_run_source_persists_sanitized_429_and_preserves_cooldown` expected a hard-coded `2026-11-05T10:10:00+00:00`, but the test runner's clock was around 17:54 UTC. The implementation correctly computes a near-future time from `now() + cooldown`; the test expectation was time-zone/time-of-day dependent.
+
+### Corrective commit
+- Updated the remaining legacy `source_runs` test fixture to include the nullable telemetry columns.
+- Changed the cooldown test to parse the returned expiry and assert that the remaining interval is within 598–600 seconds, instead of comparing to a fixed date/time.
+- Code/test commit: `78a95a2e8b6ea42b933ccd855eda6e64036bda2d` on `work/source-run-telemetry`.
+- These are test fixes based on the observed CI failures. The corrected branch has not yet been tested; do not state that the suite passes until the next validation run completes.
+
+### Current verification / safety state
+- PR #38 remains the implementation PR targeting `work/job-intelligence-foundation` and is still draft. Its trigger does not run from the default `main` branch workflow because that workflow filters PR target branches to `main` and `v2-live-radar` only.
+- PR #39 remains a validation-only draft PR to `v2-live-radar`; its branch must be advanced to the corrected feature commit to trigger the next run. Close it unmerged after recording final CI.
+- PR #37 remains separate. No application runtime, Oracle VM, Docker, DB, config, collector cadence, source enablement, Telegram, secret, or deployment state changed.
+
+### Next action
+1. Advance `validation/source-run-telemetry` to the new feature commit `78a95a2e8b6ea42b933ccd855eda6e64036bda2d` using a non-force fast-forward ref update (confirm the old validation branch SHA first).
+2. Poll the new V2 CI run, inspect all outcomes and rerun/fix as needed.
+3. Update both handovers and continuation prompt with the exact tested head/result; close PR #39 unmerged only after verification. Keep PR #38 open/draft pending review.
+
+
+## Telemetry CI second run and remaining fixture correction — 2026-11-05
+
+- Validation PR #39 V2 CI run #1135 / ID `42077890037` tested head `b97a6ca0abbd450129f62f3730ab74edac19ad4f`.
+- Dependency installation, syntax compilation, focused router/extractor tests passed. Full suite ran 141 tests and had **1 error, 0 failures**.
+- The variable-clock cooldown assertion is now passing. The new `partial_rate_limited` test, legacy schema migration test, structured source-status test and sanitized 429 persistence test also passed.
+- Remaining error: `SourceRegistryApiCoverageTests.test_source_status_includes_every_registered_collector` still had a legacy fixture without the new telemetry columns. The prior correction had updated the similarly shaped migration-test fixture instead of this specifically located source-registry fixture.
+- Corrected the fixture in commit `701df0b2c8dc11403cd5e7a48390c4b0479c20f8` on `work/source-run-telemetry`. This commit has not yet been tested. Advance `validation/source-run-telemetry` and rerun PR #39 CI on the resulting exact head.
+- No code/runtime/config/VM/DB/Docker/Telegram/polling/source enablement/deployment changes outside the test fixture. PR #38 remains the implementation PR; PR #39 remains validation-only and should be closed unmerged after final CI.
+
+
+## Telemetry slice CI verified — 2026-11-05
+
+- After correcting the last source-registry fixture, V2 CI run #1136 / ID `42078168015` completed successfully on commit `997235c658177b17fc2f9257e039d171841e617b` (validation-only PR #39, base `v2-live-radar`).
+- Confirmed workflow steps: dependency installation passed; Python compilation passed; focused router/extractor tests passed; full V2 unittest suite passed. The job log reports **141 tests in 17.071s — OK**.
+- New telemetry tests passed: legacy `source_runs` schema migration, sanitized 429 persistence/cooldown, partial-result-plus-429 classification, and structured `/api/source-status` output. The source-registry all-collector status fixture also passed after its schema correction.
+- First validation run #1134 (ID `42077545562`) had 2 test issues; second run #1135 (ID `42077890037`) had 1 remaining stale fixture; both failures and fixes are retained in the prior sections. Run #1136 is the successful final verification.
+- Validation PR #39 is only a CI vehicle because default `main` filters PR events to `main` and `v2-live-radar`. Close #39 **unmerged** after this log update. Implementation PR #38 remains open/draft into `work/job-intelligence-foundation`; it contains the code/test change from the tested commit. Subsequent handover-only commits may advance PR #38's HEAD, but the application/test files are unchanged from the successfully tested commit.
+- Successful code/test head: `997235c658177b17fc2f9257e039d171841e617b`. The handover/knowledge-transfer updates in this section are documentation-only and occur after this validation.
+
+### Remaining limitations and next engineering task
+- This is **phase 1** only: one persisted record per source run, run ID/outcome/duration and coarse HTTP 429 metadata. It does not count individual requests/targets, parse per-target success/partial failure, record stage-by-stage processing times, or persist rate-limit cooldown across restart.
+- Current LinkedIn cooldown behavior and request pacing are unchanged. No Oracle VM, production/dev runtime, DB volume, Docker, config, Telegram, source scan, secret, polling frequency or deployment change occurred.
+- Next: review PR #38 and the source-run contract; then design the next telemetry slice for per-target/request attempts and fetched/parsed/rejected/new/updated/duplicate counts, with sanitized errors and source isolation. Continue with tests first; do not increase request volume or add durable cooldown until restart semantics are explicitly designed.
