@@ -177,3 +177,8 @@ Current PR/CI verification when this note was written:
 ## Latest engineering continuation — 2026-11-05
 
 A separate source-run telemetry slice is in progress on child branch `work/source-run-telemetry`, based on foundation commit `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`. It extends SQLite `source_runs` with run IDs, outcomes, durations, error type, HTTP status, Retry-After and cooldown metadata; detects LinkedIn 429 even when partial jobs are returned; preserves runtime cooldown state; sanitizes stored errors; and exposes the new fields through `/api/source-status`. Tests were added for legacy schema migration, source status output and partial 429 results. Verification is still pending. Read the latest section of `docs/JOB_RADAR_HANDOVER.md`; open draft PR #38 into `work/job-intelligence-foundation` to run CI. Do not change polling or deploy. The generic fresh-chat prompt is `docs/AGENT_CONTINUATION_PROMPT.md`.
+
+
+## Verification checkpoint — 2026-11-05
+
+The first source-run telemetry slice has now passed V2 CI. Validation-only PR #39 run #1136 / ID `42078168015` passed on code/test commit `997235c658177b17fc2f9257e039d171841e617b`; syntax, focused router/extractor tests and full suite **141 tests in 17.071s — OK**. Earlier failed runs #1134/#1135 exposed test fixtures which are now fixed. PR #38 remains the actual draft implementation PR targeting `work/job-intelligence-foundation`. PR #39 is only a CI validation vehicle to `v2-live-radar` and should be closed unmerged. Read the latest handover section for exact history. Application/runtime behavior, VM, DB, Docker, polling, source enablement, Telegram and deployment remain unchanged.
