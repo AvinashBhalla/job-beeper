@@ -2473,3 +2473,35 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Then manually use one public browse control (prefer a filter that changes the URL) with Network Preserve log enabled and export a sanitized HAR. Do not submit forms that create accounts, alerts or applications.
 - If additional source analysis is needed, inspect public-page script source only within the normal page scope, and focus next on the hiring-this-week page's loaded scripts rather than re-running the detail-page bundle analysis.
 - No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed.
+
+
+## JobBeeper public hiring feed — inspection findings (2026-11-05)
+
+### Evidence record
+- Route/title: `/browse/hiring-this-week` — `Who is hiring this week — JobBeeper`.
+- REA evidence ID: `ev_ab4ed5862048380655d9421dbfeccd63eb35f12e9a877546a181ada8e6a1635a`.
+- One-second passive inspection: DOM 1,175 nodes; accessibility tree 545 nodes.
+
+### Observed page structure and exposed data
+- Two main content sections: `Top hiring companies` and `Freshest openings`.
+- The companies section exposes 20 company links and live-opening counts. Sample snapshot: Domino's 844; Accenture India 413; jobgether 263; CVS Health 194; Winners Merchants International, L.P. 166.
+- The page reports 5,873 active companies and 20,000 recent public openings, with an explicit caveat that the 20,000 figure is a sample and counts describe that sample rather than the whole market.
+- The freshest section labels the set `Latest 20` and exposes 20 job detail links. Card labels contain title, company, and location. Examples include Motive's Senior Product Manager, Growth (Hybrid - Bangalore), Motive's Senior Product Designer (Bangalore, India), and New Relic's Software Engineer 1 (Hyderabad, India).
+- Job-detail URLs follow `/j/{job-id}-{slug}`; the 20 captured IDs run 28757581 through 28757562. Treat that as one observed sample only.
+- Company links follow `/browse/company/{slug}`.
+- Browse navigation includes Companies, Hiring this week, Backend, Frontend, and Data.
+- The capture contains no INPUT, SELECT, or FORM elements. The accessibility tree exposes one button, `Color theme: System`. No visible keyword/location/experience/type filters, sort control, or pagination/load-more control was found on this page.
+- Salary, experience, source/ATS, and posted-age values are not present in the public job-card accessibility labels. Do not infer they are absent from canonical job data.
+- Scripts loaded: `/static/jobpage.js` (2,653 bytes), `/static/publicpage-theme.js` (2,842 bytes), `/static/publicpage-ui.js` (5,259 bytes).
+
+### Limitations and interpretation
+- Values and company counts are dynamic page snapshots, not fixed product specifications.
+- This REA capture started after page load. Its zero network requests are not evidence that the initial page load made no requests.
+- A separate earlier sanitized HAR across the browse, company, and job-detail pages recorded no same-origin JSON API calls for those specific page loads; this is still bounded evidence, not a universal claim about all states/routes.
+- HTML-delivered/server-rendered public content is plausible, but not proven solely by the present capture.
+- Category links may be curated route pages rather than in-page filters. Their behavior remains untested.
+- Authenticated browse capabilities, ranking, pagination, and hidden job metadata remain unknown.
+
+### Next exact evidence to collect
+- Follow only the public `Backend` category link (`/browse/role/backend`) with DevTools Network Preserve log enabled. Compare URL, content, job-card fields/count, and navigation; export a sanitized HAR. Do not create alerts, accounts, or applications.
+- No application code, configuration, server runtime, database, collectors, Telegram settings, or deployment were changed.
