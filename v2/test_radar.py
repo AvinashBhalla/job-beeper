@@ -366,7 +366,7 @@ class MatcherTests(unittest.TestCase):
         details = match_details(
             make_job(
                 "Product Engineer",
-                "Work with software engineers to build Python services.",
+                "Work with a software engineer to build Python services.",
                 "Bengaluru, India",
             ),
             config,
