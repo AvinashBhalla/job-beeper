@@ -5321,3 +5321,36 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Next exact investigation step
 - Manually test only the `Search Backend roles` field with a unique short term already visible in a card (e.g. `Cognizant`) while DevTools Network Preserve log is enabled. Observe whether the visible count/cards change immediately, whether URL changes, and whether any request is sent. Do not submit location yet; isolate the search behavior first.
 - After that, test the `City, country, or remote` form with a grounded location only if necessary, recording the URL, visible count/cards, and HAR. Do not create alerts, accounts, or applications. No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls, or deployment were changed by this inspection.
+
+
+## Backend search interaction and research-to-build decision — 2026-11-05
+
+### OBSERVED — search interaction
+- New REA evidence ID: `ev_fdb8b7bbb29e59ff3bb337775db569496bdb1d4df043e0108461bd84e9a9988a`; capture at `2026-11-05T11:33:01Z`; same Backend public route.
+- Searchbox is focused and its accessible value is `Cognizant`.
+- The DOM still contains 200 job-card anchors marked `data-filter-item`; 199 carry the `hidden` attribute and one remains visible.
+- The visible matching item is `Engineering Manager Cognizant · Bengaluru, Karnataka, India (Hybrid)`.
+- Page count text retains `200 found`, while the dynamic filter-count text is `1 role`.
+- The search interaction's DOM state therefore demonstrates filtering among the 200 already-rendered cards. This is strong evidence of client-side filtering of the loaded preview, not a fresh query across the complete job corpus.
+- REA observation started after the interaction; no prior network activity is available. The capture reports no requests during its short 1-second observation, but cannot prove no request was issued during the keypress before capture began.
+
+### Research boundary / conclusion
+- Public UI + sanitized HAR have established the public browse surfaces, a 20-card Hiring-this-week preview, a 200-card role-category preview, role-page search behavior, a location form, public HTML delivery, shared page scripts, and a one-hour public HTML cache header observed on the Backend route.
+- JobBeeper's private collection architecture is not exposed by these observations. The public pages do not reveal scheduler design, worker count, queue, source credentials/agreements, per-source rate limits, source fetch intervals, retry policy, or database/index architecture. These are UNKNOWN, not inferable from a fast UI.
+- Public JobBeeper claims (homepage as reviewed 2026-11-05): it checks LinkedIn, Naukri, Workday and company career pages; sources presented include Greenhouse, Lever and Ashby; its site says availability and detection times vary by source. Treat stated coverage numbers and per-job discovery-time displays as vendor claims/snapshots, not independently verified measurements. Do not assume it avoids rate limits.
+- Important distinction: fast public page render/search is not proof of fast upstream collection. The captured role page already contains 200 result cards, and its search hides/show cards locally. Public HTML caching and precomputed/rendered results can explain the fast UI independently of how frequently sources are polled.
+
+### Decision: stop open-ended JobBeeper reverse engineering and begin product development
+- Do not block our product on discovering JobBeeper's private backend. Exact internal architecture is not recoverable from public browser evidence. Keep any later reverse engineering narrowly targeted to a specific unresolved product decision.
+- Existing Job Radar v2 remains the foundation; preserve it and extend it incrementally rather than replacing it. Current documented foundation: FastAPI, SQLite, Docker on Oracle VM, separate source collectors, Telegram notifications, and dashboard APIs. Reconfirm actual checkout/runtime state before first code change; this documentation alone is not a production health check.
+- Start with a short architecture/PRD baseline for a reliable ingestion system:
+  1. Source registry and capability contract per adapter: canonical source, endpoint/feed/page type, allowed access method, poll interval, concurrency, freshness expectation, last success, last error, retry/backoff, rate-limit state.
+  2. Per-source scheduler with jitter, bounded concurrency, host-level request budgets, conditional requests where supported (ETag/If-Modified-Since), incremental cursors, and 429/Retry-After-aware exponential backoff. Respect provider policies; no login bypass, CAPTCHA bypass, proxy/account rotation or rate-limit circumvention.
+  3. Collect → retain raw evidence → normalize canonical job → deduplicate/merge → upsert → classify/match → notify. Keep source-specific raw provenance for audit and reparsing.
+  4. Explicit freshness/latency metrics: source-published time (when supplied), first-seen time, last-seen time, collection lag, processing lag, notification lag, run duration, status/429 counts, and stale/closed detection. Do not conflate UI latency with ingestion latency.
+  5. Source priority: stable public ATS endpoints/feeds and official career-page integrations first; compliant partner/provider APIs or board integrations next; less stable public pages only where permitted and operationally justified. Evaluate LinkedIn/Naukri access paths separately rather than making them a critical dependency for all other collectors.
+- Phase order: (A) read-only repo and production baseline; (B) source inventory + adapter contract + end-to-end sequence diagram; (C) PRD/acceptance criteria; (D) implement instrumentation and one reliable new adapter end to end; (E) expand adapters and matching; (F) referral intelligence after discovery and notification reliability are measured.
+- No implementation changes were made as part of this research update.
+
+### Next exact development step
+- Perform a read-only audit of the current `v2-live-radar` checkout and Oracle runtime, confirm exact commit, enabled collectors, real per-source scan/last-success/429 state, DB counts, and Telegram configuration presence (never reveal secrets). Use the previously supplied read-only Oracle diagnostic command. Then produce a source inventory/architecture baseline from current code before editing.
