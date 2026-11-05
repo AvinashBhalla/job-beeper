@@ -294,3 +294,46 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - The feature worktree `/tmp/job-radar-naukri-location-v3` currently has pending documentation modifications and untracked matcher benchmark files. Preserve these; inspect `git status` before staging.
 - Production remains a separate release gate. Do not pull, rebuild, restart, migrate or send production notifications as part of multi-user implementation planning.
 - Termalin encrypted backup job remains DRAFT; local verified snapshots do not mean an off-host encrypted backup exists.
+
+## 11. Read-only tenant-readiness audit — 2026-11-06
+
+The following was verified against the feature worktree and the live development SQLite schema. This is a code/schema inventory, not a migration.
+
+### Current tables and ownership
+- Live dev tables: `jobs`, `canonical_opportunities`, `job_evaluations`, `notification_ledger`, `source_runs`, `gemini_shadow_cache`, plus SQLite's `sqlite_sequence`.
+- No table currently contains a `user_id` column; there are no `users`, `sessions`, `user_preferences`, `telegram_connections` or application/contact tables.
+- `job_evaluations` is keyed by `job_id`; it stores one global match decision per job.
+- `notification_ledger` is keyed by `canonical_opportunity_id`; it stores one global notification decision per opportunity.
+- `source_runs`, `jobs`, `canonical_opportunities` and `gemini_shadow_cache` are naturally shared/system-level data and should remain so unless a later privacy requirement says otherwise.
+
+### Current config/auth boundary
+- Candidate preferences and runtime flags are loaded from one global `/data/config.json` (or the configured DB parent) through `get_config()` and `save_config()`.
+- The backend creates/reads one global config token from `JOB_RADAR_CONFIG_TOKEN` or `/data/config_token`; `PUT /api/config` requires `X-Config-Token`.
+- `GET /api/config` currently returns the global config without user authentication. Protect this before external beta access; it can disclose the current candidate profile and system settings.
+- The frontend stores the config token in browser `sessionStorage`. This is not a user session and must be retired after cookie-session auth is implemented and tested.
+- There are no login, logout, current-user, signup/invite, session-refresh, password-reset or role-management routes in the current API.
+
+### Current Telegram boundary
+- `v2/telegram.py` obtains both `JOB_RADAR_TELEGRAM_BOT_TOKEN` and one global `JOB_RADAR_TELEGRAM_CHAT_ID` from process environment.
+- `credentials_available()` requires both global values. `_claim_one()` selects from the global `notification_ledger` and joins the global `job_evaluations`; delivery has no user dimension.
+- The notification worker and source-triggered delivery call this shared module. Per-user fan-out therefore requires a redesigned claim/query/delivery contract, not just adding a chat ID field to the UI.
+
+### Current applied-job boundary
+- The dashboard's Applied Jobs feature is stored in browser `localStorage` under `job_beeper_applied_jobs_v1`; it is not persisted in SQLite or associated with a server account.
+- This means applied state is browser/device-specific today. Before the referral workflow, migrate it to an authenticated server-side `applications` table, preserving a safe export/import path for the existing browser data.
+
+### API surface to protect and scope
+Current API routes include `/api/config`, `/api/jobs`, `/api/opportunities`, `/api/opportunities/{id}`, `/api/jobs/{id}`, `/api/notification-queue`, `/api/daily-summary`, `/api/source-status`, `/api/latency-summary`, `/api/dedupe-candidates` and `/api/llm-shadow-status`, plus `/health`.
+- User-facing job/feed/detail routes must join the authenticated user's evaluation and saved/application state.
+- Global operational routes (health, source status, latency, LLM diagnostics, dedupe) should be admin-only or return a deliberately sanitized public subset. Do not expose global source internals or another user's diagnostics to ordinary accounts.
+- Configuration must be split into user preferences and admin-only system/source configuration. Do not keep returning the full global config to ordinary users.
+
+### First implementation cut suggested by this audit
+1. Add auth/session dependencies and role guards without changing collector behavior.
+2. Add `users`, `sessions` and `user_preferences`; bootstrap the existing owner/admin and backfill their current global preferences.
+3. Protect config and operational routes; move candidate config reads to an explicit user context.
+4. Add `user_job_evaluations` and `user_notification_ledger`; keep shared ingestion unchanged.
+5. Replace the single chat ID with `telegram_connections` and per-user delivery claims.
+6. Move Applied Jobs from browser localStorage to an `applications` API, with a one-time client-side import/export transition.
+
+Do not combine this with a production database migration. Build and test on a copy of the isolated dev DB first, with Telegram delivery disabled.

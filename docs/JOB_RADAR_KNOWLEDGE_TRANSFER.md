@@ -3019,3 +3019,11 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Draft PR #44 targets `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/44. Do not merge to `main` or deploy production. GitHub `syntax` check was still in progress at the first post-create check; re-check before claiming CI pass.
 - Exact feature branch worktree remains `/tmp/job-radar-naukri-location-v3`; ordinary checkout `/home/ubuntu/job-beeper-dev` remains stale/protected and must not be reset/cleaned/overwritten. Dev image code hashes still match the feature worktree; no recreate occurred for this PR/docs operation.
 - Local verification: 149 V2 tests passed in 18.723s in a throwaway Docker container with networking disabled; benchmark-focused tests 2/2 passed; benchmark seed reports 4/4 scored examples pass and one unresolved review-only example.
+
+## 2026-11-06 — Multi-user readiness audit findings
+- Live dev schema currently has only shared/system tables: `jobs`, `canonical_opportunities`, `job_evaluations`, `notification_ledger`, `source_runs`, `gemini_shadow_cache`; no `user_id` columns or users/sessions/preferences/application tables.
+- Global `job_evaluations(job_id)` and `notification_ledger(canonical_opportunity_id)` must be replaced/augmented with user-scoped evaluation and notification records before multi-user alerts.
+- One global `/data/config.json` and global `X-Config-Token` protect `PUT /api/config`; `GET /api/config` currently returns config without auth. Protect it before beta. No login/session/role API routes exist. Dashboard stores the token in sessionStorage.
+- Telegram delivery uses one global bot token + one global chat ID from environment; delivery claims the global ledger. Implement per-user Telegram linking and a user-scoped delivery worker.
+- Applied Jobs is currently browser localStorage (`job_beeper_applied_jobs_v1`), not server-side. Migrate to user-owned `applications` before referral intelligence.
+- Full read-only inventory, API scoping recommendations and first implementation cut are in section 11 of `docs/MULTI_USER_AND_REFERRAL_ROADMAP.md`.
