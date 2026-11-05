@@ -2865,3 +2865,10 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Local backup prep remains valid: snapshot service and daily 02:45 UTC timer installed; both SQLite online snapshots passed integrity checks; all 9 checksum manifest entries verified. No encrypted off-host archive exists yet.
 - No production application or database was changed by this confirmation troubleshooting. No container restart/build, config mutation, source activation, or notification send. Keep production and dev services untouched.
 - Next agent must first call `backup_list` before attempting `backup_create`; only execute first archive after Termalin reports job status is confirmed (not DRAFT). After run, verify archive result and size with `backup_list`.
+
+
+## 2026-11-06 follow-through — rechecked backup draft after user retry
+- User asked to check again after reporting that the Confirm button appeared disabled/stuck. Re-read the latest handover and knowledge-transfer instructions first, then queried Termalin `backup_list` for host `job-radar`.
+- Authoritative status is unchanged: `Job Radar production and dev daily backup` (`ae51ea55-d396-417e-8792-8ddfc1cd66c7`) remains `DRAFT, waiting for the owner to confirm`; recent archives: none. No encrypted backup has run.
+- Do not call `backup_create` until `backup_list` reports a confirmed/active backup job. Do not create a duplicate draft. Owner should retry same draft link in a fresh tab/session or inspect visible inline errors; confirmation appears to remain client-side/UI-pending even after click. Link: `https://termal.in/account#backup-draft=ae51ea55-d396-417e-8792-8ddfc1cd66c7`.
+- Local snapshot system remains established and previously verified: daily timer at 02:45 UTC; consistent production/dev SQLite snapshots passed integrity checks; checksum manifest verified. Encrypted off-host backup is still pending.
