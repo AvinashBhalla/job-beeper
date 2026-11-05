@@ -5287,3 +5287,37 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Next exact investigation step
 - Keep Chrome on `https://jobbeeper.com/browse/role/backend`; rediscover its target ID with `list-browser-targets` and run `inspect-web-page` with `--include-accessibility-text --observation-ms 1000 --json`. Compare the visible Backend card count, titles, companies, locations, controls, links and ordering with the prior `/browse/hiring-this-week` capture.
 - Only after the DOM comparison, choose one clearly visible public navigation/control for a second controlled test. Do not create alerts, accounts, or applications. No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls, or deployment were changed by this investigation.
+
+
+## Backend category DOM inspection — 2026-11-05
+
+### OBSERVED
+- REA evidence ID: `ev_c220ac81730bb00fc4720d535b3e1f69a40f858cb7c423e0d63ba7a6933a04a0`; target remained `https://jobbeeper.com/browse/role/backend`, title `Latest Backend jobs | JobBeeper`.
+- 1-second accessibility capture; 3,797 DOM nodes and 2,057 accessibility nodes.
+- Page headline: `Fresh Backend roles, without the noise.`; section heading: `Latest Backend openings`; supporting text says the shortlist is ordered by freshness.
+- Result count displayed: `200 found`; `200 roles`. The page explicitly states: `Showing the latest 200 public results, up to 200. Search filters this displayed list.`
+- Exactly 200 accessible job links share one result-list parent. Each link's accessible name exposes job title, employer, and location, and includes work-mode text such as Remote, Hybrid, or On-site when available. Detail links follow `/j/{id}-{slug}`.
+- Search field: accessible role `searchbox`, label `Search Backend roles`; corresponding DOM input has `data-filter-input`. Each of the 200 job anchors has `data-filter-item` and `data-filter-text`. This markup aligns with the page's own statement that search filters the displayed list.
+- Separate location form: one `FORM` with a searchbox labelled `City, country, or remote` and a button labelled `Filter location`. Form action resolves to the same Backend route. No behavior of the location submit was tested.
+- Accessibility tree exposes no sort selector or pagination/load-more control. Accessible buttons are `Filter location` and `Color theme: System`. Searchboxes are the role-search and location fields.
+- This is unlike the `/browse/hiring-this-week` public snapshot, which had a `Latest 20` set without visible search or location forms. Backend category route exposes a 200-result public set.
+- The 200 Backend entries are not all clearly Backend-specific based on their visible titles. Examples in the captured first 20 include `Actuarial Internship Program 2027`, `DSRD Global Pathology Quality Control Scientist`, and `Frontend Software Developer`. Additional visible entries farther in the 200-card sample include Chemistry Expert, Mathematics Specialist, Biology Researcher, and Population Health Informaticist. This is direct evidence of category relevance noise in this snapshot, not proof of how the category was assigned.
+- Page category and card metadata are public preview values. No job age, salary, explicit experience, or ATS/source label was found in the accessible job-card names; this does not establish that those fields are absent from hidden/server-side job records.
+- The separate one-second REA capture began after load; network request list is empty with prior activity unavailable. The earlier sanitized HAR remains the bounded network evidence: HTML route, shared first-party scripts, no first-party JSON/XHR/API request in that capture.
+
+### INFERRED — confidence bounded by DOM structure
+- Client-side in-list search is strongly indicated by the `data-filter-input` field, 200 `data-filter-item` anchors, and explicit text saying search filters the displayed list. Treat it as filtering the loaded 200-result DOM list until a controlled interaction shows otherwise; do not assume it searches the whole JobBeeper corpus.
+- Location selection appears to be a separate form submission to the same category URL, likely a server/navigation filter, but actual query parameters and result behavior remain untested.
+- The page appears to use a fixed public preview cap of 200 results. Pagination or deeper public retrieval is not exposed in this capture.
+- Role category should be treated as a noisy discovery bucket rather than a strict normalized job family until precision is measured.
+
+### UNKNOWN / not established
+- Actual search matching logic (title only vs title/company/location/full card), debounce behavior, clear/reset behavior, and whether search state changes the URL.
+- Location input autocomplete/suggestion mechanism, allowed values, form method/query parameters, and the resulting URL/result set after submit.
+- How the 200 results are selected and ranked beyond the page's freshness claim; whether older roles are reachable on a later page or in an authenticated session.
+- Whether any further sort/pagination controls are available outside the captured public state.
+- How category assignment works and why visibly non-backend roles are included.
+
+### Next exact investigation step
+- Manually test only the `Search Backend roles` field with a unique short term already visible in a card (e.g. `Cognizant`) while DevTools Network Preserve log is enabled. Observe whether the visible count/cards change immediately, whether URL changes, and whether any request is sent. Do not submit location yet; isolate the search behavior first.
+- After that, test the `City, country, or remote` form with a grounded location only if necessary, recording the URL, visible count/cards, and HAR. Do not create alerts, accounts, or applications. No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls, or deployment were changed by this inspection.
