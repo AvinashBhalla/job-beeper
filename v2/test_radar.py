@@ -340,6 +340,16 @@ class MatcherTests(unittest.TestCase):
         self.assertGreaterEqual(details["score"], 55)
         self.assertIn("javascript", " ".join(details["reasons"]).lower())
 
+    def test_matcher_rules_version_changes_evaluation_fingerprint(self):
+        baseline = radar._config_fingerprint(BASE_CONFIG)
+        with patch.object(
+            radar,
+            "MATCHER_RULES_VERSION",
+            radar.MATCHER_RULES_VERSION + 1,
+        ):
+            upgraded = radar._config_fingerprint(BASE_CONFIG)
+        self.assertNotEqual(baseline, upgraded)
+
     def test_description_role_mention_does_not_match_non_engineering_title(self):
         config = {
             **BASE_CONFIG,
