@@ -2701,3 +2701,39 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### LinkedIn latency precision clarification
 - In `normalize_job`, `discovery_latency_seconds` is only populated when `posted_precision == "minute"`. Therefore the 363 production samples in the 24-hour report are minute-precision posting timestamps, not date-only postings. They are a useful baseline subset, subject to source timestamp-label accuracy.
 - The p50/p90 delay cannot be attributed solely to polling cadence; target rotation, source indexing, and collection success each need separate telemetry.
+
+
+## Latest Docker/SQLite audit results — 2026-11-05
+
+### Container separation
+- `sudo docker` succeeded; two containers are running.
+- Dev: `job-radar-dev`, image `job-radar-dev-radar`, port 8001 -> container 8000, up 2 weeks, named data volume `job-radar-dev_radar-dev-data:/data`.
+- Prod: `v2-radar-1`, image `v2-radar` (docker ps abbreviated ID `97368934ed14`), port 8000 -> container 8000, up 3 weeks, named volume `v2_radar-data:/data`.
+- Named volumes are distinct, so SQLite data is isolated at Docker-volume level.
+- Dev config file is also mounted at `/app/v2/config.json`; host source path was omitted by the mount-format command. Use read-only docker inspect with Type/Source/Destination if needed.
+
+### DB snapshot — two values were pasted; keep both
+**First pasted set**
+- Dev: 7,152 jobs, 7,152 canonical opportunities, 7,152 evaluations, 7,152 ledger, 7,052 source runs, 500 Gemini cache; Naukri 7,152; pending 18, suppressed 7,134; DB 33,128,448 bytes.
+- Prod: 19,795 jobs, 19,486 canonical, 19,795 evaluations, 19,486 ledger, 20,564 source runs; LinkedIn 11,785, Naukri 8,010; failed 10, sent 1,379, suppressed 18,097; DB 67,866,624 bytes.
+
+**Second/later pasted set (latest visible)**
+- Dev: 7,134 jobs, 7,134 canonical opportunities, 7,134 evaluations, 7,134 ledger, 7,026 source runs, 500 Gemini cache; Naukri 7,134; pending 18, suppressed 7,116; DB 33,046,528 bytes.
+- Prod: 19,751 jobs, 19,442 canonical, 19,751 evaluations, 19,442 ledger, 20,495 source runs; LinkedIn 11,759, Naukri 7,992; failed 10, sent 1,378, suppressed 18,054; DB 67,719,168 bytes.
+
+The two sets differ and lack timestamps. Do not silently treat them as a confirmed time series or assume data loss. Repeat a read-only count if exact current values matter.
+
+### Combined runtime facts
+- Production port 8000: healthy; v2.0.0; config v10; LinkedIn/Naukri enabled; notifications enabled. Daily summary 450 discovered / 30 matched / 30 alertable / 30 sent. LinkedIn latency n=363, p50 29 min, p90 4h, max 6h.
+- Development port 8001: healthy; v2.0.0; config v11; Naukri only; notifications disabled. Daily summary 153 discovered / 4 matched / 0 alertable / 0 sent.
+- Prod DB contains LinkedIn and Naukri only. Dev DB contains Naukri only.
+- Prod notification ledger's later values: 1,378 sent, 10 failed, 18,054 suppressed. Dev: 18 pending, 7,116 suppressed. Do not point dev to production Telegram credentials.
+
+### Git/runtime safety
+- Prod checkout clean but 19 commits behind remote, commit `61d8271480eaf48b0a6442b62b1b0bb9a032df34`.
+- Dev checkout 8 commits behind, commit `296c1a4d261d4a6fe7b3dc2c791c7d159f9cb135`, dirty modified `v2/config.json`, untracked `.env.save` and `.venv/`.
+- No pull/reset/clean/rebuild/restart/deploy. No config replacement or deletion of local dev state.
+- Docker permission issue was resolved with sudo for read-only commands; do not weaken socket permissions.
+
+### Immediate next step
+Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and implement telemetry/source registry improvements in a new isolated slice. First add per-query target attempt/success/failure/429 and processing/notification lag metrics. Do not increase LinkedIn request rate or attempt circumvention. Select one validated ATS adapter for a dev-only canary with notifications off.
