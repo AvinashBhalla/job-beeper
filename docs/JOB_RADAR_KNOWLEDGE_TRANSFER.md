@@ -2838,3 +2838,11 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Code/test blobs match the green validation versions exactly: radar `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; tests `0f33aae175d69a5c59291894e351535740003651`. V2 CI run #1136 / ID `42078168015` passed all steps and full suite (141 tests in 17.071s — OK). PR #40 itself has no workflow run because default `main` only triggers PRs targeting `main`/`v2-live-radar`; the separate validation PR #39 is closed unmerged after its pass.
 - Old PR #38 closed unmerged. PR #37 remains separate open/draft/unmerged at head `689130ab6d39061a9a69fdd8349aeb060bf52beb`. No runtime/VM/deployment change.
 - Next: review phase 1; design request/target-level telemetry and ingest counters with tests, no increase in source request volume. Full record in latest `JOB_RADAR_HANDOVER.md` section. Generic prompt points to clean branch.
+
+
+## Latest status check — 2026-11-05 18:20 UTC
+
+- PR #40 is open/draft/unmerged/mergeable. Branch `work/source-run-telemetry-clean` is 14 commits ahead and 0 behind foundation head `689130ab6d39061a9a69fdd8349aeb060bf52beb`; observed head before this append `bb84b3048217c618652ffc797e2d9691fdb2383b`.
+- App/test blob SHAs remain exactly the versions validated by V2 CI run #1136: radar `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; tests `0f33aae175d69a5c59291894e351535740003651`; 141 tests passed. Subsequent changes were documentation only.
+- Generic prompt points to active clean branch. PR #38/#39 closed unmerged; PR #37 remains draft. No application/runtime/deployment change.
+- Re-check current PR head after this docs commit. Full record in latest detailed handover section.
