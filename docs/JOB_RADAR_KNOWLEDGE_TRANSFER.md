@@ -2662,3 +2662,13 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Dev/test checkout remains `/home/ubuntu/job-beeper-dev` at `7ebc38b`; user-reported full suite: 136 tests passed. Preserve its modified `v2/config.json`, `.env.save`, `.venv/`, and timestamped backup.
 - Next action: read-only inspection from `/home/ubuntu/job-beeper`: status, branch, HEAD, remotes, fetch `origin/v2-live-radar`, compare commit counts. Do not pull. Never print secrets. Purpose is release-drift analysis only; production runtime and `v2_radar-data` remain untouched.
 - Detailed chronology and continuation prompt: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`.
+
+## Current state — 2026-11-06 — production checkout is 611 commits behind
+
+- Production `/home/ubuntu/job-beeper` (port 8000) is confirmed by user. Read-only audit: clean working tree, branch `v2-live-radar`, HEAD `61d8271480eaf48b0a6442b62b1b0bb9a032df34`; fetch advanced `origin/v2-live-radar` to `f4f61b8d55d6a52c05e1dd9d98510ccea12ad77a`.
+- Commit counts: `0 611` (production-only / remote-only). GitHub compare independently confirms 611 commits ahead, 0 behind, merge base = production HEAD. This is straight-line release drift, not deployment approval.
+- Compare summary reports 22 changed paths, including `v2/config.json` (+15/-3), `v2/radar.py` (+313/-13), `v2/test_radar.py` (+528/-2), CI, dashboard, Compose/dev config, Gemini extractor/diagnostic, LLM router, Greenhouse canary, and docs. Review exact diffs and commit subjects before proposing any release; do not assume branch config should replace live config.
+- Only `git fetch` updated remote-tracking metadata. No pull/checkout/build/restart, production config/env/DB/volume change, source enablement, provider call or notification send.
+- Hard boundary: port 8000 is production; preserve `v2-radar-1` and `v2_radar-data:/data`. No production mutation without reviewed backup/rollback plan and separate explicit deployment approval.
+- Next: read-only review of all 611 commit subjects and critical diffs, especially `v2/config.json`, source/notification settings, `v2/radar.py`, Compose and CI. Then propose a bounded release candidate and backup/rollback plan; do not deploy.
+- Detailed evidence and continuation prompt: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`.
