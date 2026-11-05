@@ -5635,3 +5635,8 @@ done
 - Do not run `git pull`, `git reset`, `git clean`, checkout, compose up/down/rebuild/restart, or source scans.
 - Do not modify `/home/ubuntu/job-beeper-dev/v2/config.json`, delete `.env.save` or `.venv/`, or expose any secrets.
 - PR #37 remains draft; PR #35 remains draft. No code deployment has occurred.
+
+
+### Clarification — LinkedIn latency sample precision
+- Static code review of `normalize_job` confirms `discovery_latency_seconds` is calculated only when `posted_precision == "minute"`. The reported 363 production samples therefore represent minute-precision LinkedIn posting timestamps, not date-only values. The p50/p90 figures are suitable as a baseline for this subset, while still subject to correctness of the source's relative/minute posting label.
+- Do not attribute all of the gap to our scheduler: source indexing/publication delay and the 16-target rotation may both contribute. Per-target attempt/success timestamps and request outcome counts are needed to separate them.
