@@ -2761,3 +2761,9 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Found why PR #38 had no workflow result: `.github/workflows/v2-ci.yml` filtered `pull_request.branches` to `main` and `v2-live-radar`, excluding its base branch `work/job-intelligence-foundation`. Empty status/workflow response was neither pass nor failure.
 - Added `work/job-intelligence-foundation` to the pull-request branch filter on the foundation branch (`84945d4049ad82df8bd355caaff3f7d81cd4e112`). Push filters are unchanged. No runtime changes.
 - Next: synchronize base changes to `work/source-run-telemetry`, push a child-head update and verify CI on PR #38. Preserve the telemetry section and do not merge/deploy.
+
+
+## CI trigger clarification — 2026-11-05
+
+- The default `main` branch workflow filters pull requests to base branches `main` and `v2-live-radar`; a filter edit only on `work/job-intelligence-foundation` does not enable PR #38 CI. The temporary ineffective workflow edit was reverted on the foundation branch (commit `c2e27b17bfa2042045c37900e57f212c3366245a`).
+- Do not change `main` just to enable this stacked PR. Keep PR #38 as the real implementation PR into the foundation branch; create validation-only PR #39 from the exact telemetry head into `v2-live-radar`, run CI using the existing trigger, then close #39 without merging. Record the actual run. No runtime changes.
