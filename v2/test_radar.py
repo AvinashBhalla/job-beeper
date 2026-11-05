@@ -2431,6 +2431,46 @@ if __name__ == "__main__":
 
 
 
+class DedupeCandidatesSourceCoverageTests(unittest.TestCase):
+    def test_dedupe_candidates_includes_ashby_from_collector_registry(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE jobs (
+                            id INTEGER PRIMARY KEY,
+                            source TEXT NOT NULL,
+                            source_job_id TEXT,
+                            company TEXT,
+                            title TEXT,
+                            location TEXT,
+                            url TEXT,
+                            description TEXT
+                        )
+                    """)
+                    conn.executemany(
+                        "INSERT INTO jobs "
+                        "(id, source, source_job_id, company, title, location, url, description) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        [
+                            (1, "linkedin", "li-1", "Acme", "Software Engineer",
+                             "Bengaluru", "https://example.com/jobs/1", "Python"),
+                            (2, "ashby", "ashby-openai-1", "Acme", "Software Engineer",
+                             "Bengaluru", "https://example.com/jobs/2", "Python"),
+                        ],
+                    )
+                payload = radar.dedupe_candidates()
+                self.assertEqual(payload["jobs_considered"], 2)
+                self.assertTrue(any(
+                    {item["source_a"], item["source_b"]} == {"linkedin", "ashby"}
+                    for item in payload["candidates"]
+                ))
+            finally:
+                radar.DB_PATH = original_db
+
+
 class SourceStatusPersistenceTests(unittest.TestCase):
     def _source_status_for_rows(self, rows):
         with TemporaryDirectory() as tmp:
