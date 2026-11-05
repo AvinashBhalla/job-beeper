@@ -2274,3 +2274,12 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - This is the Oracle application host, not the Windows workstation selected for REA/browser investigation. Do not upgrade Node on Oracle just to install REA; the existing Job Radar V2 backend is Python/FastAPI and does not need this change for the planned investigation.
 - Next action: on the Windows development workstation, open PowerShell (not the SSH terminal) and run `node -v; npm -v`. REA requires Node.js 22.23.4+, 24.22.1+ or 26.12.1+. Then follow the reviewed local setup instructions. The previously remembered Windows Node version (26.7.0) is historical and must be rechecked.
 - No VM package installation, Node upgrade, collector run, service restart or application change was performed.
+
+
+## 2026-11-05 — Windows REA Node prerequisite
+
+- User's Windows PowerShell reports Node.js `v27.0.0-alpha.0.0.0`, npm `12.1.0`, executable `C:\\Program Files\\nodejs\\node.exe`. This is a prerelease and is unsupported by REA.
+- Current REA docs require Node 22.23.4+, 24.22.1+ or 26.12.1+ and explicitly exclude prereleases. REA's Windows getting-started guide recommends installing Node 24 LTS with `winget install --exact --id OpenJS.NodeJS.LTS`; see https://morluto.github.io/rea/get-started/.
+- Recommended next step: in a NEW Windows PowerShell session, run `winget install --exact --id OpenJS.NodeJS.LTS`. Reopen PowerShell and verify `node -v`, `npm -v`, and `where.exe node`. Do not uninstall the currently installed Node 27 alpha or manually delete `C:\\Program Files\\nodejs` if winget reports a conflict; capture the exact installer error and assess a version-manager route instead.
+- Do not run the REA installation from the Oracle SSH session; no Node change is required on Oracle for the Python/FastAPI app.
+- No Windows or Oracle installation was performed by the assistant; no application code, server runtime or source config was changed.
