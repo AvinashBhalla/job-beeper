@@ -880,9 +880,18 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
         conn.commit()
     return new_count
 
+# Increment whenever deterministic matching/alertability rules change so
+# persisted evaluations are invalidated and recomputed under the new rules.
+MATCHER_RULES_VERSION = 2
+
+
 def _config_fingerprint(config: dict[str, Any]) -> str:
-    payload = json.dumps(config, sort_keys=True, ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    payload = {
+        "config": config,
+        "matcher_rules_version": MATCHER_RULES_VERSION,
+    }
+    serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(serialized).hexdigest()
 
 
 def _persist_job_evaluation(
