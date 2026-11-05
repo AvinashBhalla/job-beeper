@@ -5736,3 +5736,34 @@ The counts and DB byte sizes decreased between the two pasted snapshots. The cap
 
 ### Continuation
 - For a fresh chat, paste the contents of `docs/AGENT_CONTINUATION_PROMPT.md`, followed immediately by the latest sanitized command output. Then have the new agent read the latest dated entries in this handover and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` before acting.
+
+
+## Source-run telemetry slice — 2026-11-05 (implementation; verification pending)
+
+### Scope and branch
+- Created child branch `work/source-run-telemetry` from foundation branch tip `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`, keeping PR #37's scope unchanged.
+- This slice adds durable source-run metadata without changing collector request behavior, schedules, intervals, or notification policy.
+
+### Code changes
+- `v2/radar.py`: added nullable `source_runs` fields for run ID, outcome, duration, error type, HTTP status, Retry-After seconds, and cooldown seconds, with backward-compatible `_ensure_column` migrations.
+- `record_run` now persists a run ID, outcome and monotonic duration.
+- `run_source` records UUIDs, preserves partial job counts if later processing fails, and detects LinkedIn 429 events caught inside the collector by comparing the process rate-limit generation at start/end.
+- A collector run which returns jobs and then encounters HTTP 429 is reported as `partial_rate_limited`, not a clean success.
+- LinkedIn runtime cooldown and parsed Retry-After state is preserved after failures rather than being dropped when the runtime status object is replaced.
+- Stored source-run error text is normalized to an HTTP status or exception class, not the full exception string/URL. Source status now exposes run ID, outcome, duration, error type, HTTP status, Retry-After and cooldown metadata.
+- `v2/test_radar.py`: added tests for legacy schema migration, structured source status and 429 after partial results. Updated source-run fixtures for the new columns.
+
+### Verification and boundaries
+- Static inspection completed. Tests have not yet been executed on this branch; CI is pending PR creation. Do not claim these tests pass until a run is confirmed.
+- No Oracle VM command output was received for this slice. No application runtime, database, Docker, Telegram, source scan, polling interval, source enablement or deployment was changed.
+- Per-request/per-target attempts, request counts, board-level partial-success counters and stage timing are not yet implemented. Cooldown remains in-memory; persistence across process restarts is not part of this slice.
+- PR #37 remains separate; PR #35 remains separate.
+
+### Next action
+1. Create draft PR #38 from `work/source-run-telemetry` into `work/job-intelligence-foundation` to run CI without expanding PR #37.
+2. Verify CI on the exact PR head and fix failures on this child branch.
+3. Review the migration and partial-429 tests before merging. Do not deploy or change live polling.
+
+### Continuation
+- Active feature branch: `work/source-run-telemetry`, child of `work/job-intelligence-foundation`.
+- Fresh chat: use `docs/AGENT_CONTINUATION_PROMPT.md` followed by the latest sanitized command output, then read this latest handover entry.
