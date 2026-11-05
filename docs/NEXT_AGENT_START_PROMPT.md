@@ -170,3 +170,10 @@ Current PR/CI verification when this note was written:
 - Latest V2 CI for that exact head: run #1125 / ID `42074147311`, completed successfully.
 - No application/runtime change or deployment occurred during this documentation update.
 - Continue to append new evidence to `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` on every turn.
+
+
+---
+
+## Latest engineering continuation — 2026-11-05
+
+A separate source-run telemetry slice is in progress on child branch `work/source-run-telemetry`, based on foundation commit `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`. It extends SQLite `source_runs` with run IDs, outcomes, durations, error type, HTTP status, Retry-After and cooldown metadata; detects LinkedIn 429 even when partial jobs are returned; preserves runtime cooldown state; sanitizes stored errors; and exposes the new fields through `/api/source-status`. Tests were added for legacy schema migration, source status output and partial 429 results. Verification is still pending. Read the latest section of `docs/JOB_RADAR_HANDOVER.md`; open draft PR #38 into `work/job-intelligence-foundation` to run CI. Do not change polling or deploy. The generic fresh-chat prompt is `docs/AGENT_CONTINUATION_PROMPT.md`.
