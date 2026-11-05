@@ -5738,6 +5738,19 @@ The counts and DB byte sizes decreased between the two pasted snapshots. The cap
 - For a fresh chat, paste the contents of `docs/AGENT_CONTINUATION_PROMPT.md`, followed immediately by the latest sanitized command output. Then have the new agent read the latest dated entries in this handover and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` before acting.
 
 
+## CI branch-filter discovery — 2026-11-05
+
+- PR #38 (`work/source-run-telemetry` -> `work/job-intelligence-foundation`) had no workflow run and no combined commit-status entries for head `1812fce7c483b8f04dc55585ada8cb43e9adfff2`.
+- Inspected `.github/workflows/v2-ci.yml` on the PR base. Its `pull_request.branches` filter listed only `main` and `v2-live-radar`; it did not include `work/job-intelligence-foundation`. Therefore PR #38 was excluded by the configured target-branch filter. The empty status response was not a failed run and not a passing run.
+- Updated `.github/workflows/v2-ci.yml` on this foundation branch to also include `work/job-intelligence-foundation` in the `pull_request.branches` filter. Push trigger remains unchanged (`main`, `v2-live-radar`); no production behavior changed.
+- New foundation branch commit for this CI change: `84945d4049ad82df8bd355caaff3f7d81cd4e112`.
+- This change is on the foundation branch itself. PR #37 (target `v2-live-radar`) should still be eligible under its existing base workflow filter; verify the latest PR #37 head/CI. For PR #38, the base branch now has the correct filter; push a synchronized child-head change after incorporating the base workflow change and verify that a V2 CI run actually starts.
+- No VM, container, DB, source, polling, Telegram, production or deployment state changed.
+
+### Next action
+Synchronize the changed CI workflow and foundation handover additions into `work/source-run-telemetry` without dropping its telemetry log, then update the child head to trigger PR #38 CI. Record exact resulting PR head and workflow result. Do not merge or deploy.
+
+
 ## Source-run telemetry slice — 2026-11-05 (implementation; verification pending)
 
 ### Scope and branch
