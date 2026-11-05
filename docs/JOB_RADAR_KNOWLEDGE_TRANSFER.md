@@ -2800,3 +2800,13 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Validation PR #39 run #1135 / ID `42077890037` on head `b97a6ca0abbd450129f62f3730ab74edac19ad4f`: install, py_compile, focused tests passed; full suite 141 tests, 1 error and 0 failures. The cooldown timing fix and all new telemetry-specific tests passed.
 - One remaining error was another legacy `source_runs` fixture in `SourceRegistryApiCoverageTests`; earlier edit hit the migration fixture instead. Corrected the exact source-registry fixture in commit `701df0b2c8dc11403cd5e7a48390c4b0479c20f8`. Not yet verified.
 - Advance the validation branch and rerun. No runtime state changed. Full context in latest handover entry.
+
+
+## Telemetry phase 1 verified — 2026-11-05
+
+- V2 CI run #1136 / ID `42078168015` passed on tested code/test commit `997235c658177b17fc2f9257e039d171841e617b` through validation-only PR #39: dependency install, py_compile, focused router/extractor tests, and full V2 suite; **141 tests in 17.071s — OK**.
+- New regression cases passed: legacy `source_runs` migration, sanitized HTTP 429/cooldown persistence, partial jobs followed by 429, structured source-status metadata, and source registry coverage for all collectors.
+- Previous runs #1134 and #1135 failed on test-fixture issues; both fixes are documented in the detailed handover. Latest code/test changes were on `work/source-run-telemetry`; the successful tested SHA is `997235c658177b17fc2f9257e039d171841e617b`. Handover commits appended after it are documentation-only.
+- PR #38 remains the real implementation PR, draft, base `work/job-intelligence-foundation`. PR #39 is a temporary CI-only PR targeting `v2-live-radar`; close it unmerged after saving the evidence. No merge/deployment or runtime changes.
+- Phase 1 does not include per-request/per-target counts, board-level partial failure metrics, detailed stage latency, or cooldown persistence across restart. Next: review PR #38 and then implement per-target/request attempts and ingest processing counters test-first. Do not increase LinkedIn request volume.
+- Latest detailed record: `docs/JOB_RADAR_HANDOVER.md`; generic fresh-chat prompt: `docs/AGENT_CONTINUATION_PROMPT.md`.
