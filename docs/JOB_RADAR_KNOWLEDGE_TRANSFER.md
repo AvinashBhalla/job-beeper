@@ -2560,3 +2560,34 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Next controlled interaction
 - Search for a visible unique employer, e.g. `Cognizant`, using DevTools Network Preserve log. Record count, matching cards, URL change, and any request to distinguish front-end filtering from a backend search call.
 - Then separately test location form if needed. Do not create an alert, account or application. No app code, server, DB, collectors, notifications, or deployment changed.
+
+
+## Search interaction result and decision to start development — 2026-11-05
+
+### Observed search result
+- REA evidence: `ev_fdb8b7bbb29e59ff3bb337775db569496bdb1d4df043e0108461bd84e9a9988a`; Backend role page at 11:33 UTC.
+- Search field focused with `Cognizant`.
+- DOM retains 200 job cards (`data-filter-item`); 199 are hidden and only one is visible: Engineering Manager — Cognizant — Bengaluru, Karnataka, India (Hybrid).
+- Dynamic count reports `1 role`; page's base result count remains `200 found`.
+- Strong evidence that search filters the 200 preloaded cards in the browser. Since capture starts after interaction, a 1-second empty network window is not proof that no request happened during the keypress.
+ 
+### What is known vs unknown
+- Known public delivery: Hiring-this-week page exposes Latest 20; role page exposes up to 200 preloaded results, local search, a location form, public HTML, and common static scripts. Backend HTML HAR included public cache headers: `Cache-Control: public, max-age=3600` and `X-Cache-Status: MISS`.
+- Not known: JobBeeper's private source scheduler, crawl topology, worker count, queues, database/index, provider credentials, access agreements, polling cadence, rate limits, retry strategy or exact upstream fetch methods. Public browser evidence cannot establish these.
+- JobBeeper's own public product claims coverage of LinkedIn, Naukri, Workday, company career pages, Greenhouse, Lever and Ashby, with detection varying by source. Those are vendor claims and snapshots, not an audited description of the underlying implementation.
+- The speed of the browse UI is separate from collection freshness: 200 job elements are already present when the search field filters them, and public HTML can be cached/pre-rendered. A fast UI therefore does not prove a live source crawl happens at search time or that upstream rate limits are bypassed.
+
+### Decision
+- End open-ended reverse engineering for now; do not wait for private backend details before building our product.
+- Extend the existing Job Radar v2 instead of replacing it. Preserve the current FastAPI/SQLite/Docker/Oracle/Telegram foundation and existing collectors unless read-only audit finds otherwise.
+- Core ingestion design:
+  1. A source registry with per-adapter access method, policy/permissions, interval, concurrency, last success/error, cursor, freshness expectation and rate-limit state.
+  2. Independent per-source scheduler, jitter, bounded concurrency, host request budgets, incremental polling, conditional requests where supported, and Retry-After-aware backoff.
+  3. Pipeline: collect → retain raw provenance → normalize → deduplicate/merge → upsert → classify/match → notify.
+  4. Measure source-to-first-seen, processing, and notification lag separately; collect run duration, errors, 429s, stale/closed state, and collector coverage.
+  5. Start with stable public ATS feeds/official career integrations; use compliant providers/partner APIs next; only use public-page collection where permitted and justified. No login bypass, CAPTCHA bypass, proxy/account rotation, or rate-limit circumvention.
+- Build order: read-only repo/runtime audit → source inventory and architecture/PRD → instrumentation and one reliable adapter end-to-end → expand sources → refine ranking/matching → referral intelligence after discovery reliability is measured.
+- No application code or production state changed in this update.
+
+### Next exact action
+- Read-only audit of current v2 repo/Oracle runtime. Confirm commit and collector state before editing. Then write the architecture baseline and implementation PRD from actual code, and start the first vertical slice. Never expose secrets in audit output.
