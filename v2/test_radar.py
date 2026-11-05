@@ -2527,6 +2527,127 @@ class SourceStatusPersistenceTests(unittest.TestCase):
         self.assertEqual(naukri["new_jobs"], 2)
 
 
+    def test_init_db_migrates_legacy_source_run_table(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE source_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT NOT NULL,
+                        jobs_seen INTEGER NOT NULL,
+                        new_jobs INTEGER NOT NULL,
+                        error TEXT
+                    )
+                """)
+            with patch.object(radar, "DB_PATH", db_path):
+                radar.init_db()
+                with sqlite3.connect(db_path) as conn:
+                    columns = {
+                        row[1] for row in conn.execute("PRAGMA table_info(source_runs)")
+                    }
+            self.assertTrue({
+                "run_id", "outcome", "duration_seconds", "error_type",
+                "http_status", "retry_after_seconds", "cooldown_seconds",
+            }.issubset(columns))
+
+    def test_run_source_records_429_caught_inside_collector_as_partial_success(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE source_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT NOT NULL,
+                        jobs_seen INTEGER NOT NULL,
+                        new_jobs INTEGER NOT NULL,
+                        error TEXT,
+                        run_id TEXT,
+                        outcome TEXT,
+                        duration_seconds REAL,
+                        error_type TEXT,
+                        http_status INTEGER,
+                        retry_after_seconds REAL,
+                        cooldown_seconds INTEGER
+                    )
+                """)
+            original_rate_state = (
+                radar.linkedin_last_http_request_monotonic,
+                radar.linkedin_rate_limited_until_monotonic,
+                radar.linkedin_last_rate_limit_monotonic,
+                radar.linkedin_rate_limit_streak,
+                radar.linkedin_rate_limit_generation,
+            )
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = 0.0
+            radar.linkedin_rate_limit_streak = 0
+            radar.linkedin_rate_limit_generation = 0
+            response = type(
+                "Response",
+                (),
+                {"status_code": 429, "headers": {"Retry-After": "600"}},
+            )()
+            job = {
+                "title": "Backend Engineer",
+                "description": "Python backend role",
+                "location": "Bengaluru, India",
+            }
+
+            def collector(_config):
+                radar._activate_linkedin_rate_limit(response)
+                return [job]
+
+            collectors = dict(radar.COLLECTORS)
+            collectors["linkedin"] = collector
+            cooldown_values = iter([0.0, 600.0])
+            try:
+                with (
+                    patch.object(radar, "DB_PATH", db_path),
+                    patch.object(radar, "COLLECTORS", collectors),
+                    patch.object(radar, "source_state", {}),
+                    patch.object(
+                        radar,
+                        "_linkedin_cooldown_remaining",
+                        side_effect=lambda: next(cooldown_values),
+                    ),
+                    patch.object(radar, "title_allowed", return_value=False),
+                    patch.object(radar, "shadow_extract_jobs"),
+                    patch.object(radar, "upsert_jobs", return_value=1),
+                    patch.object(radar, "refresh_job_evaluations"),
+                    patch.object(radar, "refresh_notification_decisions"),
+                    patch("v2.telegram.credentials_available", return_value=False),
+                ):
+                    radar.run_source("linkedin", {})
+                    with sqlite3.connect(db_path) as conn:
+                        row = conn.execute(
+                            """
+                            SELECT jobs_seen, new_jobs, outcome, http_status,
+                                   retry_after_seconds, cooldown_seconds, error
+                            FROM source_runs WHERE source='linkedin'
+                            """
+                        ).fetchone()
+                    runtime = radar.source_state["linkedin"]
+                self.assertEqual(row[:4], (1, 1, "partial_rate_limited", 429))
+                self.assertEqual(row[4], 600.0)
+                self.assertEqual(row[5], 600)
+                self.assertEqual(row[6], "HTTP 429")
+                self.assertEqual(runtime["last_run_outcome"], "partial_rate_limited")
+                self.assertEqual(runtime["rate_limit_retry_after_seconds"], 600.0)
+                self.assertGreater(runtime["rate_limit_cooldown_seconds"], 0)
+            finally:
+                (
+                    radar.linkedin_last_http_request_monotonic,
+                    radar.linkedin_rate_limited_until_monotonic,
+                    radar.linkedin_last_rate_limit_monotonic,
+                    radar.linkedin_rate_limit_streak,
+                    radar.linkedin_rate_limit_generation,
+                ) = original_rate_state
+
     def test_source_status_includes_structured_run_metadata(self):
         payload = self._source_status_for_rows([
             (
