@@ -2993,12 +2993,13 @@ def dedupe_candidates(limit: int = 100):
     limit = max(1, min(limit, 500))
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        source_placeholders = ",".join("?" for _ in SOURCE_NAMES)
+        rows = conn.execute(f"""
             SELECT id, source, source_job_id, company, title, location, url, description
             FROM jobs
-            WHERE source IN ('linkedin', 'naukri', 'instahyre', 'greenhouse')
+            WHERE source IN ({source_placeholders})
             ORDER BY id ASC
-        """).fetchall()
+        """, SOURCE_NAMES).fetchall()
 
     by_identity: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for row in rows:
