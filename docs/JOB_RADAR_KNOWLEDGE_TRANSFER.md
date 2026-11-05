@@ -2436,3 +2436,40 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Run REA `analyze-web-bundle` on the current public job-detail target (and then, separately, on a browse target) to capture/analyze the three first-party public-page scripts. Focus on jobpage.js and publicpage-ui.js. Record any data-field names, outbound URL handling, analytics events and UI behavior as static-code evidence, distinct from runtime observations.
 - Next, inspect the `/browse/hiring-this-week` page accessibility tree to identify visible filters, cards, sort controls, pagination and empty states; then manually exercise one public filter or pagination control while recording a sanitized HAR. Do not access the original employer application URL or private account data.
 - No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed.
+
+
+## 2026-11-05 — Static analysis of public job-detail JavaScript
+
+### Capture and parser result
+- User supplied REA `analyze-web-bundle` output for public Domino's job detail URL `https://jobbeeper.com/j/28752345-delivery-driver-02202-1027-w-hunter-st-domino-s`.
+- Three first-party scripts were observed and all three parsed successfully:
+  - `/static/publicpage-theme.js` — 2,842 bytes; SHA-256 `fedefd1627cfacc80c2fb9cfd8129ec8b7af820162339880eb9c4cc44e6555c8`.
+  - `/static/jobpage.js` — 2,653 bytes; SHA-256 `628090b59538f7d42ff1bad4b13d6f0b236a172acba0e3d65e4395b251471b0e`.
+  - `/static/publicpage-ui.js` — 5,259 bytes; SHA-256 `fbd77391e95e9232cf8b5a382f97e58c7ed625f3a7b62306d0211d3518a813d4`.
+- REA analysis completeness: 3 parsed scripts, 0 parse failures, 1,520 AST nodes visited. Static source analysis only; scripts were not executed by REA.
+- Source-map fetching was not requested; no source-map findings can be inferred.
+- Route inventory found zero route patterns and zero route occurrences within these 3 provided sources. This is not proof that no routes exist elsewhere.
+
+### OBSERVED — static call candidate
+- REA identified one low-confidence static endpoint candidate in `jobpage.js` at line 38, column 2: `/api/auth/user/me`, mechanism `call:fetch`.
+- The exact static call candidate is a fetch to the current-user/session endpoint. This is consistent with the earlier HAR's unauthenticated request to `GET /api/auth/user/me` returning 401 when no authorization token was present.
+- No additional endpoint candidates, route strings, source-map references or import edges were identified in the three parsed scripts.
+
+### INFERRED — public-page script responsibilities
+- `publicpage-theme.js` and `publicpage-ui.js` appear to support shared theme and public-page UI behavior based on their filenames and DOM usage. Their detailed function-level responsibilities are not established by the static route/endpoint inventory.
+- `jobpage.js` appears to include session-aware behavior, potentially toggling user-specific controls or sign-in state based on `/api/auth/user/me`. Exact response fields and resulting behavior remain unverified.
+- Given the public page's detail content was already present in the DOM accessibility capture and no job-data fetch candidate was found in these three scripts, a plausible model is that the job content is delivered with the HTML while client JavaScript enhances the page and checks user session. This is only an inference; server templates or inline serialized data were not directly inspected in this bundle analysis.
+- The lack of public job-content API candidates in these scripts is not evidence that no such API exists elsewhere or is never called by other code paths.
+
+### UNKNOWN / not established
+- No complete job schema, original application link, pay or experience extraction behavior was recovered from these three scripts.
+- No event handler behavior for Copy job link, Apply/Log in, Create account, alert or related openings was behaviorally tested.
+- Static analyzer did not enumerate dynamically constructed URLs or route names, hidden server-side routes, or network operations in other scripts.
+- No source maps were requested; original source modules remain unavailable.
+- The `/api/auth/user/me` candidate was previously observed in runtime HAR only on the homepage, not specifically exercised by this static analysis on the job page.
+
+### Next exact investigation step
+- Navigate the isolated Chrome profile to `/browse/hiring-this-week`; rediscover its target ID; capture accessibility text with `inspect-web-page`. Identify visible filters, sorting, job cards, pagination and links.
+- Then manually use one public browse control (prefer a filter that changes the URL) with Network Preserve log enabled and export a sanitized HAR. Do not submit forms that create accounts, alerts or applications.
+- If additional source analysis is needed, inspect public-page script source only within the normal page scope, and focus next on the hiring-this-week page's loaded scripts rather than re-running the detail-page bundle analysis.
+- No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed.
