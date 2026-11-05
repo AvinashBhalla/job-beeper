@@ -2737,3 +2737,9 @@ The two sets differ and lack timestamps. Do not silently treat them as a confirm
 
 ### Immediate next step
 Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and implement telemetry/source registry improvements in a new isolated slice. First add per-query target attempt/success/failure/429 and processing/notification lag metrics. Do not increase LinkedIn request rate or attempt circumvention. Select one validated ATS adapter for a dev-only canary with notifications off.
+
+
+### Continuation prompt
+- The full next-agent prompt is now saved at `docs/NEXT_AGENT_START_PROMPT.md`.
+- It includes product goal, current branch/PR state, code and collector baseline, Oracle runtime facts, Docker volumes/DB snapshot counts (including the two differing count outputs), hard safety rules and the next implementation sequence.
+- Copy that file's prompt section into the next model session; the new agent should still verify current branch/PR/CI and read the handover before editing.
