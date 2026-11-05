@@ -2759,3 +2759,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Detached worktree HEAD verified as c93f0414e8f99540d6004f012e8cb286e32bf1f6. `v2/radar.py` and `v2/test_radar.py` have no diff. Local `v2/config.json` is modified (2 insertions/2 deletions) and `.venv/` is untracked; preserve both without reset/clean/stage/commit.
 - Full V2 suite: 137 tests passed in 18.998s, including Ashby dedupe regression. CI remains unverified. Production remains untouched; no deploy, config/DB/volume mutation, source activation, or notification send.
 - Next: prepare a non-mutating isolated runtime/release checklist; production changes require separate explicit approval and backup/rollback review.
+
+
+## 2026-11-06 follow-through — verify isolated development Docker service
+- User asked to verify whether the isolated development Docker service on port 8001 is still running. The assistant cannot inspect the VM directly; requested read-only VM checks: `sudo docker ps -a --filter 'publish=8001' --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`, `sudo docker compose ls`, `sudo ss -ltnp | grep ':8001' || ...`, and from `/home/ubuntu/job-beeper-dev`, `git status --short` plus `git rev-parse --short HEAD`.
+- Await user-supplied command output before declaring service status. Do not start/stop/rebuild containers or change configuration. Keep production port 8000 and production checkout/container/volume untouched.
