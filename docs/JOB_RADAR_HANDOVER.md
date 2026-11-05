@@ -5831,3 +5831,13 @@ Synchronize the changed CI workflow and foundation handover additions into `work
 1. Advance `validation/source-run-telemetry` to the new feature commit `78a95a2e8b6ea42b933ccd855eda6e64036bda2d` using a non-force fast-forward ref update (confirm the old validation branch SHA first).
 2. Poll the new V2 CI run, inspect all outcomes and rerun/fix as needed.
 3. Update both handovers and continuation prompt with the exact tested head/result; close PR #39 unmerged only after verification. Keep PR #38 open/draft pending review.
+
+
+## Telemetry CI second run and remaining fixture correction — 2026-11-05
+
+- Validation PR #39 V2 CI run #1135 / ID `42077890037` tested head `b97a6ca0abbd450129f62f3730ab74edac19ad4f`.
+- Dependency installation, syntax compilation, focused router/extractor tests passed. Full suite ran 141 tests and had **1 error, 0 failures**.
+- The variable-clock cooldown assertion is now passing. The new `partial_rate_limited` test, legacy schema migration test, structured source-status test and sanitized 429 persistence test also passed.
+- Remaining error: `SourceRegistryApiCoverageTests.test_source_status_includes_every_registered_collector` still had a legacy fixture without the new telemetry columns. The prior correction had updated the similarly shaped migration-test fixture instead of this specifically located source-registry fixture.
+- Corrected the fixture in commit `701df0b2c8dc11403cd5e7a48390c4b0479c20f8` on `work/source-run-telemetry`. This commit has not yet been tested. Advance `validation/source-run-telemetry` and rerun PR #39 CI on the resulting exact head.
+- No code/runtime/config/VM/DB/Docker/Telegram/polling/source enablement/deployment changes outside the test fixture. PR #38 remains the implementation PR; PR #39 remains validation-only and should be closed unmerged after final CI.
