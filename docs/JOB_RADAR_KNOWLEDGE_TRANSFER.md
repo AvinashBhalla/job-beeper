@@ -2283,3 +2283,57 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Recommended next step: in a NEW Windows PowerShell session, run `winget install --exact --id OpenJS.NodeJS.LTS`. Reopen PowerShell and verify `node -v`, `npm -v`, and `where.exe node`. Do not uninstall the currently installed Node 27 alpha or manually delete `C:\\Program Files\\nodejs` if winget reports a conflict; capture the exact installer error and assess a version-manager route instead.
 - Do not run the REA installation from the Oracle SSH session; no Node change is required on Oracle for the Python/FastAPI app.
 - No Windows or Oracle installation was performed by the assistant; no application code, server runtime or source config was changed.
+
+
+## 2026-11-05 — JobBeeper public homepage HAR and runtime API findings
+
+### Evidence collected
+- User supplied a sanitized Chrome DevTools HAR from the isolated REA Chrome profile, capturing a public homepage load and a short idle window. Browser: Chrome 156.0.8078.80. Capture starts 2026-11-05T10:56:51.520Z; first API activity follows shortly after page load.
+- HAR contains 50 HTTP entries: 47 to jobbeeper.com, 1 Google Tag Manager script load, and 2 Google Analytics collection POSTs. Statuses: 46 x 200, 2 x 401 (unauthenticated session lookups), 2 x 204 (analytics). No failed static asset responses were observed.
+- The sanitized HAR contains no Cookie/Authorization/Set-Cookie headers and no request postData. Do not reproduce public plan response payment-routing values in documentation, tickets, code or reports. The /api/auth/plan response included UPI routing fields; values intentionally omitted.
+- Request headers show X-Client-Timezone: Asia/Calcutta. The HAR was captured with DevTools Disable cache and Preserve log enabled; request Cache-Control: no-cache / Pragma: no-cache therefore should not be used to infer normal browser cache behavior.
+
+### OBSERVED — runtime HTTP endpoints
+- GET /api/public/pulse -> 200, application/json, response time approx. 84 ms on first request and 99 ms on the second.
+- GET /api/auth/plan -> 200, application/json.
+- GET /api/auth/plans -> 200, application/json.
+- GET /api/auth/user/me -> 401, response body reports missing authorization token.
+- GET /api/auth/me -> 401, response body reports missing authorization token.
+- The two 401s occurred in an unauthenticated public homepage session. No authenticated/private account behavior was exercised.
+- /api/public/pulse response headers included Cache-Control: public, max-age=60. The auth plan endpoints returned private/no-store cache directives.
+- /api/public/pulse was requested twice, approximately 14.5 seconds apart. This is only two requests and must not be described as a proven 15-second polling interval.
+
+### OBSERVED — public pulse response shape and snapshot
+- JSON top-level fields: generated_at, locked, open, stats, sufficient, window.
+- locked items in the captured response included age_minutes, found_after_minutes, location, source and title; captured locked records did not include company or share_path.
+- open items included age_minutes, company, found_after_minutes, location, share_path, source and title.
+- Snapshot had 3 locked and 3 open records. Locked sample ages were 2–3 minutes; open sample ages were 362–363 minutes. open records had share_path values; locked records had found_after_minutes null and no share_path in the captured objects.
+- stats snapshot (time-bound, not a stable product constant): companies_tracked=79,469; jobs_24h=77,742; jobs_last_hour=2,839; jobs_week=452,780; median_alert_minutes=10; portals_watched=89,905; share_delay_hours=6. Response window was "hour" and sufficient=true.
+- generated_at values of the two pulse responses were approximately one minute apart even though the two client requests were approximately 14.5 seconds apart. Preserve as observed; generation/cache cadence is not yet explained.
+- The captured record structure is consistent with the public-page statement that newer jobs are subscriber-first and held from the public feed for six hours. Treat this as a well-supported inference, not proof of the private subscriber delivery path.
+
+### OBSERVED — static frontend code from HAR/REA bundle analysis
+- API client module api-B1bIDMMX.js defines API base path /api and a fetch wrapper using credentials: include. It adds X-Client-Timezone from Intl.DateTimeFormat().resolvedOptions().timeZone; non-GET methods attach X-CSRF-Token from the jn_csrf cookie. Static code contains a 401 refresh fallback trying POST /auth/user/refresh and then /auth/refresh before retrying unless noRetry is set. Those POST refresh requests were NOT observed in this unauthenticated HAR; this is source-code evidence only.
+- LiveJobFeed-DGhOmHyc.js calls the API client with GET /public/pulse. Its hook default interval is 90,000 ms; it fetches immediately on mount and has a visibilitychange handler which fetches again when document.visibilityState becomes visible. Thus, the 14.5-second separation in the HAR must not be interpreted as the normal polling interval; a visibility event or another trigger is plausible but the exact cause was not captured. Confirm with a longer stable Network recording if needed.
+- The LiveJobFeed component calculates/display-formats job ages client-side and uses stats from the pulse response (jobs_last_hour or jobs_24h depending on window, median_alert_minutes, portals_watched, companies_tracked).
+- portalLabels-tSl-pka_.js contains labels for many ATS/source families including LinkedIn, Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Darwinbox, SuccessFactors, iCIMS, Naukri, Cutshort, Instahyre, Hirist, Oracle Cloud Recruiting, Wellfound, Workable, PeopleStrong, Phenom, Eightfold, Zoho Recruit, Keka, Freshteam, Taleo, Avature, BambooHR, BrassRing, Jobvite, Breezy, Recruitee, Rippling, Teamtailor, UKG, LinkedIn Hiring Posts, X Hiring Posts and others. This is a frontend label registry, not proof that every listed integration is active or currently collecting.
+- portalLabels module contains static code paths for GET /companies/platforms and fallback GET /auth/user/portals; neither request appeared in this HAR, so runtime behavior remains unverified.
+- REA's static bundle analysis retained 29 script sources and parsed most sources, but the 293 KB index bundle exceeded REA's per-script deadline. The HAR itself includes the fetched JavaScript response bodies, enabling targeted offline inspection of specific bundles if required.
+
+### INFERRED — architecture implications
+- /api/public/pulse is a public, aggregate feed/statistics endpoint and should be treated separately from authenticated user/job preference APIs.
+- Public job access is staged: records in locked are newer and omit company/link fields in the observed representation; open records are older and include company/share_path. The six-hour delay matches the product's public statement.
+- The frontend API utility centralizes the /api prefix, credentialed fetches, timezone header, CSRF behavior for mutations and a refresh/retry path. Do not imitate refresh endpoints or private APIs; only use documented/public behavior in the user's own design.
+- The 90-second LiveJobFeed interval is source-code evidence. Validate actual runtime cadence with longer recording and page-visibility controlled before using it as a performance benchmark.
+
+### UNKNOWN / not established by this HAR
+- No logged-in behavior, private user feed, saved preferences, Telegram delivery, alert rules or subscriber-first notification path was observed.
+- No search/filter queries, company directory requests, job-detail API calls, pagination cursors or source-specific feeds were captured.
+- No backend framework, database schema, ingestion architecture, collector schedule, deduplication mechanism or exact meaning of found_after_minutes has been established.
+- The 401 auth lookups do not establish the complete authentication design.
+- The HAR's two pulse requests do not independently establish the 90-second interval; static bundle source contains that interval, and a longer runtime test remains desirable.
+
+### Next exact investigation step
+- Continue read-only public investigation. Navigate the isolated Chrome profile to /browse/hiring-this-week and capture a sanitized HAR with Preserve log; examine actual browse API calls, response shape, filter parameters, pagination and job IDs. Then open one public /j/{id}-{slug} detail page and capture its requests.
+- Do not sign in, change settings, submit applications, create alerts, automate interactions, or access private account data during this public investigation.
+- No Job Radar application code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed as part of this research.
