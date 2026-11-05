@@ -2505,3 +2505,25 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Next exact evidence to collect
 - Follow only the public `Backend` category link (`/browse/role/backend`) with DevTools Network Preserve log enabled. Compare URL, content, job-card fields/count, and navigation; export a sanitized HAR. Do not create alerts, accounts, or applications.
 - No application code, configuration, server runtime, database, collectors, Telegram settings, or deployment were changed.
+
+
+## Backend category-route HAR — 2026-11-05
+
+### Observed evidence
+- Route: `https://jobbeeper.com/browse/role/backend`; analytics/page-view title: `Latest Backend jobs | JobBeeper`; navigation referrer: `/browse/hiring-this-week`.
+- The sanitized HAR contains 10 requests, 8 first-party. All 8 first-party requests returned HTTP 200.
+- The route is loaded as `GET /browse/role/backend`, MIME `text/html`, status 200. HAR also records a Fetch to the same URL initiated by `https://jobbeeper.com/sw.js` line 57.
+- Main document request duration about 558 ms. HAR page timing: onContentLoad ~660 ms; onLoad ~859 ms.
+- Actual Fetch response headers: `Cache-Control: public, max-age=3600`; `Content-Type: text/html; charset=utf-8`; `Content-Encoding: zstd`; `X-Cache-Status: MISS`.
+- Same first-party shared scripts loaded as other public pages: `jobpage.js` (2,653 bytes), `publicpage-theme.js` (2,842 bytes), `publicpage-ui.js` (5,259 bytes). Fonts/CSS also loaded.
+- Analytics page-view event is Google Analytics `POST /g/collect` with HTTP 204.
+- No first-party JSON/XHR/API endpoint is present in this HAR.
+
+### Interpretation and limitations
+- This is evidence for a distinct public HTML route, not proof of how the category data is generated. Backend may be a server-side category query or a curated route; cannot distinguish from this HAR alone.
+- The service worker is involved in the Fetch request (initiator stack), but HAR fields `_fetchedViaServiceWorker` and `_serviceWorkerResponseSource` are null. Cache strategy or cache-served behavior is not confirmed.
+- HAR contains no response body text, therefore cannot derive the Backend page's visible job cards/count, ordering, filters, or pagination from this file.
+- No API calls in this capture does not rule out APIs after user interactions or in authenticated states.
+
+### Next action
+- Inspect the live Backend page's accessibility tree with REA and compare its visible job cards and controls against the hiring-this-week feed. Then test one public route/control only if it is visible. No app code, deployment, database, collectors, or Telegram settings were changed.
