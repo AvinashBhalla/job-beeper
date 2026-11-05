@@ -5394,3 +5394,173 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Prefer public/official ATS endpoints and employer career pages; evaluate licensed data feeds or formal partner access for sources that need them. Treat LinkedIn as optional and isolated so LinkedIn unavailability cannot stop other collection.
 - Keep private matching/alerts and public delayed catalogue as distinct delivery layers; don't copy the exact 6-hour delay as a requirement without validating our product needs.
 - No Job Radar application code/config, Oracle runtime, SQLite database, collector behavior, Telegram notifications, or deployment was changed by this research update.
+
+ 
+## Job Intelligence Agent foundation — repo audit and first code slice (2026-11-05)
+
+### Current branch / safety
+- Foundation work is isolated on work/job-intelligence-foundation, created from v2-live-radar at 3f5b1e63ab43ca97ded73be40b05c0ce6f6e50c6.
+- Existing v2-live-radar and existing draft PR #35 (Gemini shadow validation to main) were not modified by this work.
+- New draft PR #37 targets v2-live-radar: https://github.com/AvinashBhalla/job-beeper/pull/37
+- PR #37 has not been merged or deployed. No Oracle VM, runtime config, DB, collectors, Telegram settings or production container were changed.
+
+### New planning documents
+- docs/INGESTION_ARCHITECTURE.md: current V2 static architecture, target source-registry/scheduler/adapter design, data flow, operational safety, known gaps, release gates.
+- docs/JOB_INTELLIGENCE_AGENT_PRD.md: personal single-user job intelligence product requirements, goals/non-goals, acceptance criteria, phases and success measures.
+- docs/SOURCE_INVENTORY.md: the five current V2 collector implementations, tracked config defaults, poll targets, limitations and unimplemented source candidates.
+
+### Static code audit — observed
+- Current V2 COLLECTORS registry has five adapters: LinkedIn, Naukri, Instahyre, Greenhouse and Ashby.
+- Tracked v2/config.json enables LinkedIn and Naukri; Instahyre, Greenhouse and Ashby are disabled. Tracked v2/config.dev.json enables Naukri only and disables notifications. Live persisted config is not yet verified.
+- LinkedIn uses the public guest search endpoint, 4-second minimum request spacing, 180-second scan cadence, 2 of 16 query/location targets per scan, 1 detail worker, 30-minute deep-scan cadence and 5/10/20/30-minute escalating cooldown with Retry-After. At a clean cadence the 16 target rotation is about 24 minutes; this is scheduling math, not a discovery guarantee. No claim of rate-limit immunity is warranted.
+- Naukri is consumed from a separate public relay JSON feed; the app does not fetch Naukri directly from the VM.
+- Instahyre is one direct search request; Greenhouse and Ashby use public board APIs over explicit small allowlists. All three are currently opt-in in tracked config.
+- Scheduler is an in-process loop; due source collectors run in threads with per-source in-memory overlap guards. Source run summary persists, but runtime source state/cooldown/cursor are process-local.
+- SQLite stores jobs/source observations, canonical opportunities, evaluations, notification ledger and coarse source_runs. Telegram has a persistent retry ledger.
+- Confirmed defect: source-status, latency-summary and dedupe-candidates API views hard-coded four sources and omitted Ashby despite its presence in COLLECTORS.
+
+### First code slice — source registry observability
+- v2/radar.py: latency summary, source status and dedupe-candidate SQL now enumerate COLLECTORS instead of maintaining hard-coded source lists.
+- v2/test_radar.py: added tests for every registered source in status, Ashby latency sample inclusion, and Ashby observation inclusion in dedupe candidates.
+- No collector, HTTP request, scheduler, request limit, matching, alert policy, notification or deployment behavior changed.
+- CI workflow run 42048420905 completed successfully on 2026-11-05. Python compilation, focused Gemini/router tests and full V2 suite passed; full suite result: 137 tests, OK.
+- PR #37 remains draft pending the read-only runtime audit and review.
+
+### Next required manual action — read-only Oracle baseline
+The assistant cannot access the user's Oracle VM. Run the following from an SSH session on the VM. It reads Git state, Docker state, API health/config/status/latency, and SQLite summary counts. It does not edit files, restart containers, trigger collector runs, send Telegram messages or print secrets.
+
+~~~bash
+set +e
+echo "========== CHECKOUTS =========="
+for d in /home/ubuntu/job-beeper /home/ubuntu/job-beeper-dev; do
+  echo "--- $d ---"
+  if [ -d "$d/.git" ]; then
+    git -C "$d" status --short --branch
+    git -C "$d" branch --show-current
+    git -C "$d" rev-parse HEAD
+    git -C "$d" log -1 --format='%h %cs %s'
+  else
+    echo "Checkout not found"
+  fi
+done
+
+echo "========== CONTAINERS =========="
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+echo "========== VOLUMES =========="
+docker volume ls --format '{{.Name}}'
+
+echo "========== API SNAPSHOTS =========="
+for p in 8000 8001; do
+  echo "--- port $p ---"
+  curl -fsS --max-time 5 "http://127.0.0.1:$p/health" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+print(json.dumps({
+  "status": d.get("status"),
+  "version": d.get("version"),
+  "uptime_seconds": d.get("uptime_seconds"),
+  "db": d.get("db"),
+  "sources": {
+    k: {
+      "running": v.get("running"),
+      "last_success": v.get("last_success"),
+      "jobs_seen": v.get("jobs_seen"),
+      "new_jobs": v.get("new_jobs"),
+      "has_error": bool(v.get("error")),
+      "rate_limited_until": v.get("rate_limited_until"),
+      "rate_limit_cooldown_seconds": v.get("rate_limit_cooldown_seconds")
+    } for k,v in (d.get("sources") or {}).items()
+  }
+}, indent=2))
+' || echo "Health unavailable"
+
+  curl -fsS --max-time 5 "http://127.0.0.1:$p/api/config" | python3 -c '
+import json,sys
+d=json.load(sys.stdin).get("config",{})
+print(json.dumps({
+  "config_version": d.get("config_version"),
+  "poll_seconds": d.get("poll_seconds"),
+  "source_enabled": d.get("source_enabled"),
+  "notifications_enabled": d.get("notifications_enabled")
+}, indent=2))
+' || echo "Config unavailable"
+
+  curl -fsS --max-time 5 "http://127.0.0.1:$p/api/source-status" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+print(json.dumps([{
+  "source":x.get("source"),
+  "enabled":x.get("enabled"),
+  "last_run":x.get("last_run"),
+  "jobs_seen":x.get("jobs_seen"),
+  "new_jobs":x.get("new_jobs"),
+  "has_last_error":bool(x.get("last_error")),
+  "runtime_running":(x.get("runtime") or {}).get("running"),
+  "runtime_last_success":(x.get("runtime") or {}).get("last_success"),
+  "runtime_rate_limited_until":(x.get("runtime") or {}).get("rate_limited_until")
+} for x in d.get("sources",[])], indent=2))
+' || echo "Source status unavailable"
+
+  curl -fsS --max-time 5 "http://127.0.0.1:$p/api/latency-summary?hours=24" | python3 -c '
+import json,sys
+print(json.dumps(json.load(sys.stdin), indent=2))
+' || echo "Latency summary unavailable"
+
+  curl -fsS --max-time 5 "http://127.0.0.1:$p/api/daily-summary" | python3 -c '
+import json,sys
+print(json.dumps(json.load(sys.stdin), indent=2))
+' || echo "Daily summary unavailable"
+done
+
+echo "========== SQLITE COUNTS (READ ONLY) =========="
+for c in $(docker ps --format '{{.Names}}' | grep -i radar); do
+  echo "--- $c ---"
+  docker exec "$c" python3 -c '
+import os,sqlite3,json
+p="/data/jobs.db"
+if not os.path.exists(p):
+ print("DB not found"); raise SystemExit
+con=sqlite3.connect("file:"+p+"?mode=ro",uri=True)
+con.execute("PRAGMA query_only=ON")
+tables={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='''table'''")}
+out={"db_bytes":os.path.getsize(p),"tables":sorted(tables)}
+for t in ("jobs","canonical_opportunities","job_evaluations","notification_ledger","source_runs","gemini_shadow_cache"):
+ if t in tables:
+  out[t+"_count"]=con.execute("SELECT COUNT(*) FROM "+t).fetchone()[0]
+if "jobs" in tables:
+ out["jobs_by_source"]=dict(con.execute("SELECT source,COUNT(*) FROM jobs GROUP BY source").fetchall())
+if "source_runs" in tables:
+ out["latest_source_runs"]=[
+  {"source":r[0],"finished_at":r[1],"jobs_seen":r[2],"new_jobs":r[3],"has_error":bool(r[4])}
+  for r in con.execute("""
+   SELECT sr.source,sr.finished_at,sr.jobs_seen,sr.new_jobs,sr.error
+   FROM source_runs sr JOIN (
+    SELECT source,MAX(finished_at) AS latest FROM source_runs GROUP BY source
+   ) x ON x.source=sr.source AND x.latest=sr.finished_at
+   ORDER BY sr.source
+  """).fetchall()
+ ]
+if "notification_ledger" in tables:
+ out["notification_counts"]=dict(con.execute("SELECT status,COUNT(*) FROM notification_ledger GROUP BY status").fetchall())
+print(json.dumps(out,indent=2))
+con.close()
+' || echo "Read-only DB summary unavailable for $c"
+done
+~~~
+
+Expected result: this diagnostic output only. Do not paste .env, docker inspect environment, config token, Telegram token, Gemini key, session cookies, or full raw logs.
+
+### Stop conditions
+- If either checkout is dirty, do not pull, reset or overwrite anything.
+- If production/development container-volume mapping is unclear, do not rebuild/restart.
+- Do not trigger a LinkedIn/Naukri/ATS scan as part of this audit.
+- Keep PR #37 draft and PR #35 draft unmerged. Do not deploy.
+
+### After the runtime audit
+1. Reconcile repo defaults against the actual persisted config and live source state.
+2. Confirm production/dev data volumes are separate.
+3. Inspect per-source request/yield/429 history and notification counts.
+4. Decide the smallest scheduler/telemetry changes and first new ATS canary on dev only.
+5. Only then make behavior-changing code edits; run CI and the dev test suite before any release.
+
+No code or production configuration is permitted to auto-deploy from this branch.
