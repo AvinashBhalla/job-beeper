@@ -5354,3 +5354,43 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 ### Next exact development step
 - Perform a read-only audit of the current `v2-live-radar` checkout and Oracle runtime, confirm exact commit, enabled collectors, real per-source scan/last-success/429 state, DB counts, and Telegram configuration presence (never reveal secrets). Use the previously supplied read-only Oracle diagnostic command. Then produce a source inventory/architecture baseline from current code before editing.
+
+
+## JobBeeper collection architecture — current public evidence and LinkedIn boundary (2026-11-05)
+
+### OBSERVED — public product evidence
+- JobBeeper homepage says it checks LinkedIn, Naukri, Workday and company career pages; its source list names Greenhouse, Lever and Ashby, and the homepage says availability and detection times vary by source.
+- The homepage shows 11 job sources in a demonstration and a snapshot of 89,849 career pages/job boards watched and 79,424 companies tracked (snapshot dated 4 Nov 2026). These are JobBeeper's own claims and dynamic snapshot values, not independently audited metrics.
+- The homepage says matching jobs go to subscribers privately first and jobs that can be shared appear on the public site after the private window. It displays a 6-hour subscriber head start.
+- The public company page for LinkedIn shows an 18-role shortlist and source logos/labels for Greenhouse, Instahyre, Lever, LinkedIn, Naukri, own, SmartRecruiters and Workable. This demonstrates that JobBeeper's public surface associates roles with multiple source types; it does not reveal whether it obtained any particular role from the company ATS, LinkedIn, a licensed partner, or multiple origins.
+- A public JobBeeper detail page labels its source LinkedIn and claims a 32-minute interval from LinkedIn publishing to JobBeeper finding it; another JobBeeper page claims 14 minutes for a different role. Such per-role displayed intervals are vendor claims and page snapshots, not an independent measurement of their collection method.
+- The role-category page preloads up to 200 jobs into the DOM. A user search for `Cognizant` left one visible card and 199 hidden cards without replacing the 200-card collection. Strong evidence for client-side local filtering of the already-loaded page results, not global source search.
+- The Backend route HAR recorded public HTML with `Cache-Control: public, max-age=3600` and `X-Cache-Status: MISS` on that request. This is a single page response, not evidence of internal job-ingestion caching strategy.
+
+### VERIFIED — LinkedIn public API/policy boundary (checked 2026-11-05)
+- LinkedIn's official Job Posting API documentation states the API is for approved third parties such as clients, ATS systems and job distributors to post jobs to LinkedIn on behalf of customers. It is not documented as a general public API for searching/reading the full LinkedIn job catalogue.
+- The same documentation says API access is restricted to developers approved by LinkedIn and requires a partner/API agreement. It states LinkedIn is not accepting new Job Posting API partnerships and directs access applicants to Apply Connect. The Microsoft Learn page records last updated 2026-06-03.
+- LinkedIn help documentation prohibits third-party crawlers, bots, browser extensions and other tools that scrape or automate LinkedIn, and says circumventing access controls or usage limits is prohibited. See official references: https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview?view=li-lts-2026-04 ; https://www.linkedin.com/help/linkedin/answer/a1341387/prohibited-software-and-extensions
+- Do not assume that a public Job Posting API provides inbound job-search access. The documented API is for job submission/publishing.
+- No public evidence establishes that JobBeeper is exempt from LinkedIn rate limits or that it uses an undisclosed bypass.
+
+### INFERRED — conceptual product architecture only
+- Most plausible high-level flow: independent source adapters → collection/scheduling → normalization and provenance → deduplication/entity resolution → central job store/index → profile matching → private subscriber notifications → delayed public catalogue.
+- Source-specific collectors likely need independent schedules, rate budgets, retry/backoff and health state. This is a sensible architectural pattern for a multi-source job product, not a verified JobBeeper internal design.
+- The speed of the public experience is plausibly due to pre-collected job records, pre-rendered/cached HTML, and client-side filtering. This is distinct from the speed and access method of upstream LinkedIn collection.
+- The large career-page count does not establish that every page is fetched every minute or at the same frequency. The product itself says detection times vary by source.
+
+### UNKNOWN / not established
+- JobBeeper's actual LinkedIn job acquisition method: authorized/private access, third-party licensed feed, public-page access, employer ATS mirrors, or a combination.
+- Whether JobBeeper has any direct LinkedIn partnership or approved API arrangement.
+- Its workers, queues, scheduler, polling cadence, account/API topology, request budgets, database/index, retry policy and uptime/latency SLOs.
+- Whether any source is polled continuously; how it discovers and prioritizes the 89k+ advertised pages; how it detects changes efficiently.
+- Whether a given LinkedIn-origin-labeled listing is uniquely obtained from LinkedIn or independently seen at another source.
+- Whether the advertised detection metrics are measured from publication timestamps accurately across all providers.
+
+### Product design decision
+- Do not attempt to reproduce or circumvent LinkedIn anti-abuse systems. No account rotation, proxy rotation, CAPTCHA bypass, login-wall bypass, or unauthorized scraping.
+- Build a resilient multi-source architecture: independently scheduled source adapters with allowed access modes, source-specific concurrency and request budgets, conditional/incremental polling where supported, jitter, Retry-After-aware backoff, idempotent ingest, canonical job records, source provenance and cross-source deduplication.
+- Prefer public/official ATS endpoints and employer career pages; evaluate licensed data feeds or formal partner access for sources that need them. Treat LinkedIn as optional and isolated so LinkedIn unavailability cannot stop other collection.
+- Keep private matching/alerts and public delayed catalogue as distinct delivery layers; don't copy the exact 6-hour delay as a requirement without validating our product needs.
+- No Job Radar application code/config, Oracle runtime, SQLite database, collector behavior, Telegram notifications, or deployment was changed by this research update.
