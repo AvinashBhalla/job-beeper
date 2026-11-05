@@ -2626,3 +2626,44 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Prioritize official ATS/company career endpoints and licensed feeds; keep LinkedIn isolated and optional unless a permitted access path is available.
 - Separate private matching/alert delivery from any public catalogue/index.
 - No application code or production configuration changed during this research update.
+
+ 
+## Job Intelligence Agent foundation — current state (2026-11-05)
+
+### Repository / branches
+- Active source of truth audited: v2-live-radar; latest base at start of foundation work was 3f5b1e63ab43ca97ded73be40b05c0ce6f6e50c6.
+- Foundation work is isolated on work/job-intelligence-foundation; existing draft PR #35 (Gemini shadow validation to main) is untouched.
+- Draft PR #37 targets v2-live-radar: https://github.com/AvinashBhalla/job-beeper/pull/37. Not merged, not deployed.
+- New docs: docs/INGESTION_ARCHITECTURE.md, docs/JOB_INTELLIGENCE_AGENT_PRD.md, docs/SOURCE_INVENTORY.md.
+
+### Current V2 static baseline
+- FastAPI in v2/radar.py; SQLite; Docker; Telegram; separate source adapters; normalization, canonical dedupe, deterministic match/evaluation, notification ledger.
+- Five collector adapters: LinkedIn, Naukri relay, Instahyre, Greenhouse, Ashby.
+- Tracked prod config enables LinkedIn/Naukri only; tracked dev config enables Naukri only with notifications off. Runtime persisted config remains unknown until Oracle audit.
+- LinkedIn guest endpoint pacing in code: 4-second global minimum request interval, 180-second scheduler target, 2 of 16 query/location search pairs per scan, one JD worker, 30-minute deep scan, escalated cooldown and Retry-After handling. It does not guarantee avoiding 429 and its precise permitted access basis needs separate review.
+- Naukri acquisition is a separate relay; API process consumes its JSON feed.
+- Instahyre direct endpoint, Greenhouse public Job Board API, Ashby public Job Posting API exist in code but are opt-in.
+- Scheduler currently runs within FastAPI process and dispatches source workers via threads. Source run history is persistent; detailed per-request metrics and persisted scheduler/cooldown state are not implemented.
+- Source API views omitted Ashby even though the registry included it.
+
+### First code change
+- PR #37 changes the three source enumeration APIs to use the collector registry and adds regression tests for source status, Ashby latency and Ashby dedupe observations.
+- CI run #42048420905 passed: Python compilation, focused Gemini/router tests, and full V2 suite; full suite: 137 tests, OK.
+- No collector requests, polling, matching, notifications, secrets, production runtime or database were changed.
+
+### Next required manual action
+- Run the read-only Oracle audit command in the latest dated section of docs/JOB_RADAR_HANDOVER.md.
+- Attach only the sanitized output. Do not send .env, API keys, Telegram tokens, config tokens, session cookies or raw environment dumps.
+- Stop if worktree is dirty or Docker volume mapping is ambiguous. No pull/reset/rebuild/restart/scan/deploy during this read-only audit.
+
+### Work sequence after audit
+1. Verify production and dev branches/commits, worktree cleanliness, containers and separate persistent volumes.
+2. Confirm actual source enabled flags, poll intervals, last success, 429 cooldown, DB counts and notification ledger counts.
+3. Compare source run yield/latency and identify which source is the next best dev canary.
+4. Build the source registry/adapter contract and request telemetry incrementally; maintain independent source failure domains and no anti-rate-limit evasion.
+5. Add one validated, permitted ATS adapter end-to-end on dev with notifications off; compare fresh job yield and reliability.
+6. Expand towards 20–30 useful sources only after the first canary is stable. Referral intelligence follows ingestion reliability.
+
+### Existing open work that must remain isolated
+- PR #35 (Gemini shadow JD extraction) is draft and requires its own CI/dev VM validation. Do not merge or deploy it as part of PR #37.
+- PR #37 is draft; runtime audit is still required before behavior changes or merge.
