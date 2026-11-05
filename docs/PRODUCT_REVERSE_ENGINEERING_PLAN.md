@@ -79,3 +79,17 @@ Do not run job-processing endpoints simply to generate sample data. Do not print
 - No automatic LinkedIn connection requests or messages; use official authorized integrations if available, otherwise require human action.
 - No expensive provider subscription until a controlled sample demonstrates added coverage, freshness or accuracy.
 - No ground-up rewrite before the existing V2 audit is complete.
+
+## 2026-11-06 — Product priority reset: multi-user first, referral intelligence after beta
+
+The next product milestone is now **multi-user support**, not additional source expansion. The previous single-user/personal-watcher assumption is superseded for forward planning.
+
+- Shared source collection and canonical job data should serve all users once.
+- Candidate profiles/preferences, evaluations, saved/applied state, notification decisions and Telegram destinations must be user-scoped.
+- Implement admin/user roles and real login/session security before inviting external beta users.
+- First Telegram design should use one JobBeeper-owned bot and independently linked user chat IDs through a one-time deep link; BYO bot tokens are optional future scope.
+- Use the new `docs/MULTI_USER_AND_REFERRAL_ROADMAP.md` as the detailed design and acceptance source.
+
+HAPPPY-like referral intelligence remains a later phase, but is now explicitly documented as a product workflow: application tracking, relevant contact discovery from authorized/public sources, explainable contact ranking, user-approved referral/follow-up drafts, user-authorized email integration, draft creation, follow-up reminders and response tracking. Keep email sending human-approved in the first release. Do not automate LinkedIn connection requests/messages or evade platform controls.
+
+The delivery sequence is: current search/description release -> multi-user identity/RBAC -> per-user preferences/evaluations -> per-user Telegram -> small beta/feedback -> application tracker -> referral intelligence. Hiring-post discovery remains later.

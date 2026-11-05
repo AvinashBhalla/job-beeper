@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "profile_config": "v2/config.dev.json",
+  "annotation_status": "provisional_seed_review",
+  "notes": "Small anonymized regression seed, not a statistically representative benchmark. Positive/negative labels are deterministic checks. The description-mismatch case remains review-only because the upstream listing page could not be independently inspected.",
+  "cases": [
+    {
+      "case_id": "naukri_ai_automation_positive_01",
+      "source": "naukri",
+      "title": "AI Automation Engineer",
+      "location": "Gurugram, India",
+      "description": "We are seeking an AI Implementation Automation Engineer to design, build, and deploy practical AI, automation, and workflow solutions. The role combines process improvement, solution architecture, and hands-on development. Build agentic AI solutions using LLMs, Power Automate, RPA tools, APIs, and custom integrations. Identify automation opportunities, develop proof-of-concepts, and deliver scalable automation solutions. Required: 2+ years of hands-on automation, workflow development, AI solution development, or related experience.",
+      "review_label": "positive",
+      "expected_match": true,
+      "rationale": "The role title and responsibilities both directly describe hands-on AI, workflow, and automation implementation within the candidate's configured locations and experience band."
+    },
+    {
+      "case_id": "naukri_qa_automation_soft_positive_01",
+      "source": "naukri",
+      "title": "QA Automation Engineer",
+      "location": "Kochi, Bengaluru, India",
+      "description": "We are seeking an Automation Engineer to develop, maintain, and execute automated test solutions for complex software applications. Design, develop, and maintain automated test scripts and frameworks. Integrate automated testing into CI/CD pipelines, analyze software defects, and expand automation coverage. Required: 2+ years of experience in software testing and test automation.",
+      "review_label": "soft_positive",
+      "expected_match": true,
+      "rationale": "This is relevant automation engineering, but it is QA/test-automation focused rather than general application development; retain the soft-positive distinction for future precision analysis."
+    },
+    {
+      "case_id": "naukri_python_title_description_mismatch_01",
+      "source": "naukri",
+      "title": "Python Developer",
+      "location": "Bengaluru, India",
+      "description": "Develop and implement effective business strategies to drive growth and expansion. Build and maintain strong relationships with clients and stakeholders. Identify new business opportunities and partnerships. Collaborate with cross-functional teams to achieve business objectives. Analyze market trends and competitor activity. Provide customer service and support. Disclaimer: This job posting has been aggregated from external source. Applicants are advised to confirm the latest information directly on the company website before applying. 0-2 Yrs SQL, Cs, Javascript, Intelligence, CSS, Processing, Natural language processing, Django",
+      "review_label": "review",
+      "expected_match": null,
+      "observed_match": true,
+      "observed_score": 88,
+      "rationale": "The title is a configured target role, but the responsibility body is business-development/customer-service oriented and technical terms occur only in the trailing keyword metadata. Keep out of precision scoring until the employer's original posting can be verified."
+    },
+    {
+      "case_id": "naukri_explicit_work_location_negative_01",
+      "source": "naukri",
+      "title": "Software Engineer",
+      "location": "Pune, Chennai, Bengaluru, India",
+      "description": "Work Location: Pune. Work Mode: Hybrid. Build and maintain Python services. 2 years of experience.",
+      "review_label": "negative",
+      "expected_match": false,
+      "rationale": "The source metadata lists Bengaluru, but the explicit employer-stated work location is Pune, outside the configured location list."
+    },
+    {
+      "case_id": "ashby_analyst_title_incidental_engineer_mention_01",
+      "source": "ashby",
+      "title": "Conversation Quality Analyst",
+      "location": "Bengaluru, India",
+      "description": "Verify LLM evaluations and collaborate with forward deployed engineers.",
+      "review_label": "negative",
+      "expected_match": false,
+      "rationale": "The role is an analyst position; an incidental engineering phrase in the description must not turn it into an engineering-role match."
+    }
+  ]
+}
