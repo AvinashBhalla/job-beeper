@@ -5885,3 +5885,16 @@ Synchronize the changed CI workflow and foundation handover additions into `work
 
 ### Next step
 Review draft PR #40's six-file diff for API compatibility, migration safety and run outcome semantics. If approved, merge only after explicit user direction. After review, proceed to phase 2 observability design: per-source target/request attempts/outcomes plus fetched/parsed/rejected/new/updated/duplicate counts and stage timings, with tests and secret-safe error handling. Do not change request rate or deploy.
+
+
+## Restacked implementation PR status — 2026-11-05
+
+- The first telemetry implementation/test content has been restacked onto the latest foundation head after the original child branch diverged. Clean branch: `work/source-run-telemetry-clean`, based on `work/job-intelligence-foundation` at `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- Git compare reports status `ahead`, 11 commits ahead, **0 behind**, merge base equals the foundation HEAD. PR #40 is open, draft, unmerged and currently mergeable; base `work/job-intelligence-foundation`; head `78e5b2da8ed01d4b277cad86010c2b5f86d14094`.
+- Current application/test blobs on the clean branch are unchanged from the previously validated versions: `v2/radar.py` blob `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; `v2/test_radar.py` blob `0f33aae175d69a5c59291894e351535740003651`. These same versions passed V2 CI run #1136 / ID `42078168015` through validation-only PR #39: 141 tests in 17.071s — OK.
+- PR #38 (the earlier divergent telemetry PR) is now closed unmerged. PR #39 (validation-only to `v2-live-radar`) is closed unmerged after successful CI. PR #37 remains open/draft/unmerged into `v2-live-radar`, with current head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- No workflow run is reported for PR #40 because the default branch `main` workflow trigger only permits PR targets `main` and `v2-live-radar`; do not mislabel the empty status as pass/failure. The exact application/test blobs on PR #40 have already passed run #1136, but the new restacked PR head itself has not triggered CI. PR #40 is therefore kept draft for review; do not merge until normal base/head verification and review.
+- Generic continuation prompt: `docs/AGENT_CONTINUATION_PROMPT.md`; active branch instruction now points to `work/source-run-telemetry-clean`. No runtime, VM, Docker, DB, polling, collector, Telegram, source-enable, or deployment changes occurred.
+
+### Next action
+- Review phase-1 telemetry semantics and compatibility on PR #40. Then design phase 2 request/target instrumentation: source run ID correlation, target-level attempts/outcomes, HTTP status/Retry-After, and counts for fetched, parsed, rejected, new, updated and duplicate jobs. Keep provider-specific semantics explicit; preserve partial-success, don't log URLs/secrets, don't increase request volume, and add tests before implementation. Do not add cooldown persistence across restart until clock/boot recovery and source-specific backoff semantics are designed.
