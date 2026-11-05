@@ -2743,3 +2743,14 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - The full next-agent prompt is now saved at `docs/NEXT_AGENT_START_PROMPT.md`.
 - It includes product goal, current branch/PR state, code and collector baseline, Oracle runtime facts, Docker volumes/DB snapshot counts (including the two differing count outputs), hard safety rules and the next implementation sequence.
 - Copy that file's prompt section into the next model session; the new agent should still verify current branch/PR/CI and read the handover before editing.
+
+
+## Session continuity update — 2026-11-05
+
+- User requested a generic, reusable next-agent prompt and a strict continuity practice: keep logging every change and new output in the handover so the work can continue safely if chat context expires.
+- Created `docs/AGENT_CONTINUATION_PROMPT.md`. It directs the next agent to read durable project docs, incorporate the latest pasted command output as evidence, continue a bounded task, and append both handovers on every turn with code/CI/runtime/safety/next-action details.
+- GitHub verification: branch `work/job-intelligence-foundation` exists. PR #37 remains open/draft/unmerged, base `v2-live-radar`, head `bbe98e33a3e131d8d63c753623d384e6ac01ced4`, base commit `3f5b1e63ab43ca97ded73be40b05c0ce6f6e50c6). Latest V2 CI run on that exact head is run #1125 / ID `42074147311`, completed successfully. The combined status endpoint itself returned no status entries; the workflow-run result is the positive CI evidence.
+- No application code, runtime configuration, DB, Docker, collectors, polling, Telegram or VM state changed in this turn. No deployment or merge occurred. No new VM command output was received; retain the prior 2026-11-05 API/Docker/SQLite audit as the latest runtime evidence.
+- Detailed session record: latest section of `docs/JOB_RADAR_HANDOVER.md`.
+- Next: read current `v2/radar.py`, adapters, schema/migrations and tests on the foundation branch; design a small source/run telemetry slice without increasing request volume. Keep PR #37 draft until reviewed; preserve all VM safety boundaries.
+- Fresh-chat handoff: paste `docs/AGENT_CONTINUATION_PROMPT.md` followed by the latest sanitized command output.
