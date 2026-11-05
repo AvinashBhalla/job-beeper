@@ -5898,3 +5898,13 @@ Review draft PR #40's six-file diff for API compatibility, migration safety and 
 
 ### Next action
 - Review phase-1 telemetry semantics and compatibility on PR #40. Then design phase 2 request/target instrumentation: source run ID correlation, target-level attempts/outcomes, HTTP status/Retry-After, and counts for fetched, parsed, rejected, new, updated and duplicate jobs. Keep provider-specific semantics explicit; preserve partial-success, don't log URLs/secrets, don't increase request volume, and add tests before implementation. Do not add cooldown persistence across restart until clock/boot recovery and source-specific backoff semantics are designed.
+
+
+## Latest status check — 2026-11-05 18:20 UTC
+
+- Re-queried GitHub after the restack documentation updates. PR #40 current state: open, draft, unmerged, mergeable; target `work/job-intelligence-foundation`; observed head before this log append `bb84b3048217c618652ffc797e2d9691fdb2383b`.
+- Branch compare against foundation: `ahead`, 14 commits ahead, 0 behind; merge base is foundation head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- Re-fetched current application/test files: `v2/radar.py` blob remains `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; `v2/test_radar.py` blob remains `0f33aae175d69a5c59291894e351535740003651`. Both exactly match the blobs used in successful V2 CI run #1136 (#39), full suite 141 tests passed. Since the verified run, only handover/prompt documentation changed; application and test content is unchanged.
+- Generic continuation prompt at `docs/AGENT_CONTINUATION_PROMPT.md` was verified to point to `work/source-run-telemetry-clean`.
+- PR #38 and PR #39 remain closed unmerged; PR #37 remains open/draft/unmerged. No PR merge/deployment or runtime changes.
+- This entry is appended as documentation only; verify the resulting branch/PR head in the next session rather than assuming the pre-append SHA remains current.
