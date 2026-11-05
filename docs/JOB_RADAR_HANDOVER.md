@@ -5092,3 +5092,42 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Continue read-only public investigation. Navigate the isolated Chrome profile to /browse/hiring-this-week and capture a sanitized HAR with Preserve log; examine actual browse API calls, response shape, filter parameters, pagination and job IDs. Then open one public /j/{id}-{slug} detail page and capture its requests.
 - Do not sign in, change settings, submit applications, create alerts, automate interactions, or access private account data during this public investigation.
 - No Job Radar application code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed as part of this research.
+
+
+## 2026-11-05 — JobBeeper browse, company and public job-detail HAR findings
+
+### Capture overview
+- User supplied a sanitized Chrome DevTools HAR captured while navigating the isolated browser through the homepage, `/browse/hiring-this-week`, `/browse/company/domino-s`, and `/j/28752345-delivery-driver-02202-1027-w-hunter-st-domino-s`.
+- HAR contained 137 HTTP entries across four page groups. 81 requests were to jobbeeper.com and 56 to Google-related hosts/services.
+- Overall statuses: 92 x 200, 22 x 301, 12 x 404, 7 x 204, 4 x 401.
+- JobBeeper-only statuses: 77 x 200, 4 x 401. The 4 JobBeeper 401s were unauthenticated homepage lookups to /api/auth/user/me and /api/auth/me; the public browse/company/job-detail documents returned 200.
+- The 22 HTTP 301 responses were Google favicon lookup redirects (/s2/favicons); the 12 HTTP 404 responses were gstatic favicon lookups (/faviconV2), not JobBeeper application routes. The 7 HTTP 204 responses were Google Analytics /g/collect POSTs.
+- HAR contains 4 page records: homepage, hiring-this-week, Domino's company page, and one Domino's job detail. The main public routes were navigated as distinct pages.
+- The capture did not include Cookie, Authorization, Set-Cookie, Proxy-Authorization or X-API-Key headers. HAR response objects had MIME type and body size but no response body text for the public HTML documents. Do not infer HTML content from byte sizes alone.
+
+### OBSERVED — public page routing and delivery
+- `GET /` -> 200 text/html.
+- `GET /browse/hiring-this-week` -> 200 text/html, response content size 85,920 bytes; document request about 580 ms. HAR page timing: onContentLoad ~869 ms; onLoad ~1,200 ms.
+- `GET /browse/company/domino-s` -> 200 text/html, response content size 176,280 bytes; document request about 321 ms. HAR page timing: onContentLoad ~494 ms; onLoad ~687 ms.
+- `GET /j/28752345-delivery-driver-02202-1027-w-hunter-st-domino-s` -> 200 text/html, response content size 67,639 bytes; document request about 198 ms. HAR page timing: onContentLoad ~339 ms; onLoad ~576 ms.
+- The browse, company and detail pages each loaded shared assets: `/static/jobpage.js`, `/static/publicpage-theme.js`, and `/static/publicpage-ui.js`. The job detail page additionally loaded `/static/public-job.css`. CSS and JavaScript resources returned 200.
+- Each of the four page paths (including homepage) had a document request and a near-immediate duplicate Fetch request for the same URL. The second request's initiator stack points to `https://jobbeeper.com/sw.js` at line 58 (HAR lineNumber 57), confirming service-worker involvement in the duplicate fetch. The service-worker script body was not captured, so cache strategy, navigation preload behavior and purpose of this duplicate are unknown.
+- On the three browse/company/detail page groups, no same-origin JSON API endpoints appeared in the HAR. The only observed same-origin API JSON traffic in this HAR was on the homepage: `/api/public/pulse`, `/api/auth/plan`, `/api/auth/plans`, `/api/auth/user/me`, and `/api/auth/me`.
+- The 81 JobBeeper requests included the homepage's SPA bundles and pulse/plan endpoints, and the separate public-page static assets. This appears to be a distinct public HTML page delivery path for browse/company/job-detail routes, but implementation boundary needs source/runtime confirmation.
+
+### INFERRED — public browsing architecture
+- Large HTML documents plus shared public-page JavaScript/CSS, with no observed JSON API calls on the browse/company/detail pages, are consistent with server-rendered HTML or content embedded in delivered HTML. This is not proven because the sanitized HAR omitted response bodies.
+- The `/sw.js`-initiated duplicate Fetch requests indicate the service worker participates in navigation handling or follow-up fetch behavior. Do not label the strategy as cache-first, network-first or stale-while-revalidate without observing the service-worker source or controlled runtime behavior.
+- The public browsing pages may use a different implementation path from the homepage SPA. The homepage uses hashed `/assets/*.js` modules and /api JSON endpoints; the public browse/detail pages load `/static/*.js` and larger HTML documents.
+
+### UNKNOWN / not established by this capture
+- Actual HTML text, job-card data, company metadata, job description fields, filters, pagination, page size, and application outbound URL are unknown because HAR response bodies were not included.
+- No filter form submission, query change, next-page action, detail CTA click, logged-in flow, or private job preference behavior was observed.
+- No backend route handlers, database schema, template system, service-worker caching policy, source collection schedule, job ingestion or deduplication behavior were established.
+- No same-origin JSON API calls for browse/company/detail appeared in this capture. This does not prove that those pages never call APIs; lazy loading, user interaction, scroll-triggered activity or a different state may initiate additional calls.
+
+### Next exact investigation step
+- Use REA `inspect-web-page` against the currently selected public job-detail or browse page, after refreshing target discovery, with accessibility text enabled; this should capture actual visible labels and page structure without relying on HAR response bodies. Keep the page stable during the capture.
+- Then inspect `/static/jobpage.js` and `/static/publicpage-ui.js` as public, loaded scripts using REA bundle/source observation. Avoid executing unknown page code outside the site's normal browser context.
+- After page content is understood, test public filtering and pagination manually in Chrome while recording a sanitized HAR. Record which controls were used and compare URL/query changes and network requests. Do not sign in, submit applications, create alerts, or access private data.
+- No Job Radar app code/config, Oracle runtime, SQLite database, collectors, Telegram notifications, provider API calls or deployment were changed during this capture or its analysis.
