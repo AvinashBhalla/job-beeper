@@ -5420,3 +5420,47 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
   Return the output. Do not pull if the tree has local changes or is not simply behind; preserve the files/volume above. Once the fast-forward is confirmed safe, run `./.venv/bin/python -m py_compile v2/radar.py v2/test_radar.py`, `./.venv/bin/python -m unittest v2.test_radar.SourceStatusPersistenceTests v2.test_radar.SourceLatencySummaryTests -v`, then the full documented suite `./.venv/bin/python -m unittest discover -s v2 -p 'test_*.py' -v`. Do not rebuild or deploy until those results are reviewed.
 - **Continuation prompt:** “Continue Job Radar V2 on `v2-live-radar`. Read both handovers and the reference docs first. Cognizant search confirmed browser-local filtering over 200 preloaded Backend cards; stop open-ended JobBeeper reverse engineering. A repo-only audit found five collectors and an observability omission for Ashby; commits `6f6c62d` and `4f73e73` fix source-status/latency coverage and add tests. CI and VM tests are not yet verified. First compare the dev checkout with origin using the exact read-only commands in the latest handover; preserve local config, .venv, .env and the named volume. Then run targeted and full tests before considering any dev rebuild. Keep notifications off and production untouched.”
 - **Cross-reference:** compact status is in `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`; product/architecture guardrails are in `docs/JOBBEEPER_REFERENCE.md`; router rollout constraints remain in `docs/LLM_PROVIDER_ROUTER.md`.
+
+
+## Latest user prompt follow-through — 2026-11-06 — deployment checkout and volume identity clarified
+
+### Goal and evidence
+- Goal remains reliable, fresh multi-source discovery → normalization/canonical deduplication → consistent matching/notification decisions → dashboard and Telegram delivery. This turn was an evidence-only deployment-safety investigation; no application code/config was changed.
+- Development checkout `/home/ubuntu/job-beeper-dev`: branch `v2-live-radar`, HEAD `7ebc38b321847e74895557551478c3ff11bd4a`. User reported the four focused Ashby observability tests passed, then the full suite passed: **136 tests in 19.323s, OK**. `py_compile` also completed before the suite. These tests ran against the checkout, not the running container.
+- Development checkout still has local state that must be preserved: modified `v2/config.json`; untracked `.env.save`, `.venv/`, and `v2/config.json.backup.20261105-183321`. Do not stage, overwrite, reset, clean, or delete these.
+- Runtime API on port 8000 returned `status=ok`, version 2.0.0, DB `/data/jobs.db`; health showed LinkedIn and Naukri enabled, neither running at the instant sampled, no reported errors; Instahyre and Greenhouse disabled. `/api/source-status` listed LinkedIn, Naukri, Instahyre and Greenhouse, but **not Ashby**. This is consistent with the old runtime image, not proof of an Ashby collector failure in the new source.
+- Runtime daily summary for 2026-11-06 (Asia/Kolkata): 5 jobs discovered, 0 matched, 0 alertable, 0 alerts sent. Last-hour latency: LinkedIn 19 samples, p50 2,520s (42m), p90 14,400s (4h), max 18,000s (5h), 4/19 under 300s; Naukri 0 usable samples. Treat these as one point-in-time runtime snapshot, not a stable SLO.
+- Docker access without privilege failed with permission denied. With `sudo`, read-only inspection succeeded. Container `v2-radar-1` uses image `v2-radar`, image ID `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`, created 2026-10-12T03:44:43Z, and was Up about three weeks. Its Compose project label is `v2`; Compose config path label is `/home/ubuntu/job-beeper/v2/docker-compose.yml`.
+- Actual mount is Docker named volume `v2_radar-data` at `/data`, host path `/var/lib/docker/volumes/v2_radar-data/_data`. This is the existing runtime database/config volume. Preserve it; never use `down -v`, volume prune/remove, or a different Compose project for this service.
+- Original deployment checkout `/home/ubuntu/job-beeper`: branch `v2-live-radar`, HEAD `61d8271` (`Document free-first LinkedIn strategy and release cleanup`). Its Compose file resolves service `radar`. User's `git status --short` printed no entries, but explicitly re-check before any change rather than assuming it is clean.
+- Critical path distinction: `/home/ubuntu/job-beeper-dev` is the tested, updated checkout; `/home/ubuntu/job-beeper` is the checkout path recorded in the currently running container's Compose labels. Do not run Compose from the dev directory for the port-8000 service. Doing so may create another project/volume. Do not pull/rebuild the original checkout until its role (production/live deployment versus a development target) and commit relationship are explicitly established.
+- A YAML fragment (`volumes: - radar-data:/data`) was mistakenly pasted at the shell prompt and produced `command not found`; YAML belongs in a Compose file, not executed as shell commands. No harm to the repository or service was evidenced.
+
+### Diagnosis and confidence
+- High confidence: port-8000 container is an old image created on 12 Oct and is not running the just-tested 7 Nov? correction: **6 Nov 2026** checkout source at `7ebc38b`. The missing Ashby API row is consistent with this old image. No image rebuild/recreate has occurred.
+- High confidence: current persistent runtime volume identity is `v2_radar-data` mounted at `/data`.
+- Not established: whether the original checkout at `61d8271` is production, staging, or a separate intended dev target; whether it has uncommitted changes (the status command emitted no lines but must be rechecked); whether its Git history can fast-forward to the tested commit; whether the image can be safely recreated under the intended release policy.
+- CI for `7ebc38b` remains unverified. User-run local tests are the evidence above.
+
+### What changed / what did not
+- No source/config edits, database writes, Docker builds, container restarts, Compose up/down, source enablement, notification sends, provider requests, or production changes.
+- No Git commit was created by this runtime investigation. The preceding Ashby code/test commits and handover updates remain as recorded above.
+
+### Exact next action — do not deploy yet
+1. Confirm with the user whether `/home/ubuntu/job-beeper` on port 8000 is the live/production service or the intended development service. Treat it as production/live until clarified.
+2. Read-only, from `/home/ubuntu/job-beeper`, run:
+   ```bash
+   cd /home/ubuntu/job-beeper
+   git status --short
+   git branch --show-current
+   git rev-parse HEAD
+   git remote -v
+   git fetch origin v2-live-radar
+   git rev-list --left-right --count HEAD...origin/v2-live-radar
+   ```
+   Do not pull, checkout, build, or recreate the service as part of this inspection. Do not print `.env`, `/data/config_token`, tokens, or private feed credentials.
+3. Compare the original checkout history to `7ebc38b321847e74895557551478c3ff11bd4a`. If the original checkout is the live/production service, prepare a separately reviewed backup/rollback plan and obtain explicit deployment approval before touching it. If a dedicated dev service is desired, use its own Compose project name, loopback-only port and separate volume; never reuse `v2_radar-data` for a second instance.
+4. Before any future recreate, verify Compose resolves the intended project and exact existing volume. Preserve `v2_radar-data`, runtime `/data/config.json`, generated `/data/config_token`, local `v2/config.json`, `.env.save`, and `.venv/`.
+
+### Continuation prompt
+“Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md` first. Latest evidence dated 2026-11-06: dev checkout `/home/ubuntu/job-beeper-dev` is at `7ebc38b`; 136 V2 tests pass. It has local modified `v2/config.json` and untracked `.env.save`, `.venv/`, config backup; preserve them. Port 8000 container is old (created 2026-10-12), Compose project `v2`, Compose file path `/home/ubuntu/job-beeper/v2/docker-compose.yml`, persistent named volume `v2_radar-data:/data`. Original checkout `/home/ubuntu/job-beeper` is branch `v2-live-radar` at `61d8271`; its role as production/live vs development is not yet clarified. Runtime API did not list Ashby; this is consistent with old image. No rebuild/restart/deploy occurred. First clarify service role, then do read-only status/fetch/commit comparison in original checkout. Do not pull or rebuild until release target and rollback plan are clear. Never remove/recreate volumes, send notifications, expose secrets, or modify production without explicit approval. Update both handovers after every prompt.”
