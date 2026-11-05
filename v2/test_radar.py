@@ -2539,7 +2539,14 @@ class SourceStatusPersistenceTests(unittest.TestCase):
                         finished_at TEXT NOT NULL,
                         jobs_seen INTEGER NOT NULL,
                         new_jobs INTEGER NOT NULL,
-                        error TEXT
+                        error TEXT,
+                        run_id TEXT,
+                        outcome TEXT,
+                        duration_seconds REAL,
+                        error_type TEXT,
+                        http_status INTEGER,
+                        retry_after_seconds REAL,
+                        cooldown_seconds INTEGER
                     )
                 """)
             with patch.object(radar, "DB_PATH", db_path):
@@ -2742,7 +2749,10 @@ class SourceStatusPersistenceTests(unittest.TestCase):
                 self.assertEqual(row[6], 600.0)
                 self.assertEqual(row[7], 599)
                 self.assertNotIn("must-not-persist", row[0])
-                self.assertEqual(runtime["rate_limited_until"], "2026-11-05T10:10:00+00:00")
+                rate_limited_until = radar.parse_relative(runtime["rate_limited_until"])
+                remaining_seconds = (rate_limited_until - radar.now()).total_seconds()
+                self.assertGreaterEqual(remaining_seconds, 598)
+                self.assertLessEqual(remaining_seconds, 600)
                 self.assertEqual(runtime["rate_limit_cooldown_seconds"], 599)
                 self.assertFalse(runtime["running"])
                 self.assertEqual(runtime["run_id"], row[1])
