@@ -5751,6 +5751,32 @@ The counts and DB byte sizes decreased between the two pasted snapshots. The cap
 Synchronize the changed CI workflow and foundation handover additions into `work/source-run-telemetry` without dropping its telemetry log, then update the child head to trigger PR #38 CI. Record exact resulting PR head and workflow result. Do not merge or deploy.
 
 
+## CI trigger clarification and validation approach — 2026-11-05
+
+- Follow-up inspection of `.github/workflows/v2-ci.yml` on `main` (the repository default branch) confirmed its `pull_request.branches` filter includes only `main` and `v2-live-radar`. This explains why PR #38, targeting `work/job-intelligence-foundation`, does not receive a workflow run even after a filter edit on the base feature branch: the default-branch workflow definition remains authoritative for trigger availability.
+- The temporary addition of `work/job-intelligence-foundation` to the workflow file on this feature branch did not trigger PR #38. It was reverted in commit `c2e27b17bfa2042045c37900e57f212c3366245a`, restoring the original workflow content; no lasting CI configuration change is proposed here.
+- We will not modify `main` merely to enable CI for this stacked draft PR. Instead, create a separate **validation-only draft PR** from the exact telemetry branch head to `v2-live-radar` (a base branch already in the default workflow filter) to execute the same full code tree. Keep PR #38 as the implementation PR targeting the foundation branch. Close the validation-only PR unmerged after the CI result is captured.
+- This is a CI routing workaround, not a change to production or source behavior. Do not merge/deploy either PR on the basis of this workaround; PR #38 still needs normal review.
+
+### Next action
+1. Restore the workflow file on `work/source-run-telemetry` to match this foundation branch so PR #38 contains no dead CI-filter diff.
+2. Synchronize the latest foundation handover/knowledge-transfer entries into the child branch while preserving its telemetry additions.
+3. Create validation-only PR #39 targeting `v2-live-radar` from the exact child head; verify full CI; close #39 unmerged after recording the run. Keep PR #38 open/draft.
+
+
+## CI branch-filter discovery — 2026-11-05
+
+- PR #38 (`work/source-run-telemetry` -> `work/job-intelligence-foundation`) had no workflow run and no combined commit-status entries for head `1812fce7c483b8f04dc55585ada8cb43e9adfff2`.
+- Inspected `.github/workflows/v2-ci.yml` on the PR base. Its `pull_request.branches` filter listed only `main` and `v2-live-radar`; it did not include `work/job-intelligence-foundation`. Therefore PR #38 was excluded by the configured target-branch filter. The empty status response was not a failed run and not a passing run.
+- Updated `.github/workflows/v2-ci.yml` on this foundation branch to also include `work/job-intelligence-foundation` in the `pull_request.branches` filter. Push trigger remains unchanged (`main`, `v2-live-radar`); no production behavior changed.
+- New foundation branch commit for this CI change: `84945d4049ad82df8bd355caaff3f7d81cd4e112`.
+- This change is on the foundation branch itself. PR #37 (target `v2-live-radar`) should still be eligible under its existing base workflow filter; verify the latest PR #37 head/CI. For PR #38, the base branch now has the correct filter; push a synchronized child-head change after incorporating the base workflow change and verify that a V2 CI run actually starts.
+- No VM, container, DB, source, polling, Telegram, production or deployment state changed.
+
+### Next action
+Synchronize the changed CI workflow and foundation handover additions into `work/source-run-telemetry` without dropping its telemetry log, then update the child head to trigger PR #38 CI. Record exact resulting PR head and workflow result. Do not merge or deploy.
+
+
 ## Source-run telemetry slice — 2026-11-05 (implementation; verification pending)
 
 ### Scope and branch
