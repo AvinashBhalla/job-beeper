@@ -1423,6 +1423,41 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
 
 
 
+def extract_explicit_work_location(description: str) -> str | None:
+    """Return a clearly labelled work-location value from a job description.
+
+    Some aggregators combine several source locations even when the employer
+    states one actual work location in the JD. Only trust the explicit
+    "Work Location:" label; do not infer a city from an address or interview
+    venue.
+    """
+    raw = re.sub(r"\\s+", " ", str(description or "")).strip()
+    if not raw:
+        return None
+    match = re.search(
+        r"\\bwork\\s+location\\s*[:\\-]\\s*(?P<location>.+?)"
+        r"(?=\\s+\\b(?:interview\\s+venue|work\\s+mode|employment\\s+type|"
+        r"job\\s+type|qualification|experience|key\\s+responsibilities|"
+        r"responsibilities|job\\s+summary|job\\s+description)\\b\\s*:|[;|\\n]|$)",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    value = re.sub(r"\\s+", " ", match.group("location")).strip(" ,;|.-")
+    if not value or len(value) > 80 or len(value.split()) > 8:
+        return None
+    return value
+
+
+def job_location_for_matching(job: dict[str, Any]) -> str:
+    """Prefer an explicit work location over broad aggregator metadata."""
+    return (
+        extract_explicit_work_location(str(job.get("description") or ""))
+        or str(job.get("location") or "")
+    )
+
+
 
 def _clean_experience_text(text: str) -> str:
     raw = html_lib.unescape(str(text or "")).replace("\xa0", " ")
@@ -1783,7 +1818,7 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
             "experience_max_years": None,
         }
 
-    if not location_allowed(job.get("location") or "", config):
+    if not location_allowed(job_location_for_matching(job), config):
         return {
             "match": False,
             "score": 0,
@@ -2742,7 +2777,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         shadow_candidates = [
             job for job in jobs
             if title_allowed(job.get("title", ""), config)
-            and location_allowed(job.get("location", ""), config)
+            and location_allowed(job_location_for_matching(job), config)
             and (
                 match_details(job, config)["match"]
                 or phrase_hits(config.get("target_roles", []), job.get("title", ""))
