@@ -2830,3 +2830,11 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - V2 CI run #1136 / ID `42078168015` passed on the exact same `v2/radar.py` and `v2/test_radar.py` blobs now in PR #40: 141 tests in 17.071s — OK. PR #40's newest follow-up commits are documentation-only.
 - No merge/deploy/runtime/VM/DB/Docker/polling/collector/Telegram/config changes. Next: review PR #40; then design phase 2 per-target/request attempt and processing-count telemetry, without increasing requests.
 - Full chronological evidence: latest `docs/JOB_RADAR_HANDOVER.md` section. Fresh chat: paste `docs/AGENT_CONTINUATION_PROMPT.md` then the latest sanitized command output.
+
+
+## Restacked telemetry PR — 2026-11-05
+
+- Active branch `work/source-run-telemetry-clean` is based on latest foundation SHA `689130ab6d39061a9a69fdd8349aeb060bf52beb`; compare: 11 ahead, 0 behind. PR #40 is open/draft/unmerged and mergeable, head `78e5b2da8ed01d4b277cad86010c2b5f86d14094`.
+- Code/test blobs match the green validation versions exactly: radar `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; tests `0f33aae175d69a5c59291894e351535740003651`. V2 CI run #1136 / ID `42078168015` passed all steps and full suite (141 tests in 17.071s — OK). PR #40 itself has no workflow run because default `main` only triggers PRs targeting `main`/`v2-live-radar`; the separate validation PR #39 is closed unmerged after its pass.
+- Old PR #38 closed unmerged. PR #37 remains separate open/draft/unmerged at head `689130ab6d39061a9a69fdd8349aeb060bf52beb`. No runtime/VM/deployment change.
+- Next: review phase 1; design request/target-level telemetry and ingest counters with tests, no increase in source request volume. Full record in latest `JOB_RADAR_HANDOVER.md` section. Generic prompt points to clean branch.
