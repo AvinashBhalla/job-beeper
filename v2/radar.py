@@ -2964,7 +2964,10 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             )
             runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
         source_state[source] = runtime
-        log.exception("%s collector failed run_id=%s outcome=%s", source, run_id, outcome)
+        log.error(
+            "%s collector failed run_id=%s outcome=%s error_type=%s",
+            source, run_id, outcome, metadata["error_type"],
+        )
 
 
 async def notification_worker() -> None:
