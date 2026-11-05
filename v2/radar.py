@@ -1846,9 +1846,15 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
         if generic_title and title_skill_hits:
             role_hits = [f"{title_skill_hits[0]} developer"]
 
-    if not role_hits:
-        role_hits = phrase_hits(config.get("target_roles", []), description)
-        role_source = "description"
+    # A role keyword mentioned in a description is not sufficient on its
+    # own: non-engineering titles (for example, "Conversation Quality Analyst")
+    # can mention engineers they collaborate with. Use description fallback
+    # only when the title itself identifies a developer/engineer role family.
+    if not role_hits and generic_title:
+        description_role_hits = phrase_hits(config.get("target_roles", []), description)
+        if description_role_hits:
+            role_hits = description_role_hits
+            role_source = "description"
 
     if role_hits:
         role_bonus = 35 if role_source == "title" else 30
