@@ -2754,3 +2754,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - No application code was changed in this review. No production pull/build/restart, config/DB/volume mutation, source activation, provider call or Telegram send. Production /home/ubuntu/job-beeper, port 8000, v2-radar-1 and v2_radar-data:/data remain untouched.
 - Goal remains reliable multi-source discovery → normalization/deduplication → explainable matching → dashboard and Telegram delivery. The endpoint code fix and regression are validated by the local full suite, but no runtime/deployment claim follows. Keep production approval-gated.
 - Continuation: verify the isolated worktree status/HEAD/diff with the exact commands above. Then review CI availability and prepare an isolated runtime/release plan only after the code state is clean. Do not deploy or send notifications.
+
+## 2026-11-06 follow-through — clean code diff
+- Detached worktree HEAD verified as c93f0414e8f99540d6004f012e8cb286e32bf1f6. `v2/radar.py` and `v2/test_radar.py` have no diff. Local `v2/config.json` is modified (2 insertions/2 deletions) and `.venv/` is untracked; preserve both without reset/clean/stage/commit.
+- Full V2 suite: 137 tests passed in 18.998s, including Ashby dedupe regression. CI remains unverified. Production remains untouched; no deploy, config/DB/volume mutation, source activation, or notification send.
+- Next: prepare a non-mutating isolated runtime/release checklist; production changes require separate explicit approval and backup/rollback review.
