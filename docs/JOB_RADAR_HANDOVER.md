@@ -5579,3 +5579,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - `git status --short`: modified `v2/config.json`, untracked `.venv/`. `git diff --stat`: only config, 2 insertions/2 deletions. `git diff -- v2/radar.py v2/test_radar.py` was empty. Ashby fix and regression-test files are clean; preserve config and venv, do not reset/clean/stage/commit them.
 - Full V2 suite previously passed: 137 tests in 18.998s, including the Ashby dedupe regression. CI remains unverified. No production change/deployment, source activation, DB/volume mutation, provider call, or Telegram send.
 - Next: retain the isolated worktree and prepare a non-mutating isolated runtime/release checklist. Production deployment still requires separate explicit approval and backup/rollback review.
+
+
+## 2026-11-06 follow-through — verify isolated development Docker service
+- User asked to verify whether the isolated development Docker service on port 8001 is still running. The assistant cannot inspect the VM directly; requested read-only VM checks: `sudo docker ps -a --filter 'publish=8001' --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`, `sudo docker compose ls`, `sudo ss -ltnp | grep ':8001' || ...`, and from `/home/ubuntu/job-beeper-dev`, `git status --short` plus `git rev-parse --short HEAD`.
+- Await user-supplied command output before declaring service status. Do not start/stop/rebuild containers or change configuration. Keep production port 8000 and production checkout/container/volume untouched.
