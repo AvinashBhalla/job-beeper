@@ -5841,3 +5841,18 @@ Synchronize the changed CI workflow and foundation handover additions into `work
 - Remaining error: `SourceRegistryApiCoverageTests.test_source_status_includes_every_registered_collector` still had a legacy fixture without the new telemetry columns. The prior correction had updated the similarly shaped migration-test fixture instead of this specifically located source-registry fixture.
 - Corrected the fixture in commit `701df0b2c8dc11403cd5e7a48390c4b0479c20f8` on `work/source-run-telemetry`. This commit has not yet been tested. Advance `validation/source-run-telemetry` and rerun PR #39 CI on the resulting exact head.
 - No code/runtime/config/VM/DB/Docker/Telegram/polling/source enablement/deployment changes outside the test fixture. PR #38 remains the implementation PR; PR #39 remains validation-only and should be closed unmerged after final CI.
+
+
+## Telemetry slice CI verified — 2026-11-05
+
+- After correcting the last source-registry fixture, V2 CI run #1136 / ID `42078168015` completed successfully on commit `997235c658177b17fc2f9257e039d171841e617b` (validation-only PR #39, base `v2-live-radar`).
+- Confirmed workflow steps: dependency installation passed; Python compilation passed; focused router/extractor tests passed; full V2 unittest suite passed. The job log reports **141 tests in 17.071s — OK**.
+- New telemetry tests passed: legacy `source_runs` schema migration, sanitized 429 persistence/cooldown, partial-result-plus-429 classification, and structured `/api/source-status` output. The source-registry all-collector status fixture also passed after its schema correction.
+- First validation run #1134 (ID `42077545562`) had 2 test issues; second run #1135 (ID `42077890037`) had 1 remaining stale fixture; both failures and fixes are retained in the prior sections. Run #1136 is the successful final verification.
+- Validation PR #39 is only a CI vehicle because default `main` filters PR events to `main` and `v2-live-radar`. Close #39 **unmerged** after this log update. Implementation PR #38 remains open/draft into `work/job-intelligence-foundation`; it contains the code/test change from the tested commit. Subsequent handover-only commits may advance PR #38's HEAD, but the application/test files are unchanged from the successfully tested commit.
+- Successful code/test head: `997235c658177b17fc2f9257e039d171841e617b`. The handover/knowledge-transfer updates in this section are documentation-only and occur after this validation.
+
+### Remaining limitations and next engineering task
+- This is **phase 1** only: one persisted record per source run, run ID/outcome/duration and coarse HTTP 429 metadata. It does not count individual requests/targets, parse per-target success/partial failure, record stage-by-stage processing times, or persist rate-limit cooldown across restart.
+- Current LinkedIn cooldown behavior and request pacing are unchanged. No Oracle VM, production/dev runtime, DB volume, Docker, config, Telegram, source scan, secret, polling frequency or deployment change occurred.
+- Next: review PR #38 and the source-run contract; then design the next telemetry slice for per-target/request attempts and fetched/parsed/rejected/new/updated/duplicate counts, with sanitized errors and source isolation. Continue with tests first; do not increase request volume or add durable cooldown until restart semantics are explicitly designed.
