@@ -156,3 +156,17 @@ Then implement a **small, tested, incremental observability/scheduler foundation
 - The immediate goal is reliable ingestion/observability and one validated ATS canary—not a large rewrite and not more JobBeeper browsing.
 
 Start by confirming the current Git branch/PR head and reading the latest handover. Then continue with the next small engineering slice.
+
+
+---
+
+## Continuity note — 2026-11-05
+
+For the most portable fresh-chat handoff, use `docs/AGENT_CONTINUATION_PROMPT.md` and paste the latest sanitized command output directly after it. Then read the latest dated entries in both handover documents before editing.
+
+Current PR/CI verification when this note was written:
+- PR #37: open, draft, unmerged; base `v2-live-radar`; head `work/job-intelligence-foundation`.
+- Head: `bbe98e33a3e131d8d63c753623d384e6ac01ced4`.
+- Latest V2 CI for that exact head: run #1125 / ID `42074147311`, completed successfully.
+- No application/runtime change or deployment occurred during this documentation update.
+- Continue to append new evidence to `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` on every turn.
