@@ -2756,6 +2756,13 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Fresh-chat handoff: paste `docs/AGENT_CONTINUATION_PROMPT.md` followed by the latest sanitized command output.
 
 
+## CI branch filter — 2026-11-05
+
+- Found why PR #38 had no workflow result: `.github/workflows/v2-ci.yml` filtered `pull_request.branches` to `main` and `v2-live-radar`, excluding its base branch `work/job-intelligence-foundation`. Empty status/workflow response was neither pass nor failure.
+- Added `work/job-intelligence-foundation` to the pull-request branch filter on the foundation branch (`84945d4049ad82df8bd355caaff3f7d81cd4e112`). Push filters are unchanged. No runtime changes.
+- Next: synchronize base changes to `work/source-run-telemetry`, push a child-head update and verify CI on PR #38. Preserve the telemetry section and do not merge/deploy.
+
+
 ## Source-run telemetry phase 1 — 2026-11-05
 
 - Isolated child branch: `work/source-run-telemetry`, based on foundation commit `851fc4d857e7fa811e5a687f6e72fbf02e3125d7`; PR #37 remains separate.
