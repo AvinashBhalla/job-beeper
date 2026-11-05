@@ -2672,3 +2672,15 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Hard boundary: port 8000 is production; preserve `v2-radar-1` and `v2_radar-data:/data`. No production mutation without reviewed backup/rollback plan and separate explicit deployment approval.
 - Next: read-only review of all 611 commit subjects and critical diffs, especially `v2/config.json`, source/notification settings, `v2/radar.py`, Compose and CI. Then propose a bounded release candidate and backup/rollback plan; do not deploy.
 - Detailed evidence and continuation prompt: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`.
+
+## Current release review — 2026-11-06 — 613 commits behind, production gates reviewed
+
+- Production branch `v2-live-radar` HEAD `61d8271` is 613 commits behind fetched remote `a21e2f2`; working tree was clean. Aggregate range: 22 files, 9,694 additions / 120 deletions, much of it docs/tests. `v2/docker-compose.yml` is unchanged; dev Compose is separate, loopback-only 8001, separate volume, Telegram blank.
+- Production default config v10→v11 adds Ashby cadence 1,800s and OpenAI/PostHog board definitions, but sets Ashby disabled. Migration explicitly forces Ashby false for pre-v11 runtime configs after merge. LinkedIn/Naukri remain true by defaults; notifications default true. Dev config keeps Naukri only and notifications off. Live `/data/config.json` remains authoritative; never overwrite it with repo config.
+- AI paths are feature gated: Gemini extraction `GEMINI_EXTRACTION_ENABLED`, Gemini matcher `GEMINI_MATCHER_ENABLED`, router `LLM_ROUTER_ENABLED`, routed matcher `LLM_ROUTER_MATCHER_ENABLED`; code defaults false. Production Compose does not map these variables or provider keys. Verify actual live env gate presence/boolean only before any future release; never reveal values.
+- Reviewed Ashby public-board collector and config allowlist; source is opt-in. Registry-derived `SOURCE_NAMES` fixes source-status and latency-summary coverage. Greenhouse freshness logic leaves missing publication timestamps unknown. Gemini extractor uses bounded cache/evidence validation; hard matching requires explicit separate gate.
+- **Release review defect:** `/api/dedupe-candidates` retains hard-coded source filter without Ashby. Add Ashby or use registry-derived placeholders and test it before considering Ashby support complete.
+- CI workflow now includes Greenhouse compile/tests, focused router/extractor tests, and full V2 suite. GitHub status lookup did not confirm CI. User-reported dev tests: 136 pass; not production/runtime validation.
+- No production changes or notifications. No pull, build, restart, DB/config/volume mutation, or source enablement. Protect `v2-radar-1` and `v2_radar-data:/data`.
+- Next: read-only check live `/api/config` safe projection and AI feature-gate booleans, then patch/test Ashby omission on dev/branch. Prepare release backup/rollback plan only after code review; separate explicit deployment approval remains mandatory.
+- Detailed chronology: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`.
