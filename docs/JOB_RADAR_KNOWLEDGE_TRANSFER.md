@@ -2706,3 +2706,21 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - The patch remains repository-only. Production /home/ubuntu/job-beeper, port 8000, container v2-radar-1, and volume v2_radar-data:/data remain untouched; no deployment approval was given. No config, DB, source toggle, or notification state changed.
 - Overarching goal remains reliable multi-source discovery → normalization/deduplication → consistent explainable matching → dashboard and Telegram delivery. The Ashby endpoint fix only closes registry coverage in dedupe candidate discovery; it does not activate Ashby or prove collection/runtime health.
 - Continuation: run the three python3 commands above in the isolated worktree and return complete output. Then review failures or confirm test evidence, check CI, and update both handover documents. No production mutation or notification send.
+## User prompt follow-through — 2026-11-06 — test import blocked by missing dependency
+
+- User ran the focused Ashby regression test, full V2 unittest discovery, and py_compile from /tmp/job-beeper-ashby-dedupe-test at c93f041 using python3.
+- Focused test did not load: importing v2.radar failed with ModuleNotFoundError: No module named 'bs4'. Full discovery loaded and passed 17 LLM-router tests, but four test modules failed to import (Radar, Gemini experience diagnostic, Gemini extractor, Greenhouse canary) for the same missing bs4 dependency. Therefore the full suite is BLOCKED/INCOMPLETE, not a code-test failure and not a pass.
+- py_compile was the final command and emitted no error output; this is consistent with syntax compilation success, but the user did not separately show an exit code. Compilation does not validate imports or behavior.
+- Repository-declared runtime dependencies are in v2/requirements.txt: FastAPI, Uvicorn, requests, beautifulsoup4, tzdata. The missing import maps to the declared beautifulsoup4 package.
+- Next exact action, still inside /tmp/job-beeper-ashby-dedupe-test: create an isolated virtual environment and install the V2 requirements, without changing system Python or production:
+
+  python3 -m venv .venv
+  .venv/bin/python -m pip install -r v2/requirements.txt
+  .venv/bin/python -m unittest v2.test_radar.DedupeCandidatesSourceCoverageTests -v
+  .venv/bin/python -m unittest discover -s v2 -p 'test_*.py' -v
+  .venv/bin/python -m py_compile v2/radar.py v2/test_radar.py
+
+- If venv creation fails because python3-venv is unavailable, stop and return that error; do not install OS packages or modify the VM globally without a separate decision. If dependency installation fails, return the complete pip error. Preserve the temporary worktree until test results are reviewed.
+- No application code/config change, test result validating the Ashby fix, CI confirmation, production deployment, DB/volume mutation, source activation, or Telegram send occurred. Production /home/ubuntu/job-beeper, port 8000, v2-radar-1, and v2_radar-data:/data remain untouched.
+- Product goal remains reliable multi-source discovery → normalization/deduplication → explainable matching → dashboard and Telegram delivery. This is a test-environment setup issue; Ashby remains opt-in and this endpoint fix remains repository-only.
+- Continuation: set up only the isolated worktree venv from v2/requirements.txt, rerun focused and full tests, report complete output. Then diagnose actual test failures, check CI, and keep production approval-gated.
