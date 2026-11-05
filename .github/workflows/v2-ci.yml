@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - v2-live-radar
+      - work/job-intelligence-foundation
 
 jobs:
   syntax:
