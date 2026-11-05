@@ -2754,3 +2754,10 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Detailed session record: latest section of `docs/JOB_RADAR_HANDOVER.md`.
 - Next: read current `v2/radar.py`, adapters, schema/migrations and tests on the foundation branch; design a small source/run telemetry slice without increasing request volume. Keep PR #37 draft until reviewed; preserve all VM safety boundaries.
 - Fresh-chat handoff: paste `docs/AGENT_CONTINUATION_PROMPT.md` followed by the latest sanitized command output.
+
+
+## CI branch filter — 2026-11-05
+
+- Found why PR #38 had no workflow result: `.github/workflows/v2-ci.yml` filtered `pull_request.branches` to `main` and `v2-live-radar`, excluding its base branch `work/job-intelligence-foundation`. Empty status/workflow response was neither pass nor failure.
+- Added `work/job-intelligence-foundation` to the pull-request branch filter on the foundation branch (`84945d4049ad82df8bd355caaff3f7d81cd4e112`). Push filters are unchanged. No runtime changes.
+- Next: synchronize base changes to `work/source-run-telemetry`, push a child-head update and verify CI on PR #38. Preserve the telemetry section and do not merge/deploy.
