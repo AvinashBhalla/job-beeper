@@ -2793,3 +2793,10 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - Fixed both in `v2/test_radar.py` commit `78a95a2e8b6ea42b933ccd855eda6e64036bda2d`: all manually-created source-run fixtures now include fields; cooldown assertion checks remaining seconds (598–600), not a hard-coded timestamp. This correction is not yet verified.
 - Advance validation branch to this commit and re-run V2 CI. PR #38 remains draft into foundation; PR #39 is temporary validation-only to `v2-live-radar`; no VM/runtime/deploy change.
 - Full evidence in the latest detailed handover section.
+
+
+## Telemetry CI second run — 2026-11-05
+
+- Validation PR #39 run #1135 / ID `42077890037` on head `b97a6ca0abbd450129f62f3730ab74edac19ad4f`: install, py_compile, focused tests passed; full suite 141 tests, 1 error and 0 failures. The cooldown timing fix and all new telemetry-specific tests passed.
+- One remaining error was another legacy `source_runs` fixture in `SourceRegistryApiCoverageTests`; earlier edit hit the migration fixture instead. Corrected the exact source-registry fixture in commit `701df0b2c8dc11403cd5e7a48390c4b0479c20f8`. Not yet verified.
+- Advance the validation branch and rerun. No runtime state changed. Full context in latest handover entry.
