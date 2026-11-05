@@ -2810,3 +2810,13 @@ Continue on `work/job-intelligence-foundation`, inspect PR #37 and CI, and imple
 - PR #38 remains the real implementation PR, draft, base `work/job-intelligence-foundation`. PR #39 is a temporary CI-only PR targeting `v2-live-radar`; close it unmerged after saving the evidence. No merge/deployment or runtime changes.
 - Phase 1 does not include per-request/per-target counts, board-level partial failure metrics, detailed stage latency, or cooldown persistence across restart. Next: review PR #38 and then implement per-target/request attempts and ingest processing counters test-first. Do not increase LinkedIn request volume.
 - Latest detailed record: `docs/JOB_RADAR_HANDOVER.md`; generic fresh-chat prompt: `docs/AGENT_CONTINUATION_PROMPT.md`.
+
+
+## Current telemetry PR restacked — 2026-11-05
+
+- Active branch: `work/source-run-telemetry-clean`, created from latest foundation SHA `689130ab6d39061a9a69fdd8349aeb060bf52beb`; implementation PR #40 is open/draft and mergeable (ahead 6 / behind 0 at initial compare).
+- Original `work/source-run-telemetry` diverged (ahead 23 / behind 6) and PR #38 was superseded; close #38 unmerged. PR #39 was a temporary validation PR and is closed unmerged.
+- Code/test blobs copied exactly from the successful CI code state: `v2/radar.py` `1373b8f2f62bf8fb78c996ce94770de4b8a4f494`; `v2/test_radar.py` `0f33aae175d69a5c59291894e351535740003651`.
+- V2 CI run #1136 / ID `42078168015` validated those exact file contents: compilation, focused tests, full suite **141 tests in 17.071s — OK**. It ran through validation-only PR #39 targeting `v2-live-radar`; PR #40 itself has no direct run due default-main PR base filter.
+- PR #37 remains separate, open/draft; latest V2 CI run #1133 / ID `42077437246` passed on foundation head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
+- No merge/deploy/runtime/VM/DB/Docker/Telegram/polling changes. Next: review PR #40 and design phase 2 source-target telemetry; see detailed handover.
