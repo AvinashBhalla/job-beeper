@@ -5749,3 +5749,16 @@ The counts and DB byte sizes decreased between the two pasted snapshots. The cap
 
 ### Next action
 Synchronize the changed CI workflow and foundation handover additions into `work/source-run-telemetry` without dropping its telemetry log, then update the child head to trigger PR #38 CI. Record exact resulting PR head and workflow result. Do not merge or deploy.
+
+
+## CI trigger clarification and validation approach — 2026-11-05
+
+- Follow-up inspection of `.github/workflows/v2-ci.yml` on `main` (the repository default branch) confirmed its `pull_request.branches` filter includes only `main` and `v2-live-radar`. This explains why PR #38, targeting `work/job-intelligence-foundation`, does not receive a workflow run even after a filter edit on the base feature branch: the default-branch workflow definition remains authoritative for trigger availability.
+- The temporary addition of `work/job-intelligence-foundation` to the workflow file on this feature branch did not trigger PR #38. It was reverted in commit `c2e27b17bfa2042045c37900e57f212c3366245a`, restoring the original workflow content; no lasting CI configuration change is proposed here.
+- We will not modify `main` merely to enable CI for this stacked draft PR. Instead, create a separate **validation-only draft PR** from the exact telemetry branch head to `v2-live-radar` (a base branch already in the default workflow filter) to execute the same full code tree. Keep PR #38 as the implementation PR targeting the foundation branch. Close the validation-only PR unmerged after the CI result is captured.
+- This is a CI routing workaround, not a change to production or source behavior. Do not merge/deploy either PR on the basis of this workaround; PR #38 still needs normal review.
+
+### Next action
+1. Restore the workflow file on `work/source-run-telemetry` to match this foundation branch so PR #38 contains no dead CI-filter diff.
+2. Synchronize the latest foundation handover/knowledge-transfer entries into the child branch while preserving its telemetry additions.
+3. Create validation-only PR #39 targeting `v2-live-radar` from the exact child head; verify full CI; close #39 unmerged after recording the run. Keep PR #38 open/draft.
