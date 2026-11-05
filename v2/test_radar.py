@@ -2775,7 +2775,14 @@ class SourceRegistryApiCoverageTests(unittest.TestCase):
                             finished_at TEXT NOT NULL,
                             jobs_seen INTEGER NOT NULL,
                             new_jobs INTEGER NOT NULL,
-                            error TEXT
+                            error TEXT,
+                            run_id TEXT,
+                            outcome TEXT,
+                            duration_seconds REAL,
+                            error_type TEXT,
+                            http_status INTEGER,
+                            retry_after_seconds REAL,
+                            cooldown_seconds INTEGER
                         )
                     """)
                 with patch.object(
