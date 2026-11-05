@@ -5437,7 +5437,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - A YAML fragment (`volumes: - radar-data:/data`) was mistakenly pasted at the shell prompt and produced `command not found`; YAML belongs in a Compose file, not executed as shell commands. No harm to the repository or service was evidenced.
 
 ### Diagnosis and confidence
-- High confidence: port-8000 container is an old image created on 12 Oct and is not running the just-tested 7 Nov? correction: **6 Nov 2026** checkout source at `7ebc38b`. The missing Ashby API row is consistent with this old image. No image rebuild/recreate has occurred.
+- High confidence: port-8000 container is an old image created on 12 Oct and is not running the just-tested **6 Nov 2026** checkout source at `7ebc38b`. The missing Ashby API row is consistent with this old image. No image rebuild/recreate has occurred.
 - High confidence: current persistent runtime volume identity is `v2_radar-data` mounted at `/data`.
 - Not established: whether the original checkout at `61d8271` is production, staging, or a separate intended dev target; whether it has uncommitted changes (the status command emitted no lines but must be rechecked); whether its Git history can fast-forward to the tested commit; whether the image can be safely recreated under the intended release policy.
 - CI for `7ebc38b` remains unverified. User-run local tests are the evidence above.
