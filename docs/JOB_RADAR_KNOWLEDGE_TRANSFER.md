@@ -2684,3 +2684,10 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - No production changes or notifications. No pull, build, restart, DB/config/volume mutation, or source enablement. Protect `v2-radar-1` and `v2_radar-data:/data`.
 - Next: read-only check live `/api/config` safe projection and AI feature-gate booleans, then patch/test Ashby omission on dev/branch. Prepare release backup/rollback plan only after code review; separate explicit deployment approval remains mandatory.
 - Detailed chronology: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`.
+
+## Production config confirmed; Ashby dedupe endpoint fix
+
+- Live config read-only snapshot: v10; notifications true; LinkedIn/Naukri true; Instahyre/Greenhouse false; cadence 180/300/600/900s; match threshold 55; candidate exp 2; max exp 3; explicit-experience alert requirement false. Ashby absent. All four AI gate booleans false.
+- Preserve these live settings. Expected v11 migration adds Ashby disabled and retains current source/notification flags; do not replace live config with repo defaults.
+- Code review found `/api/dedupe-candidates` hard-coded four-source SQL filter omitted Ashby. Patch now derives parameterized source placeholders from collector registry and adds a regression test for an Ashby/LinkedIn same-identity pair.
+- Patch is repository-only, not deployed. Next: run focused + full V2 tests in dev checkout; no production pull/build/restart/DB writes/notification sends. CI unverified.
