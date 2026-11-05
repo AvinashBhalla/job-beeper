@@ -2591,3 +2591,38 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 ### Next exact action
 - Read-only audit of current v2 repo/Oracle runtime. Confirm commit and collector state before editing. Then write the architecture baseline and implementation PRD from actual code, and start the first vertical slice. Never expose secrets in audit output.
+
+
+## JobBeeper architecture: evidence, inference and LinkedIn limitation (2026-11-05)
+
+### Publicly observed
+- Homepage claims checks across LinkedIn, Naukri, Workday and company career pages, lists Greenhouse, Lever and Ashby, and explicitly says availability/detection times vary by source.
+- Homepage snapshot (4 Nov 2026) claims 89,849 career pages/job boards watched, 79,424 companies tracked and an 11-source demonstration. Vendor marketing metrics only; not audited.
+- Homepage describes subscriber-first private matches followed by jobs that can be shared on the public site after a six-hour private window.
+- Public LinkedIn company page shows 18 open roles and source badges/logos including Greenhouse, Instahyre, Lever, LinkedIn, Naukri, own, SmartRecruiters and Workable. This supports multi-source coverage in the public product, but not the origin method for each job.
+- Job detail pages label some jobs as LinkedIn-sourced and display discovery intervals such as 32 minutes or 14 minutes. Treat as vendor-supplied page claims, not verified measurements.
+- Backend category page preloads 200 jobs; search for Cognizant leaves one visible card and 199 hidden, supporting local browser filtering.
+- Backend page HAR shows public HTML cache headers `Cache-Control: public, max-age=3600` and `X-Cache-Status: MISS` for one observed response.
+
+### Official LinkedIn API and policy facts
+- Official Job Posting API is a restricted partner API for publishing jobs to LinkedIn on behalf of customers, not a general job-search/read API.
+- Documentation requires LinkedIn approval and an API/partner agreement, says new Job Posting API partnerships are not being accepted and directs applicants to Apply Connect (page last updated 2026-06-03).
+- LinkedIn explicitly prohibits unauthorized third-party crawlers/bots/extensions that scrape or automate the website, and prohibits circumventing access controls or use limits.
+- Sources: https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview?view=li-lts-2026-04 and https://www.linkedin.com/help/linkedin/answer/a1341387/prohibited-software-and-extensions
+- Therefore, do not assume there is an openly available LinkedIn Jobs API that JobBeeper is using, and do not claim the platform bypasses rate limits.
+
+### Inference — not verified JobBeeper internals
+- Likely high-level architecture: independent source connectors → schedulers → normalization/provenance → dedup/entity resolution → central job store/search index → matching → private alerts → delayed public catalogue.
+- Pre-collected records plus pre-rendered/cached public pages and local search plausibly explain fast UI response. This does not explain the private upstream LinkedIn acquisition path.
+- 89k+ pages monitored does not mean every page is fetched every minute. Source cadences likely differ; JobBeeper itself says detection times vary by source.
+
+### Unknown
+- The exact LinkedIn collection mechanism, partner arrangements, licensed data providers, polling intervals, request budgets, workers, queues, DB/index, retry policy and operational SLOs remain unknown.
+- Whether a job labelled LinkedIn in JobBeeper was acquired directly from LinkedIn, a company ATS mirror, or multiple sources remains unknown.
+
+### Design decision for our product
+- Do not pursue anti-rate-limit bypasses, rotating accounts/proxies, CAPTCHA bypass, or automated login scraping.
+- Build independent, permitted source adapters with per-source scheduler, concurrency/request budget, jitter, incremental/conditional polling, backoff, provenance, idempotency, normalization and cross-source deduplication.
+- Prioritize official ATS/company career endpoints and licensed feeds; keep LinkedIn isolated and optional unless a permitted access path is available.
+- Separate private matching/alert delivery from any public catalogue/index.
+- No application code or production configuration changed during this research update.
