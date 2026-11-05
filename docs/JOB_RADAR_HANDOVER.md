@@ -5873,3 +5873,15 @@ Synchronize the changed CI workflow and foundation handover additions into `work
 - Foundation PR #37 remains separate, open/draft; latest CI run #1133 / ID `42077437246` passed on head `689130ab6d39061a9a69fdd8349aeb060bf52beb`.
 - No merge/deployment or application runtime, Oracle VM, Docker, DB, config, collectors, polling, source enablement, Telegram, secret or notification change.
 - Next: review PR #40 diff and API compatibility; then design phase 2 per-target/request telemetry and processing counters. Test first; do not increase LinkedIn request volume.
+
+
+## PR replacement and closure confirmation — 2026-11-05
+
+- Confirmed PR #38 is now **closed, unmerged** (closed 2026-11-05 17:56:56 UTC), superseded by PR #40. PR #39 is also **closed, unmerged** (closed 2026-11-05 17:50:27 UTC), retained only as the CI validation record for run #1136.
+- Active implementation PR #40 is **open, draft, unmerged, mergeable=true**, base `work/job-intelligence-foundation`, head branch `work/source-run-telemetry-clean`. Latest observed head before this handover-only write: `199463bbb7ac0be804d6ac24bd83636c7a1dc303`; compare to base was `ahead 9 / behind 0`, merge base `689130ab6d39061a9a69fdd8349aeb060bf52beb`. The final handover append advances the PR head by documentation only; re-check latest PR metadata before further work.
+- PR #37 remains a separate open/draft PR into `v2-live-radar`; latest observed head `689130ab6d39061a9a69fdd8349aeb060bf52beb`, V2 CI run #1133 / ID `42077437246` passed. It is not merged.
+- Successful code verification remains V2 CI run #1136 / ID `42078168015` for identical `v2/radar.py` and `v2/test_radar.py` blob contents; 141 tests passed in 17.071s. No application code changes occurred after those tested blobs. Current active branch adds documentation/branch lineage only beyond the tested code/test state.
+- No merge/deployment, Oracle VM, production/dev runtime, DB, Docker, polling, collector, source enablement, Telegram, credentials, or notification change occurred.
+
+### Next step
+Review draft PR #40's six-file diff for API compatibility, migration safety and run outcome semantics. If approved, merge only after explicit user direction. After review, proceed to phase 2 observability design: per-source target/request attempts/outcomes plus fetched/parsed/rejected/new/updated/duplicate counts and stage timings, with tests and secret-safe error handling. Do not change request rate or deploy.
