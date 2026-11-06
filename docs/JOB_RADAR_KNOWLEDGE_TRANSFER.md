@@ -3096,3 +3096,11 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Full suite attempt: 166 tests, 1 skipped, 2 import errors (`test_auth`, `test_user_preferences_api`) because the isolated older image lacks `httpx2`, now required by Starlette TestClient. Do not report full suite green. Host Node is too old for `??`; dashboard JS syntax still needs modern Node validation.
 - Fixed a regression found by focused tests: new provisioned preferences now start at revision 0, preserving first saved preference version 1. No deployment yet. Dev 8001 image unchanged; production 8000 untouched.
 - Next: rerun using current test dependencies (`httpx2`) and modern Node; inspect background evaluation concurrency; implement secure approved Google OIDC signup and hide admin-only preference controls for normal users. PR #46 remains draft.
+
+
+## 2026-11-06 — Preference fix full-suite verification
+
+- Added read-only fallback for authenticated users whose preference row is missing: return empty defaults, onboarding incomplete, version 0; do not write. Commits 4369e6c, 5e5e737.
+- Focused auth/preferences/API tests: 59 passed. Full V2 suite: 213 passed, 1 skipped in 162.321s with v2/requirements-dev.txt installed in isolated test container. CI status pending.
+- Admin-only source/Telegram settings already have .admin-only-setting wrapper and are hidden by applyUserAccess() for non-admins. Verify in next dev browser smoke test.
+- Not deployed; dev 8001 and production 8000 unchanged. Next: modern Node syntax check and secure Google OIDC signup implementation using official Google token verification, state/nonce/PKCE, strict redirect URI, verified email, user-only role, identity linking, preferences initialization, existing session cookies. Secrets remain VM env only.
