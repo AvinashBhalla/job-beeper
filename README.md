@@ -79,6 +79,9 @@ ssh -t ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker 
 # Create a separate beta test account; it starts with empty role/location preferences
 ssh -t ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.auth_admin create-user --email YOUR_TEST_USER_EMAIL"
 
+# Seed four clearly synthetic listings so the personalized feed can be tested without scraping
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.seed_feature_demo"
+
 # Terminal 1: open and keep this tunnel running
 ssh -L 18002:127.0.0.1:8002 ubuntu@130.210.27.197
 
@@ -87,7 +90,7 @@ Invoke-RestMethod "http://127.0.0.1:18002/health" | ConvertTo-Json -Depth 5
 Start-Process "http://127.0.0.1:18002/dashboard/"
 ~~~
 
-Sign in as the test user. The onboarding form must require both a target role and a target location; after saving, the user sees only their personalized matching feed. The admin account uses the legacy admin dashboard and controls. Do not paste passwords into chat or put them in command arguments.
+Sign in as the test user. For a predictable demo match, enter Python Developer and Bengaluru (the seed script adds four synthetic jobs). The onboarding form must require both a target role and a target location; after saving, the user sees only their personalized matching feed. Demo listings use example.com URLs and are not real vacancies. The admin account uses the legacy admin dashboard and controls. Do not paste passwords into chat or put them in command arguments.
 
 Stop the isolated feature container without deleting its test database:
 

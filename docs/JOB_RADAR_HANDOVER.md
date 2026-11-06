@@ -5945,7 +5945,7 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
 - `feat/multi-user-foundation-20261106` was already deleted remotely after PR #45 merge; its stale local remote-tracking ref was pruned.
 - Remote branches are now 7: `main`, `v2-live-radar`, `feat/matcher-quality-benchmark-20261106`, `feat/user-preferences-evaluations-20261106`, `work/job-intelligence-foundation`, `work/source-run-telemetry-clean`, `fix/linkedin-experience-parser`. The SSE branch is preserved only as the archive tag above.
 - Local branch list remains three: current user-preferences feature branch, protected `v2-live-radar` checkout in dirty dev worktree, and parser-fix branch in its own worktree.
-- There are multiple detached experiment worktrees. Do not bulk-delete them: several contain uncommitted local config/venv artifacts; `/tmp/job-radar-naukri-location-v3` contains the ignored Superpowers progress ledger; preserve until individually audited. The count of worktrees is not the same as active Git branches.
+- After individual audit, removed two clean detached worktrees whose HEADs were already reachable from the retained integration/production branches: `/tmp/job-beeper-main-baseline` (reachable from `origin/main`) and `/tmp/job-radar-explicit-location` (reachable from `origin/v2-live-radar`). Eight worktrees remain: three branch-attached and five detached. Preserve the remaining detached worktrees: several contain uncommitted local config/venv artifacts, and `/tmp/job-radar-naukri-location-v3` contains the ignored Superpowers progress ledger. The count of worktrees is not the same as active Git branches.
 
 ### Next exact steps
 1. Continue from `/tmp/job-radar-user-preferences` on `feat/user-preferences-evaluations-20261106`; read the design and plan above before coding.
@@ -5983,7 +5983,8 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
   - `v2/docker-compose.feature.yml`, `v2/config.feature.json`.
   - Port 8002 bound to loopback only, independent `radar-feature-data` volume, unique container name, generic non-personal candidate defaults, all collectors/Telegram/LLM providers disabled.
   - Compose config validated and Docker image built successfully. **The feature container has not been started.**
-  - Root README now has exact Windows PowerShell commands to start the feature instance, bootstrap an admin, create a beta user, open SSH tunnel `18002`, check health and stop the container. It does not share existing dev port 8001 or production port 8000.
+  - `v2/seed_feature_demo.py` inserts four synthetic listings for repeatable feed testing and refuses to run unless `JOB_BEEPER_FEATURE_DEMO=true`; the feature Compose file sets that flag. A guard test confirmed the script exits before DB initialization when the flag is absent.
+  - Root README has exact Windows PowerShell commands to start the feature instance, bootstrap an admin, create a beta user, seed demo jobs, open SSH tunnel `18002`, check health and stop the container. It does not share existing dev port 8001 or production port 8000.
 
 ### Tests and validation
 - Full V2 Python suite: **209 tests passed** in **121.559s**.

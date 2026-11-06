@@ -16,6 +16,7 @@ services:
       JOB_RADAR_DB: /data/jobs.db
       JOB_BEEPER_COOKIE_SECURE: "false"
       JOB_BEEPER_PUBLIC_ORIGIN: ""
+      JOB_BEEPER_FEATURE_DEMO: "true"
       JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
       JOB_RADAR_TELEGRAM_CHAT_ID: ""
       LOG_LEVEL: INFO
