@@ -195,10 +195,14 @@ def get_user_preferences(db_path: Path, user_id: int) -> dict[str, Any]:
             "SELECT preferences_json, version, updated_at FROM user_preferences WHERE user_id=?",
             (int(user_id),),
         ).fetchone()
-    decoded = _decode_row(row)
-    if decoded is None:
-        raise ValueError("User preferences are not initialized for this account.")
-    return decoded
+    if row is None:
+        return {
+            **PREFERENCE_DEFAULTS,
+            "onboarding_complete": False,
+            "version": 0,
+            "updated_at": None,
+        }
+    return _decode_row(row)
 
 
 def save_user_preferences(db_path: Path, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
