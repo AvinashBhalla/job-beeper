@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             password = _prompt_password()
             user = auth.create_user(db_path, args.email, password, role="user")
-            user_preferences.get_user_preferences(db_path, user["id"])
+            user_preferences.ensure_user_preferences(db_path, user["id"])
     except (ValueError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 1
