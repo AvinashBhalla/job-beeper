@@ -12,9 +12,9 @@
   // =========================================================================
   const requestedApi = new URLSearchParams(location.search).get('api');
   const API = (requestedApi ? requestedApi.replace(/\/+$/, '') : '') || '/api';
+  const authClient = window.JobBeeperAuth.createClient({ apiBase: API });
 
   const LOCAL_STORAGE_APPLIED_KEY = 'job_beeper_applied_jobs_v1';
-  const SESSION_TOKEN_KEY = 'jobradar_config_token';
   const THEME_STORAGE_KEY = 'job_beeper_theme';
 
   const state = {
@@ -787,7 +787,7 @@
           target.id === 'appliedSection' ? 'Applied Jobs' :
           target.id === 'preferencesSection' ? 'Matching Preferences' :
           target.id === 'sourcesSection' ? 'Source Health' :
-          target.id === 'accessSection' ? 'Configuration Access' : 'Jobs Feed';
+          target.id === 'accessSection' ? 'Account' : 'Jobs Feed';
       }
 
       if (target.id === 'appliedSection') {
@@ -1524,8 +1524,6 @@
       input.checked = enabled[src] !== false;
     });
 
-    const token = sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
-    if ($('accessMainTokenInput')) $('accessMainTokenInput').value = token;
   }
 
   function collectPreferencesPayload() {
@@ -1559,34 +1557,23 @@
   }
 
   async function savePreferences() {
-    const token = sessionStorage.getItem(SESSION_TOKEN_KEY) || $('accessMainTokenInput')?.value.trim();
-    if (!token) {
-      showToast('Enter configuration token in Access tab first', 'error');
-      if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Token required to save.';
-      return;
-    }
-
     const payload = collectPreferencesPayload();
     if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saving preferences…';
 
     try {
-      const response = await fetch(API + '/config', {
+      const response = await authClient.request('/config', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Config-Token': token,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
+      if (response.status === 401) {
+        window.location.reload();
+        return;
+      }
       if (!response.ok) {
-        if (response.status === 401) {
-          showToast('Invalid V2 configuration token', 'error');
-          if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Invalid token.';
-        } else {
-          showToast('Failed to save configuration', 'error');
-          if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Save failed.';
-        }
+        showToast('Failed to save configuration', 'error');
+        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Save failed.';
         return;
       }
 
@@ -1606,7 +1593,8 @@
   // =========================================================================
   async function loadConfig() {
     try {
-      const res = await fetch(API + '/config', { cache: 'no-store' });
+      const res = await authClient.request('/config', { cache: 'no-store' });
+      if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error('Config endpoint unavailable');
       const data = await res.json();
       state.config = data.config;
@@ -1631,10 +1619,11 @@
 
     try {
       const [jobsRes, summaryRes] = await Promise.all([
-        fetch(API + '/jobs?' + params.toString(), { cache: 'no-store' }),
-        fetch(API + '/daily-summary', { cache: 'no-store' }),
+        authClient.request('/jobs?' + params.toString(), { cache: 'no-store' }),
+        authClient.request('/daily-summary', { cache: 'no-store' }),
       ]);
 
+      if (jobsRes.status === 401 || summaryRes.status === 401) { window.location.reload(); return; }
       if (!jobsRes.ok || !summaryRes.ok) throw new Error('V2 API not available');
 
       const jobsData = await jobsRes.json();
@@ -1671,7 +1660,8 @@
 
   async function loadSourceStatusTelemetry() {
     try {
-      const res = await fetch(API + '/source-status', { cache: 'no-store' });
+      const res = await authClient.request('/source-status', { cache: 'no-store' });
+      if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
       state.sourceStatus = data.sources || [];
@@ -1821,35 +1811,7 @@
     // Preferences save button
     if ($('savePreferencesBtn')) $('savePreferencesBtn').addEventListener('click', savePreferences);
 
-    // Access Section Token buttons
-    if ($('accessSaveTokenBtn')) {
-      $('accessSaveTokenBtn').addEventListener('click', () => {
-        const val = $('accessMainTokenInput')?.value.trim();
-        if (val) {
-          sessionStorage.setItem(SESSION_TOKEN_KEY, val);
-          if ($('accessStatusMsg')) $('accessStatusMsg').textContent = 'Token remembered.';
-          showToast('Configuration token saved in session', 'success');
-        }
-      });
-    }
 
-    if ($('accessClearTokenBtn')) {
-      $('accessClearTokenBtn').addEventListener('click', () => {
-        sessionStorage.removeItem(SESSION_TOKEN_KEY);
-        if ($('accessMainTokenInput')) $('accessMainTokenInput').value = '';
-        if ($('accessStatusMsg')) $('accessStatusMsg').textContent = 'Token cleared.';
-        showToast('Configuration token cleared from session', 'info');
-      });
-    }
-
-    if ($('accessMainTokenToggleBtn')) {
-      $('accessMainTokenToggleBtn').addEventListener('click', () => {
-        const inp = $('accessMainTokenInput');
-        if (inp) {
-          inp.type = inp.type === 'password' ? 'text' : 'password';
-        }
-      });
-    }
   }
 
   // =========================================================================
@@ -1920,10 +1882,36 @@
   }
 
   // =========================================================================
-  // 17. Main Application Lifecycle
+  // 17. Authentication Gate & Main Application Lifecycle
   // =========================================================================
-  async function init() {
-    initThemeSystem();
+  let workspaceInitialized = false;
+
+  function setAuthPanel(panelId) {
+    ['authLoginPanel', 'authUserPanel', 'authUnavailablePanel'].forEach(id => {
+      const panel = $(id);
+      if (panel) panel.hidden = id !== panelId;
+    });
+    document.body.classList.remove('auth-ready');
+  }
+
+  function showLoginPanel(message = '') {
+    setAuthPanel('authLoginPanel');
+    if ($('authStatusMsg')) $('authStatusMsg').textContent = message;
+  }
+
+  function showUserPanel(user) {
+    setAuthPanel('authUserPanel');
+    if ($('authUserEmail')) $('authUserEmail').textContent = user.email;
+  }
+
+  function showUnavailablePanel() {
+    setAuthPanel('authUnavailablePanel');
+  }
+
+  async function initializeWorkspace() {
+    if (workspaceInitialized) return;
+    workspaceInitialized = true;
+
     loadAppliedJobs();
     setupNavigation();
     initFilterDropdowns();
@@ -1943,6 +1931,88 @@
 
     setInterval(loadJobsFeed, 10000);
     setInterval(loadSourceStatusTelemetry, 30000);
+  }
+
+  async function refreshAuthentication() {
+    const result = await authClient.bootstrap({
+      onAdmin: user => {
+        document.body.classList.add('auth-ready');
+        if ($('accountEmail')) $('accountEmail').textContent = user.email;
+        if ($('accountRole')) $('accountRole').textContent = user.role;
+      },
+      onUser: showUserPanel,
+      onLogin: () => showLoginPanel(),
+      onError: showUnavailablePanel,
+    });
+
+    if (result.access === 'admin') await initializeWorkspace();
+    return result;
+  }
+
+  async function signOut() {
+    const buttons = [$('headerLogoutBtn'), $('accountLogoutBtn'), $('authUserLogoutBtn')].filter(Boolean);
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+      const response = await authClient.logout();
+      if (!response.ok && response.status !== 401) {
+        buttons.forEach(button => { button.disabled = false; });
+        showToast('Could not sign out. Please try again.', 'error');
+        return;
+      }
+      // Reload clears in-memory job data and stops all dashboard polling timers.
+      window.location.reload();
+    } catch (_error) {
+      buttons.forEach(button => { button.disabled = false; });
+      showToast('Authentication service unavailable. Please try again.', 'error');
+    }
+  }
+
+  function bindAuthEvents() {
+    const form = $('authLoginForm');
+    if (form) {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const email = $('authEmail')?.value.trim() || '';
+        const passwordInput = $('authPassword');
+        const password = passwordInput?.value || '';
+        const button = $('authLoginBtn');
+        if (button) button.disabled = true;
+        if ($('authStatusMsg')) $('authStatusMsg').textContent = 'Signing in…';
+
+        try {
+          const response = await authClient.login(email, password);
+          if (!response.ok) {
+            let detail = 'Sign-in failed. Check your credentials and try again.';
+            try {
+              const payload = await response.json();
+              if (payload.detail) detail = payload.detail;
+            } catch (_error) { /* Keep the generic message. */ }
+            if ($('authStatusMsg')) $('authStatusMsg').textContent = detail;
+            return;
+          }
+          if (passwordInput) passwordInput.value = '';
+          await refreshAuthentication();
+        } catch (_error) {
+          if ($('authStatusMsg')) $('authStatusMsg').textContent = 'Authentication service unavailable. Please try again.';
+        } finally {
+          if (button) button.disabled = false;
+        }
+      });
+    }
+
+    ['headerLogoutBtn', 'accountLogoutBtn', 'authUserLogoutBtn'].forEach(id => {
+      const button = $(id);
+      if (button) button.addEventListener('click', signOut);
+    });
+
+    const retryButton = $('authRetryBtn');
+    if (retryButton) retryButton.addEventListener('click', refreshAuthentication);
+  }
+
+  async function init() {
+    initThemeSystem();
+    bindAuthEvents();
+    await refreshAuthentication();
   }
 
   if (document.readyState === 'loading') {

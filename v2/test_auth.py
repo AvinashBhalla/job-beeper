@@ -1,9 +1,15 @@
 import importlib.util
+import io
+import os
 import sqlite3
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+from v2 import radar
 
 AUTH_AVAILABLE = importlib.util.find_spec("v2.auth") is not None
 if AUTH_AVAILABLE:
@@ -108,19 +114,6 @@ class AuthPersistenceTests(unittest.TestCase):
 class AuthModuleAvailabilityTests(unittest.TestCase):
     def test_auth_persistence_module_is_available(self):
         self.assertTrue(AUTH_AVAILABLE, "v2.auth must provide the SQLite identity and session primitives")
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-
-from contextlib import redirect_stderr, redirect_stdout
-import io
-import os
-from unittest.mock import patch
-
-from fastapi.testclient import TestClient
-from v2 import radar
 
 
 class AuthApiTests(unittest.TestCase):
@@ -295,3 +288,7 @@ class AuthAdminCliTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as conn:
             roles = dict(conn.execute("SELECT email, role FROM users"))
         self.assertEqual(roles, {"admin@example.com": "admin", "user@example.com": "user"})
+
+
+if __name__ == "__main__":
+    unittest.main()

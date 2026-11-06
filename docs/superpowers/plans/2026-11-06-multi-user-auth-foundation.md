@@ -79,6 +79,7 @@
 ### Task 3: Dashboard login and session lifecycle
 
 **Files:**
+- Create: `dashboard/auth.js` (small, independently testable cookie-session client)
 - Modify: `dashboard/index.html`
 - Modify: `dashboard/app.js`
 - Modify: `dashboard/styles.css`
@@ -89,8 +90,8 @@
 - Store no session token in localStorage or sessionStorage. Read the CSRF cookie and send it as `X-CSRF-Token` for logout and other state-changing authenticated requests.
 - Existing global dashboard screens render only after `/api/auth/me` confirms role `admin`; `user` role sees a clear beta-not-enabled state rather than any global data.
 
-- [ ] **Step 1: Add failing tests** in `v2/test_dashboard_auth_contract.py` that inspect the shipped dashboard assets and assert the login endpoint is called, the auth bootstrap checks `/api/auth/me`, no config token is stored/sent, and non-admin UI state does not render legacy dashboard data.
-- [ ] **Step 2: Run** `python3 -m unittest v2.test_dashboard_auth_contract -v`; expected: failures against the current config-token-only dashboard.
+- [ ] **Step 1: Add failing tests** in `v2/test_dashboard_auth_contract.py` that exercise the actual `dashboard/auth.js` client under Node (login, `/api/auth/me`, same-origin credentials, CSRF header on writes/logout, and admin-vs-user bootstrap callbacks) and validate the shipped login/holding markup and script order.
+- [ ] **Step 2: Run** `python3 -m unittest v2.test_dashboard_auth_contract -v`; expected: failures against the current config-token-only dashboard. The Node contract test skips only when Node.js is unavailable; run it separately on a Node-enabled host/CI runner.
 - [ ] **Step 3: Implement** a minimal login form, logout control, session bootstrap, CSRF header helper, and user-role holding screen. Remove the browser's `X-Config-Token` flow and `sessionStorage` token key. Preserve theme and applied-job localStorage keys; do not confuse them with auth.
 - [ ] **Step 4: Run** `python3 -m unittest v2.test_dashboard_auth_contract v2.test_auth -v`; expected: both contract and API suites pass.
 - [ ] **Step 5: Commit** `feat(dashboard): use cookie sessions for admin access`.
