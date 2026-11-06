@@ -4,3 +4,4 @@ requests>=2.31,<3
 beautifulsoup4>=4.12,<5
 tzdata
 argon2-cffi>=23.1,<26
+google-auth>=2.29,<3
