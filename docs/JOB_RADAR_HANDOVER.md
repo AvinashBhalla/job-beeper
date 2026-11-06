@@ -6158,3 +6158,10 @@ On the same onboarding page, show a Telegram connection panel/link that opens th
 - `v2/google_oauth.py`, `v2/auth.py`, `v2/radar.py`, `v2/test_google_oauth.py` — Google OIDC implementation and tests.
 - `v2/user_preferences.py` — validated per-user preferences schema and defaults.
 - `dashboard/app.js`, `dashboard/index.html` — shared dashboard, auth and onboarding entry points.
+
+
+### Verification update — 2026-11-06
+- After the latest OAuth browser-state changes and handover docs were pulled to the working VM, the full V2 suite completed: **226 tests run, 225 passed, 1 skipped** in 152.153s. Command installed `v2/requirements-dev.txt` into a disposable container and ran unittest discovery; no project runtime container was replaced.
+- Node 22 syntax checks for `dashboard/auth.js` and `dashboard/app.js` completed successfully (no output/errors).
+- Working tree was clean after pulling the documentation updates.
+- This is local disposable-container verification, not a CI status assertion and not a dev deployment. Dev 8001 still runs the previous image; production 8000 untouched.
