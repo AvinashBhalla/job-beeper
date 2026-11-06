@@ -5,9 +5,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
-from v2 import auth, google_oauth
+from fastapi.testclient import TestClient
+
+from v2 import auth, google_oauth, radar, user_preferences
 
 
 class GoogleOAuthStateTests(unittest.TestCase):
@@ -107,6 +110,73 @@ class GoogleIdentityLinkTests(unittest.TestCase):
             auth.create_or_link_google_user(
                 self.db_path, "disabled@example.com", "google-sub-disabled"
             )
+
+
+
+class GoogleOAuthApiTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.temp_dir.name) / "oauth-api.sqlite3"
+        self.db_patch = patch.object(radar, "DB_PATH", self.db_path)
+        self.db_patch.start()
+        auth.init_auth_schema(self.db_path)
+        user_preferences.init_preferences_schema(self.db_path)
+        self.client = TestClient(radar.app, base_url="https://jobs.example")
+
+    def tearDown(self):
+        self.client.close()
+        self.db_patch.stop()
+        self.temp_dir.cleanup()
+
+    def test_google_status_is_disabled_without_credentials(self):
+        with patch.dict("os.environ", {}, clear=True):
+            response = self.client.get("/api/auth/google/status")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["enabled"])
+
+    def test_callback_creates_user_session_and_initializes_preferences(self):
+        config = google_oauth.GoogleOAuthConfig(
+            "client-id", "client-secret",
+            "https://jobs.example/api/auth/google/callback",
+        )
+        authorization_url = google_oauth.create_authorization_url(self.db_path, config)
+        params = parse_qs(urlsplit(authorization_url).query)
+        state = params["state"][0]
+        nonce = params["nonce"][0]
+        identity = {
+            "email": "new.beta@example.com",
+            "subject": "google-sub-api",
+            "claims": {"nonce": nonce},
+        }
+        with patch.object(google_oauth, "load_config", return_value=config), patch.object(
+            google_oauth, "exchange_code_for_identity", return_value=identity
+        ):
+            response = self.client.get(
+                "/api/auth/google/callback?code=authorization-code&state=" + state,
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/dashboard/")
+        self.assertIn("job_beeper_session", response.cookies)
+        current = self.client.get("/api/auth/me")
+        self.assertEqual(current.status_code, 200)
+        self.assertEqual(current.json()["user"]["role"], "user")
+        preferences = self.client.get("/api/preferences")
+        self.assertEqual(preferences.status_code, 200)
+        self.assertFalse(preferences.json()["preferences"]["onboarding_complete"])
+
+    def test_callback_rejects_replayed_state(self):
+        config = google_oauth.GoogleOAuthConfig(
+            "client-id", "client-secret",
+            "https://jobs.example/api/auth/google/callback",
+        )
+        with patch.object(google_oauth, "load_config", return_value=config):
+            response = self.client.get(
+                "/api/auth/google/callback?code=authorization-code&state=invalid-state",
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/dashboard/?google_auth=failed")
 
 
 if __name__ == "__main__":
