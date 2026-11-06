@@ -21,10 +21,13 @@ from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from v2 import auth
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -69,7 +72,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 db_lock = threading.Lock()
@@ -827,6 +830,7 @@ def init_db() -> None:
         conn.commit()
     backfill_canonical_opportunities()
     backfill_notification_ledger()
+    auth.init_auth_schema(DB_PATH)
 
 
 def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
@@ -2972,7 +2976,6 @@ async def startup() -> None:
     config = get_config()
     refresh_job_evaluations(config)
     refresh_notification_decisions(config)
-    ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
     app.state.notification_worker_task = asyncio.create_task(notification_worker())
 
@@ -2986,19 +2989,141 @@ async def shutdown() -> None:
             await task
 
 
+SESSION_COOKIE_NAME = "job_beeper_session"
+CSRF_COOKIE_NAME = "job_beeper_csrf"
+CSRF_HEADER_NAME = "X-CSRF-Token"
+
+
+class AuthLoginRequest(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(min_length=1, max_length=1024)
+
+
+def _auth_cookie_secure() -> bool:
+    value = os.getenv("JOB_BEEPER_COOKIE_SECURE", "true").strip().lower()
+    return value not in {"0", "false", "no", "off"}
+
+
+def get_current_user(request: Request) -> dict[str, Any]:
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    user = auth.get_session_user(DB_PATH, session_token or "")
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    request.state.current_user = user
+    return user
+
+
+def require_admin(
+    request: Request,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required.")
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        session_token = request.cookies.get(SESSION_COOKIE_NAME, "")
+        cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
+        header_token = request.headers.get(CSRF_HEADER_NAME, "")
+        if (
+            not cookie_token
+            or not header_token
+            or not secrets.compare_digest(cookie_token, header_token)
+            or not auth.validate_csrf(DB_PATH, session_token, header_token)
+        ):
+            raise HTTPException(status_code=403, detail="CSRF validation failed.")
+    return user
+
+
+@app.post("/api/auth/login")
+def auth_login(payload: AuthLoginRequest, request: Request, response: Response):
+    client_ip = request.client.host if request.client else "unknown"
+    email = payload.email.strip().lower()
+    try:
+        if auth.check_login_rate_limit(DB_PATH, email, client_ip):
+            raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
+    except ValueError:
+        pass
+
+    user = auth.verify_user(DB_PATH, email, payload.password)
+    try:
+        auth.record_login_attempt(DB_PATH, email, client_ip, success=user is not None)
+    except ValueError:
+        pass
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    # A successful login replaces any browser session cookie already presented,
+    # including a session for a different account. Failed logins leave it intact.
+    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if previous_session:
+        auth.revoke_session(DB_PATH, previous_session)
+    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
+    cookie_options = {
+        "path": "/",
+        "secure": _auth_cookie_secure(),
+        "samesite": "lax",
+        "max_age": auth.SESSION_TTL_SECONDS,
+    }
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        **cookie_options,
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=csrf_token,
+        httponly=False,
+        **cookie_options,
+    )
+    return {"user": user}
+
+
+@app.get("/api/auth/me")
+def auth_me(user: dict[str, Any] = Depends(get_current_user)):
+    return {"user": user}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(
+    request: Request,
+    response: Response,
+    user: dict[str, Any] = Depends(get_current_user),
+):
+    session_token = request.cookies.get(SESSION_COOKIE_NAME, "")
+    cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
+    header_token = request.headers.get(CSRF_HEADER_NAME, "")
+    if (
+        not cookie_token
+        or not header_token
+        or not secrets.compare_digest(cookie_token, header_token)
+        or not auth.validate_csrf(DB_PATH, session_token, header_token)
+    ):
+        raise HTTPException(status_code=403, detail="CSRF validation failed.")
+    auth.revoke_session(DB_PATH, session_token)
+    cookie_options = {
+        "path": "/",
+        "secure": _auth_cookie_secure(),
+        "samesite": "lax",
+    }
+    response.delete_cookie(key=SESSION_COOKIE_NAME, httponly=True, **cookie_options)
+    response.delete_cookie(key=CSRF_COOKIE_NAME, httponly=False, **cookie_options)
+    return {"status": "logged_out"}
+
+
 @app.get("/health")
 def health():
+    # Public liveness endpoint: keep internal paths and operational diagnostics private.
     return {
         "status": "ok",
         "version": app.version,
         "uptime_seconds": int(time.monotonic() - started),
-        "db": str(DB_PATH),
-        "sources": source_state,
     }
 
 
 
-@app.get("/api/config")
+@app.get("/api/config", dependencies=[Depends(require_admin)])
 def read_config():
     return {
         "config": get_config(),
@@ -3007,16 +3132,15 @@ def read_config():
     }
 
 
-@app.put("/api/config")
-def update_config(payload: dict[str, Any], x_config_token: str | None = Header(default=None, alias="X-Config-Token")):
-    authorize_config_update(x_config_token)
+@app.put("/api/config", dependencies=[Depends(require_admin)])
+def update_config(payload: dict[str, Any]):
     saved = save_config(payload)
     refresh_job_evaluations(saved)
     refresh_notification_decisions(saved)
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
-@app.get("/api/latency-summary")
+@app.get("/api/latency-summary", dependencies=[Depends(require_admin)])
 def latency_summary(hours: int = 24):
     hours = max(1, min(hours, 168))
     cutoff = iso(now() - dt.timedelta(hours=hours))
@@ -3062,7 +3186,7 @@ def latency_summary(hours: int = 24):
     return {"hours": hours, "sources": summary}
 
 
-@app.get("/api/source-status")
+@app.get("/api/source-status", dependencies=[Depends(require_admin)])
 def source_status():
     config = get_config()
     with sqlite3.connect(DB_PATH) as conn:
@@ -3105,7 +3229,7 @@ def source_status():
     return {"sources": sources}
 
 
-@app.get("/api/dedupe-candidates")
+@app.get("/api/dedupe-candidates", dependencies=[Depends(require_admin)])
 def dedupe_candidates(limit: int = 100):
     limit = max(1, min(limit, 500))
     with sqlite3.connect(DB_PATH) as conn:
@@ -3165,7 +3289,7 @@ def dedupe_candidates(limit: int = 100):
     }
 
 
-@app.get("/api/opportunities")
+@app.get("/api/opportunities", dependencies=[Depends(require_admin)])
 def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
@@ -3199,7 +3323,7 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     }
 
 
-@app.get("/api/jobs")
+@app.get("/api/jobs", dependencies=[Depends(require_admin)])
 def jobs(
     minutes: int = 60,
     limit: int = 100,
@@ -3308,7 +3432,7 @@ def jobs(
     return {"jobs": result}
 
 
-@app.get("/api/notification-queue")
+@app.get("/api/notification-queue", dependencies=[Depends(require_admin)])
 def notification_queue(limit: int = 100):
     limit = max(1, min(limit, 500))
     with sqlite3.connect(DB_PATH) as conn:
@@ -3352,7 +3476,7 @@ def notification_queue(limit: int = 100):
     return {"notifications": result}
 
 
-@app.get("/api/opportunities/{opportunity_id}")
+@app.get("/api/opportunities/{opportunity_id}", dependencies=[Depends(require_admin)])
 def opportunity_detail(opportunity_id: int):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -3381,13 +3505,13 @@ def opportunity_detail(opportunity_id: int):
     }
 
 
-@app.get("/api/llm-shadow-status")
+@app.get("/api/llm-shadow-status", dependencies=[Depends(require_admin)])
 def llm_shadow_status():
     """Return bounded Gemini shadow-mode health without exposing credentials or JD text."""
     return shadow_status(DB_PATH)
 
 
-@app.get("/api/daily-summary")
+@app.get("/api/daily-summary", dependencies=[Depends(require_admin)])
 def daily_summary():
     cutoff = iso(current_day_start_utc())
     with sqlite3.connect(DB_PATH) as conn:
@@ -3426,7 +3550,7 @@ def daily_summary():
     }
 
 
-@app.get("/api/jobs/{job_id}")
+@app.get("/api/jobs/{job_id}", dependencies=[Depends(require_admin)])
 def job_detail(job_id: int):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
