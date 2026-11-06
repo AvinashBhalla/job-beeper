@@ -19,6 +19,7 @@ PASSWORD_MAX_BYTES = 1024
 SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 LOGIN_WINDOW_SECONDS = 15 * 60
 LOGIN_FAILURE_LIMIT = 5
+LOGIN_ACCOUNT_FAILURE_LIMIT = 20
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PASSWORD_HASHER = PasswordHasher()
 _DUMMY_PASSWORD_HASH = _PASSWORD_HASHER.hash(secrets.token_urlsafe(32))
@@ -109,6 +110,13 @@ def init_auth_schema(db_path: Path) -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_login_attempts_updated
                 ON login_attempts(updated_at);
+
+            CREATE TABLE IF NOT EXISTS login_account_attempts (
+                email_key_hash TEXT PRIMARY KEY,
+                window_started_at REAL NOT NULL,
+                failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
+                updated_at REAL NOT NULL
+            );
             """
         )
 
@@ -276,37 +284,45 @@ def check_login_rate_limit(db_path: Path, email: str, client_ip: str) -> bool:
     email_key_hash, ip_hash = _rate_limit_identity(email, client_ip)
     now = time.time()
     with _connect(Path(db_path)) as conn:
-        row = conn.execute(
+        pair_row = conn.execute(
             """SELECT window_started_at, failed_attempts FROM login_attempts
                WHERE email_key_hash=? AND ip_hash=?""",
             (email_key_hash, ip_hash),
         ).fetchone()
-    if row is None or now - row["window_started_at"] >= LOGIN_WINDOW_SECONDS:
-        return False
-    return row["failed_attempts"] >= LOGIN_FAILURE_LIMIT
+        account_row = conn.execute(
+            """SELECT window_started_at, failed_attempts FROM login_account_attempts
+               WHERE email_key_hash=?""",
+            (email_key_hash,),
+        ).fetchone()
+    pair_limited = bool(
+        pair_row is not None
+        and now - pair_row["window_started_at"] < LOGIN_WINDOW_SECONDS
+        and pair_row["failed_attempts"] >= LOGIN_FAILURE_LIMIT
+    )
+    account_limited = bool(
+        account_row is not None
+        and now - account_row["window_started_at"] < LOGIN_WINDOW_SECONDS
+        and account_row["failed_attempts"] >= LOGIN_ACCOUNT_FAILURE_LIMIT
+    )
+    return pair_limited or account_limited
 
 
-def record_login_attempt(
-    db_path: Path,
-    email: str,
-    client_ip: str,
-    success: bool,
-) -> None:
+def record_login_attempt(db_path: Path, email: str, client_ip: str, success: bool) -> None:
     email_key_hash, ip_hash = _rate_limit_identity(email, client_ip)
     now = time.time()
     with _connect(Path(db_path)) as conn:
         if success:
-            conn.execute(
-                "DELETE FROM login_attempts WHERE email_key_hash=? AND ip_hash=?",
-                (email_key_hash, ip_hash),
-            )
+            # A successful account login clears failed attempts across all source IPs.
+            conn.execute("DELETE FROM login_attempts WHERE email_key_hash=?", (email_key_hash,))
+            conn.execute("DELETE FROM login_account_attempts WHERE email_key_hash=?", (email_key_hash,))
             return
-        row = conn.execute(
-            """SELECT window_started_at, failed_attempts FROM login_attempts
+
+        pair_row = conn.execute(
+            """SELECT window_started_at FROM login_attempts
                WHERE email_key_hash=? AND ip_hash=?""",
             (email_key_hash, ip_hash),
         ).fetchone()
-        if row is None or now - row["window_started_at"] >= LOGIN_WINDOW_SECONDS:
+        if pair_row is None or now - pair_row["window_started_at"] >= LOGIN_WINDOW_SECONDS:
             conn.execute(
                 """INSERT INTO login_attempts
                    (email_key_hash, ip_hash, window_started_at, failed_attempts, updated_at)
@@ -324,27 +340,58 @@ def record_login_attempt(
                 (now, email_key_hash, ip_hash),
             )
 
+        account_row = conn.execute(
+            "SELECT window_started_at FROM login_account_attempts WHERE email_key_hash=?",
+            (email_key_hash,),
+        ).fetchone()
+        if account_row is None or now - account_row["window_started_at"] >= LOGIN_WINDOW_SECONDS:
+            conn.execute(
+                """INSERT INTO login_account_attempts
+                   (email_key_hash, window_started_at, failed_attempts, updated_at)
+                   VALUES (?, ?, 1, ?)
+                   ON CONFLICT(email_key_hash) DO UPDATE SET
+                     window_started_at=excluded.window_started_at,
+                     failed_attempts=1,
+                     updated_at=excluded.updated_at""",
+                (email_key_hash, now, now),
+            )
+        else:
+            conn.execute(
+                """UPDATE login_account_attempts SET failed_attempts=failed_attempts+1, updated_at=?
+                   WHERE email_key_hash=?""",
+                (now, email_key_hash),
+            )
+
 
 def begin_login_attempt(db_path: Path, email: str, client_ip: str) -> bool:
-    """Atomically reserve a login attempt; return True when the pair is throttled.
+    """Atomically reserve per-IP and account-wide login attempts.
 
-    Attempts are reserved before password verification, so concurrent requests
-    cannot all pass a read-only check and exceed the configured failure budget.
-    A successful verification must call record_login_attempt(..., success=True)
-    to clear the reservation window.
+    Each email/IP pair gets five attempts and each account gets twenty attempts
+    across all IPs per 15-minute window. Successful verification clears both scopes.
     """
     email_key_hash, ip_hash = _rate_limit_identity(email, client_ip)
     now = time.time()
     with _connect(Path(db_path)) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute(
+        pair_row = conn.execute(
             """SELECT window_started_at, failed_attempts FROM login_attempts
                WHERE email_key_hash=? AND ip_hash=?""",
             (email_key_hash, ip_hash),
         ).fetchone()
-        if row is not None and now - row["window_started_at"] < LOGIN_WINDOW_SECONDS:
-            if row["failed_attempts"] >= LOGIN_FAILURE_LIMIT:
-                return True
+        account_row = conn.execute(
+            """SELECT window_started_at, failed_attempts FROM login_account_attempts
+               WHERE email_key_hash=?""",
+            (email_key_hash,),
+        ).fetchone()
+
+        pair_active = pair_row is not None and now - pair_row["window_started_at"] < LOGIN_WINDOW_SECONDS
+        account_active = account_row is not None and now - account_row["window_started_at"] < LOGIN_WINDOW_SECONDS
+        if pair_active and pair_row["failed_attempts"] >= LOGIN_FAILURE_LIMIT:
+            return True
+        if account_active and account_row["failed_attempts"] >= LOGIN_ACCOUNT_FAILURE_LIMIT:
+            return True
+
+        if pair_active:
             conn.execute(
                 """UPDATE login_attempts SET failed_attempts=failed_attempts+1, updated_at=?
                    WHERE email_key_hash=? AND ip_hash=?""",
@@ -360,5 +407,23 @@ def begin_login_attempt(db_path: Path, email: str, client_ip: str) -> bool:
                      failed_attempts=1,
                      updated_at=excluded.updated_at""",
                 (email_key_hash, ip_hash, now, now),
+            )
+
+        if account_active:
+            conn.execute(
+                """UPDATE login_account_attempts SET failed_attempts=failed_attempts+1, updated_at=?
+                   WHERE email_key_hash=?""",
+                (now, email_key_hash),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO login_account_attempts
+                   (email_key_hash, window_started_at, failed_attempts, updated_at)
+                   VALUES (?, ?, 1, ?)
+                   ON CONFLICT(email_key_hash) DO UPDATE SET
+                     window_started_at=excluded.window_started_at,
+                     failed_attempts=1,
+                     updated_at=excluded.updated_at""",
+                (email_key_hash, now, now),
             )
     return False

@@ -6,8 +6,29 @@
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this), function () {
   'use strict';
 
-  function createClient({ apiBase = '/api', fetchImpl = fetch, documentRef = document } = {}) {
-    const base = String(apiBase || '/api').replace(/\/+$/, '');
+  function resolveApiBase(apiBase = '/api', locationRef = null) {
+    const candidate = String(apiBase || '/api').trim() || '/api';
+    const origin = locationRef && locationRef.origin;
+    if (!origin) {
+      if (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(candidate)) return '/api';
+      return candidate.replace(/\/+$/, '') || '/api';
+    }
+    try {
+      const resolved = new URL(candidate, origin);
+      if (resolved.origin !== origin || resolved.username || resolved.password) return '/api';
+      return resolved.pathname.replace(/\/+$/, '') || '/api';
+    } catch (_error) {
+      return '/api';
+    }
+  }
+
+  function createClient({
+    apiBase = '/api',
+    fetchImpl = fetch,
+    documentRef = document,
+    locationRef = (typeof window !== 'undefined' ? window.location : null),
+  } = {}) {
+    const base = resolveApiBase(apiBase, locationRef);
 
     function readCookie(name) {
       const prefix = `${name}=`;
@@ -76,5 +97,5 @@
     return { login, currentUser, logout, request, bootstrap };
   }
 
-  return { createClient };
+  return { createClient, resolveApiBase };
 });

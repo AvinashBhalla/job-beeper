@@ -11,8 +11,10 @@
   // 1. API Resolution, Constants, State & SVG Icon Registry
   // =========================================================================
   const requestedApi = new URLSearchParams(location.search).get('api');
-  const API = (requestedApi ? requestedApi.replace(/\/+$/, '') : '') || '/api';
-  const authClient = window.JobBeeperAuth.createClient({ apiBase: API });
+  // API overrides are restricted to this dashboard's origin so login credentials
+  // can never be sent to a URL supplied in a crafted query string.
+  const API = window.JobBeeperAuth.resolveApiBase(requestedApi || '/api', window.location);
+  const authClient = window.JobBeeperAuth.createClient({ apiBase: API, locationRef: window.location });
 
   const LOCAL_STORAGE_APPLIED_KEY = 'job_beeper_applied_jobs_v1';
   const THEME_STORAGE_KEY = 'job_beeper_theme';

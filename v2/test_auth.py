@@ -36,7 +36,7 @@ class AuthPersistenceTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as conn:
             self.assertEqual(conn.execute("SELECT title FROM jobs").fetchone()[0], "Existing job")
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertTrue({"users", "sessions", "login_attempts"}.issubset(tables))
+        self.assertTrue({"users", "sessions", "login_attempts", "login_account_attempts"}.issubset(tables))
 
     def test_first_admin_bootstrap_is_atomic_under_concurrent_calls(self):
         def attempt_create():
@@ -116,12 +116,33 @@ class AuthPersistenceTests(unittest.TestCase):
         self.assertNotEqual(stored_key, identity[0])
         self.assertEqual(len(stored_key), 64)
 
+    def test_account_level_login_limit_cannot_be_bypassed_by_rotating_ips(self):
+        email = "target@example.com"
+        for index in range(20):
+            self.assertFalse(auth.begin_login_attempt(self.db_path, email, f"198.51.100.{index + 1}"))
+        self.assertTrue(auth.begin_login_attempt(self.db_path, email, "203.0.113.50"))
+
+    def test_concurrent_account_level_reservations_cannot_exceed_the_limit(self):
+        email = "parallel-target@example.com"
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            allowed = list(pool.map(lambda index: auth.begin_login_attempt(self.db_path, email, f"203.0.113.{index + 1}"), range(30)))
+        self.assertEqual(allowed.count(False), 20)
+        self.assertEqual(allowed.count(True), 10)
+
     def test_concurrent_login_attempt_reservations_cannot_exceed_the_limit(self):
         identity = ("parallel@example.com", "192.0.2.26")
         with ThreadPoolExecutor(max_workers=8) as pool:
             allowed = list(pool.map(lambda _: auth.begin_login_attempt(self.db_path, *identity), range(12)))
         self.assertEqual(allowed.count(False), 5)
         self.assertEqual(allowed.count(True), 7)
+
+    def test_successful_login_clears_account_throttle_across_all_ips(self):
+        email = "reset-account@example.com"
+        for index in range(19):
+            self.assertFalse(auth.begin_login_attempt(self.db_path, email, f"192.0.2.{index + 1}"))
+        self.assertFalse(auth.begin_login_attempt(self.db_path, email, "203.0.113.20"))
+        auth.record_login_attempt(self.db_path, email, "203.0.113.20", success=True)
+        self.assertFalse(auth.begin_login_attempt(self.db_path, email, "192.0.2.1"))
 
     def test_login_rate_limit_persists_and_resets_after_success(self):
         identity = ("person@example.com", "192.0.2.15")
@@ -280,7 +301,7 @@ class AuthApiTests(unittest.TestCase):
             radar.init_db()
         with sqlite3.connect(uninitialized_db) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertTrue({"users", "sessions", "login_attempts", "jobs"}.issubset(tables))
+        self.assertTrue({"users", "sessions", "login_attempts", "login_account_attempts", "jobs"}.issubset(tables))
 
     def test_public_health_response_contains_only_liveness_metadata(self):
         response = self.client.get("/health")

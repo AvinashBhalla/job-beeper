@@ -33,8 +33,10 @@ class DashboardAuthContractTests(unittest.TestCase):
     def test_auth_client_sends_cookie_credentials_and_csrf_without_bearer_tokens(self):
         script = r"""
 const assert = require('assert');
-const { createClient } = require('./dashboard/auth.js');
+const { createClient, resolveApiBase } = require('./dashboard/auth.js');
 (async () => {
+  assert.strictEqual(resolveApiBase('https://attacker.example/api', { origin: 'https://jobbeeper.example' }), '/api');
+  assert.strictEqual(resolveApiBase('/api/v2', { origin: 'https://jobbeeper.example' }), '/api/v2');
   const calls = [];
   const responses = [
     { ok: true, status: 200, json: async () => ({ user: { id: 7, email: 'admin@example.com', role: 'admin', status: 'active' } }) },
@@ -42,10 +44,12 @@ const { createClient } = require('./dashboard/auth.js');
     { ok: true, status: 200, json: async () => ({ config: {} }) },
     { ok: true, status: 200, json: async () => ({ user: { id: 8, email: 'user@example.com', role: 'user', status: 'active' } }) },
     { ok: true, status: 200, json: async () => ({ status: 'logged_out' }) },
+    { ok: true, status: 200, json: async () => ({ user: { id: 7, email: 'admin@example.com', role: 'admin', status: 'active' } }) },
   ];
   const client = createClient({
     apiBase: '/api',
     documentRef: { cookie: 'theme=dark; job_beeper_csrf=csrf-123' },
+    locationRef: { origin: 'https://jobbeeper.example' },
     fetchImpl: async (url, options) => { calls.push({ url, options }); return responses.shift(); },
   });
   await client.login('admin@example.com', 'example-password');
@@ -72,6 +76,10 @@ const { createClient } = require('./dashboard/auth.js');
   assert.strictEqual(calls[4].options.method, 'POST');
   assert.strictEqual(calls[4].options.headers['X-CSRF-Token'], 'csrf-123');
   assert.strictEqual(calls[4].options.credentials, 'same-origin');
+  const externalClient = createClient({ apiBase: 'https://attacker.example/api', locationRef: { origin: 'https://jobbeeper.example' }, documentRef: { cookie: '' }, fetchImpl: async (url, options) => { calls.push({ url, options }); return responses.shift(); } });
+  await externalClient.login('victim@example.com', 'do-not-leak-this-password');
+  assert.strictEqual(calls[5].url, '/api/auth/login');
+  assert.strictEqual(calls[5].options.credentials, 'same-origin');
   console.log('cookie auth client contract passed');
 })().catch(error => { console.error(error); process.exit(1); });
 """
@@ -99,7 +107,7 @@ const { createClient } = require('./dashboard/auth.js');
 
     def test_admin_dashboard_initialization_is_gated_by_session_bootstrap(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
-        for required in ("JobBeeperAuth.createClient", "authClient.bootstrap", "initializeWorkspace"):
+        for required in ("JobBeeperAuth.resolveApiBase", "JobBeeperAuth.createClient", "authClient.bootstrap", "initializeWorkspace"):
             self.assertIn(required, source, f"dashboard must integrate {required}")
         for retired in ("SESSION_TOKEN_KEY", "sessionStorage", "X-Config-Token", "fetch(API"):
             self.assertNotIn(retired, source, f"dashboard must not use {retired}")
