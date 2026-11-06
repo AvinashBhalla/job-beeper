@@ -3088,3 +3088,11 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Commits on `feat/user-preferences-evaluations-20261106`: `f2b8e44` read-only preference getter + explicit provisioning initializer; `537f1a3` CLI provisioning uses initializer; `3d93883` regression test ensures getter does not write; `bfc55e4` evaluation refresh moved to FastAPI background task after preference save; `77121f2` frontend no longer waits for full feed reload after save.
 - These changes are not yet tested, CI-verified, rebuilt, or deployed. Termalin tool returned agent-not-found during attempt to run tests. Do not assume dev runtime includes them. Production remains untouched.
 - Next: pull latest branch in `/tmp/job-radar-user-preferences`; run targeted and full tests + JS syntax; review background evaluation/feed concurrency; rebuild only isolated dev if green. Then implement approved open Google OIDC signup (new users always role=user, server-verified identity, secure state/nonce/JWKS validation, secrets only in VM env) and hide admin-only controls from members. PR #46 remains draft.
+
+
+## 2026-11-06 — Contention fix test results
+
+- Latest branch commit `8202ba6`. Focused `v2.test_user_preferences`: **10 passed**. Python AST syntax checks passed for changed Python modules.
+- Full suite attempt: 166 tests, 1 skipped, 2 import errors (`test_auth`, `test_user_preferences_api`) because the isolated older image lacks `httpx2`, now required by Starlette TestClient. Do not report full suite green. Host Node is too old for `??`; dashboard JS syntax still needs modern Node validation.
+- Fixed a regression found by focused tests: new provisioned preferences now start at revision 0, preserving first saved preference version 1. No deployment yet. Dev 8001 image unchanged; production 8000 untouched.
+- Next: rerun using current test dependencies (`httpx2`) and modern Node; inspect background evaluation concurrency; implement secure approved Google OIDC signup and hide admin-only preference controls for normal users. PR #46 remains draft.
