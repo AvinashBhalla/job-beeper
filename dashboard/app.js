@@ -2035,11 +2035,18 @@
 
   function bindAuthEvents() {
     const googleButton = $('googleSignInBtn');
-    if (googleButton) {
+    const googleSignup = $('googleSignupWrap');
+    if (googleButton && googleSignup) {
       authClient.request('/auth/google/status', { cache: 'no-store' })
         .then(response => response.ok ? response.json() : { enabled: false })
-        .then(status => { googleButton.hidden = !status.enabled; })
-        .catch(() => { googleButton.hidden = true; });
+        .then(status => {
+          googleSignup.hidden = !status.enabled;
+          googleButton.hidden = !status.enabled;
+        })
+        .catch(() => {
+          googleSignup.hidden = true;
+          googleButton.hidden = true;
+        });
     }
     const googleAuthResult = new URLSearchParams(window.location.search).get('google_auth');
     if (googleAuthResult === 'failed' && $('authStatusMsg')) {
