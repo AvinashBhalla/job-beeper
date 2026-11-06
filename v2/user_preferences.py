@@ -177,7 +177,8 @@ def init_preferences_schema(db_path: Path) -> None:
         )
 
 
-def get_user_preferences(db_path: Path, user_id: int) -> dict[str, Any]:
+def ensure_user_preferences(db_path: Path, user_id: int) -> None:
+    """Create empty defaults once, during account provisioning rather than reads."""
     timestamp = _timestamp()
     with _connect(Path(db_path)) as conn:
         conn.execute(
@@ -185,13 +186,18 @@ def get_user_preferences(db_path: Path, user_id: int) -> dict[str, Any]:
                VALUES (?, '{}', 1, ?, ?) ON CONFLICT(user_id) DO NOTHING""",
             (int(user_id), timestamp, timestamp),
         )
+
+
+def get_user_preferences(db_path: Path, user_id: int) -> dict[str, Any]:
+    """Read preferences without acquiring a SQLite write lock."""
+    with _connect(Path(db_path)) as conn:
         row = conn.execute(
             "SELECT preferences_json, version, updated_at FROM user_preferences WHERE user_id=?",
             (int(user_id),),
         ).fetchone()
     decoded = _decode_row(row)
     if decoded is None:
-        raise ValueError("User account does not exist.")
+        raise ValueError("User preferences are not initialized for this account.")
     return decoded
 
 
