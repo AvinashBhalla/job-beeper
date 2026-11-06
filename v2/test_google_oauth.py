@@ -139,8 +139,10 @@ class GoogleOAuthApiTests(unittest.TestCase):
             "client-id", "client-secret",
             "https://jobs.example/api/auth/google/callback",
         )
-        authorization_url = google_oauth.create_authorization_url(self.db_path, config)
-        params = parse_qs(urlsplit(authorization_url).query)
+        with patch.object(google_oauth, "load_config", return_value=config):
+            start = self.client.get("/api/auth/google/start", follow_redirects=False)
+        self.assertEqual(start.status_code, 302)
+        params = parse_qs(urlsplit(start.headers["location"]).query)
         state = params["state"][0]
         nonce = params["nonce"][0]
         identity = {
