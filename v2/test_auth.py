@@ -336,7 +336,10 @@ class AuthApiTests(unittest.TestCase):
         self.assertTrue(routes)
         for route in routes:
             dependency_calls = {dependency.call for dependency in route.dependant.dependencies}
-            if route.path == "/api/auth/login":
+            if route.path in {
+                "/api/auth/login", "/api/auth/google/status",
+                "/api/auth/google/start", "/api/auth/google/callback",
+            }:
                 self.assertNotIn(radar.require_admin, dependency_calls, route.path)
             elif route.path in {"/api/auth/me", "/api/auth/logout"}:
                 self.assertIn(radar.get_current_user, dependency_calls, route.path)
