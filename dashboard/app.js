@@ -2034,6 +2034,20 @@
   }
 
   function bindAuthEvents() {
+    const googleButton = $('googleSignInBtn');
+    if (googleButton) {
+      authClient.request('/auth/google/status', { cache: 'no-store' })
+        .then(response => response.ok ? response.json() : { enabled: false })
+        .then(status => { googleButton.hidden = !status.enabled; })
+        .catch(() => { googleButton.hidden = true; });
+    }
+    const googleAuthResult = new URLSearchParams(window.location.search).get('google_auth');
+    if (googleAuthResult === 'failed' && $('authStatusMsg')) {
+      $('authStatusMsg').textContent = 'Google sign-in could not be completed. Please try again.';
+    } else if (googleAuthResult === 'cancelled' && $('authStatusMsg')) {
+      $('authStatusMsg').textContent = 'Google sign-in was cancelled.';
+    }
+
     const passwordInput = $('authPassword');
     const passwordToggle = $('authPasswordToggle');
     if (passwordInput && passwordToggle) {
