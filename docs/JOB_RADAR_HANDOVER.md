@@ -6165,3 +6165,5 @@ On the same onboarding page, show a Telegram connection panel/link that opens th
 - Node 22 syntax checks for `dashboard/auth.js` and `dashboard/app.js` completed successfully (no output/errors).
 - Working tree was clean after pulling the documentation updates.
 - This is local disposable-container verification, not a CI status assertion and not a dev deployment. Dev 8001 still runs the previous image; production 8000 untouched.
+
+- GitHub Actions CI: V2 CI run **#1265** for code/test commit `2e78e01` completed with conclusion **success**. Run #1262 for `de893b8` also succeeded. The latest handover-only documentation commits do not change runtime code.
