@@ -3410,6 +3410,43 @@ def latency_summary(hours: int = 24):
     return {"hours": hours, "sources": summary}
 
 
+@app.get("/api/source-status/summary")
+def source_status_summary(user: dict[str, Any] = Depends(require_authenticated)):
+    """Expose operational availability without leaking collector diagnostics to members."""
+    config = get_config()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs
+            FROM source_runs sr
+            JOIN (
+                SELECT source, MAX(finished_at) AS latest_finished_at
+                FROM source_runs GROUP BY source
+            ) latest
+              ON latest.source = sr.source AND latest.latest_finished_at = sr.finished_at
+            ORDER BY sr.source
+        """).fetchall()
+    history = {
+        row[0]: {"last_run": row[1], "jobs_seen": row[2] or 0, "new_jobs": row[3] or 0}
+        for row in rows
+    }
+    sources = []
+    for source in SOURCE_NAMES:
+        item = history.get(source, {})
+        runtime = source_state.get(source, {})
+        sources.append({
+            "source": source,
+            "enabled": bool(config.get("source_enabled", {}).get(source, True)),
+            "last_run": item.get("last_run"),
+            "jobs_seen": item.get("jobs_seen", 0),
+            "new_jobs": item.get("new_jobs", 0),
+            "runtime": {
+                "running": bool(runtime.get("running")),
+                "last_success": runtime.get("last_success"),
+            },
+        })
+    return {"sources": sources}
+
+
 @app.get("/api/source-status", dependencies=[Depends(require_admin)])
 def source_status():
     config = get_config()

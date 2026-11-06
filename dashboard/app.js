@@ -17,7 +17,7 @@
   const authClient = window.JobBeeperAuth.createClient({ apiBase: API, locationRef: window.location });
 
   const LOCAL_STORAGE_APPLIED_KEY = 'job_beeper_applied_jobs_v1';
-  let userFeedPollTimer = null;
+  const appliedStorageKey = () => state.currentUser && state.currentUser.id ? `${LOCAL_STORAGE_APPLIED_KEY}_user_${state.currentUser.id}` : LOCAL_STORAGE_APPLIED_KEY;
   const THEME_STORAGE_KEY = 'job_beeper_theme';
 
   const state = {
@@ -27,6 +27,7 @@
     config: null,
     summary: null,
     currentUser: null,
+    isAdmin: false,
     userPreferences: null,
     sourceStatus: [],
     activeSection: 'jobsSection',
@@ -589,7 +590,7 @@
   // =========================================================================
   function loadAppliedJobs() {
     try {
-      const raw = localStorage.getItem(LOCAL_STORAGE_APPLIED_KEY);
+      const raw = localStorage.getItem(appliedStorageKey());
       state.appliedJobs = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(state.appliedJobs)) state.appliedJobs = [];
     } catch (e) {
@@ -601,7 +602,7 @@
 
   function saveAppliedJobs() {
     try {
-      localStorage.setItem(LOCAL_STORAGE_APPLIED_KEY, JSON.stringify(state.appliedJobs));
+      localStorage.setItem(appliedStorageKey(), JSON.stringify(state.appliedJobs));
     } catch (e) {
       console.error('Failed to save applied jobs to localStorage', e);
     }
@@ -920,7 +921,7 @@
       const applied = isJobApplied(job.id);
       const scoreTier = getScoreTierClass(job.match_score);
 
-      const alertableBadge = job.alertable
+      const alertableBadge = state.isAdmin && job.alertable
         ? `<span class="tag-alertable-compact" title="${esc((job.alertability_reasons || []).join('; '))}">ALERTABLE</span>`
         : '';
       const notificationStatus = String(job.notification_status || 'not_eligible').toLowerCase();
@@ -931,7 +932,7 @@
         ...(job.notification_last_error ? [`Delivery error: ${job.notification_last_error}`] : []),
       ].join('; ') || (job.alertability_reasons || []).join('; ');
       let notificationBadge = '';
-      if (qualifiesForAlertPolicy) {
+      if (state.isAdmin && qualifiesForAlertPolicy) {
         if (notificationStatus === 'sent') {
           notificationBadge = `<span class="tag-alertable-compact" title="Telegram sent${job.notification_sent_at ? ` at ${esc(fmtTimestamp(job.notification_sent_at))}` : ''}">TELEGRAM SENT</span>`;
         } else if (notificationStatus === 'queued' || notificationStatus === 'sending') {
@@ -1545,7 +1546,7 @@
 
     next.candidate_experience_years = cand === '' ? null : Number(cand);
     next.min_experience_years = min === '' ? null : Number(min);
-    next.max_experience_years = Number($('cfgMaxExp')?.value || 3);
+    next.max_experience_years = Number($('cfgMaxExp')?.value || (state.isAdmin ? 3 : 30));
     next.match_threshold = Number($('cfgMatchThreshold')?.value || 55);
     next.max_age_hours = Number($('cfgMaxAge')?.value || 72);
 
@@ -1561,12 +1562,23 @@
     return next;
   }
 
-  async function savePreferences() {
+  function collectUserPreferencesPayload() {
     const payload = collectPreferencesPayload();
+    return {
+      target_roles: payload.target_roles, locations: payload.locations, skills: payload.skills,
+      title_exclude: payload.title_exclude, excluded_role_terms: payload.excluded_role_terms,
+      candidate_experience_years: payload.candidate_experience_years,
+      min_experience_years: payload.min_experience_years, max_experience_years: payload.max_experience_years,
+      match_threshold: payload.match_threshold, max_age_hours: payload.max_age_hours, remote_only: payload.remote_only,
+    };
+  }
+
+  async function savePreferences() {
+    const payload = state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload();
     if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saving preferences…';
 
     try {
-      const response = await authClient.request('/config', {
+      const response = await authClient.request(state.isAdmin ? '/config' : '/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1583,9 +1595,16 @@
       }
 
       const data = await response.json();
-      state.config = data.config;
+      state.config = data.config || data.preferences;
+      state.userPreferences = state.isAdmin ? state.userPreferences : data.preferences;
       populatePreferencesForm();
-      showToast('Preferences saved successfully. Live matching updated.', 'success');
+      if (!state.isAdmin) {
+        const notice = $('userOnboardingNotice');
+        if (notice) notice.hidden = true;
+        await loadJobsFeed();
+        window.showSection?.('jobsSection', true);
+      }
+      showToast('Preferences saved successfully. Your personalized matching has been updated.', 'success');
       if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saved.';
     } catch (e) {
       showToast('Backend API unreachable', 'error');
@@ -1598,12 +1617,18 @@
   // =========================================================================
   async function loadConfig() {
     try {
-      const res = await authClient.request('/config', { cache: 'no-store' });
+      const res = await authClient.request(state.isAdmin ? '/config' : '/preferences', { cache: 'no-store' });
       if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error('Config endpoint unavailable');
       const data = await res.json();
-      state.config = data.config;
+      state.config = data.config || data.preferences;
+      state.userPreferences = state.isAdmin ? state.userPreferences : data.preferences;
       populatePreferencesForm();
+      const onboardingNotice = $('userOnboardingNotice');
+      if (onboardingNotice) onboardingNotice.hidden = Boolean(data.preferences?.onboarding_complete || state.isAdmin);
+      if (!state.isAdmin && !data.preferences?.onboarding_complete) {
+        window.showSection?.('preferencesSection', false);
+      }
     } catch (e) {
       state.config = null;
       showToast('Live backend configuration unavailable. Check the dashboard API URL.', 'error', 5000);
@@ -1665,7 +1690,8 @@
 
   async function loadSourceStatusTelemetry() {
     try {
-      const res = await authClient.request('/source-status', { cache: 'no-store' });
+      const endpoint = state.isAdmin ? '/source-status' : '/source-status/summary';
+      const res = await authClient.request(endpoint, { cache: 'no-store' });
       if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -1924,149 +1950,29 @@
     }
   }
 
-  async function initializeUserWorkspace(user) {
-    state.currentUser = user;
-    document.body.classList.add('user-ready');
-    const workspace = $('userWorkspace');
-    if (workspace) workspace.hidden = false;
-    if ($('userWorkspaceEmail')) $('userWorkspaceEmail').textContent = user.email;
 
-    if ($('userWorkspaceLogoutBtn') && !$('userWorkspaceLogoutBtn').dataset.bound) {
-      $('userWorkspaceLogoutBtn').dataset.bound = '1';
-      $('userWorkspaceLogoutBtn').addEventListener('click', signOut);
-    }
-    if ($('userPreferencesForm') && !$('userPreferencesForm').dataset.bound) {
-      $('userPreferencesForm').dataset.bound = '1';
-      $('userPreferencesForm').addEventListener('submit', saveUserPreferences);
-    }
-    if ($('userEditPreferencesBtn') && !$('userEditPreferencesBtn').dataset.bound) {
-      $('userEditPreferencesBtn').dataset.bound = '1';
-      $('userEditPreferencesBtn').addEventListener('click', () => {
-        if ($('userFeedPanel')) $('userFeedPanel').hidden = true;
-        if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = false;
-        if ($('userPreferencesStatus')) $('userPreferencesStatus').textContent = '';
-      });
-    }
-    if ($('userRefreshFeedBtn') && !$('userRefreshFeedBtn').dataset.bound) {
-      $('userRefreshFeedBtn').dataset.bound = '1';
-      $('userRefreshFeedBtn').addEventListener('click', loadUserJobs);
-    }
-    await loadUserPreferences();
-    if (!userFeedPollTimer) {
-      userFeedPollTimer = setInterval(() => {
-        if (document.body.classList.contains('user-ready') && $('userFeedPanel') && !$('userFeedPanel').hidden) {
-          loadUserJobs();
-        }
-      }, 30000);
-    }
-  }
-
-  async function loadUserPreferences() {
-    try {
-      const response = await authClient.request('/preferences', { cache: 'no-store' });
-      if (response.status === 401) { window.location.reload(); return; }
-      if (!response.ok) throw new Error('Could not load your preferences.');
-      const data = await response.json();
-      const preferences = data.preferences || {};
-      state.userPreferences = preferences;
-      if ($('userTargetRoles')) $('userTargetRoles').value = (preferences.target_roles || []).join(', ');
-      if ($('userTargetLocations')) $('userTargetLocations').value = (preferences.locations || []).join(', ');
-      if ($('userTargetSkills')) $('userTargetSkills').value = (preferences.skills || []).join(', ');
-
-      if (preferences.onboarding_complete) {
-        if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = true;
-        if ($('userFeedPanel')) $('userFeedPanel').hidden = false;
-        await loadUserJobs();
-      } else {
-        if ($('userFeedPanel')) $('userFeedPanel').hidden = true;
-        if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = false;
-      }
-    } catch (error) {
-      if ($('userPreferencesStatus')) $('userPreferencesStatus').textContent = error.message || 'Could not load preferences.';
-    }
-  }
-
-  async function saveUserPreferences(event) {
-    if (event) event.preventDefault();
-    const payload = {
-      target_roles: splitUserTags($('userTargetRoles')?.value),
-      locations: splitUserTags($('userTargetLocations')?.value),
-      skills: splitUserTags($('userTargetSkills')?.value),
-    };
-    const status = $('userPreferencesStatus');
-    const button = $('userPreferencesSaveBtn');
-    if (button) button.disabled = true;
-    if (status) status.textContent = 'Saving your preferences…';
-    try {
-      const response = await authClient.request('/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 401) { window.location.reload(); return; }
-      if (!response.ok) throw new Error(data.detail || 'Could not save preferences.');
-      state.userPreferences = data.preferences;
-      if (status) status.textContent = 'Preferences saved. Loading your matches…';
-      if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = true;
-      if ($('userFeedPanel')) $('userFeedPanel').hidden = false;
-      await loadUserJobs();
-    } catch (error) {
-      if (status) status.textContent = error.message || 'Could not save preferences.';
-    } finally {
-      if (button) button.disabled = false;
-    }
-  }
-
-  async function loadUserJobs() {
-    const status = $('userFeedStatus');
-    const list = $('userJobsList');
-    if (status) status.textContent = 'Refreshing your personalized matches…';
-    try {
-      const responses = await Promise.all([
-        authClient.request('/jobs?minutes=10080&limit=500', { cache: 'no-store' }),
-        authClient.request('/daily-summary', { cache: 'no-store' }),
-      ]);
-      const jobsResponse = responses[0];
-      const summaryResponse = responses[1];
-      if (jobsResponse.status === 401 || summaryResponse.status === 401) { window.location.reload(); return; }
-      const jobsData = await jobsResponse.json().catch(() => ({}));
-      const summary = await summaryResponse.json().catch(() => ({}));
-      if (!jobsResponse.ok) throw new Error(jobsData.detail || 'Could not load your job feed.');
-      const matches = (jobsData.jobs || []).filter(job => job.likely_match);
-      if ($('userFeedSummary')) {
-        $('userFeedSummary').textContent = String(summary.matched_jobs ?? matches.length) + ' matching jobs discovered today · Personalized to your saved preferences.';
-      }
-      if (!matches.length) {
-        if (list) list.innerHTML = '<p class="auth-description">No matching jobs in the current feed yet. Your preferences are saved; new matching jobs will appear as they are discovered.</p>';
-      } else if (list) {
-        list.innerHTML = matches.map(job => {
-          const url = safeExternalJobUrl(job.url);
-          const title = url
-            ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(job.title || 'Untitled role') + '</a>'
-            : esc(job.title || 'Untitled role');
-          const reasons = (job.match_reasons || []).slice(0, 4).map(reason => '<li>' + esc(reason) + '</li>').join('');
-          return '<article class="user-job-card">' +
-            '<h2>' + title + '</h2>' +
-            '<p class="user-job-meta">' + esc(job.company || 'Unknown company') + ' · ' + esc(job.location || 'Location not listed') + ' · ' + esc(job.source || 'Source') + '</p>' +
-            '<span class="user-job-score">' + esc(job.match_score ?? 0) + '% match</span>' +
-            '<ul class="user-job-reasons">' + reasons + '</ul>' +
-            '</article>';
-        }).join('');
-      }
-      if (status) status.textContent = 'Showing ' + matches.length + ' personalized matches.';
-    } catch (error) {
-      if (status) status.textContent = error.message || 'Could not load your job feed.';
-    }
-  }
 
   function showUnavailablePanel() {
     setAuthPanel('authUnavailablePanel');
   }
 
-  async function initializeWorkspace() {
+  async function initializeWorkspace(user) {
     if (workspaceInitialized) return;
     workspaceInitialized = true;
+    state.currentUser = user;
+    state.isAdmin = user?.role === 'admin';
+    document.body.classList.add('auth-ready');
+    document.body.classList.remove('user-ready');
+    const userWorkspace = $('userWorkspace');
+    if (userWorkspace) userWorkspace.hidden = true;
+    if ($('accountEmail')) $('accountEmail').textContent = user?.email || '—';
+    if ($('accountRole')) $('accountRole').textContent = state.isAdmin ? 'Administrator' : 'Member';
+    document.querySelectorAll('.admin-only-setting').forEach(el => { el.hidden = !state.isAdmin; });
+    if ($('preferencesSubtitle')) $('preferencesSubtitle').textContent = state.isAdmin
+      ? 'Candidate profile and global matching, source, and notification settings.'
+      : 'Your personal target roles, locations, skills, and matching criteria. Changes affect only your feed.';
+    const saveButton = $('savePreferencesBtn');
+    if (saveButton) saveButton.textContent = state.isAdmin ? 'Save Preferences to V2' : 'Save My Preferences';
 
     loadAppliedJobs();
     setupNavigation();
@@ -2082,10 +1988,13 @@
     handleHashRoute();
 
     await loadConfig();
-    await loadJobsFeed();
+    if (state.isAdmin || state.config?.onboarding_complete) await loadJobsFeed();
+    else { state.jobs = []; renderFeed(); }
     await loadSourceStatusTelemetry();
 
-    setInterval(loadJobsFeed, 10000);
+    setInterval(() => {
+      if (state.isAdmin || (state.config && state.config.onboarding_complete)) loadJobsFeed();
+    }, 10000);
     setInterval(loadSourceStatusTelemetry, 30000);
   }
 
@@ -2101,13 +2010,12 @@
       onError: showUnavailablePanel,
     });
 
-    if (result.access === 'admin') await initializeWorkspace();
-    if (result.access === 'user') await initializeUserWorkspace(result.user);
+    if (result.access === 'admin' || result.access === 'user') await initializeWorkspace(result.user);
     return result;
   }
 
   async function signOut() {
-    const buttons = [$('headerLogoutBtn'), $('accountLogoutBtn'), $('authUserLogoutBtn'), $('userWorkspaceLogoutBtn')].filter(Boolean);
+    const buttons = [$('headerLogoutBtn'), $('accountLogoutBtn'), $('authUserLogoutBtn')].filter(Boolean);
     buttons.forEach(button => { button.disabled = true; });
     try {
       const response = await authClient.logout();

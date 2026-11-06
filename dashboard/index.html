@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=obsidian_v3">
+  <link rel="stylesheet" href="styles.css?v=obsidian_v4">
 </head>
 
 <body>
@@ -51,53 +51,6 @@
       </div>
     </div>
   </section>
-
-  <main id="userWorkspace" class="user-workspace" hidden>
-    <header class="user-workspace-header">
-      <div>
-        <div class="auth-brand user-workspace-brand">
-          <span class="brand-beacon" aria-hidden="true">
-            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.4"></circle><circle cx="12" cy="12" r="6" stroke-opacity="0.7"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle><line x1="12" y1="12" x2="20" y2="4"></line></svg>
-          </span>
-          <span><b>JOB BEEPER</b><small>Personal Job Feed</small></span>
-        </div>
-        <p class="auth-description">Signed in as <strong id="userWorkspaceEmail"></strong></p>
-      </div>
-      <button type="button" class="btn-pill btn-pill-secondary" id="userWorkspaceLogoutBtn">Sign out</button>
-    </header>
-
-    <section id="userOnboardingPanel" class="user-panel-card">
-      <h1>Set up your job preferences</h1>
-      <p class="auth-description">Tell us what role you want and where you want to work. Both are required before we show your personalized job feed.</p>
-      <form id="userPreferencesForm" class="auth-form">
-        <label for="userTargetRoles">Target job roles</label>
-        <textarea id="userTargetRoles" rows="2" placeholder="e.g. Python Developer, Backend Engineer" required></textarea>
-        <small>Separate multiple roles with commas or new lines.</small>
-        <label for="userTargetLocations">Target locations</label>
-        <textarea id="userTargetLocations" rows="2" placeholder="e.g. Bengaluru, Gurugram, Remote India" required></textarea>
-        <small>Separate multiple locations with commas or new lines.</small>
-        <label for="userTargetSkills">Skills (optional)</label>
-        <textarea id="userTargetSkills" rows="2" placeholder="e.g. Python, Django, React"></textarea>
-        <p id="userPreferencesStatus" class="auth-status" role="status" aria-live="polite"></p>
-        <button type="submit" class="btn-pill btn-pill-primary" id="userPreferencesSaveBtn">Save preferences and find jobs</button>
-      </form>
-    </section>
-
-    <section id="userFeedPanel" class="user-panel-card" hidden>
-      <div class="user-feed-heading">
-        <div>
-          <h1>Your matching jobs</h1>
-          <p class="auth-description" id="userFeedSummary">Jobs matched against your saved preferences.</p>
-        </div>
-        <div class="user-feed-actions">
-          <button type="button" class="btn-pill btn-pill-secondary" id="userEditPreferencesBtn">Edit preferences</button>
-          <button type="button" class="btn-pill btn-pill-secondary" id="userRefreshFeedBtn">Refresh</button>
-        </div>
-      </div>
-      <p id="userFeedStatus" class="auth-status" role="status" aria-live="polite"></p>
-      <div id="userJobsList" class="user-jobs-list"></div>
-    </section>
-  </main>
 
   <div class="app-shell">
     <!-- Desktop Left Navigation Sidebar -->
@@ -486,6 +439,8 @@
               </div>
             </div>
 
+            <div id="userOnboardingNotice" class="auth-description" hidden>Complete at least one target role and one target location, then save your preferences to unlock your personalized job feed.</div>
+
             <!-- Matching Criteria Group -->
             <div class="settings-block">
               <span class="settings-block-title">Matching Criteria</span>
@@ -570,7 +525,7 @@
 
               <!-- Sources & Toggles -->
               <div style="display:flex;flex-direction:column;gap:var(--space-6);margin-top:var(--space-8);">
-                <div style="display:flex;gap:var(--space-12);flex-wrap:wrap;" id="cfgSourcesWrap">
+                <div class="admin-only-setting" style="display:flex;gap:var(--space-12);flex-wrap:wrap;" id="cfgSourcesWrap">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="linkedin" checked> LinkedIn</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="naukri" checked> Naukri</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="greenhouse"> Greenhouse</label>
@@ -579,6 +534,8 @@
 
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRemoteOnly"> Remote opportunities only</label>
+                </div>
+                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRequireExp"> Require explicit experience for Telegram alerts</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgTelegramAlerts"> Telegram alerts enabled</label>
                 </div>
@@ -673,8 +630,8 @@
   <!-- Toast Notification Mount Host -->
   <div class="toast-notifications-host" id="toastContainer" aria-live="polite"></div>
 
-  <script src="auth.js?v=auth_v2"></script>
-  <script src="app.js?v=auth_v2"></script>
+  <script src="auth.js?v=auth_v3"></script>
+  <script src="app.js?v=shared_workspace_v1"></script>
 </body>
 
 </html>

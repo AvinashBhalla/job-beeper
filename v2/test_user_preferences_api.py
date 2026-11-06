@@ -162,6 +162,22 @@ class UserScopedJobFeedTests(unittest.TestCase):
                 0,
             )
 
+    def test_member_can_read_sanitized_source_health_without_collector_errors(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO source_runs(source, started_at, finished_at, jobs_seen, new_jobs, error) VALUES (?, ?, ?, ?, ?, ?)",
+                ("naukri", "2026-11-06T00:00:00+00:00", "2026-11-06T00:00:05+00:00", 12, 2, "private collector traceback"),
+            )
+        response = self.client.get("/api/source-status/summary")
+        self.assertEqual(response.status_code, 200)
+        naukri = next(item for item in response.json()["sources"] if item["source"] == "naukri")
+        self.assertEqual(naukri["jobs_seen"], 12)
+        self.assertEqual(naukri["new_jobs"], 2)
+        self.assertNotIn("last_error", naukri)
+        self.assertNotIn("error", naukri["runtime"])
+        self.assertEqual(self.client.get("/api/source-status").status_code, 403)
+
     def test_user_daily_summary_counts_only_own_matches(self):
         self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
         summary = self.client.get("/api/daily-summary")

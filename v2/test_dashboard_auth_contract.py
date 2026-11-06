@@ -105,23 +105,20 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         app_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("app.js"))
         self.assertLess(auth_index, app_index, "auth client must load before the dashboard application")
 
-    def test_user_workspace_requires_role_and_location_before_loading_feed(self):
+    def test_members_use_the_existing_dashboard_shell_and_user_scoped_preferences(self):
         parser = DashboardAuthMarkupParser()
         parser.feed((ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
-        required_ids = {
-            "userWorkspace", "userPreferencesForm", "userTargetRoles",
-            "userTargetLocations", "userTargetSkills", "userPreferencesSaveBtn",
-            "userOnboardingPanel", "userFeedPanel", "userJobsList",
-            "userWorkspaceLogoutBtn", "userRefreshFeedBtn",
-        }
-        self.assertTrue(required_ids.issubset(parser.ids))
+        self.assertTrue({"jobsSection", "appliedSection", "preferencesSection", "sourcesSection", "accessSection", "userOnboardingNotice"}.issubset(parser.ids))
+        self.assertNotIn("userWorkspace", parser.ids, "members must not be routed to a separate simplified dashboard")
+        self.assertIn('class="app-shell"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         for required in (
-            "initializeUserWorkspace", "loadUserPreferences", "saveUserPreferences",
-            "preferences.onboarding_complete", "authClient.request('/jobs?",
-            "job.likely_match", "user-ready",
+            "initializeWorkspace(user)", "state.isAdmin ? '/config' : '/preferences'",
+            "state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload()",
+            "state.currentUser.id", "'/source-status/summary'", "userOnboardingNotice",
         ):
-            self.assertIn(required, source, f"user workspace must implement {required}")
+            self.assertIn(required, source, f"shared dashboard must implement {required}")
+        self.assertIn("admin-only-setting", (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
 
     def test_admin_dashboard_initialization_is_gated_by_session_bootstrap(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")

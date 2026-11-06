@@ -6034,3 +6034,16 @@ Use `ssh -t` and `docker compose exec radar python -m v2.auth_admin create-admin
 - Sign-in form now includes an accessible Show/Hide password toggle and HTML `minlength=5`; asset query versions were bumped to prevent stale browser cache.
 - Provisioning CLI prompt now reflects the 5-character minimum.
 - Regression coverage accepts a 5-character password and rejects 4 characters.
+
+
+## 2026-11-06 — Shared production dashboard for all account roles (PR #46 follow-up)
+
+- Product decision: ordinary members and administrators use the existing production Job Beeper dashboard shell. The separate simplified member workspace has been removed.
+- Member sessions now initialize the same Jobs Feed, Applied, Matching Preferences, Source Health, Account, navigation, filters, job inspector, and refresh controls as admins.
+- Admins continue using `/api/config` and the full operational controls. Members load/save only their own `/api/preferences`; source enablement and Telegram/global operational controls remain hidden and server-protected.
+- Members use `/api/source-status/summary`, which exposes enabled/running/last-success and aggregate discovery counts but deliberately omits collector errors/diagnostics. Detailed `/api/source-status` remains admin-only.
+- Applied-job browser storage is now namespaced by authenticated user ID so accounts sharing a browser do not see one another's local application records. This remains browser-local (not cross-device/server-synced), matching the pre-existing dashboard behavior.
+- Onboarding is integrated into the existing Matching Preferences page; incomplete users are routed there and the feed polling loop waits until target role and location are saved.
+- User-specific matching criteria include target roles, locations, skills, exclusions, experience range, match threshold, max age, and remote-only preference. Source toggles and Telegram policy remain administrator-only.
+- Regression coverage confirms shared dashboard shell, per-user preferences/evaluations, safe source-health access, and admin-only diagnostics. Full V2 suite: 212 tests passed; one optional Node test skipped in the Python test image. Dashboard JS syntax checks passed with Node 22.
+- This follow-up is on the existing draft PR #46; not merged or deployed to dev yet.
