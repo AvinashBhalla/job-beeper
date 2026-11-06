@@ -6046,4 +6046,17 @@ Use `ssh -t` and `docker compose exec radar python -m v2.auth_admin create-admin
 - Onboarding is integrated into the existing Matching Preferences page; incomplete users are routed there and the feed polling loop waits until target role and location are saved.
 - User-specific matching criteria include target roles, locations, skills, exclusions, experience range, match threshold, max age, and remote-only preference. Source toggles and Telegram policy remain administrator-only.
 - Regression coverage confirms shared dashboard shell, per-user preferences/evaluations, safe source-health access, and admin-only diagnostics. Full V2 suite: 212 tests passed; one optional Node test skipped in the Python test image. Dashboard JS syntax checks passed with Node 22.
-- This follow-up is on the existing draft PR #46; not merged or deployed to dev yet.
+- Shared-dashboard follow-up commit `f43cd4af27a8cc68e97b5260b233299047a34245` is pushed to draft PR #46; CI run #1228 passed. It is not merged.
+
+
+## 2026-11-06 — Shared-dashboard build deployed to isolated dev
+
+- Deployed CI-green shared-dashboard PR head `f43cd4a` to the existing isolated dev service on loopback port 8001 (`job-radar-dev`).
+- Built image: `job-radar-dev-multitenant:f43cd4a`; temporary compose file: `/tmp/job-radar-dev-live.yml`.
+- Preserved existing dev volume and mounted config at `/home/ubuntu/job-beeper-dev/v2/config.dev.json`; preserved its `.env` provider configuration. Telegram bot token/chat ID remain blank in dev.
+- Pre-replacement SQLite backup: `/home/ubuntu/job-radar-dev-pre-shared-ui-20261106.db` (integrity ok, 8,009 jobs, 0 accounts at backup time).
+- Post-start dev DB integrity ok; 8,009 jobs; auth/preferences/evaluation tables initialized; zero users pending first-admin provisioning.
+- Health endpoint returned status ok. HTML served `obsidian_v4`, `auth_v3`, `shared_workspace_v1`. Anonymous `/api/source-status/summary` correctly returned 401.
+- Naukri polling is active and has successful source runs; current dev config has LinkedIn disabled, Naukri enabled, and notifications disabled. Do not enable LinkedIn or notifications without explicit approval.
+- Production container `v2-radar-1` on port 8000 and synthetic feature container on 8002 remain untouched.
+- Next: provision first dev admin using the user's confirmed email; CLI migrates existing global candidate preferences from mounted `config.json` into that first admin. Then create a separate ordinary beta account and test same-shell UI, user-specific feed/preferences, source health, and applied-state isolation.
