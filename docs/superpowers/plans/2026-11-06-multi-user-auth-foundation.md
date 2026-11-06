@@ -109,11 +109,12 @@
 - Modify: `docs/superpowers/plans/2026-11-06-multi-user-auth-foundation.md`
 - Modify: `v2/README.md`
 - Modify: `README.md`
+- Modify: `.github/workflows/v2-ci.yml` (install test dependencies and run JS syntax checks)
 
 - [x] **Step 1: Add/adjust route-matrix tests** that enumerate every existing `/api/*` route, assert anonymous and `user` sessions are denied, assert an `admin` session reaches the handler, and assert `/health` plus login remain public.
 - [x] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: the route-matrix tests fail for any missing guard and pass once all guards are applied.
 - [x] **Step 3: Correct** missing guards and update handover docs with actual implemented scope, bootstrap command, environment requirements, and explicit next milestone (user preferences/evaluations).
-- [x] **Step 4: Run** the full V2 suite with `python3 -m unittest discover -s v2 -p 'test_*.py' -v`; expected: all tests pass, no live network calls, no Telegram sends.
+- [x] **Step 4: Run** the full V2 suite with `python3 -m unittest discover -s v2 -p 'test_*.py' -v`; expected: all tests pass, no live network calls, no Telegram sends. Ensure CI installs `v2/requirements-dev.txt`, runs JavaScript syntax checks, and executes the full suite on a Node-enabled runner so TestClient and dashboard contract tests run.
 - [x] **Step 5: Commit** `docs(auth): document multi-user foundation and rollout gates`.
 
 ## Completion gates

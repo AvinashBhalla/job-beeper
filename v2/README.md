@@ -63,6 +63,17 @@ The first command creates only the first admin; the second creates an ordinary u
 
 This is a transitional security foundation, not full tenant isolation. Per-user preferences, evaluations, Telegram destinations/ledger and server-side applications are still future milestones. Do not invite ordinary beta users to use the job feed until those user-scoped features are implemented.
 
+### Running the test suite
+
+Install runtime and test-only dependencies, then run the complete V2 suite:
+
+```bash
+python -m pip install -r v2/requirements-dev.txt
+python -m unittest discover -s v2 -p 'test_*.py' -v
+```
+
+The dashboard authentication contract tests use Node.js to exercise the cookie-session client. The GitHub V2 CI runner provides Node and installs the development requirements before running the full suite.
+
 ### Isolated Naukri relay
 
 The main `AvinashBhalla/job-beeper` repository and application remain private. Naukri acquisition runs from a separate public relay-only repository, `AvinashBhalla/job-beeper-naukri-relay`. That repository should contain only the scheduled relay workflow, setup documentation and the generated feed on its `naukri-relay` branch; it must not contain or mirror the application source.
