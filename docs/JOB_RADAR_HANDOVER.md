@@ -6106,3 +6106,55 @@ Use `ssh -t` and `docker compose exec radar python -m v2.auth_admin create-admin
 - Admin-only UI settings were inspected: source toggles and Telegram alert controls are wrapped in .admin-only-setting, and applyUserAccess() sets hidden = !state.isAdmin. This is already implemented; do not duplicate it. Confirm browser member view after next dev deployment.
 - Current branch now includes through 5e5e737; dev runtime remains old image and has not been rebuilt/restarted. Production 8000 untouched.
 - Next: check Node syntax with a modern Node runtime (host Node is too old); implement secure Google OIDC registration using maintained Google token verification (google-auth), one-time state/nonce/PKCE, strict callback URI, verified email, identity linking by verified email, new account always role=user, preference initialization, existing opaque session cookies. OAuth config variables should be GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REDIRECT_URI; do not commit values. Keep sign-in button hidden/disabled until configured.
+
+
+## 2026-11-06 — Google beta signup and next onboarding/Telegram phase handover
+
+### Branch / deployment truth
+- Feature branch: `feat/user-preferences-evaluations-20261106`; PR #46 remains draft.
+- Google OIDC implementation and supporting tests have been pushed to this branch. Latest code before this handover update includes browser-bound OAuth state, one-time hashed state storage, nonce, PKCE S256, verified Google ID token, verified email, user-only account provisioning, identity linking, preference initialization, and shared Job Beeper session cookies.
+- **Not deployed to dev yet.** Isolated dev service on loopback port 8001 is still running image `job-radar-dev-multitenant:f43cd4a`. Production port 8000 remains untouched. Do not report a push as a deployment.
+- Google credentials are not configured; no live Google OAuth test has occurred. Setup is documented in `docs/GOOGLE_OAUTH_SETUP.md`. OAuth CTA is hidden unless all three env variables are valid.
+- Most recent focused verification before the browser-state hardening: 60 tests passed (121.890s) across Google OAuth, auth and preference API; Node 22 syntax checks were included in that command. Re-run focused and full V2 suite on latest HEAD before deploying. A later full-suite command was started but its result was not captured in chat; verify it rather than assuming it passed.
+- Existing earlier baseline: 213 V2 tests passed, 1 skipped before Google OAuth was added.
+
+### New product requirement from owner — post-signup resume onboarding
+After successful signup/login for a newly registered user, provide a guided onboarding step to upload their resume and automatically prefill matching preferences. The user must be able to review/edit every extracted value; do not force manual entry of the entire profile.
+
+**Proposed UX and behavior**
+1. New Google/password account lands in onboarding, not an empty feed. Existing accounts with completed onboarding go straight to the shared dashboard.
+2. On the Matching Preferences/onboarding page, show a prominent optional resume upload control (PDF/DOCX initially; validate extension, MIME and file signature; enforce a documented size/page limit). Explain what will be extracted and how it is used.
+3. Parse resume server-side. Extract candidate name (if useful), target job titles/roles, skills, years/level of experience, locations only when explicitly present, remote preference only if stated, and relevant keywords. Map only to supported preference schema fields. Never infer sensitive traits or invent preferences. Treat resume text as untrusted input, not instructions.
+4. Show a structured editable review form prefilled with confidence/unknown handling. Preserve user-entered values when re-parsing. Do not silently overwrite saved preferences. The user explicitly confirms the proposed profile before it is saved through the existing per-user `PUT /api/preferences` validation path.
+5. If parsing fails or no resume is supplied, retain the current manual onboarding path. User can skip upload and fill preferences themselves; upload is assistance, not a hard requirement.
+6. Keep the existing role/location minimum required for feed activation, but explain missing required fields and focus the form on only those fields. Keep all other values optional.
+7. Store resume files privately outside the public dashboard/static directory, keyed by user ID with randomized names and strict ownership checks. Do not expose file paths or raw resume text to other users/admin dashboard. Define retention/deletion behavior; safest beta default is delete the original after parsing unless the user explicitly opts to retain it. Do not log resume contents or extracted personal data. Add file deletion endpoint/UI if retained.
+8. Add parser unit tests for PDF/DOCX, malformed/empty files, unsupported format, size limit, prompt/injection-like resume content, missing fields, and ownership/isolation. Add API tests for auth, CSRF on writes, cross-user file access denial, and preferences not being saved until explicit confirmation.
+9. Prefer deterministic extraction first (text parsing + conservative rules). If an LLM is later used, send only the minimum required text, treat it as untrusted, validate output against strict schema, never let the model directly write preferences, and document provider/data retention implications.
+
+### New product requirement — connect Telegram bot per user
+On the same onboarding page, show a Telegram connection panel/link that opens the Job Beeper bot conversation. The user should be able to connect their Telegram account to their Job Beeper user account and receive only notifications matching their own preferences.
+
+**Proposed secure linking flow**
+1. UI calls an authenticated endpoint to request a short-lived, single-use link token. Store only a hash, with user ID, expiry, creation time and consumed timestamp. Token must be cryptographically random and never reused.
+2. Render a deep link to the official Job Beeper bot, e.g. `https://t.me/<configured_bot_username>?start=<opaque_token>`. Bot username is public config; bot token remains server-side only. Do not invent/commit the username or token.
+3. Telegram user opens bot dialogue and presses Start. Telegram sends `/start <token>` to the webhook. Validate webhook using Telegram's configured `secret_token` header (and optionally source network validation only as defense-in-depth). Consume token atomically; link Telegram chat ID to the authenticated Job Beeper user. Reject expired/replayed tokens. Never trust a user-supplied chat ID from the browser.
+4. Enforce unique Telegram chat ID and one active mapping per Job Beeper user unless product owner explicitly chooses multi-chat support. Provide authenticated disconnect/relink controls and audit timestamps.
+5. The same onboarding page displays connection state and offers reconnect/disconnect. Telegram linking is optional and must not block onboarding/feed access.
+6. Notification delivery must be per-user: match jobs using that user's saved preferences, then send only that user's opted-in alerts to their linked chat ID. Respect per-user notification enablement, frequency/quiet hours, deduplication and opt-out. Do not route ordinary member notifications through the existing single global admin chat ID. Keep the admin/global Telegram configuration for operational alerts separate.
+7. Add tests for valid link, expired token, replay, wrong/unknown token, Telegram webhook secret rejection, duplicate chat ID, cross-user isolation, disconnected user, disabled notifications, per-user matching and no duplicate delivery. Add rate limits and safe error handling.
+8. Store bot token and webhook secret only in server environment. Add a documented webhook setup runbook, secret rotation procedure and dev-only test bot guidance. Never print secrets.
+
+### Suggested implementation order for next agent
+- Phase A: verify latest branch CI and all tests; inspect latest diff for OAuth state/cookie path, callback errors and Google token verification dependency in `v2/requirements.txt`. Fix before dev deployment.
+- Phase B: configure a dedicated Google OAuth client for loopback dev only, after owner supplies/configures credentials privately; deploy only isolated dev port 8001 and smoke test new account, existing-email link, replay/mismatch rejection, admin/member role and preferences. Production remains off-limits.
+- Phase C: implement resume parser module + upload API + private temp storage + editable review UI + explicit save + deletion/retention policy. Keep parser behind auth and per-user ownership.
+- Phase D: implement per-user Telegram link-token table/API, bot webhook handler, connection UI and per-user notification dispatcher. Keep operational/global admin Telegram path separate.
+- Phase E: integration tests, security review, documentation, owner smoke test. Only then discuss merge/deploy; no production deployment without explicit owner approval.
+
+### Files to read first
+- `docs/GOOGLE_OAUTH_SETUP.md` — OAuth setup and current implementation constraints.
+- `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` — concise continuation notes.
+- `v2/google_oauth.py`, `v2/auth.py`, `v2/radar.py`, `v2/test_google_oauth.py` — Google OIDC implementation and tests.
+- `v2/user_preferences.py` — validated per-user preferences schema and defaults.
+- `dashboard/app.js`, `dashboard/index.html` — shared dashboard, auth and onboarding entry points.
