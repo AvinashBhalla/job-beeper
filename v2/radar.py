@@ -28,7 +28,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, user_preferences
+from v2 import auth, google_oauth, user_preferences
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -3180,6 +3180,27 @@ def _expected_login_origin(request: Request):
     return expected
 
 
+def _issue_user_session(request: Request, response: Response, user: dict[str, Any]) -> None:
+    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if previous_session:
+        auth.revoke_session(DB_PATH, previous_session)
+    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
+    cookie_options = {
+        "path": "/",
+        "secure": _auth_cookie_secure(),
+        "samesite": "lax",
+        "max_age": auth.SESSION_TTL_SECONDS,
+    }
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME, value=session_token, httponly=True, **cookie_options
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME, value=csrf_token, httponly=False, **cookie_options
+    )
+
+
 def get_current_user(request: Request) -> dict[str, Any]:
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     user = auth.get_session_user(DB_PATH, session_token or "")
@@ -3245,33 +3266,67 @@ def auth_login(payload: AuthLoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     auth.record_login_attempt(DB_PATH, email, client_ip, success=True)
 
-    # A successful login replaces any browser session cookie already presented,
-    # including a session for a different account. Failed logins leave it intact.
-    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
-    if previous_session:
-        auth.revoke_session(DB_PATH, previous_session)
-    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
-    cookie_options = {
-        "path": "/",
-        "secure": _auth_cookie_secure(),
-        "samesite": "lax",
-        "max_age": auth.SESSION_TTL_SECONDS,
-    }
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=session_token,
-        httponly=True,
-        **cookie_options,
-    )
-    response.set_cookie(
-        key=CSRF_COOKIE_NAME,
-        value=csrf_token,
-        httponly=False,
-        **cookie_options,
-    )
+    # A successful login replaces any browser session cookie already presented.
+    _issue_user_session(request, response, user)
     return {"user": user}
+
+
+@app.get("/api/auth/google/status")
+def google_auth_status():
+    try:
+        configured = google_oauth.load_config() is not None
+    except ValueError:
+        configured = False
+    return {"enabled": configured}
+
+
+@app.get("/api/auth/google/start")
+def google_auth_start():
+    try:
+        config = google_oauth.load_config()
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if config is None:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+    return RedirectResponse(
+        google_oauth.create_authorization_url(DB_PATH, config),
+        status_code=302,
+    )
+
+
+@app.get("/api/auth/google/callback")
+def google_auth_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    error: str = "",
+):
+    failure_url = "/dashboard/?google_auth=failed"
+    if error:
+        return RedirectResponse("/dashboard/?google_auth=cancelled", status_code=303)
+    config = google_oauth.load_config()
+    if config is None:
+        return RedirectResponse(failure_url, status_code=303)
+    state_data = google_oauth.consume_authorization_state(DB_PATH, state)
+    if state_data is None:
+        return RedirectResponse(failure_url, status_code=303)
+
+    expected_nonce, code_verifier = state_data
+    try:
+        identity = google_oauth.exchange_code_for_identity(code, code_verifier, config)
+        if not google_oauth.validate_nonce(identity["claims"], expected_nonce):
+            raise ValueError("Google identity nonce validation failed.")
+        user = auth.create_or_link_google_user(
+            DB_PATH, identity["email"], identity["subject"]
+        )
+        user_preferences.ensure_user_preferences(DB_PATH, user["id"])
+    except (ValueError, requests.RequestException, sqlite3.Error) as exc:
+        log.warning("Google sign-in failed error_type=%s", type(exc).__name__)
+        return RedirectResponse(failure_url, status_code=303)
+
+    response = RedirectResponse("/dashboard/", status_code=303)
+    _issue_user_session(request, response, user)
+    return response
 
 
 @app.get("/api/auth/me")
