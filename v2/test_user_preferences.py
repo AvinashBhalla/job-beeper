@@ -38,8 +38,10 @@ class UserPreferencesTests(unittest.TestCase):
         user = auth.create_user(
             self.db_path, "read-only@example.com", "a-strong-test-password", role="user"
         )
-        with self.assertRaisesRegex(ValueError, "not initialized"):
-            user_preferences.get_user_preferences(self.db_path, user["id"])
+        defaults = user_preferences.get_user_preferences(self.db_path, user["id"])
+        self.assertEqual(defaults["target_roles"], [])
+        self.assertEqual(defaults["version"], 0)
+        self.assertFalse(defaults["onboarding_complete"])
         with sqlite3.connect(self.db_path) as conn:
             count = conn.execute(
                 "SELECT COUNT(*) FROM user_preferences WHERE user_id=?", (user["id"],)
