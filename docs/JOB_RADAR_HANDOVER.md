@@ -6026,3 +6026,11 @@ Use `ssh -t` and `docker compose exec radar python -m v2.auth_admin create-admin
 - Remote branches: 7; includes this feature branch, integration/production branches, three active PR branches and the parser-fix branch. SSE branch was archived as `archive/sse-infrastructure-20261106` and removed from active branch list. Exact inventory is above.
 - Existing dev `job-radar-dev` and production `v2-radar-1` were not restarted/rebuilt/modified. The image build above created only a new image; no new feature container exists.
 - Existing dirty dev checkout, production checkout, old detached/dirty worktrees and draft encrypted backup remain protected as described above.
+
+## 2026-11-06 — Beta sign-in usability follow-up
+
+- Sign-in email is trimmed and lowercased by the API before account lookup and rate-limit identity calculation; regression test now covers leading/trailing spaces and mixed case.
+- Password provisioning minimum is now 5 characters (maximum remains 1024 UTF-8 bytes). This is intentionally a beta usability choice requested by the project owner; it is weaker than the recommended 12+ character passphrase. Argon2id hashing and login throttling remain enabled.
+- Sign-in form now includes an accessible Show/Hide password toggle and HTML `minlength=5`; asset query versions were bumped to prevent stale browser cache.
+- Provisioning CLI prompt now reflects the 5-character minimum.
+- Regression coverage accepts a 5-character password and rejects 4 characters.

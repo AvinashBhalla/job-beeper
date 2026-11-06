@@ -14,7 +14,7 @@ from typing import Any
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
-PASSWORD_MIN_LENGTH = 12
+PASSWORD_MIN_LENGTH = 5
 PASSWORD_MAX_BYTES = 1024
 SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 LOGIN_WINDOW_SECONDS = 15 * 60
@@ -52,7 +52,7 @@ def _validate_password(password: str) -> None:
         raise ValueError("Password must be text.")
     size = len(password.encode("utf-8"))
     if len(password) < PASSWORD_MIN_LENGTH or size > PASSWORD_MAX_BYTES:
-        raise ValueError("Password must be at least 12 characters and no more than 1024 UTF-8 bytes.")
+        raise ValueError("Password must be at least 5 characters and no more than 1024 UTF-8 bytes.")
 
 
 def _token_hash(token: str) -> str:

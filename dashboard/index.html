@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=obsidian_v2">
+  <link rel="stylesheet" href="styles.css?v=obsidian_v3">
 </head>
 
 <body>
@@ -28,7 +28,10 @@
           <label for="authEmail">Email address</label>
           <input id="authEmail" name="email" type="email" autocomplete="username" maxlength="254" required>
           <label for="authPassword">Password</label>
-          <input id="authPassword" name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+          <div class="auth-password-field">
+            <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="5" maxlength="1024" required>
+            <button type="button" class="auth-password-toggle" id="authPasswordToggle" aria-controls="authPassword" aria-pressed="false">Show</button>
+          </div>
           <button type="submit" class="btn-pill btn-pill-primary" id="authLoginBtn">Sign in</button>
           <p class="auth-status" id="authStatusMsg" role="status" aria-live="polite"></p>
         </form>
@@ -670,8 +673,8 @@
   <!-- Toast Notification Mount Host -->
   <div class="toast-notifications-host" id="toastContainer" aria-live="polite"></div>
 
-  <script src="auth.js?v=auth_v1"></script>
-  <script src="app.js?v=auth_v1"></script>
+  <script src="auth.js?v=auth_v2"></script>
+  <script src="app.js?v=auth_v2"></script>
 </body>
 
 </html>

@@ -41,7 +41,7 @@ def _admin_count(db_path: Path) -> int:
 
 
 def _prompt_password() -> str:
-    password = getpass.getpass("Password (minimum 12 characters): ")
+    password = getpass.getpass("Password (minimum 5 characters): ")
     confirmation = getpass.getpass("Confirm password: ")
     if password != confirmation:
         raise ValueError("Passwords do not match.")

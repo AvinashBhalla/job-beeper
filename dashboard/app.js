@@ -2125,6 +2125,17 @@
   }
 
   function bindAuthEvents() {
+    const passwordInput = $('authPassword');
+    const passwordToggle = $('authPasswordToggle');
+    if (passwordInput && passwordToggle) {
+      passwordToggle.addEventListener('click', () => {
+        const reveal = passwordInput.type === 'password';
+        passwordInput.type = reveal ? 'text' : 'password';
+        passwordToggle.textContent = reveal ? 'Hide' : 'Show';
+        passwordToggle.setAttribute('aria-pressed', String(reveal));
+      });
+    }
+
     const form = $('authLoginForm');
     if (form) {
       form.addEventListener('submit', async event => {

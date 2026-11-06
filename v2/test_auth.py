@@ -67,9 +67,13 @@ class AuthPersistenceTests(unittest.TestCase):
         self.assertIsNone(auth.verify_user(self.db_path, "person@example.com", "incorrect password value"))
         self.assertIsNone(auth.verify_user(self.db_path, "missing@example.com", "correct horse battery staple"))
 
-    def test_password_and_role_validation_reject_weak_or_unknown_values(self):
+    def test_password_validation_accepts_five_characters_and_rejects_four(self):
+        user = auth.create_user(self.db_path, "five@example.com", "abcde")
+        self.assertEqual(auth.verify_user(self.db_path, "five@example.com", "abcde")["id"], user["id"])
         with self.assertRaises(ValueError):
-            auth.create_user(self.db_path, "person@example.com", "short")
+            auth.create_user(self.db_path, "four@example.com", "abcd")
+
+    def test_password_and_role_validation_reject_weak_or_unknown_values(self):
         with self.assertRaises(ValueError):
             auth.create_user(self.db_path, "person@example.com", "correct horse battery staple", role="owner")
         self.assertEqual(auth.create_user(self.db_path, "admin@example.com", "correct horse battery staple", role="admin")["role"], "admin")
@@ -250,6 +254,11 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(current.status_code, 200)
         self.assertEqual(login.headers.get("cache-control"), "no-store")
         self.assertEqual(current.headers.get("cache-control"), "no-store")
+
+    def test_login_trims_email_whitespace_and_normalizes_case(self):
+        response = self.login(email="  USER@EXAMPLE.COM  ")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["email"], "user@example.com")
 
     def test_current_user_endpoint_returns_safe_session_identity(self):
         self.assertEqual(self.login().status_code, 200)
