@@ -6014,7 +6014,7 @@ Invoke-RestMethod "http://127.0.0.1:18002/health" | ConvertTo-Json -Depth 5
 Use `ssh -t` and `docker compose exec radar python -m v2.auth_admin create-admin/create-user` to provision accounts. Password entry is interactive; never put passwords in command arguments or chat. Stop with `docker compose down` (no `-v`) to preserve the disposable DB volume.
 
 ### Current branch/runtime state
-- Feature branch: `feat/user-preferences-evaluations-20261106`; base `dd7aeb1`; docs/spec/plan commit `e2439ab` is pushed. Implementation changes described above are currently uncommitted at this note.
+- Feature branch: `feat/user-preferences-evaluations-20261106`; base `dd7aeb1`; implementation commit `cf9d69c` is pushed. Draft PR #46 is open against `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/46. The CI run for head `cf9d69c` was in progress at the time of this note; `@codex review` was requested. The workflow's explicit py_compile list is being expanded to include the new preference module/tests; this will create a follow-up CI run.
 - Remote branches: 7; includes this feature branch, integration/production branches, three active PR branches and the parser-fix branch. SSE branch was archived as `archive/sse-infrastructure-20261106` and removed from active branch list. Exact inventory is above.
 - Existing dev `job-radar-dev` and production `v2-radar-1` were not restarted/rebuilt/modified. The image build above created only a new image; no new feature container exists.
 - Existing dirty dev checkout, production checkout, old detached/dirty worktrees and draft encrypted backup remain protected as described above.
