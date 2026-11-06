@@ -218,7 +218,7 @@ def create_or_link_google_user(db_path: Path, email: str, subject: str) -> dict[
                 if row is None or row["status"] != "active":
                     raise ValueError("This Google account is not linked to an active account.")
                 if row["email"].strip().lower() != normalized_email:
-                    raise ValueError("The Google account email changed. Contact support to update it.")
+                    raise ValueError("This Google identity is already linked to another account.")
                 return _safe_user(row)
 
             existing = conn.execute(
