@@ -23,7 +23,7 @@
 
       <div id="authLoginPanel">
         <h1 id="authGateTitle">Sign in to Job Beeper</h1>
-        <p class="auth-description">Use the account credentials provided for your beta access.</p>
+        <p class="auth-description">Sign in with your account or create a beta account using Google.</p>
         <form id="authLoginForm" class="auth-form" method="post">
           <label for="authEmail">Email address</label>
           <input id="authEmail" name="email" type="email" autocomplete="username" maxlength="254" required>
@@ -35,7 +35,7 @@
           <button type="submit" class="btn-pill btn-pill-primary" id="authLoginBtn">Sign in</button>
           <p class="auth-status" id="authStatusMsg" role="status" aria-live="polite"></p>
         </form>
-        <div class="auth-google-signup">
+        <div class="auth-google-signup" id="googleSignupWrap" hidden>
           <p class="auth-description">New to Job Beeper?</p>
           <a class="btn-pill btn-pill-secondary" id="googleSignInBtn" href="/api/auth/google/start" hidden>
             Continue with Google
