@@ -50,7 +50,7 @@ Runtime candidate preferences are still global and persisted at `/data/config.js
 
 ### Authentication and beta account provisioning
 
-The current multi-user foundation uses SQLite tables `users`, `sessions` and `login_attempts`. Passwords use Argon2id. Browser sessions are opaque, seven-day cookies; only SHA-256 hashes of session and CSRF tokens are stored. Session cookies are HttpOnly, Secure by default and SameSite=Lax. State-changing admin requests require the CSRF cookie/header pair. All `/api/*` responses are marked `Cache-Control: no-store`. Login checks a same-origin `Origin` header when supplied (login-CSRF protection) and atomically reserves up to five attempts per email/IP in a 15-minute window. Email/IP keys are hashed in the throttle table, and malformed email values are throttled too; a successful login clears the reservation window.
+The current multi-user foundation uses SQLite tables `users`, `sessions`, `login_attempts` and `login_account_attempts`. Passwords use Argon2id. Browser sessions are opaque, seven-day cookies; only SHA-256 hashes of session and CSRF tokens are stored. Session cookies are HttpOnly, Secure by default and SameSite=Lax. State-changing admin requests require the CSRF cookie/header pair. All `/api/*` responses are marked `Cache-Control: no-store`. Login checks a same-origin `Origin` header when supplied (login-CSRF protection) and atomically reserves up to five attempts per email/IP and twenty attempts per account across all IPs in a 15-minute window. Email/IP keys are hashed in the throttle table, and malformed email values are throttled too; a successful login clears the reservation window.
 
 There is no public signup endpoint. After deploying the feature to an isolated environment, create the first administrator from inside the app container (`WORKDIR /app`, `JOB_RADAR_DB=/data/jobs.db`):
 
@@ -72,7 +72,7 @@ python -m pip install -r v2/requirements-dev.txt
 python -m unittest discover -s v2 -p 'test_*.py' -v
 ```
 
-The dashboard authentication contract tests use Node.js to exercise the cookie-session client. The GitHub V2 CI runner provides Node and installs the development requirements before running the full suite.
+The dashboard authentication contract tests use Node.js to exercise the cookie-session client, including protection against crafted cross-origin `?api=` URLs that could otherwise capture credentials. The GitHub V2 CI runner provides Node and installs the development requirements before running the full suite.
 
 ### Isolated Naukri relay
 

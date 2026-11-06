@@ -1,6 +1,6 @@
 # Multi-user authentication foundation — design
 
-**Status:** Implemented on isolated feature branch; not deployed; review/PR pending
+**Status:** Implemented on isolated feature branch; PR #45 open; CI/re-review pending; not deployed
 
 ## Intent
 
@@ -36,7 +36,7 @@ Prepare JobBeeper for an invite-only beta without allowing one account to see or
 - Use Argon2id from `argon2-cffi`; return the same generic 401 for unknown email and wrong password.
 - Generate opaque session and CSRF values with `secrets.token_urlsafe(32)`. Store SHA-256 hashes only. Session lifetime is seven days; logout revokes the server-side row and clears both cookies.
 - Cookies: `job_beeper_session` is HttpOnly; `job_beeper_csrf` is readable by same-origin JavaScript. Both use Path=/ and SameSite=Lax. Session cookie Secure is true by default; a development-only environment override may disable Secure for loopback HTTP. CSRF-protected writes require matching cookie/header values and a matching stored hash.
-- Login attempts are atomically reserved and limited to five attempts per normalized-email/IP pair in a 15-minute fixed window using persisted hashed email/IP keys; a successful login clears that pair’s failure counter. Do not trust arbitrary forwarded-IP headers. Return 429 after the threshold and do not reveal whether an email exists.
+- Login attempts are atomically reserved and limited to five attempts per normalized-email/IP pair and twenty attempts per account across all IPs in a 15-minute fixed window. Persist only hashed email/IP keys; a successful login clears the account’s reservations across all IPs. Do not trust arbitrary forwarded-IP headers. Return 429 after the threshold and do not reveal whether an email exists.
 - First admin is created with `python3 -m v2.auth_admin create-admin --email ...`; password is prompted with `getpass`, never passed as a command-line argument or logged. The command atomically refuses to create a second bootstrap admin, including concurrent invocations. Until an invitation UI/API is added, the admin can provision ordinary beta users with `python3 -m v2.auth_admin create-user --email ...`; the password is prompted and the command can create only the `user` role.
 - Auth helpers live in `v2/auth.py`; FastAPI routes/dependencies and legacy route guards live in `v2/radar.py`; dashboard login/session UX lives in `dashboard/index.html`, `dashboard/app.js`, and `dashboard/styles.css`; tests live in `v2/test_auth.py` and targeted additions to `v2/test_radar.py`.
 - `/api/auth/login` is public; `/api/auth/me` requires a valid session; `/api/auth/logout` requires a valid session and CSRF validation. All existing `/api/*` routes require `admin`. `/health` remains public and must not expose config, user, or secret data.

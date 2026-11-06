@@ -243,12 +243,12 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - Confirmed the old global profile/evaluation/notification model cannot be exposed to ordinary users.
 
 ### Gate 2 — authentication and roles (implemented on feature branch; not deployed)
-- Added `users`, `sessions` and `login_attempts` tables; Argon2id password hashing; opaque seven-day cookie sessions with hashed session/CSRF tokens; same-origin login-Origin validation; concurrency-safe login-attempt reservations with hashed email/IP keys; logout/revocation.
+- Added `users`, `sessions`, `login_attempts` and `login_account_attempts` tables; Argon2id password hashing; opaque seven-day cookie sessions with hashed session/CSRF tokens; same-origin login-Origin validation; dashboard rejects external `?api=` overrides before sending credentials; concurrency-safe per-IP and account-wide login-attempt reservations (five per email/IP and twenty per account across IPs per 15 minutes) with hashed email/IP keys; logout/revocation.
 - Added `/api/auth/login`, `/api/auth/me`, `/api/auth/logout`, a one-time first-admin CLI and an ordinary-user provisioning CLI.
 - All existing legacy `/api/*` endpoints require an admin session; unsafe admin requests require CSRF; every API response is `Cache-Control: no-store`. `/health` is a minimal public liveness endpoint. Login validates browser Origin and supports `JOB_BEEPER_PUBLIC_ORIGIN` behind TLS termination.
 - Replaced the dashboard config-token flow with cookie-session login/account UI. Ordinary users see a holding screen and do not load the legacy global job feed.
-- Final V2 suite passed 186 tests in 87.493 seconds in a throwaway `--network none` container (one Node-only dashboard contract test is skipped inside that Python image); the Node-enabled dashboard contract suite passed 4/4 separately in 0.611 seconds.
-- The feature branch has not been pushed or deployed yet. Keep the live dev and production containers untouched until review and a separately authorized dev rollout.
+- Final V2 suite passed 189 tests in 79.321 seconds in a throwaway `--network none` container (one Node-only dashboard contract test is skipped inside that Python image); the Node-enabled dashboard contract suite passed 4/4 separately in 0.655 seconds.
+- The feature branch is pushed to GitHub and PR #45 is open against `v2-live-radar`; current head is `ea463cb`. Automated review findings P1/P2 were fixed in `ea463cb`; CI and re-review are pending on the latest head. The live dev and production containers remain untouched.
 
 ### Gate 3 — per-user preferences and matching
 - Move candidate preferences to user scope.
@@ -280,8 +280,8 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - The full V2 unit suite in a throwaway `--network none` container passed 149 tests in 18.723 seconds.
 
 **Implemented on feature branch `feat/multi-user-foundation-20261106` (not deployed)**
-- SQLite identity tables: `users`, `sessions`, `login_attempts`.
-- Argon2id password hashing, normalized email identity, `admin`/`user` roles, active/disabled account status, seven-day opaque sessions, hashed session/CSRF tokens, revocation and an atomic five-attempt/15-minute per-email/IP throttle (email/IP keys are hashed; malformed emails are throttled too).
+- SQLite identity tables: `users`, `sessions`, `login_attempts`, `login_account_attempts`.
+- Argon2id password hashing, normalized email identity, `admin`/`user` roles, active/disabled account status, seven-day opaque sessions, hashed session/CSRF tokens, revocation and atomic five-attempt/15-minute per-email/IP and twenty-attempt/15-minute per-account-across-IPs throttles (email/IP keys are hashed; malformed emails are throttled too).
 - Auth endpoints: `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`.
 - All existing legacy API routes require an admin session; state-changing admin requests require CSRF; all `/api/*` responses are no-store. `/health` is public and returns only liveness metadata.
 - Server-side CLI: `python -m v2.auth_admin create-admin --email ...` creates the first admin only; `python -m v2.auth_admin create-user --email ...` provisions ordinary beta users.
@@ -303,7 +303,7 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - No live provider/LLM calls, Telegram sends or runtime deployment occurred.
 
 **Operational cautions**
-- Base branch `v2-live-radar` includes merged PR #44 at `7b61d74`. Current feature branch is `feat/multi-user-foundation-20261106`, worktree `/tmp/job-radar-naukri-location-v3`, with auth commits `9ffed3f`, `93dea33`, `44a052f` and `27a77cd` above that base. It is not yet pushed and has no PR at the time of this note.
+- Base branch `v2-live-radar` includes merged PR #44 at `7b61d74`. Current feature branch is `feat/multi-user-foundation-20261106`, worktree `/tmp/job-radar-naukri-location-v3`, with auth commits `9ffed3f`, `93dea33`, `44a052f`, `27a77cd` and `ea463cb` above that base; CI/documentation commits are also present. The branch is pushed and PR #45 is open against `v2-live-radar`.
 - The ordinary development checkout `/home/ubuntu/job-beeper-dev` has protected local changes/artifacts (`M v2/config.json`, `.env.save`, `.venv/` and a config backup); do not reset, clean, overwrite or use it as the feature source.
 - Production checkout `/home/ubuntu/job-beeper` was observed at `61d8271`, 613 commits behind its fetched `origin/v2-live-radar` ref. The running production container remains on its old image. Never assume checkout and runtime are synchronized. Do not pull, rebuild, restart, migrate or send production notifications.
 - Termalin encrypted backup job remains DRAFT; local verified snapshots do not mean an off-host encrypted backup exists.
