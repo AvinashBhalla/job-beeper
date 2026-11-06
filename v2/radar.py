@@ -16,7 +16,7 @@ import time
 import warnings
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
@@ -3154,6 +3154,7 @@ async def shutdown() -> None:
 SESSION_COOKIE_NAME = "job_beeper_session"
 CSRF_COOKIE_NAME = "job_beeper_csrf"
 CSRF_HEADER_NAME = "X-CSRF-Token"
+GOOGLE_STATE_COOKIE_NAME = "job_beeper_google_state"
 
 
 class AuthLoginRequest(BaseModel):
@@ -3288,10 +3289,19 @@ def google_auth_start():
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if config is None:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
-    return RedirectResponse(
-        google_oauth.create_authorization_url(DB_PATH, config),
-        status_code=302,
+    authorization_url = google_oauth.create_authorization_url(DB_PATH, config)
+    state = parse_qs(urlsplit(authorization_url).query).get("state", [""])[0]
+    response = RedirectResponse(authorization_url, status_code=302)
+    response.set_cookie(
+        key=GOOGLE_STATE_COOKIE_NAME,
+        value=state,
+        httponly=True,
+        secure=_auth_cookie_secure(),
+        samesite="lax",
+        max_age=google_oauth.STATE_TTL_SECONDS,
+        path="/api/auth/google",
     )
+    return response
 
 
 @app.get("/api/auth/google/callback")
@@ -3302,14 +3312,29 @@ def google_auth_callback(
     error: str = "",
 ):
     failure_url = "/dashboard/?google_auth=failed"
+
+    def finish_redirect(url: str):
+        redirect = RedirectResponse(url, status_code=303)
+        redirect.delete_cookie(
+            key=GOOGLE_STATE_COOKIE_NAME,
+            httponly=True,
+            secure=_auth_cookie_secure(),
+            samesite="lax",
+            path="/api/auth/google",
+        )
+        return redirect
+
     if error:
-        return RedirectResponse("/dashboard/?google_auth=cancelled", status_code=303)
+        return finish_redirect("/dashboard/?google_auth=cancelled")
+    browser_state = request.cookies.get(GOOGLE_STATE_COOKIE_NAME, "")
+    if not browser_state or not secrets.compare_digest(browser_state, state):
+        return finish_redirect(failure_url)
     try:
         config = google_oauth.load_config()
     except ValueError:
-        return RedirectResponse(failure_url, status_code=303)
+        return finish_redirect(failure_url)
     if config is None:
-        return RedirectResponse(failure_url, status_code=303)
+        return finish_redirect(failure_url)
     state_data = google_oauth.consume_authorization_state(DB_PATH, state)
     if state_data is None:
         return RedirectResponse(failure_url, status_code=303)
@@ -3327,7 +3352,7 @@ def google_auth_callback(
         log.warning("Google sign-in failed error_type=%s", type(exc).__name__)
         return RedirectResponse(failure_url, status_code=303)
 
-    response = RedirectResponse("/dashboard/", status_code=303)
+    response = finish_redirect("/dashboard/")
     _issue_user_session(request, response, user)
     return response
 
