@@ -35,6 +35,14 @@
           <button type="submit" class="btn-pill btn-pill-primary" id="authLoginBtn">Sign in</button>
           <p class="auth-status" id="authStatusMsg" role="status" aria-live="polite"></p>
         </form>
+        <div class="auth-google-signup">
+          <p class="auth-description">New to Job Beeper?</p>
+          <a class="btn-pill btn-pill-secondary" id="googleSignInBtn" href="/api/auth/google/start" hidden>
+            Continue with Google
+          </a>
+        </div>
+        <form hidden aria-hidden="true">
+        </form>
       </div>
 
       <div id="authUserPanel" hidden>
