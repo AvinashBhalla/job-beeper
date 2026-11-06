@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import v2.radar as radar
+from v2 import auth, user_preferences
 from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
 from v2.radar import (
     _merge_config,
@@ -48,6 +49,13 @@ def make_job(title, description="", location="Bengaluru, India"):
 class MatcherTests(unittest.TestCase):
 
     def setUp(self):
+        self._runtime_config_dir = TemporaryDirectory()
+        self._runtime_config_patch = patch.object(
+            radar,
+            "RUNTIME_CONFIG_PATH",
+            Path(self._runtime_config_dir.name) / "runtime-config.json",
+        )
+        self._runtime_config_patch.start()
         # These module-level values model a process-wide LinkedIn 429 cooldown.
         # Reset them between tests so a rate-limit test cannot make unrelated
         # collector tests order-dependent or flaky.
@@ -65,6 +73,8 @@ class MatcherTests(unittest.TestCase):
         radar.linkedin_rate_limit_generation = 0
 
     def tearDown(self):
+        self._runtime_config_patch.stop()
+        self._runtime_config_dir.cleanup()
         (
             radar.linkedin_last_http_request_monotonic,
             radar.linkedin_rate_limited_until_monotonic,
@@ -72,6 +82,13 @@ class MatcherTests(unittest.TestCase):
             radar.linkedin_rate_limit_streak,
             radar.linkedin_rate_limit_generation,
         ) = self._linkedin_rate_state
+
+    def _create_direct_api_admin(self):
+        admin = auth.create_first_admin(
+            radar.DB_PATH, "api-admin@example.com", "direct-api-admin-password"
+        )
+        user_preferences.migrate_first_admin_preferences(radar.DB_PATH, BASE_CONFIG)
+        return admin
 
     def test_explicit_work_location_overrides_broad_feed_location(self):
         job = make_job(
@@ -924,6 +941,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 job = normalize_job(
                     "linkedin", "li-api-consistency", "Acme", "Software Engineer",
                     "Bengaluru, India", "https://linkedin.com/jobs/view/api-consistency",
@@ -944,7 +962,7 @@ class MatcherTests(unittest.TestCase):
                     """).fetchone()
 
                 with patch.object(radar, "get_config", return_value=BASE_CONFIG):
-                    response = radar.jobs(minutes=60, limit=100, today_only=True)
+                    response = radar.jobs(minutes=60, limit=100, today_only=True, user=admin)
                 item = next(
                     entry for entry in response["jobs"]
                     if entry["source_job_id"] == "li-api-consistency"
@@ -2384,6 +2402,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 day_start = radar.current_day_start_utc()
 
                 older_match = normalize_job(
@@ -2426,6 +2445,7 @@ class MatcherTests(unittest.TestCase):
                     minutes=4320,
                     limit=1,
                     q="NOVISYNC",
+                    user=admin,
                 )
 
                 self.assertEqual(len(result["jobs"]), 1)
@@ -2438,6 +2458,7 @@ class MatcherTests(unittest.TestCase):
                     minutes=4320,
                     limit=10,
                     q="backend services",
+                    user=admin,
                 )
                 self.assertEqual(
                     [item["source_job_id"] for item in description_result["jobs"]],
@@ -2452,6 +2473,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 literal_percent = normalize_job(
                     "naukri",
                     "nk-percent-literal",
@@ -2483,6 +2505,7 @@ class MatcherTests(unittest.TestCase):
                     minutes=4320,
                     limit=10,
                     q="100%",
+                    user=admin,
                 )
                 self.assertEqual(
                     [item["source_job_id"] for item in result["jobs"]],
@@ -2497,6 +2520,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 source_details = {
                     "role": "Back End Developer",
                     "role_category": "Software Development",
@@ -2525,7 +2549,7 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
 
                 with patch.object(radar, "get_config", return_value=BASE_CONFIG):
-                    result = radar.jobs(minutes=10080, limit=10, q="pandas")
+                    result = radar.jobs(minutes=10080, limit=10, q="pandas", user=admin)
 
                 item = next(
                     entry for entry in result["jobs"]
@@ -2550,7 +2574,7 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(upsert_jobs([older_payload], BASE_CONFIG), 0)
 
                 with patch.object(radar, "get_config", return_value=BASE_CONFIG):
-                    result_after = radar.jobs(minutes=10080, limit=10, q="pandas")
+                    result_after = radar.jobs(minutes=10080, limit=10, q="pandas", user=admin)
                 item_after = next(
                     entry for entry in result_after["jobs"]
                     if entry["source_job_id"] == "nk-rich-description-1"
@@ -2569,6 +2593,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 day_start = radar.current_day_start_utc()
 
                 old_job = normalize_job(
@@ -2613,7 +2638,7 @@ class MatcherTests(unittest.TestCase):
                     2,
                 )
 
-                result = radar.jobs(today_only=True, limit=100)
+                result = radar.jobs(today_only=True, limit=100, user=admin)
                 ids = {row["source_job_id"] for row in result["jobs"]}
 
                 self.assertNotIn("li-old-day", ids)
@@ -2641,6 +2666,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 config = {
                     **BASE_CONFIG,
                     "notifications_enabled": False,
@@ -2682,7 +2708,7 @@ class MatcherTests(unittest.TestCase):
                 self.assertIsNotNone(persisted)
                 opportunity_id = persisted["canonical_opportunity_id"]
                 api_job = next(
-                    item for item in radar.jobs(minutes=10080, limit=500)["jobs"]
+                    item for item in radar.jobs(minutes=10080, limit=500, user=admin)["jobs"]
                     if item["source_job_id"] == "naukri-consistency-1"
                 )
                 api_opportunity = next(

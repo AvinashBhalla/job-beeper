@@ -37,7 +37,7 @@
       <div id="authUserPanel" hidden>
         <h1 id="authUserHeading">Your account is ready</h1>
         <p class="auth-description">You are signed in as <strong id="authUserEmail"></strong>.</p>
-        <p class="auth-description">Personal job feeds and individual preferences are not enabled for beta users yet. Your account is safe, but the workspace will become available after tenant-specific matching is released.</p>
+        <p class="auth-description">Your personalized job workspace is loading. If this takes more than a moment, refresh the page or sign out and back in.</p>
         <button type="button" class="btn-pill btn-pill-secondary" id="authUserLogoutBtn">Sign out</button>
       </div>
 
@@ -48,6 +48,53 @@
       </div>
     </div>
   </section>
+
+  <main id="userWorkspace" class="user-workspace" hidden>
+    <header class="user-workspace-header">
+      <div>
+        <div class="auth-brand user-workspace-brand">
+          <span class="brand-beacon" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.4"></circle><circle cx="12" cy="12" r="6" stroke-opacity="0.7"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle><line x1="12" y1="12" x2="20" y2="4"></line></svg>
+          </span>
+          <span><b>JOB BEEPER</b><small>Personal Job Feed</small></span>
+        </div>
+        <p class="auth-description">Signed in as <strong id="userWorkspaceEmail"></strong></p>
+      </div>
+      <button type="button" class="btn-pill btn-pill-secondary" id="userWorkspaceLogoutBtn">Sign out</button>
+    </header>
+
+    <section id="userOnboardingPanel" class="user-panel-card">
+      <h1>Set up your job preferences</h1>
+      <p class="auth-description">Tell us what role you want and where you want to work. Both are required before we show your personalized job feed.</p>
+      <form id="userPreferencesForm" class="auth-form">
+        <label for="userTargetRoles">Target job roles</label>
+        <textarea id="userTargetRoles" rows="2" placeholder="e.g. Python Developer, Backend Engineer" required></textarea>
+        <small>Separate multiple roles with commas or new lines.</small>
+        <label for="userTargetLocations">Target locations</label>
+        <textarea id="userTargetLocations" rows="2" placeholder="e.g. Bengaluru, Gurugram, Remote India" required></textarea>
+        <small>Separate multiple locations with commas or new lines.</small>
+        <label for="userTargetSkills">Skills (optional)</label>
+        <textarea id="userTargetSkills" rows="2" placeholder="e.g. Python, Django, React"></textarea>
+        <p id="userPreferencesStatus" class="auth-status" role="status" aria-live="polite"></p>
+        <button type="submit" class="btn-pill btn-pill-primary" id="userPreferencesSaveBtn">Save preferences and find jobs</button>
+      </form>
+    </section>
+
+    <section id="userFeedPanel" class="user-panel-card" hidden>
+      <div class="user-feed-heading">
+        <div>
+          <h1>Your matching jobs</h1>
+          <p class="auth-description" id="userFeedSummary">Jobs matched against your saved preferences.</p>
+        </div>
+        <div class="user-feed-actions">
+          <button type="button" class="btn-pill btn-pill-secondary" id="userEditPreferencesBtn">Edit preferences</button>
+          <button type="button" class="btn-pill btn-pill-secondary" id="userRefreshFeedBtn">Refresh</button>
+        </div>
+      </div>
+      <p id="userFeedStatus" class="auth-status" role="status" aria-live="polite"></p>
+      <div id="userJobsList" class="user-jobs-list"></div>
+    </section>
+  </main>
 
   <div class="app-shell">
     <!-- Desktop Left Navigation Sidebar -->

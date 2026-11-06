@@ -62,3 +62,37 @@ Runtime candidate preferences remain global and are admin-only until the in-prog
 - **Product behavior and source roadmap:** [JobBeeper Reference](docs/JOBBEEPER_REFERENCE.md)
 
 Mandatory process: update both handover files after every user prompt, directly on `v2-live-radar` for working-state documentation. Do not create a separate branch solely for docs. Code and config changes require tests; promote to `main` only when verified.
+
+## Multi-user feature smoke test (isolated from the existing dev service)
+
+The current multi-user feature branch has its own disposable Compose file, loopback port **8002**, and independent Docker volume. It disables all collectors, Telegram and LLM providers. It does not share the existing job-radar-dev database on port 8001 or production on port 8000.
+
+Run these from Windows PowerShell after the feature branch is pushed to the VM worktree:
+
+~~~powershell
+# Build/start the isolated feature container (does not touch ports 8000 or 8001)
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml up -d --build"
+
+# Bootstrap the first admin; the CLI prompts for a password interactively
+ssh -t ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.auth_admin create-admin --email YOUR_ADMIN_EMAIL"
+
+# Create a separate beta test account; it starts with empty role/location preferences
+ssh -t ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.auth_admin create-user --email YOUR_TEST_USER_EMAIL"
+
+# Terminal 1: open and keep this tunnel running
+ssh -L 18002:127.0.0.1:8002 ubuntu@130.210.27.197
+
+# Terminal 2: health check and dashboard
+Invoke-RestMethod "http://127.0.0.1:18002/health" | ConvertTo-Json -Depth 5
+Start-Process "http://127.0.0.1:18002/dashboard/"
+~~~
+
+Sign in as the test user. The onboarding form must require both a target role and a target location; after saving, the user sees only their personalized matching feed. The admin account uses the legacy admin dashboard and controls. Do not paste passwords into chat or put them in command arguments.
+
+Stop the isolated feature container without deleting its test database:
+
+~~~powershell
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml down"
+~~~
+
+The feature image has been built and the Compose file validated, but the feature container has not been started. The feature environment's radar-feature-data volume is intentionally preserved by down; do not add -v unless you explicitly want to erase the isolated test database. This is a user-run smoke-test environment, not a production deployment.

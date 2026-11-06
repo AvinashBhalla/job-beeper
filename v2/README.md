@@ -92,3 +92,18 @@ uvicorn v2.radar:app --host 0.0.0.0 --port 8000
 ```
 
 For production, run the same process under Docker/systemd on a persistent VM. GitHub Actions is not the persistent monitoring engine; it is used only as the Naukri acquisition relay.
+
+## Multi-user preferences and personalized feed (feature branch)
+
+The user-preferences milestone adds user_preferences and user_job_evaluations. New beta users start with empty preferences; they must save at least one target_roles entry and one locations entry before /api/jobs, /api/jobs/{job_id} or /api/daily-summary returns personalized data. The server derives ownership from the authenticated session and joins evaluations by user_id. The shared jobs, canonical_opportunities, source telemetry, global job_evaluations and notification_ledger remain shared/admin-owned in this milestone.
+
+Authenticated endpoints:
+- GET /api/preferences — current user's preferences and onboarding_complete.
+- PUT /api/preferences — save the current user's preferences (CSRF required).
+- GET /api/jobs — shared jobs with only the current user's match score/reasons; global notification details are withheld from normal users.
+- GET /api/jobs/{job_id} — detail only when an evaluation row exists for the authenticated user.
+- GET /api/daily-summary — shared discovered count and user-scoped match count. Normal users do not see global alert delivery counts.
+
+Admin operational routes such as /api/config, source status, latency, dedupe, notification queue and LLM diagnostics remain admin-only. The first admin's legacy global candidate profile is migrated to that admin's preference row; new ordinary users never inherit it. Per-user Telegram and server-side applications are later milestones.
+
+For isolated smoke testing, use v2/docker-compose.feature.yml (port 8002, separate radar-feature-data volume, all source/Telegram/LLM integrations disabled). See the root README's Multi-user feature smoke test section for PowerShell commands. This feature Compose project is separate from the existing dev service and must not be confused with a production rollout.

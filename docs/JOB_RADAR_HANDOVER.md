@@ -5911,7 +5911,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Roadmap updated: `docs/MULTI_USER_AND_REFERRAL_ROADMAP.md`.
 
 ### Current worktree and test baseline
-- Active feature branch/worktree: `feat/user-preferences-evaluations-20261106`, `/tmp/job-radar-user-preferences`, based on `dd7aeb1`. No application code has been changed yet; baseline V2 suite passed 189 tests in 82.489s (one Node-only skip in Python image).
+- Active feature branch/worktree: `feat/user-preferences-evaluations-20261106`, `/tmp/job-radar-user-preferences`, based on `dd7aeb1`. Initial baseline before implementation passed 189 tests; latest implementation validation is recorded in the 2026-11-06 progress section below.
 - The active feature worktree is clean at the point this note was written, before the docs/spec/plan updates in this commit.
 - Existing dev checkout `/home/ubuntu/job-beeper-dev` is dirty and protected: `M v2/config.json`, `.env.save`, `.venv/`, and `v2/config.json.backup.20261105-183321`; HEAD `7ebc38b`, local `v2-live-radar` branch appears 66 commits behind refreshed remote. Do not reset, clean, checkout, or overwrite this checkout.
 - Production checkout `/home/ubuntu/job-beeper` remains stale/protected; do not touch it.
@@ -5939,10 +5939,11 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
   - `work/job-intelligence-foundation` — open draft PR #37, keep.
   - `work/source-run-telemetry-clean` — open PR #40, keep.
   - `fix/linkedin-experience-parser` — PR #36 merged to `main`, but its 70-line parser/test delta is not in `v2-live-radar`; keep until this fix is deliberately ported or explicitly retired.
-  - `feature/sse-infrastructure` — parked, unmerged SSE experiment with unique adapter/SSE changes and no active PR; preserve until reviewed/explicitly retired.
+  - `feat/user-preferences-evaluations-20261106` — current active multi-user milestone branch; keep until its PR is reviewed/merged.
 - Deleted remote branches `validation/source-run-telemetry` and `work/source-run-telemetry`: their PRs #39/#38 were closed without merge and their code changes are present in the retained clean telemetry branch; comparison against `work/source-run-telemetry-clean` showed only handover-document differences. PR #40's clean branch remains.
+- Archived the unique, unreviewed SSE experiment as tag `archive/sse-infrastructure-20261106`, then deleted remote branch `feature/sse-infrastructure`. This keeps the exact source commit recoverable without leaving an inactive branch.
 - `feat/multi-user-foundation-20261106` was already deleted remotely after PR #45 merge; its stale local remote-tracking ref was pruned.
-- Remote branches are now 7: `main`, `v2-live-radar`, `feat/matcher-quality-benchmark-20261106`, `work/job-intelligence-foundation`, `work/source-run-telemetry-clean`, `fix/linkedin-experience-parser`, `feature/sse-infrastructure`.
+- Remote branches are now 7: `main`, `v2-live-radar`, `feat/matcher-quality-benchmark-20261106`, `feat/user-preferences-evaluations-20261106`, `work/job-intelligence-foundation`, `work/source-run-telemetry-clean`, `fix/linkedin-experience-parser`. The SSE branch is preserved only as the archive tag above.
 - Local branch list remains three: current user-preferences feature branch, protected `v2-live-radar` checkout in dirty dev worktree, and parser-fix branch in its own worktree.
 - There are multiple detached experiment worktrees. Do not bulk-delete them: several contain uncommitted local config/venv artifacts; `/tmp/job-radar-naukri-location-v3` contains the ignored Superpowers progress ledger; preserve until individually audited. The count of worktrees is not the same as active Git branches.
 
@@ -5954,3 +5955,66 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
 5. Run full test suites, security/tenant review and CI; update these handover docs and roadmap with every material change.
 6. Open a focused PR targeting `v2-live-radar`. No production deploy; no rebuild/restart of the existing dev service until a separate isolated test environment and backup gate are verified.
 7. User does not need to supply anything for implementation/design. When isolated auth testing is ready, the user may need to set the first admin password interactively inside the disposable test environment; never ask them to send a password in chat.
+
+## 2026-11-06 — user preferences implementation progress (feature branch, not merged)
+
+### Implemented in the current working tree
+- New `v2/user_preferences.py`:
+  - Idempotent `user_preferences` and `user_job_evaluations` tables, foreign keys, unique `(user_id, job_id)`, and feed/fingerprint indexes.
+  - Empty defaults for ordinary users; strict field allowlist and type/range validation.
+  - Both target role and target location are required to mark onboarding complete.
+  - First-admin-only candidate profile migration and admin config synchronization. System/source/notification fields are excluded.
+  - The account-provisioning CLI performs first-admin migration immediately, even if the API process is already running; normal users are provisioned with an empty row.
+  - Deterministic SHA-256 preference + matcher-rules fingerprint.
+- `v2/radar.py`:
+  - DB initialization creates preference/evaluation schema and migrates the first admin's legacy candidate profile.
+  - `require_authenticated` enforces session auth and CSRF for unsafe methods; `require_admin` builds on it.
+  - `GET/PUT /api/preferences` are session-scoped; writes require CSRF.
+  - User-specific evaluation rows are created on preference save, startup and for touched jobs after shared ingestion. Preference edits do not start collectors. If the first admin is provisioned after app startup, the first feed request lazily initializes their evaluations without a process restart.
+  - `GET /api/jobs`, `GET /api/jobs/{job_id}`, and `GET /api/daily-summary` are user-scoped and blocked until onboarding is complete.
+  - Job feed uses only the session owner's evaluation row. Normal users receive no global notification-ledger status, sent timestamp or last error. Admin continues to see the existing global alertability/notification state.
+  - Existing global `job_evaluations` and `notification_ledger` are preserved for the admin Telegram worker.
+- `dashboard/index.html`, `dashboard/styles.css`, `dashboard/app.js`:
+  - Separate minimal user workspace; normal users do not load the admin app shell or operational controls.
+  - Onboarding form for comma/newline-separated target roles and locations, optional skills, save/edit, refresh, and personalized matching cards.
+  - Incomplete users do not request the jobs feed. Configured users see only likely matches and their own scores/reasons.
+  - User workspace does not use the admin localStorage applied/saved state.
+- New isolated smoke-test environment:
+  - `v2/docker-compose.feature.yml`, `v2/config.feature.json`.
+  - Port 8002 bound to loopback only, independent `radar-feature-data` volume, unique container name, generic non-personal candidate defaults, all collectors/Telegram/LLM providers disabled.
+  - Compose config validated and Docker image built successfully. **The feature container has not been started.**
+  - Root README now has exact Windows PowerShell commands to start the feature instance, bootstrap an admin, create a beta user, open SSH tunnel `18002`, check health and stop the container. It does not share existing dev port 8001 or production port 8000.
+
+### Tests and validation
+- Full V2 Python suite: **209 tests passed** in **121.559s**.
+- Focused preference, API, feed, auth and dashboard contract tests passed.
+- Dashboard contract suite includes the Node auth-client contract; Node 12 on the VM cannot parse the app's existing optional-chaining/nullish syntax, so app.js syntax was checked with cached esbuild 0.19.12 instead (passed).
+- Python compile passed for `v2/user_preferences.py`, `v2/auth_admin.py`, `v2/radar.py`.
+- esbuild syntax checks passed for `dashboard/app.js` and `dashboard/auth.js`.
+- `docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml config` passed.
+- Isolated Docker image build passed: `job-radar-user-preferences-radar:latest`. No container was started.
+- `git diff --check` passed.
+- Test coverage includes role+location gate, admin-only legacy migration, new-user no-inheritance, preferences validation, user isolation, preference-change reevaluation, per-user match scores, job detail, daily summary, and no global notification status leakage.
+
+### Explicit remaining gaps before PR
+1. Opportunity list/detail endpoints remain admin-only. Keep them hidden from normal users until tenant-scoped.
+2. Add any desired additional preference controls (experience range, exclusions, remote-only) to the user form; current UI collects role, location and optional skills only. Backend accepts the full candidate preference allowlist.
+3. Manual browser smoke test in the isolated feature Compose environment has not yet been performed; the image is built but the service is not running.
+4. Manual tenant/security review and automated PR review are still required.
+5. Open a focused PR against `v2-live-radar`; do not merge until CI/review pass.
+
+### Exact isolated feature commands (Windows PowerShell)
+The root README contains the full sequence. Key commands:
+```powershell
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml up -d --build"
+ssh -L 18002:127.0.0.1:8002 ubuntu@130.210.27.197
+Start-Process "http://127.0.0.1:18002/dashboard/"
+Invoke-RestMethod "http://127.0.0.1:18002/health" | ConvertTo-Json -Depth 5
+```
+Use `ssh -t` and `docker compose exec radar python -m v2.auth_admin create-admin/create-user` to provision accounts. Password entry is interactive; never put passwords in command arguments or chat. Stop with `docker compose down` (no `-v`) to preserve the disposable DB volume.
+
+### Current branch/runtime state
+- Feature branch: `feat/user-preferences-evaluations-20261106`; base `dd7aeb1`; docs/spec/plan commit `e2439ab` is pushed. Implementation changes described above are currently uncommitted at this note.
+- Remote branches: 7; includes this feature branch, integration/production branches, three active PR branches and the parser-fix branch. SSE branch was archived as `archive/sse-infrastructure-20261106` and removed from active branch list. Exact inventory is above.
+- Existing dev `job-radar-dev` and production `v2-radar-1` were not restarted/rebuilt/modified. The image build above created only a new image; no new feature container exists.
+- Existing dirty dev checkout, production checkout, old detached/dirty worktrees and draft encrypted backup remain protected as described above.

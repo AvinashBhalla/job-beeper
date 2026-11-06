@@ -17,6 +17,7 @@
   const authClient = window.JobBeeperAuth.createClient({ apiBase: API, locationRef: window.location });
 
   const LOCAL_STORAGE_APPLIED_KEY = 'job_beeper_applied_jobs_v1';
+  let userFeedPollTimer = null;
   const THEME_STORAGE_KEY = 'job_beeper_theme';
 
   const state = {
@@ -25,6 +26,8 @@
     appliedJobs: [],
     config: null,
     summary: null,
+    currentUser: null,
+    userPreferences: null,
     sourceStatus: [],
     activeSection: 'jobsSection',
     filters: {
@@ -1906,6 +1909,157 @@
     if ($('authUserEmail')) $('authUserEmail').textContent = user.email;
   }
 
+  function splitUserTags(value) {
+    return String(value || '').split(/[\n,;]+/)
+      .map(item => item.trim()).filter(Boolean)
+      .filter((item, index, all) => all.findIndex(other => other.toLowerCase() === item.toLowerCase()) === index);
+  }
+
+  function safeExternalJobUrl(value) {
+    try {
+      const url = new URL(String(value || ''), window.location.origin);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  async function initializeUserWorkspace(user) {
+    state.currentUser = user;
+    document.body.classList.add('user-ready');
+    const workspace = $('userWorkspace');
+    if (workspace) workspace.hidden = false;
+    if ($('userWorkspaceEmail')) $('userWorkspaceEmail').textContent = user.email;
+
+    if ($('userWorkspaceLogoutBtn') && !$('userWorkspaceLogoutBtn').dataset.bound) {
+      $('userWorkspaceLogoutBtn').dataset.bound = '1';
+      $('userWorkspaceLogoutBtn').addEventListener('click', signOut);
+    }
+    if ($('userPreferencesForm') && !$('userPreferencesForm').dataset.bound) {
+      $('userPreferencesForm').dataset.bound = '1';
+      $('userPreferencesForm').addEventListener('submit', saveUserPreferences);
+    }
+    if ($('userEditPreferencesBtn') && !$('userEditPreferencesBtn').dataset.bound) {
+      $('userEditPreferencesBtn').dataset.bound = '1';
+      $('userEditPreferencesBtn').addEventListener('click', () => {
+        if ($('userFeedPanel')) $('userFeedPanel').hidden = true;
+        if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = false;
+        if ($('userPreferencesStatus')) $('userPreferencesStatus').textContent = '';
+      });
+    }
+    if ($('userRefreshFeedBtn') && !$('userRefreshFeedBtn').dataset.bound) {
+      $('userRefreshFeedBtn').dataset.bound = '1';
+      $('userRefreshFeedBtn').addEventListener('click', loadUserJobs);
+    }
+    await loadUserPreferences();
+    if (!userFeedPollTimer) {
+      userFeedPollTimer = setInterval(() => {
+        if (document.body.classList.contains('user-ready') && $('userFeedPanel') && !$('userFeedPanel').hidden) {
+          loadUserJobs();
+        }
+      }, 30000);
+    }
+  }
+
+  async function loadUserPreferences() {
+    try {
+      const response = await authClient.request('/preferences', { cache: 'no-store' });
+      if (response.status === 401) { window.location.reload(); return; }
+      if (!response.ok) throw new Error('Could not load your preferences.');
+      const data = await response.json();
+      const preferences = data.preferences || {};
+      state.userPreferences = preferences;
+      if ($('userTargetRoles')) $('userTargetRoles').value = (preferences.target_roles || []).join(', ');
+      if ($('userTargetLocations')) $('userTargetLocations').value = (preferences.locations || []).join(', ');
+      if ($('userTargetSkills')) $('userTargetSkills').value = (preferences.skills || []).join(', ');
+
+      if (preferences.onboarding_complete) {
+        if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = true;
+        if ($('userFeedPanel')) $('userFeedPanel').hidden = false;
+        await loadUserJobs();
+      } else {
+        if ($('userFeedPanel')) $('userFeedPanel').hidden = true;
+        if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = false;
+      }
+    } catch (error) {
+      if ($('userPreferencesStatus')) $('userPreferencesStatus').textContent = error.message || 'Could not load preferences.';
+    }
+  }
+
+  async function saveUserPreferences(event) {
+    if (event) event.preventDefault();
+    const payload = {
+      target_roles: splitUserTags($('userTargetRoles')?.value),
+      locations: splitUserTags($('userTargetLocations')?.value),
+      skills: splitUserTags($('userTargetSkills')?.value),
+    };
+    const status = $('userPreferencesStatus');
+    const button = $('userPreferencesSaveBtn');
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Saving your preferences…';
+    try {
+      const response = await authClient.request('/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) { window.location.reload(); return; }
+      if (!response.ok) throw new Error(data.detail || 'Could not save preferences.');
+      state.userPreferences = data.preferences;
+      if (status) status.textContent = 'Preferences saved. Loading your matches…';
+      if ($('userOnboardingPanel')) $('userOnboardingPanel').hidden = true;
+      if ($('userFeedPanel')) $('userFeedPanel').hidden = false;
+      await loadUserJobs();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not save preferences.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function loadUserJobs() {
+    const status = $('userFeedStatus');
+    const list = $('userJobsList');
+    if (status) status.textContent = 'Refreshing your personalized matches…';
+    try {
+      const responses = await Promise.all([
+        authClient.request('/jobs?minutes=10080&limit=500', { cache: 'no-store' }),
+        authClient.request('/daily-summary', { cache: 'no-store' }),
+      ]);
+      const jobsResponse = responses[0];
+      const summaryResponse = responses[1];
+      if (jobsResponse.status === 401 || summaryResponse.status === 401) { window.location.reload(); return; }
+      const jobsData = await jobsResponse.json().catch(() => ({}));
+      const summary = await summaryResponse.json().catch(() => ({}));
+      if (!jobsResponse.ok) throw new Error(jobsData.detail || 'Could not load your job feed.');
+      const matches = (jobsData.jobs || []).filter(job => job.likely_match);
+      if ($('userFeedSummary')) {
+        $('userFeedSummary').textContent = String(summary.matched_jobs ?? matches.length) + ' matching jobs discovered today · Personalized to your saved preferences.';
+      }
+      if (!matches.length) {
+        if (list) list.innerHTML = '<p class="auth-description">No matching jobs in the current feed yet. Your preferences are saved; new matching jobs will appear as they are discovered.</p>';
+      } else if (list) {
+        list.innerHTML = matches.map(job => {
+          const url = safeExternalJobUrl(job.url);
+          const title = url
+            ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(job.title || 'Untitled role') + '</a>'
+            : esc(job.title || 'Untitled role');
+          const reasons = (job.match_reasons || []).slice(0, 4).map(reason => '<li>' + esc(reason) + '</li>').join('');
+          return '<article class="user-job-card">' +
+            '<h2>' + title + '</h2>' +
+            '<p class="user-job-meta">' + esc(job.company || 'Unknown company') + ' · ' + esc(job.location || 'Location not listed') + ' · ' + esc(job.source || 'Source') + '</p>' +
+            '<span class="user-job-score">' + esc(job.match_score ?? 0) + '% match</span>' +
+            '<ul class="user-job-reasons">' + reasons + '</ul>' +
+            '</article>';
+        }).join('');
+      }
+      if (status) status.textContent = 'Showing ' + matches.length + ' personalized matches.';
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not load your job feed.';
+    }
+  }
+
   function showUnavailablePanel() {
     setAuthPanel('authUnavailablePanel');
   }
@@ -1948,11 +2102,12 @@
     });
 
     if (result.access === 'admin') await initializeWorkspace();
+    if (result.access === 'user') await initializeUserWorkspace(result.user);
     return result;
   }
 
   async function signOut() {
-    const buttons = [$('headerLogoutBtn'), $('accountLogoutBtn'), $('authUserLogoutBtn')].filter(Boolean);
+    const buttons = [$('headerLogoutBtn'), $('accountLogoutBtn'), $('authUserLogoutBtn'), $('userWorkspaceLogoutBtn')].filter(Boolean);
     buttons.forEach(button => { button.disabled = true; });
     try {
       const response = await authClient.logout();

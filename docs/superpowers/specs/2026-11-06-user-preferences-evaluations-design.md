@@ -68,7 +68,8 @@ Keep existing `job_evaluations` and `notification_ledger` intact for the current
 
 - `GET /api/preferences`: return only the authenticated user's preferences and onboarding-complete state.
 - `PUT /api/preferences`: validate and save only the authenticated user's preferences; require at least one role and location before marking onboarding complete.
-- `GET /api/jobs`, `GET /api/daily-summary`, `GET /api/jobs/{id}`, `GET /api/opportunities`, and `GET /api/opportunities/{id}`: authenticated user scope; join only that user's evaluation rows.
+- `GET /api/jobs`, `GET /api/daily-summary`, and `GET /api/jobs/{id}`: authenticated user scope; join only that user's evaluation rows.
+- Opportunity list/detail endpoints remain admin-only in this first slice; tenant-scope them before exposing opportunity navigation to normal users.
 - Do not include global `notification_ledger` state in user responses.
 - `/api/config`, source telemetry, provider diagnostics, notification queue and other operational endpoints remain admin-only.
 - Admin preference writes through the legacy global config path must keep the admin's user-preference row synchronized to avoid split-brain behavior.
@@ -90,7 +91,7 @@ Keep existing `job_evaluations` and `notification_ledger` intact for the current
 - Ordinary users load `/api/preferences`; if incomplete, show onboarding and do not request the jobs feed.
 - Once complete, load user-scoped feed, summary and detail.
 - Hide admin-only source/telemetry controls from ordinary users; backend authorization remains mandatory.
-- Namespace browser-local applied/saved state by authenticated user ID. Migrate any legacy unscoped localStorage key only for the first admin, never to a normal user.
+- Normal users use a separate minimal workspace and never load the admin app shell or its browser-local applied/saved state. Server-side applications remain deferred.
 
 ## 7. Migration and safety
 
@@ -119,6 +120,7 @@ Keep existing `job_evaluations` and `notification_ledger` intact for the current
 
 ## 9. Deferred
 
+- Tenant-scoped opportunity list/detail endpoints.
 - Per-user Telegram linking/fan-out and notification ledger.
 - Server-side applications, saved jobs, notes and follow-ups.
 - Referral intelligence, contacts discovery and email drafts.

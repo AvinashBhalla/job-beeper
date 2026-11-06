@@ -1,6 +1,6 @@
 # JobBeeper Multi-User and Referral Intelligence Roadmap
 
-**Status:** Authentication foundation PR #45 merged into `v2-live-radar` as `dd7aeb1`; not deployed. Per-user preferences/evaluations are now in active development. Telegram fan-out and server-side applications remain later milestones.
+**Status:** Authentication foundation PR #45 merged into `v2-live-radar` as `dd7aeb1`; user preferences, onboarding and user-scoped job evaluations/feed are implemented on `feat/user-preferences-evaluations-20261106` but not yet merged or deployed. Opportunity list/detail tenant scoping and final PR review remain. Telegram fan-out and server-side applications remain later milestones.
 **Date:** 2026-11-06 (updated after PR #45 merge)
 **Priority:** Per-user preferences, onboarding and matching are the current product milestone
 **Repository:** AvinashBhalla/job-beeper
@@ -251,7 +251,7 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - Final V2 suite passed 189 tests in 79.321 seconds in a throwaway `--network none` container (one Node-only dashboard contract test is skipped inside that Python image); the Node-enabled dashboard contract suite passed 4/4 separately in 0.655 seconds.
 - PR #45 was merged on 2026-11-06 into `v2-live-radar` as squash commit `dd7aeb1eea4790564a73367df90f7d4a07e012ea`. The remote feature branch has been removed. This is a code merge only: no live dev or production container/database/config was changed. CI passed on the final PR head; the Codex re-review remained stuck in running, so the final merge relied on manual review, resolved inline threads and green CI.
 
-### Gate 3 — per-user preferences and matching (active; design approved)
+### Gate 3 — per-user preferences and matching (implementation on feature branch; PR pending)
 - **Onboarding gate:** a user must configure at least one target role and at least one location before the personalized feed unlocks. Do not show an empty/global feed to incomplete users; show a focused setup screen with the missing fields and save action.
 - New users start with empty candidate preferences. Never copy the admin's profile into a new user's account. The first admin's existing global candidate profile is migrated into that admin's preference row only.
 - Keep ingestion, normalized jobs, canonical opportunities, source health, polling and provider credentials shared/system-level. Keep source/runtime controls admin-only.

@@ -1,0 +1,32 @@
+# Disposable multi-user feature-test environment.
+# Isolated container, loopback port and named database volume; never shares the existing dev DB.
+services:
+  radar:
+    build:
+      context: ..
+      dockerfile: v2/Dockerfile
+    container_name: job-radar-user-preferences
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:8000"
+    volumes:
+      - radar-feature-data:/data
+      - ./config.feature.json:/app/v2/config.json:ro
+    environment:
+      JOB_RADAR_DB: /data/jobs.db
+      JOB_BEEPER_COOKIE_SECURE: "false"
+      JOB_BEEPER_PUBLIC_ORIGIN: ""
+      JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
+      JOB_RADAR_TELEGRAM_CHAT_ID: ""
+      LOG_LEVEL: INFO
+      GEMINI_API_KEY: ""
+      GEMINI_EXTRACTION_ENABLED: "false"
+      GEMINI_MATCHER_ENABLED: "false"
+      LLM_ROUTER_ENABLED: "false"
+      LLM_ROUTER_MATCHER_ENABLED: "false"
+      GROQ_API_KEY: ""
+      OPENROUTER_API_KEY: ""
+      NVIDIA_API_KEY: ""
+
+volumes:
+  radar-feature-data:

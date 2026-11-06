@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 import os
 import sqlite3
 import tempfile
@@ -175,6 +176,8 @@ class AuthApiTests(unittest.TestCase):
         self.db_patch = patch.object(radar, "DB_PATH", self.db_path)
         self.db_patch.start()
         auth.init_auth_schema(self.db_path)
+        from v2 import user_preferences
+        user_preferences.init_preferences_schema(self.db_path)
         self.admin = auth.create_user(self.db_path, "admin@example.com", "correct horse battery staple", role="admin")
         self.user = auth.create_user(self.db_path, "user@example.com", "another correct horse battery staple")
         self.client = TestClient(radar.app, base_url="https://testserver")
@@ -297,11 +300,17 @@ class AuthApiTests(unittest.TestCase):
 
     def test_application_database_initialization_creates_auth_tables(self):
         uninitialized_db = Path(self.temp_dir.name) / "uninitialized.sqlite3"
-        with patch.object(radar, "DB_PATH", uninitialized_db):
+        runtime_config = Path(self.temp_dir.name) / "uninitialized-config.json"
+        with patch.object(radar, "DB_PATH", uninitialized_db), patch.object(
+            radar, "RUNTIME_CONFIG_PATH", runtime_config
+        ):
             radar.init_db()
         with sqlite3.connect(uninitialized_db) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertTrue({"users", "sessions", "login_attempts", "login_account_attempts", "jobs"}.issubset(tables))
+        self.assertTrue({
+            "users", "sessions", "login_attempts", "login_account_attempts",
+            "user_preferences", "user_job_evaluations", "jobs",
+        }.issubset(tables))
 
     def test_public_health_response_contains_only_liveness_metadata(self):
         response = self.client.get("/health")
@@ -322,6 +331,10 @@ class AuthApiTests(unittest.TestCase):
                 self.assertNotIn(radar.require_admin, dependency_calls, route.path)
             elif route.path in {"/api/auth/me", "/api/auth/logout"}:
                 self.assertIn(radar.get_current_user, dependency_calls, route.path)
+            elif route.path in {
+                "/api/preferences", "/api/jobs", "/api/daily-summary", "/api/jobs/{job_id}"
+            }:
+                self.assertIn(radar.require_authenticated, dependency_calls, route.path)
             else:
                 self.assertIn(radar.require_admin, dependency_calls, route.path)
 
@@ -350,6 +363,71 @@ class AuthApiTests(unittest.TestCase):
             response = self.client.request(method, path, **kwargs)
             self.assertEqual(response.status_code, 403, f"user {method} {path}: {response.status_code}")
 
+    def test_user_preferences_require_authentication_and_role_location_onboarding(self):
+        self.assertEqual(self.client.get("/api/preferences").status_code, 401)
+        self.assertEqual(self.login().status_code, 200)
+        initial = self.client.get("/api/preferences")
+        self.assertEqual(initial.status_code, 200)
+        self.assertFalse(initial.json()["preferences"]["onboarding_complete"])
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        missing_role = self.client.put(
+            "/api/preferences", json={"locations": ["Bengaluru"]},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(missing_role.status_code, 422)
+        missing_location = self.client.put(
+            "/api/preferences", json={"target_roles": ["Python Developer"]},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(missing_location.status_code, 422)
+        saved = self.client.put(
+            "/api/preferences",
+            json={"target_roles": ["Python Developer"], "locations": ["Bengaluru"]},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(saved.status_code, 200)
+        self.assertTrue(saved.json()["preferences"]["onboarding_complete"])
+
+    def test_admin_must_update_candidate_preferences_through_global_config(self):
+        with patch.object(radar, "get_config", return_value={
+            "target_roles": ["Software Engineer"], "locations": ["Gurugram"]
+        }):
+            self.assertEqual(
+                self.login("admin@example.com", "correct horse battery staple").status_code,
+                200,
+            )
+            csrf = self.client.cookies.get("job_beeper_csrf")
+            response = self.client.put(
+                "/api/preferences",
+                json={"target_roles": ["QA Engineer"], "locations": ["Pune"]},
+                headers={"X-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("/api/config", response.json()["detail"])
+
+    def test_user_preferences_writes_require_csrf(self):
+        self.assertEqual(self.login().status_code, 200)
+        denied = self.client.put(
+            "/api/preferences",
+            json={"target_roles": ["Python Developer"], "locations": ["Pune"]},
+        )
+        self.assertEqual(denied.status_code, 403)
+
+    def test_admin_preferences_migrate_from_global_config(self):
+        with patch.object(radar, "get_config", return_value={
+            "target_roles": ["Software Engineer"],
+            "locations": ["Gurugram"],
+            "skills": ["Python"],
+            "match_threshold": 68,
+            "source_enabled": {"naukri": True},
+        }):
+            self.assertEqual(self.login("admin@example.com", "correct horse battery staple").status_code, 200)
+            response = self.client.get("/api/preferences")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["preferences"]["target_roles"], ["Software Engineer"])
+        self.assertEqual(response.json()["preferences"]["match_threshold"], 68)
+        self.assertNotIn("source_enabled", response.json()["preferences"])
+
     def test_admin_can_read_legacy_config_after_session_login(self):
         with patch.object(radar, "get_config", return_value={"target_roles": ["software engineer"]}):
             response = self.client.post("/api/auth/login", json={"email": "admin@example.com", "password": "correct horse battery staple"})
@@ -372,6 +450,16 @@ class AuthAdminCliTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "cli-auth.sqlite3"
+        self.config_path = Path(self.temp_dir.name) / "config.json"
+        self.config_path.write_text(
+            json.dumps({
+                "target_roles": ["Software Engineer"],
+                "locations": ["Gurugram"],
+                "skills": ["Python"],
+                "source_enabled": {"naukri": True},
+            }),
+            encoding="utf-8",
+        )
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -379,17 +467,27 @@ class AuthAdminCliTests(unittest.TestCase):
     def test_cli_bootstraps_only_one_admin_and_can_provision_users(self):
         from v2 import auth_admin
         output = io.StringIO()
-        with patch.dict(os.environ, {"JOB_RADAR_DB": str(self.db_path)}), patch("getpass.getpass", side_effect=["correct horse battery staple", "correct horse battery staple"]), redirect_stdout(output):
+        with patch.dict(os.environ, {"JOB_RADAR_DB": str(self.db_path), "JOB_RADAR_CONFIG_PATH": str(self.config_path)}), patch("getpass.getpass", side_effect=["correct horse battery staple", "correct horse battery staple"]), redirect_stdout(output):
             self.assertEqual(auth_admin.main(["create-admin", "--email", "admin@example.com"]), 0)
         output = io.StringIO()
-        with patch.dict(os.environ, {"JOB_RADAR_DB": str(self.db_path)}), redirect_stderr(output):
+        with patch.dict(os.environ, {"JOB_RADAR_DB": str(self.db_path), "JOB_RADAR_CONFIG_PATH": str(self.config_path)}), redirect_stderr(output):
             self.assertEqual(auth_admin.main(["create-admin", "--email", "second@example.com"]), 1)
         self.assertIn("already exists", output.getvalue().lower())
-        with patch.dict(os.environ, {"JOB_RADAR_DB": str(self.db_path)}), patch("getpass.getpass", side_effect=["another correct horse battery staple", "another correct horse battery staple"]), redirect_stdout(io.StringIO()):
+        with patch.dict(os.environ, {"JOB_RADAR_DB": str(self.db_path), "JOB_RADAR_CONFIG_PATH": str(self.config_path)}), patch("getpass.getpass", side_effect=["another correct horse battery staple", "another correct horse battery staple"]), redirect_stdout(io.StringIO()):
             self.assertEqual(auth_admin.main(["create-user", "--email", "user@example.com"]), 0)
         with sqlite3.connect(self.db_path) as conn:
             roles = dict(conn.execute("SELECT email, role FROM users"))
+            admin_preferences_row = conn.execute(
+                "SELECT preferences_json FROM user_preferences WHERE user_id=(SELECT id FROM users WHERE email='admin@example.com')"
+            ).fetchone()
+            user_preferences_row = conn.execute(
+                "SELECT preferences_json FROM user_preferences WHERE user_id=(SELECT id FROM users WHERE email='user@example.com')"
+            ).fetchone()
         self.assertEqual(roles, {"admin@example.com": "admin", "user@example.com": "user"})
+        self.assertIsNotNone(admin_preferences_row)
+        self.assertEqual(json.loads(admin_preferences_row[0])["target_roles"], ["Software Engineer"])
+        self.assertIsNotNone(user_preferences_row)
+        self.assertEqual(user_preferences_row[0], "{}")
 
 
 if __name__ == "__main__":

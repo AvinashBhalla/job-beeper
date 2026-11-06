@@ -105,6 +105,24 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         app_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("app.js"))
         self.assertLess(auth_index, app_index, "auth client must load before the dashboard application")
 
+    def test_user_workspace_requires_role_and_location_before_loading_feed(self):
+        parser = DashboardAuthMarkupParser()
+        parser.feed((ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+        required_ids = {
+            "userWorkspace", "userPreferencesForm", "userTargetRoles",
+            "userTargetLocations", "userTargetSkills", "userPreferencesSaveBtn",
+            "userOnboardingPanel", "userFeedPanel", "userJobsList",
+            "userWorkspaceLogoutBtn", "userRefreshFeedBtn",
+        }
+        self.assertTrue(required_ids.issubset(parser.ids))
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        for required in (
+            "initializeUserWorkspace", "loadUserPreferences", "saveUserPreferences",
+            "preferences.onboarding_complete", "authClient.request('/jobs?",
+            "job.likely_match", "user-ready",
+        ):
+            self.assertIn(required, source, f"user workspace must implement {required}")
+
     def test_admin_dashboard_initialization_is_gated_by_session_bootstrap(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         for required in ("JobBeeperAuth.resolveApiBase", "JobBeeperAuth.createClient", "authClient.bootstrap", "initializeWorkspace"):

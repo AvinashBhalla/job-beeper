@@ -28,7 +28,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth
+from v2 import auth, user_preferences
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -843,10 +843,13 @@ def init_db() -> None:
     backfill_canonical_opportunities()
     backfill_notification_ledger()
     auth.init_auth_schema(DB_PATH)
+    user_preferences.init_preferences_schema(DB_PATH)
+    user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
 def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
     new_count = 0
+    affected_job_ids: list[int] = []
     config = config or get_config()
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         for incoming in jobs:
@@ -917,6 +920,7 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 if not existing[1]:
                     _assign_canonical(conn, int(existing[0]))
                 _persist_job_evaluation(conn, int(existing[0]), config)
+                affected_job_ids.append(int(existing[0]))
             else:
                 if j.get("needs_jd_enrichment"):
                     j = enrich_linkedin_job(j)
@@ -953,8 +957,12 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
                 _persist_job_evaluation(conn, int(cur.lastrowid), config)
+                affected_job_ids.append(int(cur.lastrowid))
                 new_count += 1
         conn.commit()
+    # Shared ingestion evaluates only the touched jobs for every configured user.
+    if affected_job_ids:
+        refresh_configured_user_evaluations(affected_job_ids)
     return new_count
 
 # Increment whenever deterministic matching/alertability rules change so
@@ -1077,6 +1085,147 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
             count += 1
         conn.commit()
     return count
+
+
+def _persist_user_job_evaluation(
+    conn: sqlite3.Connection,
+    user_id: int,
+    job_id: int,
+    preferences: dict[str, Any],
+) -> dict[str, Any]:
+    job = _job_for_canonical(conn, job_id)
+    if not job:
+        raise ValueError(f"Job {job_id} does not exist")
+    details = match_details(job, preferences)
+    evaluated_at = iso(now())
+    fingerprint = user_preferences.preferences_fingerprint(
+        preferences, MATCHER_RULES_VERSION
+    )
+    # Per-user Telegram delivery is a later milestone. Store the matching
+    # result now, but never surface the global admin notification ledger.
+    alertability_reasons = ["per-user notifications are not enabled"]
+    conn.execute(
+        """INSERT INTO user_job_evaluations (
+               user_id, job_id, preference_fingerprint, evaluated_at, match, score,
+               reasons_json, experience_min_years, experience_max_years,
+               alertable, alertability_reasons_json
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+           ON CONFLICT(user_id, job_id) DO UPDATE SET
+               preference_fingerprint=excluded.preference_fingerprint,
+               evaluated_at=excluded.evaluated_at,
+               match=excluded.match,
+               score=excluded.score,
+               reasons_json=excluded.reasons_json,
+               experience_min_years=excluded.experience_min_years,
+               experience_max_years=excluded.experience_max_years,
+               alertable=0,
+               alertability_reasons_json=excluded.alertability_reasons_json""",
+        (
+            user_id, job_id, fingerprint, evaluated_at, int(details["match"]),
+            int(details["score"]), json.dumps(details["reasons"], ensure_ascii=False),
+            details["experience_min_years"], details["experience_max_years"],
+            json.dumps(alertability_reasons),
+        ),
+    )
+    return {**details, "evaluated_at": evaluated_at, "preference_fingerprint": fingerprint}
+
+
+def refresh_user_job_evaluations(
+    user_id: int,
+    preferences: dict[str, Any],
+    job_ids: list[int] | None = None,
+) -> int:
+    if not preferences.get("target_roles") or not preferences.get("locations"):
+        return 0
+    if job_ids and len(job_ids) > 500:
+        return sum(
+            refresh_user_job_evaluations(user_id, preferences, job_ids[start:start + 500])
+            for start in range(0, len(job_ids), 500)
+        )
+    with sqlite3.connect(DB_PATH) as conn:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+    if not {"jobs", "user_job_evaluations"}.issubset(tables):
+        return 0
+    fingerprint = user_preferences.preferences_fingerprint(
+        preferences, MATCHER_RULES_VERSION
+    )
+    changed = 0
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        sql = """SELECT j.id
+                 FROM jobs j
+                 LEFT JOIN user_job_evaluations e
+                   ON e.job_id=j.id AND e.user_id=?
+                 WHERE (e.job_id IS NULL OR e.preference_fingerprint != ?)"""
+        params: list[Any] = [int(user_id), fingerprint]
+        if job_ids:
+            placeholders = ",".join("?" for _ in job_ids)
+            sql += f" AND j.id IN ({placeholders})"
+            params.extend(int(job_id) for job_id in job_ids)
+        sql += " ORDER BY j.first_seen_at ASC, j.id ASC"
+        rows = conn.execute(sql, params).fetchall()
+        for row in rows:
+            _persist_user_job_evaluation(
+                conn, int(user_id), int(row["id"]), preferences
+            )
+            changed += 1
+        conn.commit()
+    return changed
+
+
+def ensure_user_job_evaluations_initialized(
+    user_id: int, preferences: dict[str, Any]
+) -> int:
+    if not preferences.get("target_roles") or not preferences.get("locations"):
+        return 0
+    with sqlite3.connect(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"jobs", "user_job_evaluations"}.issubset(tables):
+            return 0
+        jobs_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        existing = conn.execute(
+            "SELECT 1 FROM user_job_evaluations WHERE user_id=? LIMIT 1",
+            (int(user_id),),
+        ).fetchone()
+    if jobs_count and existing is None:
+        return refresh_user_job_evaluations(user_id, preferences)
+    return 0
+
+
+def refresh_configured_user_evaluations(job_ids: list[int] | None = None) -> int:
+    with sqlite3.connect(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"users", "user_preferences", "jobs", "user_job_evaluations"}.issubset(tables):
+            return 0
+        conn.row_factory = sqlite3.Row
+        users = conn.execute(
+            """SELECT u.id, p.preferences_json
+               FROM users u
+               JOIN user_preferences p ON p.user_id=u.id
+               WHERE u.status='active'"""
+        ).fetchall()
+    total = 0
+    for row in users:
+        try:
+            stored = json.loads(row["preferences_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            continue
+        preferences = {**user_preferences.PREFERENCE_DEFAULTS, **stored}
+        if preferences.get("target_roles") and preferences.get("locations"):
+            total += refresh_user_job_evaluations(int(row["id"]), preferences, job_ids)
+    return total
 
 
 def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
@@ -2988,6 +3137,7 @@ async def startup() -> None:
     config = get_config()
     refresh_job_evaluations(config)
     refresh_notification_decisions(config)
+    refresh_configured_user_evaluations()
     app.state.scheduler_task = asyncio.create_task(scheduler())
     app.state.notification_worker_task = asyncio.create_task(notification_worker())
 
@@ -3039,12 +3189,10 @@ def get_current_user(request: Request) -> dict[str, Any]:
     return user
 
 
-def require_admin(
+def require_authenticated(
     request: Request,
     user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Administrator access required.")
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         session_token = request.cookies.get(SESSION_COOKIE_NAME, "")
         cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
@@ -3056,6 +3204,14 @@ def require_admin(
             or not auth.validate_csrf(DB_PATH, session_token, header_token)
         ):
             raise HTTPException(status_code=403, detail="CSRF validation failed.")
+    return user
+
+
+def require_admin(
+    user: dict[str, Any] = Depends(require_authenticated),
+) -> dict[str, Any]:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required.")
     return user
 
 
@@ -3161,6 +3317,34 @@ def health():
 
 
 
+@app.get("/api/preferences")
+def read_user_preferences(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if preferences["onboarding_complete"]:
+        ensure_user_job_evaluations_initialized(user["id"], preferences)
+    return {"preferences": preferences}
+
+
+@app.put("/api/preferences")
+def update_user_preferences(
+    payload: dict[str, Any],
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    if user["role"] == "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator candidate preferences are managed through /api/config.",
+        )
+    try:
+        saved = user_preferences.save_user_preferences(DB_PATH, user["id"], payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    refresh_user_job_evaluations(user["id"], saved)
+    return {"preferences": saved}
+
+
 @app.get("/api/config", dependencies=[Depends(require_admin)])
 def read_config():
     return {
@@ -3173,8 +3357,10 @@ def read_config():
 @app.put("/api/config", dependencies=[Depends(require_admin)])
 def update_config(payload: dict[str, Any]):
     saved = save_config(payload)
+    user_preferences.sync_first_admin_preferences(DB_PATH, saved)
     refresh_job_evaluations(saved)
     refresh_notification_decisions(saved)
+    refresh_configured_user_evaluations()
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
@@ -3361,13 +3547,21 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     }
 
 
-@app.get("/api/jobs", dependencies=[Depends(require_admin)])
+@app.get("/api/jobs")
 def jobs(
     minutes: int = 60,
     limit: int = 100,
     today_only: bool = False,
     q: str = "",
+    user: dict[str, Any] = Depends(require_authenticated),
 ):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening the job feed.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = (
@@ -3398,15 +3592,20 @@ def jobs(
                 e.experience_max_years AS evaluation_experience_max_years,
                 e.alertable AS evaluation_alertable,
                 e.alertability_reasons_json AS evaluation_alertability_reasons_json,
+                ge.alertable AS admin_evaluation_alertable,
+                ge.alertability_reasons_json AS admin_evaluation_alertability_reasons_json,
                 nl.status AS notification_status,
                 nl.decision_reason_json AS notification_decision_reasons_json,
                 nl.sent_at AS notification_sent_at,
                 nl.last_error AS notification_last_error,
                 nl.candidate_job_id AS notification_candidate_job_id
             FROM jobs j
-            LEFT JOIN job_evaluations e ON e.job_id=j.id
+            LEFT JOIN user_job_evaluations e
+              ON e.job_id=j.id AND e.user_id=?
+            LEFT JOIN job_evaluations ge ON ge.job_id=j.id
             LEFT JOIN notification_ledger nl
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+             AND ?='admin'
             WHERE j.discovered_at >= ?
               AND LOWER(
                     COALESCE(j.company, '') || ' ' ||
@@ -3420,7 +3619,7 @@ def jobs(
             ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
                      j.discovered_at DESC
             LIMIT ?
-        """, (cutoff, search_pattern, limit)).fetchall()
+        """, (user["id"], user["role"], cutoff, search_pattern, limit)).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:
@@ -3455,9 +3654,15 @@ def jobs(
         exp_max = item.pop("evaluation_experience_max_years", None)
         item["experience_min_years"] = exp_min
         item["experience_max_years"] = exp_max
-        item["alertable"] = bool(item.pop("evaluation_alertable", 0) or 0)
+        user_alertable = item.pop("evaluation_alertable", 0)
+        user_alertability_reasons = item.pop("evaluation_alertability_reasons_json", None)
+        admin_alertable = item.pop("admin_evaluation_alertable", 0)
+        admin_alertability_reasons = item.pop("admin_evaluation_alertability_reasons_json", None)
+        item["alertable"] = bool(
+            (admin_alertable if user["role"] == "admin" else user_alertable) or 0
+        )
         item["alertability_reasons"] = parse_json_list(
-            item.pop("evaluation_alertability_reasons_json", None)
+            admin_alertability_reasons if user["role"] == "admin" else user_alertability_reasons
         )
         item["notification_status"] = item.get("notification_status") or "not_eligible"
         item["notification_decision_reasons"] = parse_json_list(
@@ -3549,8 +3754,15 @@ def llm_shadow_status():
     return shadow_status(DB_PATH)
 
 
-@app.get("/api/daily-summary", dependencies=[Depends(require_admin)])
-def daily_summary():
+@app.get("/api/daily-summary")
+def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening the job feed.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     cutoff = iso(current_day_start_utc())
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -3560,21 +3772,24 @@ def daily_summary():
         matched = conn.execute("""
             SELECT COUNT(*)
             FROM jobs j
-            JOIN job_evaluations e ON e.job_id=j.id
+            JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
             WHERE j.discovered_at >= ? AND e.match=1
-        """, (cutoff,)).fetchone()[0]
-        alertable = conn.execute("""
-            SELECT COUNT(*)
-            FROM jobs j
-            JOIN job_evaluations e ON e.job_id=j.id
-            WHERE j.discovered_at >= ? AND e.alertable=1
-        """, (cutoff,)).fetchone()[0]
-        alerted = conn.execute("""
-            SELECT COUNT(*)
-            FROM notification_ledger nl
-            JOIN jobs j ON j.id=nl.candidate_job_id
-            WHERE j.discovered_at >= ? AND nl.status='sent'
-        """, (cutoff,)).fetchone()[0]
+        """, (user["id"], cutoff)).fetchone()[0]
+        alertable = 0
+        alerted = 0
+        if user["role"] == "admin":
+            alertable = conn.execute("""
+                SELECT COUNT(*)
+                FROM jobs j
+                JOIN job_evaluations e ON e.job_id=j.id
+                WHERE j.discovered_at >= ? AND e.alertable=1
+            """, (cutoff,)).fetchone()[0]
+            alerted = conn.execute("""
+                SELECT COUNT(*)
+                FROM notification_ledger nl
+                JOIN jobs j ON j.id=nl.candidate_job_id
+                WHERE j.discovered_at >= ? AND nl.status='sent'
+            """, (cutoff,)).fetchone()[0]
 
     local_now = now().astimezone(IST)
     return {
@@ -3588,14 +3803,38 @@ def daily_summary():
     }
 
 
-@app.get("/api/jobs/{job_id}", dependencies=[Depends(require_admin)])
-def job_detail(job_id: int):
+@app.get("/api/jobs/{job_id}")
+def job_detail(
+    job_id: int,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening job details.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        row = conn.execute(
+            """SELECT j.*, e.match AS likely_match, e.score AS match_score,
+                      e.reasons_json AS match_reasons_json,
+                      e.experience_min_years, e.experience_max_years
+               FROM jobs j
+               JOIN user_job_evaluations e
+                 ON e.job_id=j.id AND e.user_id=?
+               WHERE j.id=?""",
+            (user["id"], job_id),
+        ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
-    return dict(row)
+    result = dict(row)
+    try:
+        result["match_reasons"] = json.loads(result.pop("match_reasons_json") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        result["match_reasons"] = []
+    return result
 
 @app.get("/", include_in_schema=False)
 def root():
