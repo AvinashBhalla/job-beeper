@@ -41,6 +41,7 @@
   const tagInputs = {};
   const dropdowns = {};
   const activeDropdownInstances = [];
+  let jobsFeedRequestSequence = 0;
 
   const SVG_ICONS = {
     briefcase: '<svg class="icon icon-sm" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>',
@@ -460,6 +461,10 @@
       location: raw.location || raw.jd_location || 'Location not specified',
       url: raw.url || '#',
       description: raw.description || '',
+      description_format: raw.description_format === 'markdown' ? 'markdown' : 'plain',
+      source_details: raw.source_details && typeof raw.source_details === 'object'
+        ? raw.source_details
+        : {},
       source_posted_at: raw.source_posted_at || raw.posted || null,
       posted_precision: raw.posted_precision || null,
       discovered_at: raw.discovered_at || null,
@@ -853,6 +858,8 @@
         job.company,
         job.location,
         job.source,
+        job.description,
+        JSON.stringify(job.source_details || {}),
         ...(job.match_reasons || []),
         ...(job.skills_detected || []),
       ].join(' ').toLowerCase();
@@ -1037,6 +1044,7 @@
   }
 
   function clearAllFilters() {
+    const hadSearch = Boolean(String(state.filters.search || '').trim());
     state.filters.search = '';
     state.filters.source = '';
     state.filters.minScore = 0;
@@ -1058,7 +1066,11 @@
     $('toggleRemote').classList.remove('active');
     $('toggleRemote').setAttribute('aria-pressed', 'false');
 
-    renderFeed();
+    if (hadSearch) {
+      loadJobsFeed();
+    } else {
+      renderFeed();
+    }
   }
 
   // =========================================================================
@@ -1143,14 +1155,140 @@
         : '<span style="font-size:12px;color:var(--text-muted);">No configured skills detected.</span>';
     }
 
+    renderSourceDetails(job);
+
     const descEl = $('inspDescription');
     if (descEl) {
-      descEl.textContent = job.description || 'The source did not expose a full description in this scan. Use the Apply Direct link to view the complete posting.';
+      const description = job.description || 'The source did not expose a full description in this scan. Use the Apply Direct link to view the complete posting.';
+      if (job.description_format === 'markdown') {
+        descEl.innerHTML = renderMarkdownDescription(description);
+      } else {
+        descEl.textContent = description;
+      }
     }
 
     if (pushHistory) {
       history.replaceState(null, '', `#job/${encodeURIComponent(job.id)}`);
     }
+  }
+
+  function renderMarkdownDescription(markdown) {
+    const lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
+    const blocks = [];
+
+    const inline = value => {
+      let html = esc(value);
+      html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      const tick = String.fromCharCode(96);
+      const codePattern = new RegExp(tick + '([^' + tick + ']+)' + tick, 'g');
+      html = html.replace(codePattern, '<code>$1</code>');
+      return html;
+    };
+
+    const isBullet = line => /^\s*[-*+]\s+/.test(line);
+    const isNumbered = line => /^\s*\d+[.)]\s+/.test(line);
+    const isHeading = line => /^\s*#{1,4}\s+/.test(line);
+
+    let index = 0;
+    while (index < lines.length) {
+      const line = lines[index].trim();
+      if (!line) {
+        index += 1;
+        continue;
+      }
+
+      if (isHeading(line)) {
+        const heading = line.replace(/^#{1,4}\s+/, '');
+        blocks.push('<h4>' + inline(heading) + '</h4>');
+        index += 1;
+        continue;
+      }
+
+      if (isBullet(line)) {
+        const items = [];
+        while (index < lines.length && isBullet(lines[index])) {
+          const item = lines[index].replace(/^\s*[-*+]\s+/, '');
+          items.push('<li>' + inline(item) + '</li>');
+          index += 1;
+        }
+        blocks.push('<ul>' + items.join('') + '</ul>');
+        continue;
+      }
+
+      if (isNumbered(line)) {
+        const items = [];
+        while (index < lines.length && isNumbered(lines[index])) {
+          const item = lines[index].replace(/^\s*\d+[.)]\s+/, '');
+          items.push('<li>' + inline(item) + '</li>');
+          index += 1;
+        }
+        blocks.push('<ol>' + items.join('') + '</ol>');
+        continue;
+      }
+
+      const paragraph = [line];
+      index += 1;
+      while (
+        index < lines.length &&
+        lines[index].trim() &&
+        !isHeading(lines[index]) &&
+        !isBullet(lines[index]) &&
+        !isNumbered(lines[index])
+      ) {
+        paragraph.push(lines[index].trim());
+        index += 1;
+      }
+      blocks.push('<p>' + paragraph.map(inline).join(' ') + '</p>');
+    }
+
+    return blocks.join('');
+  }
+
+  function renderSourceDetails(job) {
+    const section = $('inspSourceDetailsSection');
+    const metaContainer = $('inspSourceDetailsMeta');
+    const skillsContainer = $('inspSourceKeySkills');
+    if (!section || !metaContainer || !skillsContainer) return;
+
+    const details = job.source_details || {};
+    const education = details.education && typeof details.education === 'object'
+      ? details.education
+      : {};
+    const valueText = value => Array.isArray(value)
+      ? value.filter(Boolean).join(', ')
+      : String(value || '').trim();
+
+    const rows = [
+      ['Role', valueText(details.role)],
+      ['Industry Type', valueText(details.industry_type)],
+      ['Department', valueText(details.department)],
+      ['Employment Type', valueText(details.employment_type)],
+      ['Role Category', valueText(details.role_category)],
+      ['UG Education', valueText(education.ug)],
+      ['PG Education', valueText(education.pg)],
+      ['Other Education', valueText(education.ppg)],
+    ].filter(([, value]) => value);
+
+    const skills = Array.isArray(details.key_skills)
+      ? [...new Set(details.key_skills.map(valueText).filter(Boolean))]
+      : [];
+
+    metaContainer.innerHTML = rows.map(([label, value]) =>
+      '<div class="source-detail-row"><span class="source-detail-label">' +
+      esc(label) + '</span><span class="source-detail-value">' +
+      esc(value) + '</span></div>'
+    ).join('');
+
+    skillsContainer.innerHTML = skills.map(skill =>
+      '<span class="signal-pill signal-skill">' + esc(skill) + '</span>'
+    ).join('');
+
+    section.classList.toggle('is-hidden', rows.length === 0 && skills.length === 0);
+    const skillsHeading = $('inspSourceKeySkillsHeading');
+    if (skillsHeading) skillsHeading.classList.toggle('is-hidden', skills.length === 0);
   }
 
   function closeJobInspector() {
@@ -1480,12 +1618,20 @@
   }
 
   async function loadJobsFeed() {
+    const requestId = ++jobsFeedRequestSequence;
     const refreshBtn = $('refreshFeedBtn');
     if (refreshBtn) refreshBtn.classList.add('is-loading');
 
+    const params = new URLSearchParams({
+      minutes: '4320',
+      limit: '500',
+    });
+    const searchQuery = String(state.filters.search || '').trim();
+    if (searchQuery) params.set('q', searchQuery);
+
     try {
       const [jobsRes, summaryRes] = await Promise.all([
-        fetch(API + '/jobs?today_only=true&limit=500', { cache: 'no-store' }),
+        fetch(API + '/jobs?' + params.toString(), { cache: 'no-store' }),
         fetch(API + '/daily-summary', { cache: 'no-store' }),
       ]);
 
@@ -1493,6 +1639,7 @@
 
       const jobsData = await jobsRes.json();
       const summaryData = await summaryRes.json();
+      if (requestId !== jobsFeedRequestSequence) return;
 
       state.jobs = (jobsData.jobs || []).map(normalizeJob).filter(Boolean);
       state.summary = summaryData;
@@ -1507,6 +1654,7 @@
       populateSourceFilterOptions(state.jobs);
       renderFeed();
     } catch (err) {
+      if (requestId !== jobsFeedRequestSequence) return;
       state.jobs = [];
       state.summary = null;
       state.isStaticFallback = false;
@@ -1515,7 +1663,9 @@
       renderFeed();
       showToast('Live jobs API unavailable. Dashboard is offline; no fallback feed is shown.', 'error', 5000);
     } finally {
-      if (refreshBtn) refreshBtn.classList.remove('is-loading');
+      if (requestId === jobsFeedRequestSequence && refreshBtn) {
+        refreshBtn.classList.remove('is-loading');
+      }
     }
   }
 
@@ -1582,9 +1732,9 @@
         const val = e.target.value;
         if (searchClear) searchClear.style.display = val ? 'inline-flex' : 'none';
         searchDebounceTimer = setTimeout(() => {
-          state.filters.search = val;
-          renderFeed();
-        }, 120);
+          state.filters.search = val.trim();
+          loadJobsFeed();
+        }, 250);
       });
     }
 
@@ -1593,7 +1743,7 @@
         if (searchInp) searchInp.value = '';
         searchClear.style.display = 'none';
         state.filters.search = '';
-        renderFeed();
+        loadJobsFeed();
       });
     }
 

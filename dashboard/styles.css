@@ -1443,7 +1443,7 @@ a:hover {
   font-size: 13.5px;
   line-height: 1.65;
   color: var(--text-secondary);
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
   max-height: 380px;
   overflow-y: auto;
@@ -1452,6 +1452,79 @@ a:hover {
   border: 1px solid var(--divider-subtle);
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
+}
+
+.description-formatted-view h4 {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 18px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider-subtle);
+}
+
+.description-formatted-view h4:first-child {
+  margin-top: 0;
+}
+
+.description-formatted-view p {
+  margin: 8px 0;
+}
+
+.description-formatted-view ul,
+.description-formatted-view ol {
+  margin: 8px 0 14px;
+  padding-left: 22px;
+}
+
+.description-formatted-view li {
+  margin: 5px 0;
+  padding-left: 3px;
+}
+
+.description-formatted-view a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.description-formatted-view code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-subtle);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.source-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.source-detail-row {
+  display: grid;
+  grid-template-columns: minmax(105px, 132px) minmax(0, 1fr);
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--divider-subtle);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.source-detail-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.source-detail-value {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.source-key-skills-heading {
+  display: block;
+  margin-top: 16px;
 }
 
 /* ==========================================================================

@@ -479,9 +479,19 @@ def parse_relative(value: str | float | int | None, base: dt.datetime | None = N
     return base - dt.timedelta(seconds=amount * seconds)
 
 
-def normalize_job(source: str, source_id: str, company: str, title: str,
-                  location: str, url: str, posted_at: dt.datetime | None,
-                  posted_precision: str, description: str = "") -> dict[str, Any]:
+def normalize_job(
+    source: str,
+    source_id: str,
+    company: str,
+    title: str,
+    location: str,
+    url: str,
+    posted_at: dt.datetime | None,
+    posted_precision: str,
+    description: str = "",
+    description_format: str = "plain",
+    source_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     discovered = now()
     if posted_at is not None:
         comparable_posted_at = posted_at
@@ -507,6 +517,10 @@ def normalize_job(source: str, source_id: str, company: str, title: str,
             if posted_at and posted_precision == "minute" else None
         ),
         "description": description or "",
+        "description_format": (
+            "markdown" if str(description_format).lower() == "markdown" else "plain"
+        ),
+        "source_details": source_details if isinstance(source_details, dict) else {},
     }
 
 
@@ -720,6 +734,8 @@ def init_db() -> None:
             discovered_at TEXT NOT NULL,
             discovery_latency_seconds INTEGER,
             description TEXT NOT NULL DEFAULT '',
+            description_format TEXT NOT NULL DEFAULT 'plain',
+            source_details_json TEXT NOT NULL DEFAULT '{}',
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
             canonical_opportunity_id INTEGER,
@@ -783,6 +799,8 @@ def init_db() -> None:
             identity_version INTEGER NOT NULL DEFAULT 1
         )
         """)
+        _ensure_column(conn, "jobs", "description_format", "TEXT NOT NULL DEFAULT 'plain'")
+        _ensure_column(conn, "jobs", "source_details_json", "TEXT NOT NULL DEFAULT '{}'")
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
         _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
@@ -817,6 +835,18 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         for incoming in jobs:
             j = dict(incoming)
+            incoming_description = str(j.get("description") or "")
+            incoming_description_format = (
+                "markdown"
+                if str(j.get("description_format") or "plain").lower() == "markdown"
+                else "plain"
+            )
+            source_details = j.get("source_details")
+            source_details_json = json.dumps(
+                source_details if isinstance(source_details, dict) else {},
+                ensure_ascii=False,
+                sort_keys=True,
+            )
             observed_at = parse_relative(j.get("discovered_at"))
             incoming_posted_at = parse_relative(j.get("source_posted_at"))
             if observed_at and incoming_posted_at and incoming_posted_at > observed_at:
@@ -844,15 +874,29 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     precision_for_update = "unknown"
 
                 conn.execute("""
-                    UPDATE jobs SET last_seen_at=?, source_posted_at=COALESCE(?, source_posted_at),
+                    UPDATE jobs SET
+                    last_seen_at=?,
+                    source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
-                    description=CASE WHEN length(?) > length(description) THEN ? ELSE description
+                    description=CASE
+                        WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
+                        ELSE description
+                    END,
+                    description_format=CASE
+                        WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
+                        ELSE description_format
+                    END,
+                    source_details_json=CASE
+                        WHEN ? <> '{}' THEN ?
+                        ELSE source_details_json
                     END
                     WHERE id=?
                 """, (
                     j["discovered_at"], posted_at_for_update, precision_for_update,
                     precision_for_update,
-                    j["description"], j["description"], existing[0]
+                    incoming_description_format, incoming_description, incoming_description,
+                    incoming_description_format, incoming_description, incoming_description_format,
+                    source_details_json, source_details_json, existing[0]
                 ))
                 if not existing[1]:
                     _assign_canonical(conn, int(existing[0]))
@@ -861,17 +905,34 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 if j.get("needs_jd_enrichment"):
                     j = enrich_linkedin_job(j)
 
+                # LinkedIn enrichment may replace the original search snippet
+                # with a full JD; persist the post-enrichment values.
+                incoming_description = str(j.get("description") or "")
+                incoming_description_format = (
+                    "markdown"
+                    if str(j.get("description_format") or "plain").lower() == "markdown"
+                    else "plain"
+                )
+                source_details = j.get("source_details")
+                source_details_json = json.dumps(
+                    source_details if isinstance(source_details, dict) else {},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+
                 cur = conn.execute("""
                     INSERT INTO jobs (
                         source, source_job_id, company, title, location, url,
                         source_posted_at, posted_precision, discovered_at,
-                        discovery_latency_seconds, description, first_seen_at, last_seen_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        discovery_latency_seconds, description, description_format,
+                        source_details_json, first_seen_at, last_seen_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
                     j["source"], j["source_job_id"], j["company"], j["title"],
                     j["location"], j["url"], j["source_posted_at"],
                     j["posted_precision"], j["discovered_at"],
-                    j["discovery_latency_seconds"], j["description"],
+                    j["discovery_latency_seconds"], incoming_description,
+                    incoming_description_format, source_details_json,
                     j["discovered_at"], j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
@@ -2444,6 +2505,12 @@ def naukri_collect() -> list[dict[str, Any]]:
             posted_at,
             "date" if posted_at else "unknown",
             description,
+            description_format=str(item.get("description_format") or "plain"),
+            source_details=(
+                item.get("source_details")
+                if isinstance(item.get("source_details"), dict)
+                else {}
+            ),
         )
 
         # The actual Naukri acquisition happened on the external GitHub runner.
@@ -3133,7 +3200,12 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
 
 
 @app.get("/api/jobs")
-def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
+def jobs(
+    minutes: int = 60,
+    limit: int = 100,
+    today_only: bool = False,
+    q: str = "",
+):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = (
@@ -3141,6 +3213,17 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
         if today_only
         else iso(now() - dt.timedelta(minutes=minutes))
     )
+
+    # Apply text search in SQLite before LIMIT. Otherwise a relevant older
+    # posting can be hidden by the newest 500 rows and never reach the UI.
+    query = (q or "").strip()[:200]
+    escaped_query = (
+        query.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    search_pattern = f"%{escaped_query.lower()}%" if query else "%"
+
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
@@ -3163,10 +3246,19 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
             LEFT JOIN notification_ledger nl
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
             WHERE j.discovered_at >= ?
+              AND LOWER(
+                    COALESCE(j.company, '') || ' ' ||
+                    COALESCE(j.title, '') || ' ' ||
+                    COALESCE(j.location, '') || ' ' ||
+                    COALESCE(j.source, '') || ' ' ||
+                    COALESCE(j.source_job_id, '') || ' ' ||
+                    COALESCE(j.description, '') || ' ' ||
+                    COALESCE(j.source_details_json, '{}')
+                  ) LIKE ? ESCAPE '\\'
             ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
                      j.discovered_at DESC
             LIMIT ?
-        """, (cutoff, limit)).fetchall()
+        """, (cutoff, search_pattern, limit)).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:
@@ -3178,6 +3270,16 @@ def jobs(minutes: int = 60, limit: int = 100, today_only: bool = False):
     result = []
     for row in rows:
         item = dict(row)
+        item["description_format"] = (
+            "markdown" if item.get("description_format") == "markdown" else "plain"
+        )
+        try:
+            parsed_source_details = json.loads(item.pop("source_details_json", "{}") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            parsed_source_details = {}
+        item["source_details"] = (
+            parsed_source_details if isinstance(parsed_source_details, dict) else {}
+        )
         # Telegram reads job_evaluations and notification_ledger directly.
         # The dashboard deliberately returns those same decisions rather than
         # independently re-running the matcher at request time.
