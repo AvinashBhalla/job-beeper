@@ -51,7 +51,7 @@ Job Radar is a personal, always-on job discovery and matching service. Its pipel
 - **Greenhouse:** public Job Board API, opt-in and disabled until the single-board canary passes ingestion/dedupe/timestamp tests.
 - **Instahyre:** disabled until interface and freshness are verified.
 
-Runtime preferences are protected by `X-Config-Token`. Each environment has its own token at `/data/config_token`; never print tokens or commit them.
+Runtime candidate preferences remain global and are admin-only. The V2 browser now uses server-side cookie sessions: Argon2id passwords, HttpOnly/Secure/SameSite=Lax session cookies, CSRF validation for writes, no-store API responses, and admin-only access to legacy global APIs. The old config-token helper remains in the backend for compatibility but is no longer used by the dashboard. If TLS terminates at a reverse proxy and Uvicorn sees an internal origin, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact public dashboard origin. See [V2 authentication and account provisioning](v2/README.md#authentication-and-beta-account-provisioning) before enabling accounts; ordinary users must not be given feed access until per-user preferences/evaluations are implemented.
 
 ## Handover and product reference
 

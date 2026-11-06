@@ -46,13 +46,15 @@
 - `revoke_session(db_path: Path, session_token: str) -> bool`
 - `validate_csrf(db_path: Path, session_token: str, csrf_token: str) -> bool`
 - `check_login_rate_limit(db_path: Path, email: str, client_ip: str) -> bool`
+- `begin_login_attempt(db_path: Path, email: str, client_ip: str) -> bool` (atomic reservation; returns true when blocked)
+- `create_first_admin(db_path: Path, email: str, password: str) -> dict[str, Any]` (atomic first-admin bootstrap)
 - `record_login_attempt(db_path: Path, email: str, client_ip: str, success: bool) -> None`
 
-- [ ] **Step 1: Write failing tests** for additive schema creation, normalized unique emails, Argon2id password verification, role/status validation, opaque session/CSRF token hashing, session expiry/revocation, and persistent per-email/IP login throttling (five failed attempts per 15 minutes, cleared on success).
-- [ ] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: failures because `v2.auth` and its interfaces do not exist.
-- [ ] **Step 3: Add** `argon2-cffi>=23.1,<26` to runtime requirements and create `requirements-dev.txt` with `-r requirements.txt` plus `httpx2>=2,<3`; implement only the tested persistence/password/session/rate-limit primitives. Use parameterized SQL and SHA-256 hashes for opaque tokens.
-- [ ] **Step 4: Run** `python3 -m unittest v2.test_auth -v`; expected: all auth primitive tests pass.
-- [ ] **Step 5: Commit** `feat(auth): add SQLite identity and session primitives`.
+- [x] **Step 1: Write failing tests** for additive schema creation, normalized unique emails, Argon2id password verification, role/status validation, opaque session/CSRF token hashing, session expiry/revocation, and persistent, concurrency-safe per-email/IP login throttling (five attempts per 15 minutes, cleared on success; malformed email values are throttled too and email/IP keys are stored hashed).
+- [x] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: failures because `v2.auth` and its interfaces do not exist.
+- [x] **Step 3: Add** `argon2-cffi>=23.1,<26` to runtime requirements and create `requirements-dev.txt` with `-r requirements.txt` plus `httpx2>=2,<3`; implement only the tested persistence/password/session/rate-limit primitives. Use parameterized SQL and SHA-256 hashes for opaque tokens.
+- [x] **Step 4: Run** `python3 -m unittest v2.test_auth -v`; expected: all auth primitive tests pass.
+- [x] **Step 5: Commit** `feat(auth): add SQLite identity and session primitives`.
 
 ### Task 2: First-admin CLI, FastAPI auth endpoints, and admin-only legacy API
 
@@ -60,6 +62,7 @@
 - Create: `v2/auth_admin.py`
 - Modify: `v2/radar.py`
 - Modify: `v2/test_auth.py`
+- Modify: `v2/docker-compose.dev.yml` (loopback-only development cookie setting)
 
 **Interfaces:**
 - `get_current_user(request: Request) -> dict[str, Any]`
@@ -70,11 +73,11 @@
 - `python3 -m v2.auth_admin create-admin --email <email>` prompts for password twice and creates the first admin only.
 - `python3 -m v2.auth_admin create-user --email <email>` prompts for a password and provisions a `user` account for invite-only beta access.
 
-- [ ] **Step 1: Write failing API tests** for login success, generic bad-credential response, 429 throttling, current-user response, logout/replay rejection, CSRF validation, CLI refusing a second bootstrap admin, CLI user provisioning, and role access.
-- [ ] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: new API/CLI tests fail before implementation.
-- [ ] **Step 3: Implement** FastAPI dependencies and auth endpoints; initialize additive auth tables during existing DB initialization; add admin CLI commands for one-time admin bootstrap and ordinary user provisioning. Apply `Depends(require_admin)` to every existing `/api/*` route except the explicit auth routes. Do not alter `/health`.
-- [ ] **Step 4: Run** `python3 -m unittest v2.test_auth -v`; expected: API, CSRF, throttle, and role tests pass.
-- [ ] **Step 5: Commit** `feat(auth): add login sessions and admin route guards`.
+- [x] **Step 1: Write failing API tests** for login success, generic bad-credential response, cross-origin login rejection, 429 throttling (including malformed email attempts), current-user response, logout/replay rejection, CSRF validation, private API no-store headers, CLI refusing a second bootstrap admin (including concurrent bootstrap attempts), CLI user provisioning, and role access.
+- [x] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: new API/CLI tests fail before implementation.
+- [x] **Step 3: Implement** FastAPI dependencies and auth endpoints; initialize additive auth tables during existing DB initialization; add admin CLI commands for one-time admin bootstrap and ordinary user provisioning. Mark all `/api/*` responses no-store. Use atomic `begin_login_attempt` before password verification and clear the reservation on success; reject a supplied login Origin that differs from the configured/request origin (use `JOB_BEEPER_PUBLIC_ORIGIN` behind TLS termination). Bootstrap the first admin with atomic `create_first_admin`. Apply `Depends(require_admin)` to every existing `/api/*` route except the explicit auth routes. Do not alter `/health`.
+- [x] **Step 4: Run** `python3 -m unittest v2.test_auth -v`; expected: API, CSRF, throttle, and role tests pass.
+- [x] **Step 5: Commit** `feat(auth): add login sessions and admin route guards`.
 
 ### Task 3: Dashboard login and session lifecycle
 
@@ -90,11 +93,11 @@
 - Store no session token in localStorage or sessionStorage. Read the CSRF cookie and send it as `X-CSRF-Token` for logout and other state-changing authenticated requests.
 - Existing global dashboard screens render only after `/api/auth/me` confirms role `admin`; `user` role sees a clear beta-not-enabled state rather than any global data.
 
-- [ ] **Step 1: Add failing tests** in `v2/test_dashboard_auth_contract.py` that exercise the actual `dashboard/auth.js` client under Node (login, `/api/auth/me`, same-origin credentials, CSRF header on writes/logout, and admin-vs-user bootstrap callbacks) and validate the shipped login/holding markup and script order.
-- [ ] **Step 2: Run** `python3 -m unittest v2.test_dashboard_auth_contract -v`; expected: failures against the current config-token-only dashboard. The Node contract test skips only when Node.js is unavailable; run it separately on a Node-enabled host/CI runner.
-- [ ] **Step 3: Implement** a minimal login form, logout control, session bootstrap, CSRF header helper, and user-role holding screen. Remove the browser's `X-Config-Token` flow and `sessionStorage` token key. Preserve theme and applied-job localStorage keys; do not confuse them with auth.
-- [ ] **Step 4: Run** `python3 -m unittest v2.test_dashboard_auth_contract v2.test_auth -v`; expected: both contract and API suites pass.
-- [ ] **Step 5: Commit** `feat(dashboard): use cookie sessions for admin access`.
+- [x] **Step 1: Add failing tests** in `v2/test_dashboard_auth_contract.py` that exercise the actual `dashboard/auth.js` client under Node (login, `/api/auth/me`, same-origin credentials, CSRF header on writes/logout, and admin-vs-user bootstrap callbacks) and validate the shipped login/holding markup and script order.
+- [x] **Step 2: Run** `python3 -m unittest v2.test_dashboard_auth_contract -v`; expected: failures against the current config-token-only dashboard. The Node contract test skips only when Node.js is unavailable; run it separately on a Node-enabled host/CI runner.
+- [x] **Step 3: Implement** a minimal login form, logout control, session bootstrap, CSRF header helper, and user-role holding screen. Remove the browser's `X-Config-Token` flow and `sessionStorage` token key. Preserve theme and applied-job localStorage keys; do not confuse them with auth.
+- [x] **Step 4: Run** `python3 -m unittest v2.test_dashboard_auth_contract v2.test_auth -v`; expected: both contract and API suites pass.
+- [x] **Step 5: Commit** `feat(dashboard): use cookie sessions for admin access`.
 
 ### Task 4: Full regression, docs, and review readiness
 
@@ -104,12 +107,14 @@
 - Modify: `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`
 - Modify: `docs/superpowers/specs/2026-11-06-multi-user-auth-design.md`
 - Modify: `docs/superpowers/plans/2026-11-06-multi-user-auth-foundation.md`
+- Modify: `v2/README.md`
+- Modify: `README.md`
 
-- [ ] **Step 1: Add/adjust route-matrix tests** that enumerate every existing `/api/*` route, assert anonymous and `user` sessions are denied, assert an `admin` session reaches the handler, and assert `/health` plus login remain public.
-- [ ] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: the route-matrix tests fail for any missing guard and pass once all guards are applied.
-- [ ] **Step 3: Correct** missing guards and update handover docs with actual implemented scope, bootstrap command, environment requirements, and explicit next milestone (user preferences/evaluations).
-- [ ] **Step 4: Run** the full V2 suite with `python3 -m unittest discover -s v2 -p 'test_*.py' -v`; expected: all tests pass, no live network calls, no Telegram sends.
-- [ ] **Step 5: Commit** `docs(auth): document multi-user foundation and rollout gates`.
+- [x] **Step 1: Add/adjust route-matrix tests** that enumerate every existing `/api/*` route, assert anonymous and `user` sessions are denied, assert an `admin` session reaches the handler, and assert `/health` plus login remain public.
+- [x] **Step 2: Run** `python3 -m unittest v2.test_auth -v`; expected: the route-matrix tests fail for any missing guard and pass once all guards are applied.
+- [x] **Step 3: Correct** missing guards and update handover docs with actual implemented scope, bootstrap command, environment requirements, and explicit next milestone (user preferences/evaluations).
+- [x] **Step 4: Run** the full V2 suite with `python3 -m unittest discover -s v2 -p 'test_*.py' -v`; expected: all tests pass, no live network calls, no Telegram sends.
+- [x] **Step 5: Commit** `docs(auth): document multi-user foundation and rollout gates`.
 
 ## Completion gates
 

@@ -1,7 +1,9 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-10-16 — Gemini matcher live evaluation verified; Claude Code execution/review worksheet added to detailed handover, responses pending
-**Active release branch:** `v2-live-radar`  
+**Snapshot:** 2026-11-06 — Multi-user auth foundation implemented on isolated feature branch; not deployed
+**Release integration branch:** `v2-live-radar`
+
+**Active feature branch:** `feat/multi-user-foundation-20261106`
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
 This is the current operating summary for an engineer taking over. `docs/JOB_RADAR_HANDOVER.md` is the detailed chronological record; `docs/JOBBEEPER_REFERENCE.md` describes the product architecture. **Mandatory rule: update both this file and the detailed handover after every user prompt before ending the turn/session, including decisions or evidence-only turns (record “no code change” when applicable).** After every code/config change, document what changed, tests/CI, commit SHA, deployment evidence, remaining work, exact commands/output expected from the user, and the next-chat continuation prompt. Newest handoff supersedes older instructions; explicitly label older checklists historical. Never rely on the current chat alone.
@@ -3032,3 +3034,15 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Production checkout `/home/ubuntu/job-beeper` was observed at `61d8271480eaf48b0a6442b62b1b0bb9a032df34`, **613 commits behind** its fetched `origin/v2-live-radar` ref. It was not pulled or modified.
 - Running production container `v2-radar-1` remains on image `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`, port 8000, Compose project `v2`, restart count 0. Never assume checkout and running image are synchronized. No production update is authorized.
 - Current feature PR #44 targets `v2-live-radar`; keep production `main` and port 8000 untouched.
+
+
+## 2026-11-06 — Current multi-user authentication handoff
+
+- Worktree: `/tmp/job-radar-naukri-location-v3`; branch: `feat/multi-user-foundation-20261106`; base: `v2-live-radar` after merged PR #44 (`7b61d74`). Feature commits: `9ffed3f`, `93dea33`, `44a052f`, `27a77cd`. Not yet pushed / no PR yet.
+- Implemented additive SQLite `users`, `sessions`, `login_attempts`; Argon2id passwords; `admin`/`user` roles; seven-day opaque sessions with hashed session/CSRF values; logout/revocation; same-origin login-Origin validation (use `JOB_BEEPER_PUBLIC_ORIGIN` behind TLS termination) plus concurrency-safe five-attempt/15-minute email/IP reservations with hashed keys; success resets throttle.
+- API: `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`. Every legacy `/api/*` route requires admin; unsafe admin requests require CSRF; all API responses are no-store. `/health` is public and sanitized. Login Origin validation supports `JOB_BEEPER_PUBLIC_ORIGIN` behind TLS termination. `GET /api/auth/me` and logout work for both roles.
+- CLI inside the app container: `python -m v2.auth_admin create-admin --email ...` (first admin only), then `python -m v2.auth_admin create-user --email ...` for invite-only beta users. Passwords are prompted, never command-line arguments. Container DB path is `/data/jobs.db`.
+- Dashboard login/account/logout uses cookie sessions. Ordinary users see a holding screen; the legacy global job feed is not loaded for them. Browser `X-Config-Token` and config-token sessionStorage flow is removed. Global candidate config/evaluations remain admin-only until per-user preferences/evaluations are built.
+- Verification: final V2 suite 186 passed in 87.493s in a throwaway `--network none` Docker run (one Node-only test skipped there); Node-enabled dashboard contract 4/4 passed separately in 0.611s; esbuild 0.19.12 JS parse checks passed; dev Compose config resolved. No LLM/Telegram actions.
+- Live dev and production were not deployed or migrated. Dev still uses `job-radar-dev-rich-jd:20261106`; production `v2-radar-1` remains unchanged. `JOB_BEEPER_COOKIE_SECURE` defaults true; require HTTPS. The loopback-only dev Compose defaults it false for SSH-tunnel use; production stays Secure. Set `JOB_BEEPER_PUBLIC_ORIGIN` when TLS termination means Uvicorn sees an internal origin. Termalin encrypted backup remains DRAFT.
+- Next: finish review/docs, push branch, open PR against `v2-live-radar`, check CI/review, then implement user-scoped preferences and evaluations. Keep production untouched.
