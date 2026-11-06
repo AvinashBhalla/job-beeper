@@ -251,15 +251,16 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - Final V2 suite passed 189 tests in 79.321 seconds in a throwaway `--network none` container (one Node-only dashboard contract test is skipped inside that Python image); the Node-enabled dashboard contract suite passed 4/4 separately in 0.655 seconds.
 - PR #45 was merged on 2026-11-06 into `v2-live-radar` as squash commit `dd7aeb1eea4790564a73367df90f7d4a07e012ea`. The remote feature branch has been removed. This is a code merge only: no live dev or production container/database/config was changed. CI passed on the final PR head; the Codex re-review remained stuck in running, so the final merge relied on manual review, resolved inline threads and green CI.
 
-### Gate 3 — per-user preferences and matching (implementation on feature branch; PR pending)
+### Gate 3 — per-user preferences and matching (implemented on draft PR #46; smoke test pending)
 - **Onboarding gate:** a user must configure at least one target role and at least one location before the personalized feed unlocks. Do not show an empty/global feed to incomplete users; show a focused setup screen with the missing fields and save action.
 - New users start with empty candidate preferences. Never copy the admin's profile into a new user's account. The first admin's existing global candidate profile is migrated into that admin's preference row only.
 - Keep ingestion, normalized jobs, canonical opportunities, source health, polling and provider credentials shared/system-level. Keep source/runtime controls admin-only.
 - Introduce `user_preferences` and `user_job_evaluations` keyed by authenticated `user_id`; matcher receives explicit preference data and never falls back to a global candidate profile for a normal user.
-- Scope job feed, search, daily summary, opportunity/job detail and user evaluation state to the authenticated user. Do not expose the global notification ledger or global evaluation rows to ordinary users.
+- Implemented: preferences, job feed, job detail and daily summary are scoped to the authenticated user. Ordinary users do not receive global notification-ledger details. Opportunity list/detail endpoints remain admin-only and must be tenant-scoped before those views are exposed to users.
 - Preference saves re-evaluate the user's stored jobs without triggering another scrape. New shared ingestions evaluate for each active, configured user.
-- Namespace the current browser-local applied/saved state by user ID as a temporary isolation measure; server-side applications remain a later milestone.
-- Add migration tests using synthetic DBs and a verified read-only snapshot copy. Do not run migrations against the live dev or production database in this implementation milestone.
+- Implemented: normal users use a separate minimal workspace and never load the admin app shell or its browser-local applied/saved state. Server-side applications remain a later milestone.
+- Synthetic migration/tenant tests pass. A read-only copy of the live dev DB was not needed or used; do not run migrations against the live dev or production database in this implementation milestone.
+- PR #46 is draft and CI run #1222 passed on code head c5201ce. Manual browser smoke test and final security review remain before marking the PR ready.
 
 ### Gate 4 — Telegram fan-out and beta
 - Implement one-time Telegram linking.
