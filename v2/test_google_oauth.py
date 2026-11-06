@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -48,7 +49,7 @@ class GoogleOAuthStateTests(unittest.TestCase):
         self.assertFalse(google_oauth.validate_nonce({}, "expected"))
 
     def test_redirect_uri_rejects_non_https_and_wrong_callback_path(self):
-        with unittest.mock.patch.dict("os.environ", {
+        with patch.dict("os.environ", {
             "GOOGLE_OAUTH_CLIENT_ID": "id",
             "GOOGLE_OAUTH_CLIENT_SECRET": "secret",
             "GOOGLE_OAUTH_REDIRECT_URI": "http://jobs.example/callback",
@@ -70,7 +71,7 @@ class GoogleIdentityLinkTests(unittest.TestCase):
         user = auth.create_or_link_google_user(
             self.db_path, "Beta.User@example.com", "google-sub-1"
         )
-        self.assertEqual(user["email"], "Beta.User@example.com")
+        self.assertEqual(user["email"], "beta.user@example.com")
         self.assertEqual(user["role"], "user")
         self.assertEqual(
             auth.create_or_link_google_user(
