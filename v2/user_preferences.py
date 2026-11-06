@@ -183,7 +183,7 @@ def ensure_user_preferences(db_path: Path, user_id: int) -> None:
     with _connect(Path(db_path)) as conn:
         conn.execute(
             """INSERT INTO user_preferences(user_id, preferences_json, version, created_at, updated_at)
-               VALUES (?, '{}', 1, ?, ?) ON CONFLICT(user_id) DO NOTHING""",
+               VALUES (?, '{}', 0, ?, ?) ON CONFLICT(user_id) DO NOTHING""",
             (int(user_id), timestamp, timestamp),
         )
 
