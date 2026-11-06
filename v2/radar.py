@@ -3337,7 +3337,7 @@ def google_auth_callback(
         return finish_redirect(failure_url)
     state_data = google_oauth.consume_authorization_state(DB_PATH, state)
     if state_data is None:
-        return RedirectResponse(failure_url, status_code=303)
+        return finish_redirect(failure_url)
 
     expected_nonce, code_verifier = state_data
     try:
@@ -3350,7 +3350,7 @@ def google_auth_callback(
         user_preferences.ensure_user_preferences(DB_PATH, user["id"])
     except Exception as exc:
         log.warning("Google sign-in failed error_type=%s", type(exc).__name__)
-        return RedirectResponse(failure_url, status_code=303)
+        return finish_redirect(failure_url)
 
     response = finish_redirect("/dashboard/")
     _issue_user_session(request, response, user)
