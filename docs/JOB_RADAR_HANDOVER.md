@@ -5894,3 +5894,63 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - `JOB_BEEPER_COOKIE_SECURE` defaults to true; HTTPS is required. The loopback-only dev Compose service defaults it to false for SSH-tunnel development; production remains true. Set `JOB_BEEPER_PUBLIC_ORIGIN` if the TLS reverse proxy origin differs from Uvicorn’s request base URL. Do not disable Secure publicly.
 - The Termalin encrypted backup job remains DRAFT. Local snapshots do not prove an off-host encrypted archive exists.
 - Next: verify CI and automated re-review on PR #45, merge into `v2-live-radar` when all checks/review threads are clear, then continue with user-scoped preferences/evaluations. No production deployment is authorized.
+
+## 2026-11-06 — PR #45 merged; user preferences milestone approved; branch audit and dev access
+
+### Authentication foundation status
+- PR #45 [Add secure multi-user authentication foundation](https://github.com/AvinashBhalla/job-beeper/pull/45) is **merged** into `v2-live-radar` as `dd7aeb1eea4790564a73367df90f7d4a07e012ea`. It is a code merge only; no dev/prod container, database, config, volume or source runtime was changed.
+- Final PR head was `366028d`; full V2 suite was 189 passed (one Node-only test skipped in Python-only Docker image), Node dashboard auth contract 4/4 passed, esbuild/Python compile/Compose validation/diff check passed, and GitHub CI was green. Codex re-review remained stuck in "running"; manual review, resolved review threads and CI were used.
+- The former `feat/multi-user-foundation-20261106` remote branch is already absent from GitHub. A stale local remote-tracking ref was pruned.
+
+### Product decision confirmed by user
+- User confirmed that a new account must configure a target job role and location before it can browse its personalized feed. Both fields are required; do not show the shared/global job feed or an empty feed to incomplete users. Show a clear onboarding state instead.
+- New accounts must start with empty preferences; never clone the first admin's candidate profile into new users. Existing global candidate preferences migrate only into the first admin's `user_preferences` row.
+- Shared collectors, normalized jobs, canonical opportunities and source health remain shared. Candidate preferences and evaluation rows are per-user. Source controls and the current global Telegram pipeline remain admin-only for now.
+- Design: `docs/superpowers/specs/2026-11-06-user-preferences-evaluations-design.md`.
+- Plan: `docs/superpowers/plans/2026-11-06-user-preferences-evaluations-plan.md`.
+- Roadmap updated: `docs/MULTI_USER_AND_REFERRAL_ROADMAP.md`.
+
+### Current worktree and test baseline
+- Active feature branch/worktree: `feat/user-preferences-evaluations-20261106`, `/tmp/job-radar-user-preferences`, based on `dd7aeb1`. No application code has been changed yet; baseline V2 suite passed 189 tests in 82.489s (one Node-only skip in Python image).
+- The active feature worktree is clean at the point this note was written, before the docs/spec/plan updates in this commit.
+- Existing dev checkout `/home/ubuntu/job-beeper-dev` is dirty and protected: `M v2/config.json`, `.env.save`, `.venv/`, and `v2/config.json.backup.20261105-183321`; HEAD `7ebc38b`, local `v2-live-radar` branch appears 66 commits behind refreshed remote. Do not reset, clean, checkout, or overwrite this checkout.
+- Production checkout `/home/ubuntu/job-beeper` remains stale/protected; do not touch it.
+- Active dev container `job-radar-dev` is running on loopback `127.0.0.1:8001`; production `v2-radar-1` is separate on port `8000`. Termalin confirmed both containers are Up. Docker access required `sudo -n docker`; no container was changed. The existing dev container is an older image and does not contain PR #45.
+- No active database migration, DB write, container restart/rebuild, config change, Telegram send or LLM request was performed. The Termalin encrypted backup draft `ae51ea55-d396-417e-8792-8ddfc1cd66c7` is still DRAFT; do not claim an off-host encrypted backup.
+
+### Windows PowerShell access to the currently running dev service
+Use this only to inspect the **existing older dev build**, not to validate PR #45 or the new preferences feature:
+```powershell
+# Terminal 1: keep this SSH tunnel open
+ssh -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197
+
+# Terminal 2: open the dashboard
+Start-Process "http://127.0.0.1:18001/dashboard/"
+
+# Terminal 2: health check
+Invoke-RestMethod "http://127.0.0.1:18001/health" | ConvertTo-Json -Depth 5
+```
+If SSH requires a key or host alias, retain the exact working SSH identity/options and add only the `-L 18001:127.0.0.1:8001` argument. Do not expose port 8001 publicly. Do not rebuild the existing service from the dirty dev checkout. The new feature must be tested in an isolated project/volume/port or a disposable container before considering any migration.
+
+### Branch audit and cleanup (2026-11-06)
+- Integration branch: `v2-live-radar`; production release branch: `main`. Keep both.
+- Active/needed remote branches retained:
+  - `feat/matcher-quality-benchmark-20261106` — open PR #41, keep.
+  - `work/job-intelligence-foundation` — open draft PR #37, keep.
+  - `work/source-run-telemetry-clean` — open PR #40, keep.
+  - `fix/linkedin-experience-parser` — PR #36 merged to `main`, but its 70-line parser/test delta is not in `v2-live-radar`; keep until this fix is deliberately ported or explicitly retired.
+  - `feature/sse-infrastructure` — parked, unmerged SSE experiment with unique adapter/SSE changes and no active PR; preserve until reviewed/explicitly retired.
+- Deleted remote branches `validation/source-run-telemetry` and `work/source-run-telemetry`: their PRs #39/#38 were closed without merge and their code changes are present in the retained clean telemetry branch; comparison against `work/source-run-telemetry-clean` showed only handover-document differences. PR #40's clean branch remains.
+- `feat/multi-user-foundation-20261106` was already deleted remotely after PR #45 merge; its stale local remote-tracking ref was pruned.
+- Remote branches are now 7: `main`, `v2-live-radar`, `feat/matcher-quality-benchmark-20261106`, `work/job-intelligence-foundation`, `work/source-run-telemetry-clean`, `fix/linkedin-experience-parser`, `feature/sse-infrastructure`.
+- Local branch list remains three: current user-preferences feature branch, protected `v2-live-radar` checkout in dirty dev worktree, and parser-fix branch in its own worktree.
+- There are multiple detached experiment worktrees. Do not bulk-delete them: several contain uncommitted local config/venv artifacts; `/tmp/job-radar-naukri-location-v3` contains the ignored Superpowers progress ledger; preserve until individually audited. The count of worktrees is not the same as active Git branches.
+
+### Next exact steps
+1. Continue from `/tmp/job-radar-user-preferences` on `feat/user-preferences-evaluations-20261106`; read the design and plan above before coding.
+2. Implement additive preferences/evaluations schema with TDD; test on synthetic/disposable DB only.
+3. Refactor matching to explicit user preferences; require role+location for feed access; scope all feed/evaluation endpoints by authenticated session.
+4. Update dashboard onboarding and user-scoped feed; keep admin global operations intact; namespace local applied state.
+5. Run full test suites, security/tenant review and CI; update these handover docs and roadmap with every material change.
+6. Open a focused PR targeting `v2-live-radar`. No production deploy; no rebuild/restart of the existing dev service until a separate isolated test environment and backup gate are verified.
+7. User does not need to supply anything for implementation/design. When isolated auth testing is ready, the user may need to set the first admin password interactively inside the disposable test environment; never ask them to send a password in chat.

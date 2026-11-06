@@ -41,7 +41,8 @@ Job Radar is a personal, always-on job discovery and matching service. Its pipel
   docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml logs --tail=100 radar
   ```
 - The local `.env` stores a Gemini key only if the user supplies one; never print/commit it. Keep both `GEMINI_EXTRACTION_ENABLED` and `GEMINI_MATCHER_ENABLED` false until the initial controlled checks are complete.
-- On the developer's computer, forward the port with `ssh -L 8001:127.0.0.1:8001 ubuntu@<VM_HOST>`, then open `http://127.0.0.1:8001/dashboard/`.
+- From Windows PowerShell, forward the existing dev port with `ssh -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197`, keep that terminal open, then run `Start-Process "http://127.0.0.1:18001/dashboard/"` in a second PowerShell window. Check health with `Invoke-RestMethod "http://127.0.0.1:18001/health" | ConvertTo-Json -Depth 5`. If SSH needs a key/alias, retain the same options as the user's working SSH command.
+- The currently running dev container is an older build and does **not** yet include merged PR #45. Do not use the existing dev database for the new auth/multi-user migration until a separate feature-test environment and verified DB copy are prepared.
 - Never add production Telegram credentials to the dev Compose file. Enable source collectors in dev only deliberately; do not enable LinkedIn while production is querying it unless conducting a coordinated rate-limit test.
 
 ## Sources and pipeline
@@ -51,7 +52,7 @@ Job Radar is a personal, always-on job discovery and matching service. Its pipel
 - **Greenhouse:** public Job Board API, opt-in and disabled until the single-board canary passes ingestion/dedupe/timestamp tests.
 - **Instahyre:** disabled until interface and freshness are verified.
 
-Runtime candidate preferences remain global and are admin-only. The V2 browser now uses server-side cookie sessions: Argon2id passwords, HttpOnly/Secure/SameSite=Lax session cookies, CSRF validation for writes, no-store API responses, five attempts per email/IP plus twenty account-wide attempts across IPs per 15 minutes, same-origin login routing, and admin-only access to legacy global APIs. The old config-token helper remains in the backend for compatibility but is no longer used by the dashboard. If TLS terminates at a reverse proxy and Uvicorn sees an internal origin, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact public dashboard origin. See [V2 authentication and account provisioning](v2/README.md#authentication-and-beta-account-provisioning) before enabling accounts; ordinary users must not be given feed access until per-user preferences/evaluations are implemented.
+Runtime candidate preferences remain global and are admin-only until the in-progress per-user preferences milestone is merged and tested. The V2 browser now uses server-side cookie sessions: Argon2id passwords, HttpOnly/Secure/SameSite=Lax session cookies, CSRF validation for writes, no-store API responses, five attempts per email/IP plus twenty account-wide attempts across IPs per 15 minutes, same-origin login routing, and admin-only access to legacy global APIs. The old config-token helper remains in the backend for compatibility but is no longer used by the dashboard. If TLS terminates at a reverse proxy and Uvicorn sees an internal origin, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact public dashboard origin. See [V2 authentication and account provisioning](v2/README.md#authentication-and-beta-account-provisioning) before enabling accounts; ordinary users must not be given feed access until per-user preferences/evaluations are implemented.
 
 ## Handover and product reference
 
