@@ -3304,7 +3304,10 @@ def google_auth_callback(
     failure_url = "/dashboard/?google_auth=failed"
     if error:
         return RedirectResponse("/dashboard/?google_auth=cancelled", status_code=303)
-    config = google_oauth.load_config()
+    try:
+        config = google_oauth.load_config()
+    except ValueError:
+        return RedirectResponse(failure_url, status_code=303)
     if config is None:
         return RedirectResponse(failure_url, status_code=303)
     state_data = google_oauth.consume_authorization_state(DB_PATH, state)
@@ -3320,7 +3323,7 @@ def google_auth_callback(
             DB_PATH, identity["email"], identity["subject"]
         )
         user_preferences.ensure_user_preferences(DB_PATH, user["id"])
-    except (ValueError, requests.RequestException, sqlite3.Error) as exc:
+    except Exception as exc:
         log.warning("Google sign-in failed error_type=%s", type(exc).__name__)
         return RedirectResponse(failure_url, status_code=303)
 
