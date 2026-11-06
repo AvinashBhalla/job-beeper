@@ -4,8 +4,10 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-11-06 (multi-user priority reset, current search/Markdown feature state, and referral-intelligence roadmap)**
-**Active branch:** `v2-live-radar`  
+**Last updated: 2026-11-06 (multi-user authentication foundation implemented on an isolated feature branch; not deployed)**
+**Release integration branch:** `v2-live-radar`
+
+**Active feature branch:** `feat/multi-user-foundation-20261106`
 **Repository:** `AvinashBhalla/job-beeper`
 
 > ## Mandatory agent handover rule — every prompt
@@ -5869,3 +5871,26 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Read-only host audit found `/home/ubuntu/job-beeper` (the production checkout) on `v2-live-radar` at `61d8271480eaf48b0a6442b62b1b0bb9a032df34`, reported **613 commits behind** its fetched `origin/v2-live-radar` ref. This checkout was not pulled or modified.
 - The running production container `v2-radar-1` remains on its prior image ID `sha256:97368934ed144f3441a6271459adbd38a689d64c741081cc6382a53ba274b35f`, port 8000, Compose project `v2`, restart count 0. This is a runtime observation; it does not mean the production checkout is safe to update.
 - Treat production checkout and runtime as separate states. Do not pull, reset, rebuild, restart, migrate, switch branches or change production source/config until the user explicitly approves a reviewed release and rollback plan. Continue feature work only in `/tmp/job-radar-naukri-location-v3` and the draft PR targeting `v2-live-radar`.
+
+
+## 2026-11-06 — Multi-user authentication foundation implemented (not deployed)
+
+### Code and security boundary
+- Started from the post-PR-#44 `v2-live-radar` base (`7b61d74`) in the isolated worktree `/tmp/job-radar-naukri-location-v3`, branch `feat/multi-user-foundation-20261106`. No production or running dev checkout was used as the feature source.
+- Commits on the feature branch: `9ffed3f` — SQLite identity/session primitives; `93dea33` — login/session endpoints, CLI and admin route guards; `44a052f` — dashboard cookie-session login/account UX; `27a77cd` — atomic first-admin bootstrap, concurrency-safe hashed login throttling, login-Origin validation, no-store API responses and development cookie settings; `ea463cb` — same-origin API-base enforcement and account-wide throttling across IPs. CI dependency update is `8b7f210`; docs/test workflow update is `a5d8b42`. The branch is pushed and PR #45 is open against `v2-live-radar`; latest head `ea463cb` is awaiting CI and automated re-review.
+- Added `v2/auth.py`: additive `users`, `sessions`, `login_attempts`, `login_account_attempts` schema; normalized unique email; Argon2id password hashes; admin/user roles and active/disabled status; seven-day opaque sessions; SHA-256 token/CSRF hashes; expiry and revocation; five atomic attempt reservations per email/IP plus twenty per account across all IPs in a 15-minute window (hashed email/IP keys; malformed addresses are throttled too), reset on successful login.
+- Added `POST /api/auth/login`, `GET /api/auth/me`, and `POST /api/auth/logout`. Session cookie is HttpOnly; CSRF cookie is readable by same-origin JS; both are Secure by default, SameSite=Lax, Path=/, seven-day max age. Unsafe admin requests require matching CSRF cookie/header and stored hash. Successful login revokes the prior presented session; failed login does not.
+- All existing legacy `/api/*` routes require an admin session; user-role accounts receive 403. `/health` and login remain public; `/health` now returns only status/version/uptime. Admin state-changing routes also require CSRF, and all API responses are no-store. The old config-token helper remains unused by the browser path; `PUT /api/config` now relies on admin session + CSRF. Login rejects supplied cross-origin Origin headers; configure `JOB_BEEPER_PUBLIC_ORIGIN` when a TLS proxy origin differs from the origin Uvicorn sees. The loopback-only dev Compose service defaults Secure cookies off for SSH-tunnel development; production remains Secure=true.
+- Added operator CLI `python -m v2.auth_admin create-admin --email ...` (first admin only) and `create-user --email ...` (ordinary beta users only). Passwords are prompted with `getpass`, not accepted as CLI arguments. In the app container, `JOB_RADAR_DB=/data/jobs.db` is already configured.
+- Dashboard now loads `auth.js` before `app.js`, authenticates before initializing any job feed or polling, uses same-origin cookies and CSRF headers, rejects cross-origin `?api=` overrides before credentials are sent, and has login/account/logout and ordinary-user holding panels. Browser config-token/sessionStorage flow is removed. The old global config and job evaluations remain admin-only; user-specific preferences/evaluations are the next milestone.
+
+### Tests and verification
+- Added persistence, session, password, rate-limit, CLI, API role/CSRF and dashboard auth-client contract tests.
+- Final V2 suite passed **189 tests in 79.321 seconds** in a throwaway Docker container with `--network none` (one Node-only dashboard test was skipped inside the Python image). The separate Node-enabled dashboard contract suite passed **4/4** on the VM host in 0.655 seconds. Dashboard JS parsed/built with esbuild 0.19.12; Python compile, Compose config resolution and `git diff --check` passed.
+- No LLM/provider requests, Telegram sends, source changes, runtime config changes, database writes to live dev/prod, container rebuilds/restarts, or deployment occurred.
+
+### Runtime and release gates
+- Live development remains on `job-radar-dev-rich-jd:20261106` (loopback port 8001); the auth feature is not in that image and its live DB has not been migrated. Production `v2-radar-1` on port 8000 remains unchanged.
+- `JOB_BEEPER_COOKIE_SECURE` defaults to true; HTTPS is required. The loopback-only dev Compose service defaults it to false for SSH-tunnel development; production remains true. Set `JOB_BEEPER_PUBLIC_ORIGIN` if the TLS reverse proxy origin differs from Uvicorn’s request base URL. Do not disable Secure publicly.
+- The Termalin encrypted backup job remains DRAFT. Local snapshots do not prove an off-host encrypted archive exists.
+- Next: verify CI and automated re-review on PR #45, merge into `v2-live-radar` when all checks/review threads are clear, then continue with user-scoped preferences/evaluations. No production deployment is authorized.

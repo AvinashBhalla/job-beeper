@@ -1,10 +1,10 @@
 # JobBeeper Multi-User and Referral Intelligence Roadmap
 
-**Status:** Product/architecture decision recorded; implementation not started
+**Status:** Authentication and admin/user roles implemented on an isolated feature branch; not deployed. Per-user preferences/evaluations, Telegram fan-out and applications remain pending.
 **Date:** 2026-11-06
-**Priority:** Multi-user foundation is the next product milestone
+**Priority:** Per-user preferences and matching are the next product milestone
 **Repository:** AvinashBhalla/job-beeper
-**Development branch/worktree:** `feat/naukri-rich-descriptions-20261106`, `/tmp/job-radar-naukri-location-v3`
+**Development branch/worktree:** `feat/multi-user-foundation-20261106`, `/tmp/job-radar-naukri-location-v3`
 
 ## 1. Product direction
 
@@ -233,23 +233,22 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 
 ## 9. Immediate engineering sequence
 
-### Gate 0 — finish current work safely
-- Preserve commits `093c475` and `727bdb9`.
-- Re-run the V2 test suite against the exact feature worktree/image; the running `job-radar-dev-rich-jd:20261106` image passed 149 tests in 18.723 seconds with Docker networking disabled on 2026-11-06.
-- Preserve the existing pending handover/benchmark changes in the feature worktree.
-- Push the tested feature branch and open/review a development PR; do not deploy production.
-- Reconcile GitHub branch head with the feature worktree. The remote `v2-live-radar` and ordinary dev checkout were stale at the time of this audit.
+### Gate 0 — current search and description work
+- PR #44 was squash-merged into `v2-live-radar` as commit `7b61d74`; its duplicate intermediate PRs #42 and #43 were closed and redundant remote branches deleted.
+- The production service was not deployed or changed by that merge.
 
-### Gate 1 — multi-user discovery/design (next priority)
-- Inventory current schema, global config consumers, API routes, dashboard state and Telegram delivery.
-- Produce an endpoint-by-endpoint tenant isolation matrix.
-- Finalize migration/backfill plan and session/cookie/CSRF design.
-- Add a database migration design and test fixtures before implementing login.
+### Gate 1 — multi-user discovery/design (complete)
+- Audited current schema, global config consumers, API routes, dashboard state and Telegram delivery.
+- Recorded the endpoint-level tenant boundary and migration/backfill design in this roadmap and the auth design spec.
+- Confirmed the old global profile/evaluation/notification model cannot be exposed to ordinary users.
 
-### Gate 2 — authentication and roles
-- Implement users, password hashing, sessions, login/logout/current-user endpoints, admin provisioning and backend role enforcement.
-- Replace the access-token page with login/account UI.
-- Add security and cross-tenant tests.
+### Gate 2 — authentication and roles (implemented on feature branch; not deployed)
+- Added `users`, `sessions`, `login_attempts` and `login_account_attempts` tables; Argon2id password hashing; opaque seven-day cookie sessions with hashed session/CSRF tokens; same-origin login-Origin validation; dashboard rejects external `?api=` overrides before sending credentials; concurrency-safe per-IP and account-wide login-attempt reservations (five per email/IP and twenty per account across IPs per 15 minutes) with hashed email/IP keys; logout/revocation.
+- Added `/api/auth/login`, `/api/auth/me`, `/api/auth/logout`, a one-time first-admin CLI and an ordinary-user provisioning CLI.
+- All existing legacy `/api/*` endpoints require an admin session; unsafe admin requests require CSRF; every API response is `Cache-Control: no-store`. `/health` is a minimal public liveness endpoint. Login validates browser Origin and supports `JOB_BEEPER_PUBLIC_ORIGIN` behind TLS termination.
+- Replaced the dashboard config-token flow with cookie-session login/account UI. Ordinary users see a holding screen and do not load the legacy global job feed.
+- Final V2 suite passed 189 tests in 79.321 seconds in a throwaway `--network none` container (one Node-only dashboard contract test is skipped inside that Python image); the Node-enabled dashboard contract suite passed 4/4 separately in 0.655 seconds.
+- The feature branch is pushed to GitHub and PR #45 is open against `v2-live-radar`; current head is `ea463cb`. Automated review findings P1/P2 were fixed in `ea463cb`; CI and re-review are pending on the latest head. The live dev and production containers remain untouched.
 
 ### Gate 3 — per-user preferences and matching
 - Move candidate preferences to user scope.
@@ -280,22 +279,38 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - Image file hashes match feature worktree files for `v2/radar.py`, `dashboard/app.js` and `dashboard/index.html`.
 - The full V2 unit suite in a throwaway `--network none` container passed 149 tests in 18.723 seconds.
 
-**Not implemented**
-- No user registration/login/session system.
-- No user roles/RBAC.
-- No per-user preferences or per-user job evaluations.
-- No per-user Telegram linking or per-user notification ledger.
-- No multi-tenant isolation.
-- No HAPPPY-like people discovery, email OAuth, outreach drafting, follow-up engine or LinkedIn integration for referrals.
+**Implemented on feature branch `feat/multi-user-foundation-20261106` (not deployed)**
+- SQLite identity tables: `users`, `sessions`, `login_attempts`, `login_account_attempts`.
+- Argon2id password hashing, normalized email identity, `admin`/`user` roles, active/disabled account status, seven-day opaque sessions, hashed session/CSRF tokens, revocation and atomic five-attempt/15-minute per-email/IP and twenty-attempt/15-minute per-account-across-IPs throttles (email/IP keys are hashed; malformed emails are throttled too).
+- Auth endpoints: `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`.
+- All existing legacy API routes require an admin session; state-changing admin requests require CSRF; all `/api/*` responses are no-store. `/health` is public and returns only liveness metadata.
+- Server-side CLI: `python -m v2.auth_admin create-admin --email ...` creates the first admin only; `python -m v2.auth_admin create-user --email ...` provisions ordinary beta users.
+- Dashboard cookie-session client, login screen, account/logout controls and non-admin holding screen. No config token is stored in browser sessionStorage or sent by the dashboard.
+
+**Not implemented yet**
+- Per-user preferences, `user_preferences`, per-user job evaluations and personalized feed/search/detail responses. The current global config and global evaluation model remain admin-only.
+- Per-user Telegram linking, `user_notification_ledger`, fan-out and user-specific notification preferences.
+- Server-side applications/saved jobs; Applied Jobs still uses browser localStorage and must be migrated before multi-user use.
+- Public signup/invites, password reset, OAuth/MFA, self-service role management, HAPPPY-like contact discovery, email OAuth/drafts, follow-up engine or LinkedIn referral integrations.
+
+**Current runtime is deliberately unchanged**
+- The running development image remains `job-radar-dev-rich-jd:20261106`; it does not contain these auth changes and its live SQLite DB has not had the auth tables created. The feature code creates the tables additively at application startup when eventually deployed.
+- Production `v2-radar-1` remains on its previous image. No database, config, volume, scheduler, source or notification changes were made by this auth implementation.
+
+**Verification**
+- Final V2 suite: 186 tests passed in 87.493 seconds in a throwaway Docker container with networking disabled (one Node-only dashboard test is skipped inside that image).
+- Node-enabled dashboard contract: 4/4 passed on the VM host in 0.611 seconds. Both dashboard JS files passed esbuild 0.19.12 parse/build checks. Backend syntax checks passed.
+- No live provider/LLM calls, Telegram sends or runtime deployment occurred.
 
 **Operational cautions**
-- The remote `v2-live-radar` head was `9c56322c76958bceec65af3d15bd85553e30de53`; the feature branch has since been pushed to GitHub at `c1004955fb2fe394e56f01f5015634d442aa3c5a` and is under draft PR #44 targeting `v2-live-radar` (latest documented PR head at the time of this note: `ab1862714939ad9a51d81b93c235c70c6cae713e`). Do not merge to `main` or deploy production from this PR.
-- The ordinary development checkout `/home/ubuntu/job-beeper-dev` is behind the remote branch and has protected local changes/artifacts: `M v2/config.json`, `?? .env.save`, `?? .venv/`, and a config backup. Do not reset, clean, overwrite, or use it as the feature source.
-- The feature worktree `/tmp/job-radar-naukri-location-v3` currently has pending documentation modifications and untracked matcher benchmark files. Preserve these; inspect `git status` before staging.
-- Production checkout `/home/ubuntu/job-beeper` was observed at `61d8271`, 613 commits behind the fetched `origin/v2-live-radar` ref; the running production container remains on its old image. Never assume the checkout and runtime match. Production remains a separate release gate. Do not pull, rebuild, restart, migrate or send production notifications as part of multi-user implementation planning.
+- Base branch `v2-live-radar` includes merged PR #44 at `7b61d74`. Current feature branch is `feat/multi-user-foundation-20261106`, worktree `/tmp/job-radar-naukri-location-v3`, with auth commits `9ffed3f`, `93dea33`, `44a052f`, `27a77cd` and `ea463cb` above that base; CI/documentation commits are also present. The branch is pushed and PR #45 is open against `v2-live-radar`.
+- The ordinary development checkout `/home/ubuntu/job-beeper-dev` has protected local changes/artifacts (`M v2/config.json`, `.env.save`, `.venv/` and a config backup); do not reset, clean, overwrite or use it as the feature source.
+- Production checkout `/home/ubuntu/job-beeper` was observed at `61d8271`, 613 commits behind its fetched `origin/v2-live-radar` ref. The running production container remains on its old image. Never assume checkout and runtime are synchronized. Do not pull, rebuild, restart, migrate or send production notifications.
 - Termalin encrypted backup job remains DRAFT; local verified snapshots do not mean an off-host encrypted backup exists.
+- `JOB_BEEPER_COOKIE_SECURE` defaults to `true`; the dashboard must be served over HTTPS. Only set it to `false` in an isolated loopback-only development environment using HTTP. Never disable Secure on a public endpoint.
 
-## 11. Read-only tenant-readiness audit — 2026-11-06
+
+## 11. Read-only tenant-readiness audit — 2026-11-06 (pre-auth baseline)
 
 The following was verified against the feature worktree and the live development SQLite schema. This is a code/schema inventory, not a migration.
 
@@ -337,3 +352,22 @@ Current API routes include `/api/config`, `/api/jobs`, `/api/opportunities`, `/a
 6. Move Applied Jobs from browser localStorage to an `applications` API, with a one-time client-side import/export transition.
 
 Do not combine this with a production database migration. Build and test on a copy of the isolated dev DB first, with Telegram delivery disabled.
+
+
+## 12. Authentication foundation implementation — 2026-11-06
+
+The read-only audit above records the live single-user runtime before the auth feature was implemented. The following code now exists on the isolated feature branch; it is not deployed to either live container.
+
+### Runtime contract when this branch is released
+- Auth schema is created additively from `init_db()`; existing `jobs`, canonical opportunities, evaluations and notification tables are not migrated or rewritten by this slice.
+- First-admin bootstrap and ordinary-user provisioning are operator-only CLI commands. From the app container (`WORKDIR /app`, `JOB_RADAR_DB=/data/jobs.db`):
+  - `python -m v2.auth_admin create-admin --email admin@example.com`
+  - `python -m v2.auth_admin create-user --email beta-user@example.com`
+  Both commands prompt for the password twice; no password is accepted on the command line. Bootstrap refuses a second admin.
+- Login sets `job_beeper_session` (HttpOnly) and `job_beeper_csrf` (readable by same-origin JS) cookies with `Secure`, `SameSite=Lax`, `Path=/` and a seven-day max age. Session and CSRF values are stored only as SHA-256 hashes.
+- Login requests with a browser `Origin` header must match the configured/request origin, preventing login CSRF. All API responses carry `Cache-Control: no-store`. The configured `JOB_BEEPER_PUBLIC_ORIGIN` is used when set. If TLS terminates at a reverse proxy, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact browser-visible origin when Uvicorn does not trust proxy headers. The loopback-only dev Compose service defaults `JOB_BEEPER_COOKIE_SECURE=false` for SSH-tunnel use; production keeps the default `true`. The secure-cookie setting requires HTTPS outside that isolated development service.
+- Ordinary `user` accounts can inspect their session and sign out but cannot use legacy global feed/config/diagnostic endpoints. Their holding page intentionally does not fetch job data.
+- This is a transitional safety boundary, not complete multi-tenancy: candidate preferences and job evaluations remain global and admin-only until the next milestone adds user-owned preferences/evaluations and re-scopes feed/detail queries.
+
+### Next implementation milestone
+Implement `user_preferences` and `user_job_evaluations`, migrate the current global candidate profile to the initial admin on a copied DB, and make job feed/search/detail responses explicitly use the authenticated user's evaluation. Keep source ingestion shared. Do not add per-user Telegram delivery until user-scoped evaluation and notification-ledger tests pass.

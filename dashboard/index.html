@@ -12,6 +12,43 @@
 </head>
 
 <body>
+  <section class="auth-gate" id="authGate" aria-label="Job Beeper account authentication">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="brand-beacon" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-opacity="0.4"></circle><circle cx="12" cy="12" r="6" stroke-opacity="0.7"></circle><circle cx="12" cy="12" r="2" fill="currentColor"></circle><line x1="12" y1="12" x2="20" y2="4"></line></svg>
+        </span>
+        <span><b>JOB BEEPER</b><small>Opportunity Radar</small></span>
+      </div>
+
+      <div id="authLoginPanel">
+        <h1 id="authGateTitle">Sign in to Job Beeper</h1>
+        <p class="auth-description">Use the account credentials provided for your beta access.</p>
+        <form id="authLoginForm" class="auth-form" method="post">
+          <label for="authEmail">Email address</label>
+          <input id="authEmail" name="email" type="email" autocomplete="username" maxlength="254" required>
+          <label for="authPassword">Password</label>
+          <input id="authPassword" name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+          <button type="submit" class="btn-pill btn-pill-primary" id="authLoginBtn">Sign in</button>
+          <p class="auth-status" id="authStatusMsg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <div id="authUserPanel" hidden>
+        <h1 id="authUserHeading">Your account is ready</h1>
+        <p class="auth-description">You are signed in as <strong id="authUserEmail"></strong>.</p>
+        <p class="auth-description">Personal job feeds and individual preferences are not enabled for beta users yet. Your account is safe, but the workspace will become available after tenant-specific matching is released.</p>
+        <button type="button" class="btn-pill btn-pill-secondary" id="authUserLogoutBtn">Sign out</button>
+      </div>
+
+      <div id="authUnavailablePanel" hidden>
+        <h1>Unable to verify your session</h1>
+        <p class="auth-description">The authentication service could not be reached. No job data has been loaded.</p>
+        <button type="button" class="btn-pill btn-pill-secondary" id="authRetryBtn">Try again</button>
+      </div>
+    </div>
+  </section>
+
   <div class="app-shell">
     <!-- Desktop Left Navigation Sidebar -->
     <aside class="app-sidebar" aria-label="Main Navigation">
@@ -66,7 +103,7 @@
           </a>
           <a class="nav-link-item" href="#access" data-section="accessSection" id="navAccess">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m21 2-2 2m-1.5 1.5L14 9m-2 2-3 3 2 2 1-1 2 2 1-1-2-2 1.5-1.5M3 21l6-6"></path><circle cx="7.5" cy="7.5" r="4.5"></circle></svg>
-            <span>Access Token</span>
+            <span>Account</span>
           </a>
         </div>
       </nav>
@@ -161,6 +198,7 @@
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></svg>
             <span>Sync</span>
           </button>
+          <button type="button" id="headerLogoutBtn" class="header-action-btn" title="Sign out">Sign out</button>
         </div>
       </header>
 
@@ -539,39 +577,22 @@
         </section>
 
         <!-- ===================================================================
-             5. CONFIGURATION ACCESS SECTION
+             5. ACCOUNT SECTION
              =================================================================== -->
-        <section id="accessSection" class="workspace-page" aria-label="Configuration Access">
+        <section id="accessSection" class="workspace-page" aria-label="Account">
           <div class="view-content-wrapper">
             <div class="view-headline-row">
               <div>
-                <h2 class="view-title-main">Configuration Access</h2>
-                <p class="view-subtitle-main">V2 authentication token required for updating preferences on the Oracle VM.</p>
+                <h2 class="view-title-main">Account</h2>
+                <p class="view-subtitle-main">Your signed-in Job Beeper account.</p>
               </div>
             </div>
-
-            <div class="settings-block">
-              <div class="form-field-group">
-                <label class="form-field-label" for="accessMainTokenInput">
-                  <span>Configuration Token</span>
-                  <small>Kept in browser session storage only</small>
-                </label>
-                <div style="display:flex;gap:var(--space-6);align-items:center;">
-                  <input type="password" id="accessMainTokenInput" class="number-field-input" style="flex:1;font-family:var(--font-mono);" placeholder="Enter token..." autocomplete="off">
-                  <button type="button" class="btn-pill btn-pill-secondary" id="accessMainTokenToggleBtn">Show/Hide</button>
-                </div>
-              </div>
-
-              <div style="display:flex;gap:var(--space-8);align-items:center;margin-top:var(--space-6);">
-                <button type="button" class="btn-pill btn-pill-primary" id="accessSaveTokenBtn">Remember Token</button>
-                <button type="button" class="btn-pill btn-pill-secondary" id="accessClearTokenBtn">Clear Token</button>
-                <span id="accessStatusMsg" style="font-size:11.5px;color:var(--text-muted);"></span>
-              </div>
-
-              <div style="margin-top:var(--space-12);padding:var(--space-10);background-color:var(--bg-subtle);border:1px solid var(--border-default);border-radius:var(--radius-xs);font-size:11.5px;color:var(--text-muted);">
-                <b style="color:var(--text-primary);display:block;margin-bottom:4px;">To retrieve the token on your Oracle VM:</b>
-                <code style="font-family:var(--font-mono);color:#79c0ff;background-color:var(--bg-elevated);padding:2px 6px;border-radius:3px;">sudo docker compose -f v2/docker-compose.yml exec radar cat /data/config_token</code>
-              </div>
+            <div class="settings-block account-details-block">
+              <span class="settings-block-title">Signed-in account</span>
+              <strong id="accountEmail" class="account-email">—</strong>
+              <span id="accountRole" class="account-role">Administrator</span>
+              <p class="auth-description">Your session is stored in a secure, HttpOnly browser cookie. No access token needs to be copied or saved.</p>
+              <button type="button" class="btn-pill btn-pill-secondary" id="accountLogoutBtn">Sign out</button>
             </div>
           </div>
         </section>
@@ -602,7 +623,8 @@
   <!-- Toast Notification Mount Host -->
   <div class="toast-notifications-host" id="toastContainer" aria-live="polite"></div>
 
-  <script src="app.js?v=obsidian_v2"></script>
+  <script src="auth.js?v=auth_v1"></script>
+  <script src="app.js?v=auth_v1"></script>
 </body>
 
 </html>
