@@ -117,6 +117,24 @@ def init_auth_schema(db_path: Path) -> None:
                 failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
                 updated_at REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS google_oauth_identities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                subject TEXT NOT NULL UNIQUE,
+                email_at_link TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_google_oauth_identities_user
+                ON google_oauth_identities(user_id);
+
+            CREATE TABLE IF NOT EXISTS google_oauth_states (
+                state_hash TEXT PRIMARY KEY,
+                nonce TEXT NOT NULL,
+                code_verifier TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL
+            );
             """
         )
 
@@ -176,6 +194,64 @@ def create_first_admin(db_path: Path, email: str, password: str) -> dict[str, An
     except sqlite3.IntegrityError as exc:
         raise ValueError("An account with that email already exists.") from exc
     return _safe_user(row)
+
+
+def create_or_link_google_user(db_path: Path, email: str, subject: str) -> dict[str, Any]:
+    """Link a verified Google identity or create a normal user, never an admin."""
+    normalized_email = _normalize_email(email)
+    if not isinstance(subject, str) or not subject.strip() or len(subject) > 255:
+        raise ValueError("Google identity is invalid.")
+
+    timestamp = _utc_iso()
+    try:
+        with _connect(Path(db_path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            identity = conn.execute(
+                "SELECT user_id FROM google_oauth_identities WHERE subject=?",
+                (subject,),
+            ).fetchone()
+            if identity:
+                row = conn.execute(
+                    "SELECT id, email, role, status FROM users WHERE id=?",
+                    (int(identity["user_id"]),),
+                ).fetchone()
+                if row is None or row["status"] != "active":
+                    raise ValueError("This Google account is not linked to an active account.")
+                if row["email"].strip().lower() != normalized_email:
+                    raise ValueError("The Google account email changed. Contact support to update it.")
+                return _safe_user(row)
+
+            existing = conn.execute(
+                "SELECT id, email, role, status FROM users WHERE email_normalized=?",
+                (normalized_email,),
+            ).fetchone()
+            if existing and existing["status"] != "active":
+                raise ValueError("This account is disabled.")
+            if existing:
+                user_id = int(existing["id"])
+                row = existing
+            else:
+                password_hash = _PASSWORD_HASHER.hash(secrets.token_urlsafe(48))
+                cursor = conn.execute(
+                    """INSERT INTO users
+                       (email, email_normalized, password_hash, role, status, created_at, updated_at)
+                       VALUES (?, ?, ?, 'user', 'active', ?, ?)""",
+                    (normalized_email, normalized_email, password_hash, timestamp, timestamp),
+                )
+                user_id = int(cursor.lastrowid)
+                row = conn.execute(
+                    "SELECT id, email, role, status FROM users WHERE id=?",
+                    (user_id,),
+                ).fetchone()
+
+            conn.execute(
+                """INSERT INTO google_oauth_identities(user_id, subject, email_at_link, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                (user_id, subject, normalized_email, timestamp),
+            )
+            return _safe_user(row)
+    except sqlite3.IntegrityError as exc:
+        raise ValueError("This Google identity is already linked to another account.") from exc
 
 
 def verify_user(db_path: Path, email: str, password: str) -> dict[str, Any] | None:
