@@ -40,6 +40,7 @@
 - [x] Normal users never load the admin app shell or operational controls.
 - [x] User workspace does not read the legacy applied/saved localStorage key; server-side applications remain deferred.
 - [x] Add dashboard contract tests for onboarding controls and user feed routing.
+- [x] Filter user match rows before LIMIT and use a permissive experience default until the user-facing range control exists.
 
 ## Phase 5 — validation, docs and PR
 - [x] Run full V2 Python suite (209 passed), dashboard contract suite, esbuild JS syntax check, Python compile and isolated Compose config validation.

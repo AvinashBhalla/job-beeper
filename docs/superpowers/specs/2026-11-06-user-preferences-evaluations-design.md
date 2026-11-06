@@ -68,7 +68,7 @@ Keep existing `job_evaluations` and `notification_ledger` intact for the current
 
 - `GET /api/preferences`: return only the authenticated user's preferences and onboarding-complete state.
 - `PUT /api/preferences`: validate and save only the authenticated user's preferences; require at least one role and location before marking onboarding complete.
-- `GET /api/jobs`, `GET /api/daily-summary`, and `GET /api/jobs/{id}`: authenticated user scope; join only that user's evaluation rows.
+- `GET /api/jobs`, `GET /api/daily-summary`, and `GET /api/jobs/{id}`: authenticated user scope; join only that user's evaluation rows. For ordinary users, filter matching rows before applying the feed limit; admin retains the full operational feed.
 - Opportunity list/detail endpoints remain admin-only in this first slice; tenant-scope them before exposing opportunity navigation to normal users.
 - Do not include global `notification_ledger` state in user responses.
 - `/api/config`, source telemetry, provider diagnostics, notification queue and other operational endpoints remain admin-only.

@@ -29,6 +29,7 @@ class UserPreferencesTests(unittest.TestCase):
         preferences = user_preferences.get_user_preferences(self.db_path, user["id"])
         self.assertEqual(preferences["target_roles"], [])
         self.assertEqual(preferences["locations"], [])
+        self.assertEqual(preferences["max_experience_years"], 30.0)
         self.assertFalse(preferences["onboarding_complete"])
 
     def test_role_and_location_are_both_required_to_complete_onboarding(self):

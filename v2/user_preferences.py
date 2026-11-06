@@ -14,7 +14,9 @@ PREFERENCE_DEFAULTS: dict[str, Any] = {
     "skills": [],
     "candidate_experience_years": None,
     "min_experience_years": None,
-    "max_experience_years": 3.0,
+    # Until the user configures an experience range in the UI, stay permissive.
+    # A hidden three-year cap would silently exclude senior roles for new users.
+    "max_experience_years": 30.0,
     "match_threshold": 55,
     "title_exclude": [],
     "excluded_role_terms": [],

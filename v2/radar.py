@@ -3607,6 +3607,7 @@ def jobs(
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
              AND ?='admin'
             WHERE j.discovered_at >= ?
+              AND (?='admin' OR e.match=1)
               AND LOWER(
                     COALESCE(j.company, '') || ' ' ||
                     COALESCE(j.title, '') || ' ' ||
@@ -3619,7 +3620,9 @@ def jobs(
             ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
                      j.discovered_at DESC
             LIMIT ?
-        """, (user["id"], user["role"], cutoff, search_pattern, limit)).fetchall()
+        """, (
+            user["id"], user["role"], cutoff, user["role"], search_pattern, limit
+        )).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:

@@ -90,17 +90,22 @@ class UserScopedJobFeedTests(unittest.TestCase):
         feed_a = self.client.get("/api/jobs?minutes=10080&limit=20")
         self.assertEqual(feed_a.status_code, 200)
         by_title_a = {job["title"]: job for job in feed_a.json()["jobs"]}
+        self.assertEqual(set(by_title_a), {"Python Developer"})
         self.assertTrue(by_title_a["Python Developer"]["likely_match"])
-        self.assertFalse(by_title_a["QA Engineer"]["likely_match"])
         self.assertEqual(by_title_a["Python Developer"]["notification_status"], "not_eligible")
         self.assertIsNone(by_title_a["Python Developer"]["notification_sent_at"])
         self.assertIsNone(by_title_a["Python Developer"]["notification_last_error"])
+        # Filter the user's matches in SQL before LIMIT; otherwise the newer
+        # non-match can consume the one-row cap and hide this older match.
+        capped = self.client.get("/api/jobs?minutes=10080&limit=1")
+        self.assertEqual(capped.status_code, 200)
+        self.assertEqual([job["title"] for job in capped.json()["jobs"]], ["Python Developer"])
 
         self.assertEqual(self._login("b@example.com", "user-b-password-long").status_code, 200)
         feed_b = self.client.get("/api/jobs?minutes=10080&limit=20")
         self.assertEqual(feed_b.status_code, 200)
         by_title_b = {job["title"]: job for job in feed_b.json()["jobs"]}
-        self.assertFalse(by_title_b["Python Developer"]["likely_match"])
+        self.assertEqual(set(by_title_b), {"QA Engineer"})
         self.assertTrue(by_title_b["QA Engineer"]["likely_match"])
 
     def test_preference_update_re_evaluates_only_the_current_user(self):
@@ -114,14 +119,14 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.assertEqual(saved.status_code, 200)
         updated = self.client.get("/api/jobs?minutes=10080&limit=20")
         by_title = {job["title"]: job for job in updated.json()["jobs"]}
-        self.assertFalse(by_title["Python Developer"]["likely_match"])
+        self.assertEqual(set(by_title), {"QA Engineer"})
         self.assertTrue(by_title["QA Engineer"]["likely_match"])
 
         # The second user's independent profile/evaluations remain unchanged.
         self.assertEqual(self._login("b@example.com", "user-b-password-long").status_code, 200)
         second = self.client.get("/api/jobs?minutes=10080&limit=20")
         second_by_title = {job["title"]: job for job in second.json()["jobs"]}
-        self.assertFalse(second_by_title["Python Developer"]["likely_match"])
+        self.assertEqual(set(second_by_title), {"QA Engineer"})
         self.assertTrue(second_by_title["QA Engineer"]["likely_match"])
 
     def test_job_detail_uses_the_current_users_evaluation(self):

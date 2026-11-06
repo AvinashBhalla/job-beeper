@@ -5972,7 +5972,8 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
   - `GET/PUT /api/preferences` are session-scoped; writes require CSRF.
   - User-specific evaluation rows are created on preference save, startup and for touched jobs after shared ingestion. Preference edits do not start collectors. If the first admin is provisioned after app startup, the first feed request lazily initializes their evaluations without a process restart.
   - `GET /api/jobs`, `GET /api/jobs/{job_id}`, and `GET /api/daily-summary` are user-scoped and blocked until onboarding is complete.
-  - Job feed uses only the session owner's evaluation row. Normal users receive no global notification-ledger status, sent timestamp or last error. Admin continues to see the existing global alertability/notification state.
+  - Job feed uses only the session owner's evaluation row and filters normal-user matches before applying LIMIT, so newer non-matches cannot hide older matches. Normal users receive no global notification-ledger status, sent timestamp or last error. Admin continues to see the existing global alertability/notification state.
+  - New users default to a permissive 30-year experience ceiling until experience-range controls are exposed; a hidden three-year cap would silently exclude senior roles.
   - Existing global `job_evaluations` and `notification_ledger` are preserved for the admin Telegram worker.
 - `dashboard/index.html`, `dashboard/styles.css`, `dashboard/app.js`:
   - Separate minimal user workspace; normal users do not load the admin app shell or operational controls.
@@ -5985,6 +5986,11 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
   - Compose config validated and Docker image built successfully. **The feature container has not been started.**
   - `v2/seed_feature_demo.py` inserts four synthetic listings for repeatable feed testing and refuses to run unless `JOB_BEEPER_FEATURE_DEMO=true`; the feature Compose file sets that flag. A guard test confirmed the script exits before DB initialization when the flag is absent.
   - Root README has exact Windows PowerShell commands to start the feature instance, bootstrap an admin, create a beta user, seed demo jobs, open SSH tunnel `18002`, check health and stop the container. It does not share existing dev port 8001 or production port 8000.
+
+### Automated PR review follow-up
+- Codex review identified two P2 issues: the user feed applied LIMIT before the frontend filtered matches, and the new-user default max experience of three years was too restrictive.
+- Both are fixed in the current follow-up: SQL filters normal-user rows with `e.match=1` before LIMIT (admin remains unchanged), and the ordinary-user default max experience is now 30 years. Regression tests cover a one-row limit with a newer non-match and the permissive default.
+- Full V2 suite rerun after the fixes: **209 tests passed** in **128.014s**. The fixes/docs are still uncommitted at this checkpoint; next commit/push, run CI, then reply to and resolve both review threads.
 
 ### Tests and validation
 - Full V2 Python suite: **209 tests passed** in **121.559s**.
