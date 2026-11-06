@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -50,6 +50,43 @@ class GoogleOAuthStateTests(unittest.TestCase):
         self.assertTrue(google_oauth.validate_nonce({"nonce": "expected"}, "expected"))
         self.assertFalse(google_oauth.validate_nonce({"nonce": "other"}, "expected"))
         self.assertFalse(google_oauth.validate_nonce({}, "expected"))
+
+    def test_exchange_verifies_signed_google_token_and_verified_email(self):
+        response = Mock(status_code=200)
+        response.json.return_value = {"id_token": "signed-token"}
+        claims = {
+            "email": "verified@example.com",
+            "email_verified": True,
+            "sub": "google-sub-verified",
+            "iss": "https://accounts.google.com",
+            "aud": "client-id",
+        }
+        with patch.object(google_oauth.requests, "post", return_value=response) as post, patch(
+            "google.oauth2.id_token.verify_oauth2_token", return_value=claims
+        ) as verify:
+            identity = google_oauth.exchange_code_for_identity(
+                "auth-code", "pkce-verifier", self.config
+            )
+        self.assertEqual(identity["subject"], "google-sub-verified")
+        self.assertEqual(identity["email"], "verified@example.com")
+        verify.assert_called_once()
+        self.assertEqual(post.call_args.kwargs["timeout"], (5, 15))
+
+    def test_exchange_rejects_unverified_google_email(self):
+        response = Mock(status_code=200)
+        response.json.return_value = {"id_token": "signed-token"}
+        claims = {
+            "email": "unverified@example.com",
+            "email_verified": False,
+            "sub": "google-sub-unverified",
+        }
+        with patch.object(google_oauth.requests, "post", return_value=response), patch(
+            "google.oauth2.id_token.verify_oauth2_token", return_value=claims
+        ):
+            with self.assertRaisesRegex(ValueError, "verified email"):
+                google_oauth.exchange_code_for_identity(
+                    "auth-code", "pkce-verifier", self.config
+                )
 
     def test_redirect_uri_rejects_non_https_and_wrong_callback_path(self):
         with patch.dict("os.environ", {
