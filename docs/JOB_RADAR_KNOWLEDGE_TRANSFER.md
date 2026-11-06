@@ -3115,3 +3115,10 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Suggested order: latest CI/full tests and OAuth review; configure/test Google OAuth in isolated dev; resume upload/parse/review/save; Telegram link/webhook; per-user notifier; security review and owner smoke test.
 - Current Google OAuth code is on feature branch but **not deployed**; dev port 8001 remains old image f43cd4a and production 8000 untouched. Credentials not configured and no live OAuth flow tested. See `docs/GOOGLE_OAUTH_SETUP.md`.
 - Verify latest test status; the last confirmed focused run before final browser-state hardening was 60 passed. A subsequent full suite was initiated but its result was not captured. Do not assume it passed.
+
+
+### Verification update — 2026-11-06
+- After the latest OAuth browser-state changes and handover docs were pulled to the working VM, the full V2 suite completed: **226 tests run, 225 passed, 1 skipped** in 152.153s. Command installed `v2/requirements-dev.txt` into a disposable container and ran unittest discovery; no project runtime container was replaced.
+- Node 22 syntax checks for `dashboard/auth.js` and `dashboard/app.js` completed successfully (no output/errors).
+- Working tree was clean after pulling the documentation updates.
+- This is local disposable-container verification, not a CI status assertion and not a dev deployment. Dev 8001 still runs the previous image; production 8000 untouched.
