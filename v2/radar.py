@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -3330,6 +3330,7 @@ def read_user_preferences(user: dict[str, Any] = Depends(require_authenticated))
 @app.put("/api/preferences")
 def update_user_preferences(
     payload: dict[str, Any],
+    background_tasks: BackgroundTasks,
     user: dict[str, Any] = Depends(require_authenticated),
 ):
     if user["role"] == "admin":
@@ -3341,7 +3342,7 @@ def update_user_preferences(
         saved = user_preferences.save_user_preferences(DB_PATH, user["id"], payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    refresh_user_job_evaluations(user["id"], saved)
+    background_tasks.add_task(refresh_user_job_evaluations, user["id"], saved)
     return {"preferences": saved}
 
 
