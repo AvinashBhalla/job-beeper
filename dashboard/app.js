@@ -1601,8 +1601,9 @@
       if (!state.isAdmin) {
         const notice = $('userOnboardingNotice');
         if (notice) notice.hidden = true;
-        await loadJobsFeed();
         window.showSection?.('jobsSection', true);
+        // Do not make preference persistence wait for the much heavier feed refresh.
+        void loadJobsFeed();
       }
       showToast('Preferences saved successfully. Your personalized matching has been updated.', 'success');
       if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saved.';
