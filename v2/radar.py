@@ -16,6 +16,7 @@ import time
 import warnings
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
@@ -75,6 +76,17 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def prevent_api_response_caching(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 db_lock = threading.Lock()
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
@@ -3004,6 +3016,20 @@ def _auth_cookie_secure() -> bool:
     return value not in {"0", "false", "no", "off"}
 
 
+def _expected_login_origin(request: Request):
+    configured_origin = os.getenv("JOB_BEEPER_PUBLIC_ORIGIN", "").strip()
+    expected = urlsplit(configured_origin or str(request.base_url))
+    if (
+        expected.scheme.lower() not in {"http", "https"}
+        or not expected.netloc
+        or expected.path not in {"", "/"}
+        or expected.query
+        or expected.fragment
+    ):
+        raise HTTPException(status_code=500, detail="Authentication public origin is misconfigured.")
+    return expected
+
+
 def get_current_user(request: Request) -> dict[str, Any]:
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     user = auth.get_session_user(DB_PATH, session_token or "")
@@ -3035,21 +3061,33 @@ def require_admin(
 
 @app.post("/api/auth/login")
 def auth_login(payload: AuthLoginRequest, request: Request, response: Response):
+    # Prevent login CSRF: browser form/fetch submissions carry Origin. Non-browser
+    # clients may omit it, but a supplied origin must match this same-origin API.
+    origin = request.headers.get("origin")
+    if origin:
+        supplied = urlsplit(origin)
+        expected = _expected_login_origin(request)
+        if (
+            supplied.scheme.lower() != expected.scheme.lower()
+            or supplied.netloc.lower() != expected.netloc.lower()
+            or supplied.path not in {"", "/"}
+            or supplied.query
+            or supplied.fragment
+        ):
+            raise HTTPException(status_code=403, detail="Cross-origin login is not allowed.")
+
     client_ip = request.client.host if request.client else "unknown"
     email = payload.email.strip().lower()
     try:
-        if auth.check_login_rate_limit(DB_PATH, email, client_ip):
+        if auth.begin_login_attempt(DB_PATH, email, client_ip):
             raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
     except ValueError:
         pass
 
     user = auth.verify_user(DB_PATH, email, payload.password)
-    try:
-        auth.record_login_attempt(DB_PATH, email, client_ip, success=user is not None)
-    except ValueError:
-        pass
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    auth.record_login_attempt(DB_PATH, email, client_ip, success=True)
 
     # A successful login replaces any browser session cookie already presented,
     # including a session for a different account. Failed logins leave it intact.

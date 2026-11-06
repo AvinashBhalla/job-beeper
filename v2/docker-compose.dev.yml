@@ -15,6 +15,10 @@ services:
       - ./config.dev.json:/app/v2/config.json:ro
     environment:
       JOB_RADAR_DB: /data/jobs.db
+      # This service is loopback-only and used through an SSH tunnel; production stays Secure=true.
+      JOB_BEEPER_COOKIE_SECURE: ${JOB_BEEPER_COOKIE_SECURE:-false}
+      # Set this only when the dashboard is accessed through a different public TLS origin.
+      JOB_BEEPER_PUBLIC_ORIGIN: ${JOB_BEEPER_PUBLIC_ORIGIN:-}
       # Deliberately blank: development must never Telegram-alert users.
       JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
       JOB_RADAR_TELEGRAM_CHAT_ID: ""

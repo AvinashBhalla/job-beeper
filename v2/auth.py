@@ -100,12 +100,12 @@ def init_auth_schema(db_path: Path) -> None:
                 ON sessions(user_id, revoked_at, expires_at);
 
             CREATE TABLE IF NOT EXISTS login_attempts (
-                email_normalized TEXT NOT NULL,
+                email_key_hash TEXT NOT NULL,
                 ip_hash TEXT NOT NULL,
                 window_started_at REAL NOT NULL,
                 failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
                 updated_at REAL NOT NULL,
-                PRIMARY KEY (email_normalized, ip_hash)
+                PRIMARY KEY (email_key_hash, ip_hash)
             );
             CREATE INDEX IF NOT EXISTS idx_login_attempts_updated
                 ON login_attempts(updated_at);
@@ -133,6 +133,34 @@ def create_user(
                    (email, email_normalized, password_hash, role, status, created_at, updated_at)
                    VALUES (?, ?, ?, ?, 'active', ?, ?)""",
                 (normalized_email, normalized_email, password_hash, role, timestamp, timestamp),
+            )
+            row = conn.execute(
+                "SELECT id, email, role, status FROM users WHERE id=?", (cursor.lastrowid,)
+            ).fetchone()
+    except sqlite3.IntegrityError as exc:
+        raise ValueError("An account with that email already exists.") from exc
+    return _safe_user(row)
+
+
+def create_first_admin(db_path: Path, email: str, password: str) -> dict[str, Any]:
+    """Atomically bootstrap the first administrator; concurrent attempts cannot create two."""
+    normalized_email = _normalize_email(email)
+    _validate_password(password)
+    timestamp = _utc_iso()
+    password_hash = _PASSWORD_HASHER.hash(password)
+    try:
+        with _connect(Path(db_path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            admin_count = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE role='admin'"
+            ).fetchone()[0]
+            if admin_count:
+                raise ValueError("An administrator account already exists; bootstrap is disabled.")
+            cursor = conn.execute(
+                """INSERT INTO users
+                   (email, email_normalized, password_hash, role, status, created_at, updated_at)
+                   VALUES (?, ?, ?, 'admin', 'active', ?, ?)""",
+                (normalized_email, normalized_email, password_hash, timestamp, timestamp),
             )
             row = conn.execute(
                 "SELECT id, email, role, status FROM users WHERE id=?", (cursor.lastrowid,)
@@ -234,20 +262,24 @@ def validate_csrf(db_path: Path, session_token: str, csrf_token: str) -> bool:
 
 
 def _rate_limit_identity(email: str, client_ip: str) -> tuple[str, str]:
-    normalized_email = _normalize_email(email)
+    if not isinstance(email, str):
+        raise ValueError("An email value is required for login throttling.")
+    # Hash even malformed email values so invalid-address attempts are throttled
+    # too, without storing a plaintext identifier for accounts that do not exist.
+    normalized_email = email.strip().lower()[:254] or "<empty>"
     if not isinstance(client_ip, str) or not client_ip.strip():
         raise ValueError("A client IP address is required for login throttling.")
-    return normalized_email, _token_hash(client_ip.strip())
+    return _token_hash(normalized_email), _token_hash(client_ip.strip())
 
 
 def check_login_rate_limit(db_path: Path, email: str, client_ip: str) -> bool:
-    normalized_email, ip_hash = _rate_limit_identity(email, client_ip)
+    email_key_hash, ip_hash = _rate_limit_identity(email, client_ip)
     now = time.time()
     with _connect(Path(db_path)) as conn:
         row = conn.execute(
             """SELECT window_started_at, failed_attempts FROM login_attempts
-               WHERE email_normalized=? AND ip_hash=?""",
-            (normalized_email, ip_hash),
+               WHERE email_key_hash=? AND ip_hash=?""",
+            (email_key_hash, ip_hash),
         ).fetchone()
     if row is None or now - row["window_started_at"] >= LOGIN_WINDOW_SECONDS:
         return False
@@ -260,34 +292,73 @@ def record_login_attempt(
     client_ip: str,
     success: bool,
 ) -> None:
-    normalized_email, ip_hash = _rate_limit_identity(email, client_ip)
+    email_key_hash, ip_hash = _rate_limit_identity(email, client_ip)
     now = time.time()
     with _connect(Path(db_path)) as conn:
         if success:
             conn.execute(
-                "DELETE FROM login_attempts WHERE email_normalized=? AND ip_hash=?",
-                (normalized_email, ip_hash),
+                "DELETE FROM login_attempts WHERE email_key_hash=? AND ip_hash=?",
+                (email_key_hash, ip_hash),
             )
             return
         row = conn.execute(
             """SELECT window_started_at, failed_attempts FROM login_attempts
-               WHERE email_normalized=? AND ip_hash=?""",
-            (normalized_email, ip_hash),
+               WHERE email_key_hash=? AND ip_hash=?""",
+            (email_key_hash, ip_hash),
         ).fetchone()
         if row is None or now - row["window_started_at"] >= LOGIN_WINDOW_SECONDS:
             conn.execute(
                 """INSERT INTO login_attempts
-                   (email_normalized, ip_hash, window_started_at, failed_attempts, updated_at)
+                   (email_key_hash, ip_hash, window_started_at, failed_attempts, updated_at)
                    VALUES (?, ?, ?, 1, ?)
-                   ON CONFLICT(email_normalized, ip_hash) DO UPDATE SET
+                   ON CONFLICT(email_key_hash, ip_hash) DO UPDATE SET
                      window_started_at=excluded.window_started_at,
                      failed_attempts=1,
                      updated_at=excluded.updated_at""",
-                (normalized_email, ip_hash, now, now),
+                (email_key_hash, ip_hash, now, now),
             )
         else:
             conn.execute(
                 """UPDATE login_attempts SET failed_attempts=failed_attempts+1, updated_at=?
-                   WHERE email_normalized=? AND ip_hash=?""",
-                (now, normalized_email, ip_hash),
+                   WHERE email_key_hash=? AND ip_hash=?""",
+                (now, email_key_hash, ip_hash),
             )
+
+
+def begin_login_attempt(db_path: Path, email: str, client_ip: str) -> bool:
+    """Atomically reserve a login attempt; return True when the pair is throttled.
+
+    Attempts are reserved before password verification, so concurrent requests
+    cannot all pass a read-only check and exceed the configured failure budget.
+    A successful verification must call record_login_attempt(..., success=True)
+    to clear the reservation window.
+    """
+    email_key_hash, ip_hash = _rate_limit_identity(email, client_ip)
+    now = time.time()
+    with _connect(Path(db_path)) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """SELECT window_started_at, failed_attempts FROM login_attempts
+               WHERE email_key_hash=? AND ip_hash=?""",
+            (email_key_hash, ip_hash),
+        ).fetchone()
+        if row is not None and now - row["window_started_at"] < LOGIN_WINDOW_SECONDS:
+            if row["failed_attempts"] >= LOGIN_FAILURE_LIMIT:
+                return True
+            conn.execute(
+                """UPDATE login_attempts SET failed_attempts=failed_attempts+1, updated_at=?
+                   WHERE email_key_hash=? AND ip_hash=?""",
+                (now, email_key_hash, ip_hash),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO login_attempts
+                   (email_key_hash, ip_hash, window_started_at, failed_attempts, updated_at)
+                   VALUES (?, ?, ?, 1, ?)
+                   ON CONFLICT(email_key_hash, ip_hash) DO UPDATE SET
+                     window_started_at=excluded.window_started_at,
+                     failed_attempts=1,
+                     updated_at=excluded.updated_at""",
+                (email_key_hash, ip_hash, now, now),
+            )
+    return False

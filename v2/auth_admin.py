@@ -41,20 +41,18 @@ def main(argv: list[str] | None = None) -> int:
     db_path = _db_path()
     auth.init_auth_schema(db_path)
     try:
-        admin_count = _admin_count(db_path)
         if args.command == "create-admin":
-            if admin_count:
+            if _admin_count(db_path):
                 print("An administrator account already exists; bootstrap is disabled.", file=sys.stderr)
                 return 1
-            role = "admin"
+            password = _prompt_password()
+            user = auth.create_first_admin(db_path, args.email, password)
         else:
-            if not admin_count:
+            if not _admin_count(db_path):
                 print("Create the first administrator before provisioning beta users.", file=sys.stderr)
                 return 1
-            role = "user"
-
-        password = _prompt_password()
-        user = auth.create_user(db_path, args.email, password, role=role)
+            password = _prompt_password()
+            user = auth.create_user(db_path, args.email, password, role="user")
     except (ValueError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -4,10 +4,12 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from v2 import radar
 
@@ -35,6 +37,18 @@ class AuthPersistenceTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT title FROM jobs").fetchone()[0], "Existing job")
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({"users", "sessions", "login_attempts"}.issubset(tables))
+
+    def test_first_admin_bootstrap_is_atomic_under_concurrent_calls(self):
+        def attempt_create():
+            try:
+                return auth.create_first_admin(self.db_path, "admin@example.com", "correct horse battery staple")
+            except ValueError:
+                return None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: attempt_create(), range(2)))
+        self.assertEqual(sum(result is not None for result in results), 1)
+        with sqlite3.connect(self.db_path) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0], 1)
 
     def test_email_is_normalized_and_duplicate_accounts_are_rejected(self):
         user = auth.create_user(self.db_path, "  Person@Example.COM ", "correct horse battery staple")
@@ -92,6 +106,23 @@ class AuthPersistenceTests(unittest.TestCase):
             conn.execute("UPDATE users SET status='disabled' WHERE id=?", (user["id"],))
         self.assertIsNone(auth.get_session_user(self.db_path, session_token))
 
+    def test_malformed_email_attempts_are_rate_limited_without_storing_the_email(self):
+        identity = ("not-an-email", "192.0.2.25")
+        for _ in range(5):
+            self.assertFalse(auth.begin_login_attempt(self.db_path, *identity))
+        self.assertTrue(auth.begin_login_attempt(self.db_path, *identity))
+        with sqlite3.connect(self.db_path) as conn:
+            stored_key = conn.execute("SELECT email_key_hash FROM login_attempts").fetchone()[0]
+        self.assertNotEqual(stored_key, identity[0])
+        self.assertEqual(len(stored_key), 64)
+
+    def test_concurrent_login_attempt_reservations_cannot_exceed_the_limit(self):
+        identity = ("parallel@example.com", "192.0.2.26")
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            allowed = list(pool.map(lambda _: auth.begin_login_attempt(self.db_path, *identity), range(12)))
+        self.assertEqual(allowed.count(False), 5)
+        self.assertEqual(allowed.count(True), 7)
+
     def test_login_rate_limit_persists_and_resets_after_success(self):
         identity = ("person@example.com", "192.0.2.15")
         with patch("v2.auth.time.time", return_value=1_800_000_000):
@@ -135,6 +166,29 @@ class AuthApiTests(unittest.TestCase):
     def login(self, email="user@example.com", password="another correct horse battery staple"):
         return self.client.post("/api/auth/login", json={"email": email, "password": password})
 
+    def test_login_uses_configured_public_origin_behind_tls_termination(self):
+        with patch.dict(os.environ, {"JOB_BEEPER_PUBLIC_ORIGIN": "https://jobs.example"}):
+            response = self.client.post(
+                "/api/auth/login",
+                json={"email": "user@example.com", "password": "another correct horse battery staple"},
+                headers={"Origin": "https://jobs.example"},
+            )
+        self.assertEqual(response.status_code, 200)
+
+    def test_login_rejects_cross_origin_browser_submission(self):
+        cross_origin = self.client.post(
+            "/api/auth/login",
+            json={"email": "user@example.com", "password": "another correct horse battery staple"},
+            headers={"Origin": "https://attacker.example"},
+        )
+        self.assertEqual(cross_origin.status_code, 403)
+        same_origin = self.client.post(
+            "/api/auth/login",
+            json={"email": "user@example.com", "password": "another correct horse battery staple"},
+            headers={"Origin": "https://testserver"},
+        )
+        self.assertEqual(same_origin.status_code, 200)
+
     def test_login_sets_secure_opaque_session_and_readable_csrf_cookies(self):
         response = self.login()
         self.assertEqual(response.status_code, 200)
@@ -165,6 +219,14 @@ class AuthApiTests(unittest.TestCase):
         self.assertIsNone(auth.get_session_user(self.db_path, old_session))
         self.assertIsNotNone(auth.get_session_user(self.db_path, self.client.cookies.get("job_beeper_session")))
 
+    def test_authenticated_api_responses_are_not_cacheable(self):
+        login = self.login()
+        self.assertEqual(login.status_code, 200)
+        current = self.client.get("/api/auth/me")
+        self.assertEqual(current.status_code, 200)
+        self.assertEqual(login.headers.get("cache-control"), "no-store")
+        self.assertEqual(current.headers.get("cache-control"), "no-store")
+
     def test_current_user_endpoint_returns_safe_session_identity(self):
         self.assertEqual(self.login().status_code, 200)
         response = self.client.get("/api/auth/me")
@@ -178,6 +240,13 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual((unknown.status_code, wrong.status_code), (401, 401))
         self.assertEqual(unknown.json(), wrong.json())
         self.assertEqual(unknown.json()["detail"], "Invalid email or password.")
+
+    def test_malformed_email_login_attempts_are_rate_limited(self):
+        for _ in range(5):
+            response = self.client.post("/api/auth/login", json={"email": "not-an-email", "password": "incorrect password value"})
+            self.assertEqual(response.status_code, 401)
+        limited = self.client.post("/api/auth/login", json={"email": "not-an-email", "password": "incorrect password value"})
+        self.assertEqual(limited.status_code, 429)
 
     def test_login_is_rate_limited_after_five_failed_attempts(self):
         for _ in range(5):
@@ -222,6 +291,18 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/health").status_code, 200)
         self.assertEqual(self.client.post("/api/auth/login", json={"email": "nobody@example.com", "password": "incorrect password value"}).status_code, 401)
         self.assertEqual(self.client.get("/api/config").status_code, 401)
+
+    def test_every_registered_api_route_has_an_explicit_auth_dependency(self):
+        routes = [route for route in radar.app.routes if isinstance(route, APIRoute) and route.path.startswith("/api/")]
+        self.assertTrue(routes)
+        for route in routes:
+            dependency_calls = {dependency.call for dependency in route.dependant.dependencies}
+            if route.path == "/api/auth/login":
+                self.assertNotIn(radar.require_admin, dependency_calls, route.path)
+            elif route.path in {"/api/auth/me", "/api/auth/logout"}:
+                self.assertIn(radar.get_current_user, dependency_calls, route.path)
+            else:
+                self.assertIn(radar.require_admin, dependency_calls, route.path)
 
     def test_every_legacy_api_endpoint_rejects_anonymous_and_user_sessions(self):
         endpoints = [
