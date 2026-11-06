@@ -5990,7 +5990,8 @@ If SSH requires a key or host alias, retain the exact working SSH identity/optio
 ### Automated PR review follow-up
 - Codex review identified two P2 issues: the user feed applied LIMIT before the frontend filtered matches, and the new-user default max experience of three years was too restrictive.
 - Both are fixed in the current follow-up: SQL filters normal-user rows with `e.match=1` before LIMIT (admin remains unchanged), and the ordinary-user default max experience is now 30 years. Regression tests cover a one-row limit with a newer non-match and the permissive default.
-- Full V2 suite rerun after the fixes: **209 tests passed** in **128.014s**. The fixes/docs are still uncommitted at this checkpoint; next commit/push, run CI, then reply to and resolve both review threads.
+- Full V2 suite rerun after the fixes: **209 tests passed** in **128.014s**.
+- Follow-up fix commit `a1620a8` is pushed. Both Codex inline review threads were replied to and resolved. GitHub Actions CI run #1225 is running on this head: Python compile, JS syntax and focused tests have passed; full suite is currently running.
 
 ### Tests and validation
 - Full V2 Python suite: **209 tests passed** in **121.559s**.
