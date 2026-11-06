@@ -22,7 +22,9 @@ class UserPreferencesTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _user(self, email: str, role: str = "user") -> dict:
-        return auth.create_user(self.db_path, email, "a-strong-test-password", role=role)
+        user = auth.create_user(self.db_path, email, "a-strong-test-password", role=role)
+        user_preferences.ensure_user_preferences(self.db_path, user["id"])
+        return user
 
     def test_new_user_gets_empty_incomplete_preferences(self):
         user = self._user("new@example.com")
@@ -31,6 +33,22 @@ class UserPreferencesTests(unittest.TestCase):
         self.assertEqual(preferences["locations"], [])
         self.assertEqual(preferences["max_experience_years"], 30.0)
         self.assertFalse(preferences["onboarding_complete"])
+
+    def test_get_preferences_is_read_only_and_missing_row_is_not_created(self):
+        user = auth.create_user(
+            self.db_path, "read-only@example.com", "a-strong-test-password", role="user"
+        )
+        with self.assertRaisesRegex(ValueError, "not initialized"):
+            user_preferences.get_user_preferences(self.db_path, user["id"])
+        with sqlite3.connect(self.db_path) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM user_preferences WHERE user_id=?", (user["id"],)
+            ).fetchone()[0]
+        self.assertEqual(count, 0)
+        user_preferences.ensure_user_preferences(self.db_path, user["id"])
+        self.assertEqual(
+            user_preferences.get_user_preferences(self.db_path, user["id"])["target_roles"], []
+        )
 
     def test_role_and_location_are_both_required_to_complete_onboarding(self):
         user = self._user("setup@example.com")
