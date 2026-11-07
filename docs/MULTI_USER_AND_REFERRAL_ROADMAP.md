@@ -2,7 +2,7 @@
 
 **Status:** Authentication foundation PR #45 merged into `v2-live-radar` as `dd7aeb1`; user preferences, onboarding and user-scoped job evaluations/feed are implemented on `feat/user-preferences-evaluations-20261106` but not yet merged or deployed. Opportunity list/detail tenant scoping and final PR review remain. Telegram fan-out and server-side applications remain later milestones.
 **Date:** 2026-11-06 (updated after PR #45 merge)
-**Priority:** Per-user preferences, onboarding and matching are the current product milestone
+**Priority:** PAUSED behind ingestion reliability and broad source coverage (priority reset 2026-11-07)
 **Repository:** AvinashBhalla/job-beeper
 **Integration branch:** `v2-live-radar`
 **Current feature branch/worktree:** `feat/user-preferences-evaluations-20261106`, `/tmp/job-radar-user-preferences`
@@ -11,18 +11,19 @@
 
 JobBeeper is moving from a personal job radar to a multi-user job discovery and job-search workflow product.
 
-The immediate product objective is to let multiple real users create accounts, define independent job-search preferences, receive their own relevant matches, and connect their own Telegram destination. This enables a small beta and real user feedback before expanding the product.
+The long-term product objective remains multi-user accounts, independent preferences and per-user alerts. However, the immediate objective is now to make the shared ingestion engine reliably discover fresh jobs from a broad set of permitted sources. Multi-user onboarding and Telegram are paused until the ingestion acceptance gates in `docs/INGESTION_FIRST_ROADMAP.md` pass.
 
 The long-term direction includes a HAPPPY-like referral-intelligence workflow inspired by Uplers HAPPPY: after a user applies to a job, help identify relevant people at that employer, prepare referral/follow-up outreach, and track the follow-up process using authorized LinkedIn research and a user-authorized email integration.
 
-**Priority order is explicit:**
-1. Finish and safely promote the current search/description work.
-2. Build secure multi-user identity, roles, per-user preferences and per-user Telegram delivery.
-3. Run a small user beta and use feedback to improve matching, coverage and product UX.
-4. Build application tracking and referral intelligence as a separate, permissioned workflow.
-5. Consider hiring-post discovery and other broader features later.
+**Priority order (updated 2026-11-07; supersedes the earlier multi-user-first plan):**
+1. Audit and improve shared job ingestion: coverage, freshness, request budgets, 429 behavior, timestamp precision, deduplication and source health.
+2. Reverse-engineer observable JobBeeper UI/network behavior with a sanitized HAR from the user's authorized session; do not infer or extract private backend implementation.
+3. Build a measured source catalog and add permitted public/authorized adapters incrementally toward 100 useful sources.
+4. Validate real freshness and unique-job yield over canary windows; do not claim 100-source or instant coverage before evidence.
+5. Resume this multi-user roadmap (including PR #46, resume onboarding and Telegram) after ingestion gates pass.
+6. Build application tracking and referral intelligence later; hiring-post discovery remains later still.
 
-Do not start referral automation before the multi-user foundation and application tracking are reliable.
+Do not expand signup, resume parser or Telegram now. Keep PR #46 draft and isolated; no dev bot setup is needed during the ingestion phase.
 
 ## 2. Existing architecture: shared ingestion, personal evaluation
 
@@ -377,3 +378,8 @@ The read-only audit above records the live single-user runtime before the auth f
 
 ### Next implementation milestone
 Implement `user_preferences` and `user_job_evaluations`, migrate the current global candidate profile to the initial admin on a copied DB, and make job feed/search/detail responses explicitly use the authenticated user's evaluation. Keep source ingestion shared. Do not add per-user Telegram delivery until user-scoped evaluation and notification-ledger tests pass.
+
+
+## 2026-11-07 — Priority status
+
+This roadmap is intentionally paused while the team prioritizes ingestion. The implementation already on PR #46 remains isolated on its feature branch and isolated feature container; it has not been promoted to shared dev or production. Do not spend time configuring the Telegram test bot yet. Resume after source coverage/freshness/429 observability and the first source-expansion canaries meet the acceptance gates in `docs/INGESTION_FIRST_ROADMAP.md`.

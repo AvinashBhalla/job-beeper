@@ -233,3 +233,12 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - [CI #40651562286](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651562286): focused tests 32 passed in 0.061 seconds; full V2 suite 134 passed in 17.009 seconds. This is CI evidence only, not VM or live-provider validation.
 - Keep LLM_ROUTER_ENABLED=false and LLM_ROUTER_MATCHER_ENABLED=false until a separate rollout is approved. Keep Telegram credentials blank and notifications disabled; no VM, DB, named volume or production-like service was changed.
 - Next: read-only inspect/fetch of /home/ubuntu/job-beeper-dev and explicit ahead/behind/path assessment before any fast-forward. Preserve local v2/config.json, .venv/, .env, and job-radar-dev_radar-dev-data.
+
+
+## 2026-11-07 — Current-system comparison and browser evidence required
+
+The public product claims remain reference points, not verified implementation details. The latest read-only audit is in `docs/INGESTION_FIRST_ROADMAP.md`. In brief: our current code has five collectors, production enables two, shared dev enables one; LinkedIn is receiving repeated HTTP 429 responses; Naukri is a five-minute external relay with date-only posting dates. We cannot currently claim parity with JobBeeper's breadth or freshness.
+
+Next reverse-engineering pass should use the user's authorized logged-in browser session to capture sanitized Network metadata for initial load, background refresh, filters, pagination, job detail loading, timestamps and source labels. Record observed facts separately from inferences. Do not extract private backend code, replay authenticated endpoints, expose session tokens, bypass access controls or evade rate limits. The evidence report belongs in `docs/JOBBEEPER_NETWORK_EVIDENCE_YYYY-MM-DD.md`.
+
+The priority is now ingestion reliability and source expansion, not multi-user onboarding. Keep signup, resume parser and Telegram enhancements paused until the ingestion acceptance gates in `docs/INGESTION_FIRST_ROADMAP.md` pass.

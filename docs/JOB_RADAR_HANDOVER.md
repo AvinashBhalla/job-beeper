@@ -6252,3 +6252,31 @@ On the same onboarding page, show a Telegram connection panel/link that opens th
 - Full in-container suite: 257 tests passed, 1 skipped. Test-only `httpx2` dependencies were installed temporarily to satisfy TestClient imports, then removed. First local run had one expected config-only failure because the feature app runs HTTP with `JOB_BEEPER_COOKIE_SECURE=false`; rerun set `JOB_BEEPER_COOKIE_SECURE=true` only for the test process and passed. Runtime config was not changed.
 - No dedicated Telegram test bot credentials are configured. No external Telegram message was sent, no webhook registered, no production bot used, and production/shared-dev untouched.
 - Next: configure a separate dev/test bot privately in the isolated feature Compose environment, set webhook only for that bot, then run real link → opt-in → matching new job → Telegram delivery → opt-out/disconnect smoke test. After that, promote to shared dev. Do not use the production bot for feature testing.
+
+## 2026-11-07 — Product priority reset: ingestion before signup/Telegram
+
+The owner clarified the primary product goal: get jobs into the portal as soon as the source publishes them, expand toward 100 useful permitted sources, and reduce avoidable rate limits. This supersedes the earlier 2026-11-06 multi-user-first priority. The authoritative plan is `docs/INGESTION_FIRST_ROADMAP.md`.
+
+### Read-only runtime audit findings (2026-11-07, approx 10:48 UTC)
+
+- Current feature-branch code has five registered collectors: LinkedIn, Naukri, Instahyre, Greenhouse, Ashby. This is not 100 platforms.
+- Production `v2-radar-1` runtime config enables LinkedIn + Naukri only; Instahyre and Greenhouse are disabled; deployed runtime config does not include Ashby. Production polling: LinkedIn nominal 180s, Naukri 300s. LinkedIn has 4 query families × 4 locations and a 4-second minimum serialized request interval.
+- Production DB read-only, previous 24h: LinkedIn 368 runs, 4,570 observations, 313 new records; Naukri 288 runs, 98,211 repeated observations, 173 new records. These are database source observations, not all unique jobs.
+- Production logs: 36 LinkedIn HTTP 429 events in previous 24h, 60 in previous 72h; backoff reached 1,800 seconds. No claim of rate-limit-free operation is justified.
+- LinkedIn stored latency values over 24h: 312 samples, p50 54 minutes, p90 4 hours, max 6 hours. Treat as approximate pending timestamp validation; it is not proof of actual end-to-end source lag.
+- Naukri's 171 new 24h records had date-level posting precision and no valid exact latency samples. Relay polls/dispatches around every five minutes, fetches six configured queries with up to 30 results/query over 72 hours, and latest observed feed had 332 jobs. `updated_at` is relay collection time, not original posting time.
+- Instahyre's last recorded production runs on 2026-10-08 failed with HTTP 400; it remains disabled.
+- Shared dev `job-radar-dev` at 8001 currently enables Naukri only, with a 300s poll. Historical Ashby rows in its DB do not prove current collection is active.
+- Production and shared dev containers, DB volumes and config were inspected read-only. No restart, config change, deploy, webhook registration or outbound Telegram message occurred. Isolated feature service on 8002 remains healthy and separate.
+
+### Direction and next actions
+
+1. Pause signup, resume parser, Telegram and referral expansion. PR #46 stays draft and isolated; no Telegram test bot is needed now.
+2. Use the owner's authorized logged-in JobBeeper browser session to collect sanitized Network evidence: initial feed load, background refresh for 10–15 minutes, filter changes, pagination, job detail requests, source labels and timestamp semantics. Redact cookies, auth/CSRF/session/user identifiers and personal data. Do not replay private endpoints or bypass controls. Save a redacted evidence report as `docs/JOBBEEPER_NETWORK_EVIDENCE_YYYY-MM-DD.md`.
+3. Fix ingestion observability before increasing volume: request/page/status/429/retry/cooldown counters, source timestamps/precision, first-seen and last-seen, source run duration, unique/new/changed yield and p50/p90 freshness only for reliable timestamp types.
+4. Diagnose LinkedIn 429s; reduce request pressure or use a permitted alternative. No proxy/IP rotation, CAPTCHA bypass or rate-limit evasion.
+5. Make Naukri incremental/measurable and preserve date-only precision. Validate Instahyre HTTP 400; canary Greenhouse/Ashby board APIs one board at a time; then evaluate Lever/SmartRecruiters and other sources.
+6. Build a source catalog toward 100 useful integrations. Count platform adapters separately from employer-board configurations; do not treat ATS vendor names as global job feeds.
+7. Resume PR #46 only after ingestion acceptance gates pass; then configure a separate Telegram test bot and run link → opt-in → delivery → opt-out/disconnect E2E. Production bot `Qdhorvbot` remains reserved for approved production rollout.
+
+See `docs/INGESTION_FIRST_ROADMAP.md` for adapter contract, source matrix, browser capture rules and release gates.

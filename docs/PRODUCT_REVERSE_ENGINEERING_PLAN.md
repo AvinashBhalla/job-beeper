@@ -93,3 +93,16 @@ The next product milestone is now **multi-user support**, not additional source 
 HAPPPY-like referral intelligence remains a later phase, but is now explicitly documented as a product workflow: application tracking, relevant contact discovery from authorized/public sources, explainable contact ranking, user-approved referral/follow-up drafts, user-authorized email integration, draft creation, follow-up reminders and response tracking. Keep email sending human-approved in the first release. Do not automate LinkedIn connection requests/messages or evade platform controls.
 
 The delivery sequence is: current search/description release -> multi-user identity/RBAC -> per-user preferences/evaluations -> per-user Telegram -> small beta/feedback -> application tracker -> referral intelligence. Hiring-post discovery remains later.
+
+
+## 2026-11-07 — Priority reset: ingestion first, JobBeeper browser evidence next
+
+The previous 2026-11-06 multi-user-first sequence is superseded. The primary product promise is now fresh, broad, reliable job ingestion into the portal. See `docs/INGESTION_FIRST_ROADMAP.md` for the verified runtime audit, current source metrics, JobBeeper browser evidence plan, adapter architecture, source catalog and acceptance gates.
+
+- P0: audit/fix ingestion freshness, source coverage, request budgets, 429 behavior, timestamp quality and per-source observability.
+- P1: inspect JobBeeper's observable authenticated UI/network behavior using a sanitized HAR from the user's own browser session. Do not infer private backend implementation or bypass access controls.
+- P2: build a measured source/provider catalog and add public/authorized adapters incrementally toward 100 useful sources.
+- P3: validate 24–72 hour canaries, useful unique-job yield and freshness.
+- P4: resume multi-user signup/preferences, resume parsing, Telegram fan-out and referral intelligence. PR #46 stays draft/isolated; no Telegram test bot is needed yet.
+
+Verified 2026-11-07: current feature code has five collectors (LinkedIn, Naukri, Instahyre, Greenhouse, Ashby); production has only LinkedIn and Naukri enabled; shared dev has only Naukri enabled. Production logged 36 LinkedIn HTTP 429 events in the previous 24 hours. In the same period, production recorded 313 new LinkedIn rows and 173 new Naukri rows; Naukri's relay is polled every five minutes and its current feed uses date-level posting timestamps. These findings mean we are not yet at 100-source coverage or reliably minute-level discovery. All runtime inspection was read-only.
