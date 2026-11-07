@@ -348,7 +348,7 @@ class AuthApiTests(unittest.TestCase):
             elif route.path in {"/api/auth/me", "/api/auth/logout"}:
                 self.assertIn(radar.get_current_user, dependency_calls, route.path)
             elif route.path in {
-                "/api/preferences", "/api/preferences/resume", "/api/telegram/status", "/api/telegram/link", "/api/jobs", "/api/daily-summary", "/api/jobs/{job_id}",
+                "/api/preferences", "/api/preferences/resume", "/api/telegram/status", "/api/telegram/link", "/api/notifications/settings", "/api/jobs", "/api/daily-summary", "/api/jobs/{job_id}",
                 "/api/source-status/summary"
             }:
                 self.assertIn(radar.require_authenticated, dependency_calls, route.path)

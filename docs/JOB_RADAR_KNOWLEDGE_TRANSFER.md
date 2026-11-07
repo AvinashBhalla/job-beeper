@@ -3184,3 +3184,5 @@ Implementation added:
 Validation so far: six focused `v2.test_user_notifications` tests pass. Python AST parsing and `git diff --check` pass. Full API suite could not run on the host because FastAPI and argon2 are not installed; Docker is inaccessible to the SSH user. The host Node is old enough to reject pre-existing `??` syntax in `dashboard/app.js`, so use the supported CI Node runtime.
 
 Important boundaries: no production deployment or webhook change; no actual Telegram sends; no member alerts are enabled by default. Dev push/deployment should wait for full CI, code review, and a separate test bot/dev webhook smoke test. See `docs/TELEGRAM_PER_USER_SETUP.md` for the detailed behavior and rollout checklist.
+
+- CI follow-up: first full run found that the new notification settings route was missing from the explicit member-route allowlist in `test_auth.py` (the route itself already depends on `require_authenticated`). Added the route to that contract test; rerun CI on the new head.

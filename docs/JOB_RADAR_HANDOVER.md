@@ -6240,3 +6240,5 @@ On the same onboarding page, show a Telegram connection panel/link that opens th
 - The member dispatcher is a separate worker path and uses the existing bot token only for outbound sends; it does not require or change the legacy admin chat ID. Legacy `v2/telegram.py` and global `notification_ledger` logic remain separate.
 - No dev deployment, production deployment, webhook registration, production config change, or real Telegram message was performed.
 - Next: run complete test suite and frontend checks in supported CI/dev runtime; fix any failures; review edge cases; configure a dedicated dev test bot; deploy/smoke-test dev; only then consider production rollout with explicit approval. Quiet hours, time zones, frequency controls and delivery history remain future work.
+
+- CI follow-up: first full run found that the new notification settings route was missing from the explicit member-route allowlist in `test_auth.py` (the route itself already depends on `require_authenticated`). Added the route to that contract test; rerun CI on the new head.
