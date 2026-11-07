@@ -6280,3 +6280,5 @@ The owner clarified the primary product goal: get jobs into the portal as soon a
 7. Resume PR #46 only after ingestion acceptance gates pass; then configure a separate Telegram test bot and run link → opt-in → delivery → opt-out/disconnect E2E. Production bot `Qdhorvbot` remains reserved for approved production rollout.
 
 See `docs/INGESTION_FIRST_ROADMAP.md` for adapter contract, source matrix, browser capture rules and release gates.
+
+- Observability finding: despite 36 LinkedIn 429 log events in the last 24h, `source_runs` reported zero failed runs. The LinkedIn collector catches rate-limit exceptions and can return partial/empty results, so a source run can look successful while rate-limited. Track request-level 429/cooldown/partial-result metrics separately from run exceptions.

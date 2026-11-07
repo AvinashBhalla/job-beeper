@@ -83,7 +83,7 @@ We have a working ingestion foundation, but not the stated product promise yet:
 - Two sources are actually enabled in production, and only one is enabled in shared dev.
 - The current LinkedIn implementation discovers new records but receives repeated 429s. Increasing request concurrency or trying to evade throttling would make reliability worse and is not acceptable.
 - Naukri has a useful relay and repeated feed ingestion, but its five-minute collection cadence, relay runtime, main-app poll interval and date-only posting timestamps prevent a claim of instant discovery.
-- Current `source_runs` records `jobs_seen`, `new_jobs`, and an error string, but not enough request-level data to explain request cost, 429 rate, retry behavior, page yield or per-endpoint freshness.
+- Current `source_runs` records `jobs_seen`, `new_jobs`, and an error string, but not enough request-level data to explain request cost, 429 rate, retry behavior, page yield or per-endpoint freshness. A caught 429 can still be recorded as a successful run, so run success must be separated from source request health and partial-result status.
 - The current source registry lives in the large `v2/radar.py` module. Source adapters have different request, timestamp and retry behavior; this needs a consistent contract before expanding to dozens of sources.
 - No evidence presently supports the claim that our product can ingest from 100 platforms or match JobBeeper's observed freshness.
 

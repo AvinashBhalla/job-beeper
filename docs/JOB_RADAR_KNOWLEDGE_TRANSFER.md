@@ -3220,3 +3220,5 @@ Work order now:
 6. Return to PR #46 and Telegram test bot only after ingestion release gates pass.
 
 Current code and feature test state remain as documented in the preceding handover entries. This priority reset does not merge or discard that work.
+
+- Observability finding: despite 36 LinkedIn 429 log events in the last 24h, `source_runs` reported zero failed runs. The LinkedIn collector catches rate-limit exceptions and can return partial/empty results, so a source run can look successful while rate-limited. Track request-level 429/cooldown/partial-result metrics separately from run exceptions.
