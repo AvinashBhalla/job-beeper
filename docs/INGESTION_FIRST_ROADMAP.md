@@ -47,4 +47,4 @@ Before production enablement, require permitted access, deterministic fixtures/t
 
 ## Current next action
 
-Review draft PR #47 and merge into `v2-live-radar` only after human review/approval. CI #1303 validated the initial run-level slice; the new request-level implementation needs a fresh CI pass on the latest head. A local preview is available on isolated port 8003 with synthetic rows and all collectors disabled. After CI/review, the next metric slice is durable last-success/last-new-job and Naukri relay freshness telemetry. The older telemetry PR #40 is closed unmerged as superseded by #47.
+Review draft PR #47 and merge into `v2-live-radar` only after human review/approval. Latest request-level implementation CI #1307 (`42391947214`) passed on Python 3.12/modern Node: focused tests 32 passed and full V2 suite 199 passed. A local preview is available on isolated port 8003 with synthetic rows and all collectors disabled. After review, the next metric slice is durable last-success/last-new-job and Naukri relay freshness telemetry. The older telemetry PR #40 is closed unmerged as superseded by #47.

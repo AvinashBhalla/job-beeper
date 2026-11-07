@@ -5957,4 +5957,4 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 ### Safety and next gate
 - No deployment, source enablement, scheduler change, rate-limit-policy change, notification, Telegram send or LLM call was made.
-- Commit and push these changes to `feat/source-observability-20261107`, update draft PR #47, then verify GitHub V2 CI on the latest commit before requesting review. Keep PR #47 draft and do not merge/deploy without approval.
+- Implementation commit: `a9da22f92f9003e5317b8285fbcd5102ea348be9` on `feat/source-observability-20261107`; draft PR #47 is updated. CI #1307 passed all checks and 199 tests. Keep PR #47 draft pending human review; do not merge/deploy without approval.
