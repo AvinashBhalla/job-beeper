@@ -223,3 +223,36 @@ The owner has asked that the existing authentication, resume-assisted onboarding
 ## 2026-11-07 — Dev bot and local secret setup clarification
 
 The owner supplied `@YourJobBeeperDevBot` as the intended development Telegram bot handle. BotFather token creation/verification remains pending. The webhook secret is generated separately in Windows PowerShell (`python -c "import secrets; print(secrets.token_urlsafe(32))"`, or `py -c ...`) or Ubuntu (`python3 -c ...`); it is not a Telegram command. `.env.feature` is currently absent and git-ignored; the documented setup is in `docs/TELEGRAM_PER_USER_SETUP.md`. Google OAuth env passthrough was added to the isolated feature Compose, but all three Google OAuth values remain blank. Feature port 8002 is loopback-only, so webhook registration still waits for an approved public HTTPS dev route.
+
+
+## 2026-11-07 — JobBeeper authenticated network evidence and local comparison
+
+The sanitized browser report is now tracked at docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. It records only request paths, methods, status codes, timing observations and UI labels. No cookies, authorization values, request/response bodies or storage values were retained.
+
+### Evidence-backed JobBeeper behavior
+
+- The /user/jobs document is followed by a browser fetch to /api/user/jobs with numeric page, per_page=20, status=matched, sort_by=created_at, and sort_order=desc parameters. Clicking Next changes page=1 to page=2.
+- Keyword search is requested server-side through the same list route with search=<term>.
+- Feed initialization also requests authenticated-user bootstrap, company/filter data, stats, notification summary and trial/offer state.
+- Opening a detail caused separate metadata and tracker GETs plus a view-marking POST; notification summary was fetched again.
+- UI source labels observed: LinkedIn, Ashby, Naukri, Lever and Hirist. Cards visibly distinguish employer-stated experience from description-derived experience.
+- Ten one-minute idle windows showed no JobBeeper Fetch/XHR, WebSocket or SSE traffic. The observed account showed an expired-subscription six-hour-delay notice. This is not proof that active accounts never poll or that the product has no longer polling cadence.
+- Timestamp meaning (original publish vs discovery/ingestion/update/display) and response schemas remain unknown because response bodies were not retained.
+
+### Comparison with our current feature-branch implementation (read-only code inspection)
+
+- Our GET /api/jobs already performs keyword search in SQLite before LIMIT, orders newest-first using COALESCE(source_posted_at, discovered_at) and returns per-user evaluation/match metadata. The UI passes minutes=4320, limit=500, and q when search is entered.
+- Our feed has no numeric page/per_page parameters or total/page metadata. It retrieves up to 500 matching jobs in one request; most other feed filters are applied to that in-memory set. This is the main feed scalability/behavior gap against the observed page-based feed.
+- Our job records already separate source_posted_at, posted_precision, discovered_at, and discovery-latency fields. The dashboard shows source-posted and discovered times in the inspector. However, the normalized dashboard model does not currently carry an explicit experience-provenance field equivalent to the JobBeeper UI's employer-stated/from-description distinction. Audit extraction-to-storage-to-API provenance before displaying such a label.
+- Our /api/jobs/{job_id} returns a complete authorized job detail from the local database. The dashboard inspector currently renders the selected item from the in-memory feed; it does not issue separate metadata/tracker/view requests. We should add separate tracker or view events only when a concrete user-facing product requirement exists, not merely to imitate request names.
+- Before this change, the dashboard polled the jobs feed every 10 seconds. The feature branch now polls once per minute while the tab is visible, refreshes on return to the tab, and skips periodic source-status calls while hidden. This is our operational choice, not a claim about JobBeeper's active-account cadence.
+
+### Next implementation sequence
+
+1. Add server-side numeric pagination with stable sort and total/has-next metadata while retaining a backwards-compatible limit path; update filters/search so they operate across all pages, not only the current slice.
+2. Trace experience provenance end-to-end (source-stated vs description-derived vs inferred/unknown); persist an explicit provenance value and confidence only where supported by the extractor.
+3. Keep the existing source-posted/discovered timestamp distinction; investigate last-successful-check and last-material-change tracking separately.
+4. Add source-specific adapters for Lever/Hirist only after confirming public/authorized access methods and measuring unique useful yield. JobBeeper's visible source labels do not establish that those sources are globally searchable or expose a public API.
+5. Repeat the refresh observation on an active subscription and test each visible filter independently. Record only sanitized parameter names, HTTP outcomes and timing; do not retain private payloads or replay authenticated third-party requests.
+
+The report is behavioral evidence, not an implementation specification for JobBeeper's private backend.
