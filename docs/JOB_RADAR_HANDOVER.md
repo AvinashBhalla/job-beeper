@@ -6323,3 +6323,27 @@ See `docs/INGESTION_FIRST_ROADMAP.md` for adapter contract, source matrix, brows
 - Isolated feature Compose now passes all three `GOOGLE_OAUTH_*` variables as well as the three Telegram variables. Previously it passed only Telegram settings, so live Google OAuth configuration would not have reached the app. All remain unset today.
 - The feature service is still loopback-only on `127.0.0.1:8002`. No webhook registration until a public HTTPS dev route is configured. No production bot/OAuth settings changed; shared dev 8001 and production 8000 untouched.
 - The exact steps are documented in `docs/TELEGRAM_PER_USER_SETUP.md` and `docs/GOOGLE_OAUTH_SETUP.md`.
+
+
+## 2026-11-07 — JobBeeper browser investigation received and feature refresh hardening
+
+The owner supplied the sanitized authenticated-browser evidence report. It is tracked at \`docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md\`. Earlier sections that say the browser investigation/report is still pending are superseded.
+
+Observed JobBeeper behavior: browser-fetched job list with numeric \`page\` and \`per_page=20\`; server-requested keyword search; newest-first sort; separate metadata/tracker detail GETs and a view-marking POST; source labels LinkedIn, Ashby, Naukri, Lever and Hirist; experience labels that distinguish employer-stated vs description-derived. Ten idle one-minute windows on an expired-subscription account showed no feed-related traffic; active-account refresh cadence and private response schemas remain unknown. No private payloads or credentials were retained.
+
+Local comparison and implementation gap:
+- Our \`GET /api/jobs\` already has SQL keyword search before LIMIT, newest-first ordering and distinct source-posted/discovered timestamps.
+- Our feed still fetches up to 500 jobs in one request; numeric page/per_page and total/has-next metadata are not implemented. Filters other than keyword currently operate largely on the loaded client-side set.
+- Experience provenance is not yet exposed end-to-end in the dashboard model. Trace the source extractor/storage/API fields before adding a label.
+- Detail inspector uses the loaded job object; do not add fake metadata/tracker/view endpoints just to imitate observed request paths.
+- Dashboard automatic feed polling was reduced from 10 seconds to once per minute while visible, with immediate refresh when the tab becomes visible again. Hidden tabs skip feed and periodic source-status requests. Change is commit \`82991f3\`.
+
+Feature environment:
+- Private \`.env.feature\` exists on the VM with mode 600; Telegram token, public username and webhook-secret environment variables are populated in the isolated container. Values were not exposed.
+- Feature container rebuilt from \`v2/docker-compose.feature.yml\`, healthy at \`127.0.0.1:8002\`; volume preserved. Shared dev 8001 and production 8000 untouched.
+- Telegram \`getMe\` attempt from the VM timed out. Token acceptance and bot identity are unverified; no webhook registered or messages sent. Public HTTPS route remains a prerequisite.
+- Google OAuth client ID, secret and redirect URI remain empty.
+
+Latest branch head: \`3c247e7\`. GitHub V2 CI run \`42374315505\` passed the JS syntax check, focused router/extractor tests and full V2 suite. PR #46 remains open/draft and unmerged.
+
+Next work, in order: implement server-side numeric pagination with compatible legacy limit behavior; ensure filters/search operate across pages; trace/store/expose experience provenance and confidence; then test on an active JobBeeper subscription to resolve refresh cadence and apply other filter controls individually. Keep source expansion evidence-led and do not replay JobBeeper private requests.
