@@ -107,3 +107,11 @@ Authenticated endpoints:
 Admin operational routes such as /api/config, source status, latency, dedupe, notification queue and LLM diagnostics remain admin-only. The first admin's legacy global candidate profile is migrated to that admin's preference row; new ordinary users never inherit it. Members can link one private Telegram chat through the one-time `/api/telegram/link` flow, then explicitly opt in through `/api/notifications/settings`. Per-user messages use a separate ledger and resolve only the current user's linked private chat; the legacy global admin notifier remains separate. Server-side applications remain a later milestone.
 
 For isolated smoke testing, use v2/docker-compose.feature.yml (port 8002, separate radar-feature-data volume, all job source and LLM integrations disabled). Telegram and Google OAuth remain unconfigured by default and can be enabled only through a private, ignored .env.feature file; see docs/TELEGRAM_PER_USER_SETUP.md and docs/GOOGLE_OAUTH_SETUP.md. The feature-only seed command, python -m v2.seed_feature_demo, inserts four synthetic listings and refuses to run unless JOB_BEEPER_FEATURE_DEMO=true is set in the isolated feature container. See the root README's Multi-user feature smoke test section for PowerShell commands. This feature Compose project is separate from the existing dev service and must not be confused with a production rollout.
+
+
+## Feed behavior and authenticated JobBeeper comparison (2026-11-07)
+
+- Current member feed: GET /api/jobs?minutes=...&limit=...&q=...; keyword search is applied in SQLite before the result limit, with newest-first ordering. GET /api/jobs/{job_id} returns the current user's authorized job detail.
+- Current dashboard request loads up to 500 jobs from the preceding 72 hours. Numeric page/per_page response metadata is not implemented yet; see docs/INGESTION_FIRST_ROADMAP.md for the planned backward-compatible pagination work.
+- The dashboard refreshes the feed once per minute while visible and refreshes on tab return. Periodic feed/source-status requests are skipped while hidden.
+- The authenticated JobBeeper comparison is in docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. Treat its observed request shapes as product evidence only, not an instruction to replay JobBeeper endpoints or copy private implementation details.
