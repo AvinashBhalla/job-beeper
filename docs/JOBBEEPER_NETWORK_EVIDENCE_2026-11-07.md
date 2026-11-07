@@ -133,3 +133,64 @@ GET /api/user/jobs?page=1&per_page=20&status=matched&sort_by=created_at&sort_ord
 - Pagination: ev_2e975c22bd9b0d273d96d8ad26ce706d063d6b77f40ccefd1dff6e4c42b2d0b9
 - Detail: ev_4b90fe8361e122e47318825936108f305f03e99e914eba3c636b23b551071939
 - Search: ev_0d534928b96a352adf29ad7a39c893219fd334c0dd5ee19c43ea6362cd0535c7
+
+## Second-round authenticated investigation — 2026-11-07
+
+This addendum incorporates the second-round sanitized browser observations. It does not replace the first-round observations above.
+
+### Filter parameter mapping
+
+**OBSERVED (UI):** The normal Filters panel exposes Companies, Roles, Experience, Source / ATS Sources, notification status, and sort controls. Opening the panel did not itself produce a new list request in the retained sanitized captures.
+
+**OBSERVED:** Search was re-tested through the UI with the benign keyword java. The list request added search=java and retained page=1, per_page=20, status=matched, sort_by=created_at, and sort_order=desc.
+
+**UNKNOWN:** Company, role, experience, source, notification-status, sort, and clear/reset parameter mappings. These controls were not individually applied in this run.
+
+### Pagination consistency
+
+**OBSERVED:** Page 1 used page=1&per_page=20; Next used page=2&per_page=20. The UI showed Page 1 of 16 in the first round.
+
+**OBSERVED:** Search reset the requested page to page=1 in the tested action.
+
+**UNKNOWN:** Stable job-ID overlap between adjacent pages. Response bodies and card-specific IDs were not retained for comparison.
+
+### Experience provenance
+
+**OBSERVED (UI):** Cards displayed Employer-stated and From description labels, with ranges such as 0-2 yrs, 1-2 yrs, 2-4 yrs, and 1+ yrs.
+
+**UNKNOWN:** Whether provenance is present as a response field, whether it is repeated in detail responses, and whether the list request itself includes the displayed range. Response bodies were not retained.
+
+### Additional detail/tracker behavior
+
+**OBSERVED:** The first detail tested in round one used separate metadata and tracker GETs plus a view-marking POST.
+
+**NOT COMPLETED:** Two additional source-diverse detail opens were not completed in this second round. Repeated view-marking and save/application tracking behavior remain unknown.
+
+### Refresh behavior
+
+**OBSERVED:** Ten consecutive one-minute passive observations on the expired-subscription account produced no JobBeeper Fetch/XHR, WebSocket, or SSE-style traffic.
+
+**UNKNOWN / UNAVAILABLE:** The requested 20-minute active-subscription comparison and hidden-tab comparison were unavailable because this account remained in the expired/delayed state. No subscription restriction was bypassed.
+
+### Newly confirmed query parameters
+
+| Parameter | Observed value / behavior | Evidence classification |
+| --- | --- | --- |
+| search | java; added by UI keyword search; search resets page to 1 | OBSERVED |
+| page | Numeric page number; observed 1 and 2 | OBSERVED |
+| per_page | 20 | OBSERVED |
+| status | matched | OBSERVED |
+| sort_by | created_at | OBSERVED |
+| sort_order | desc | OBSERVED |
+
+### Remaining unknowns
+
+- Dropdown mappings for company, role, experience, source/ATS, notification status, sort, and clear/reset.
+- Response field names and payload schemas.
+- Stable-ID overlap and duplicate behavior across adjacent pages.
+- Exact experience-provenance fields in list/detail responses.
+- Whether view-marking repeats on repeated detail opens.
+- Save/application tracking request shapes.
+- Refresh behavior under an active subscription or hidden tab.
+
+The observations above are behavioral evidence, not an implementation specification for JobBeeper's private backend.

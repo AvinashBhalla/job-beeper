@@ -22,6 +22,9 @@
 
   const state = {
     jobs: [],
+    feedPage: 1,
+    feedPageSize: 20,
+    pagination: null,
     selectedJobId: null,
     appliedJobs: [],
     config: null,
@@ -487,6 +490,8 @@
       notification_candidate_job_id: raw.notification_candidate_job_id ?? null,
       experience_min_years: minExp,
       experience_max_years: maxExp,
+      experience_provenance: raw.experience_provenance || 'unknown',
+      experience_confidence: raw.experience_confidence || 'unknown',
       experience_label: expLabel,
       work_mode: workMode,
       skills_detected: skillsDetected,
@@ -877,7 +882,7 @@
         && (minScore < configuredThreshold || job.likely_match);
       const matchesAge = ageHours(ts) <= maxAge;
       const matchesAlertable = !alertableOnly || job.alertable;
-      const matchesRemote = !remoteOnly || job.work_mode.toLowerCase().includes('remote') || job.location.toLowerCase().includes('remote');
+      const matchesRemote = !remoteOnly || job.work_mode.toLowerCase().includes('remote') || job.location.toLowerCase().includes('remote') || job.description.toLowerCase().includes('remote');
 
       return matchesQuery && matchesSource && matchesScore && matchesAge && matchesAlertable && matchesRemote;
     });
@@ -891,13 +896,23 @@
       filtered.sort((a, b) => String(jobTimestamp(b) || '').localeCompare(String(jobTimestamp(a) || '')) || b.match_score - a.match_score);
     }
 
-    // Update Counter & Active Filter Pills
+    // Update Counter & Active Filter Pills.
+    const pagination = state.pagination || {
+      page: state.feedPage, per_page: state.feedPageSize,
+      total: state.jobs.length, total_pages: 1,
+      has_previous: state.feedPage > 1, has_next: false,
+    };
+    const firstItem = pagination.total ? ((pagination.page - 1) * pagination.per_page) + 1 : 0;
+    const lastItem = firstItem ? firstItem + filtered.length - 1 : 0;
     const countText = $('feedCountText');
     if (countText) {
-      countText.innerHTML = `Showing <b>${filtered.length}</b> of <b>${state.jobs.length}</b> opportunities`;
+      countText.innerHTML = 'Showing <b>' + firstItem +
+        (lastItem > firstItem ? '–' + lastItem : '') +
+        '</b> of <b>' + pagination.total + '</b> opportunities';
     }
     const navBadge = $('jobsNavCount');
-    if (navBadge) navBadge.textContent = state.jobs.length;
+    if (navBadge) navBadge.textContent = pagination.total;
+    updateFeedPagination(pagination);
 
     renderActiveFiltersBar();
 
@@ -920,6 +935,15 @@
       const isSelected = String(state.selectedJobId) === String(job.id);
       const applied = isJobApplied(job.id);
       const scoreTier = getScoreTierClass(job.match_score);
+      const experienceProvenanceLabel = ({
+        employer_stated: 'Employer-stated',
+        description: 'From description',
+        inferred: 'Text inference',
+      })[job.experience_provenance] || '';
+      const experienceEvidenceTitle = experienceProvenanceLabel
+        ? 'Experience source: ' + experienceProvenanceLabel
+          + '; rule-based evidence strength: ' + job.experience_confidence
+        : 'Experience source or confidence unavailable';
 
       const alertableBadge = state.isAdmin && job.alertable
         ? `<span class="tag-alertable-compact" title="${esc((job.alertability_reasons || []).join('; '))}">ALERTABLE</span>`
@@ -992,7 +1016,7 @@
             <div class="opportunity-meta-row">
               <span class="meta-item">${SVG_ICONS.mapPin} ${esc(job.location)}</span>
               <span class="meta-dot">·</span>
-              <span class="meta-item">${SVG_ICONS.graduationCap} ${esc(job.experience_label)}</span>
+              <span class="meta-item" title="${esc(experienceEvidenceTitle)}">${SVG_ICONS.graduationCap} ${esc(job.experience_label)}${experienceProvenanceLabel ? '<span class="experience-provenance-label">' + esc(experienceProvenanceLabel) + '</span>' : ''}</span>
               <span class="meta-dot">·</span>
               <span class="meta-item">${SVG_ICONS.clock} ${esc(fmtAge(ts))}</span>
             </div>
@@ -1011,6 +1035,19 @@
         </article>
       `;
     }).join('');
+  }
+
+  function updateFeedPagination(pagination) {
+    const nav = $('feedPagination');
+    const label = $('feedPageLabel');
+    const previous = $('previousJobsPageBtn');
+    const next = $('nextJobsPageBtn');
+    if (!nav || !label || !previous || !next) return;
+    const totalPages = Math.max(1, Number(pagination.total_pages || 0));
+    nav.hidden = Number(pagination.total || 0) <= Number(pagination.per_page || state.feedPageSize);
+    label.textContent = 'Page ' + pagination.page + ' of ' + totalPages;
+    previous.disabled = !pagination.has_previous;
+    next.disabled = !pagination.has_next;
   }
 
   function renderActiveFiltersBar() {
@@ -1050,7 +1087,6 @@
   }
 
   function clearAllFilters() {
-    const hadSearch = Boolean(String(state.filters.search || '').trim());
     state.filters.search = '';
     state.filters.source = '';
     state.filters.minScore = 0;
@@ -1072,11 +1108,8 @@
     $('toggleRemote').classList.remove('active');
     $('toggleRemote').setAttribute('aria-pressed', 'false');
 
-    if (hadSearch) {
-      loadJobsFeed();
-    } else {
-      renderFeed();
-    }
+    state.feedPage = 1;
+    loadJobsFeed();
   }
 
   // =========================================================================
@@ -1103,7 +1136,15 @@
     $('inspTitle').textContent = job.title;
     $('inspCompany').textContent = job.company;
     $('inspScore').textContent = `${job.match_score}%`;
-    $('inspExperience').textContent = job.experience_label;
+    const inspectorExperienceSource = ({
+      employer_stated: 'Employer-stated',
+      description: 'From description',
+      inferred: 'Text inference',
+    })[job.experience_provenance] || 'Source unknown';
+    const inspectorExperienceConfidence = job.experience_confidence !== 'unknown'
+      ? ' · ' + job.experience_confidence + ' evidence'
+      : '';
+    $('inspExperience').textContent = job.experience_label + ' · ' + inspectorExperienceSource + inspectorExperienceConfidence;
     $('inspLocation').textContent = job.location;
     $('inspWorkMode').textContent = job.work_mode;
     $('inspSourcePosted').textContent = fmtTimestamp(job.source_posted_at, job.posted_precision);
@@ -1794,12 +1835,26 @@
     const refreshBtn = $('refreshFeedBtn');
     if (refreshBtn) refreshBtn.classList.add('is-loading');
 
+    const sortParameters = {
+      newest: { sort_by: 'created_at', sort_order: 'desc' },
+      match: { sort_by: 'match_score', sort_order: 'desc' },
+      company: { sort_by: 'company', sort_order: 'asc' },
+    }[state.filters.sort] || { sort_by: 'created_at', sort_order: 'desc' };
     const params = new URLSearchParams({
       minutes: '4320',
-      limit: '500',
+      page: String(state.feedPage),
+      per_page: String(state.feedPageSize),
+      status: state.isAdmin ? 'all' : 'matched',
+      sort_by: sortParameters.sort_by,
+      sort_order: sortParameters.sort_order,
     });
     const searchQuery = String(state.filters.search || '').trim();
-    if (searchQuery) params.set('q', searchQuery);
+    if (searchQuery) params.set('search', searchQuery);
+    if (state.filters.source) params.set('source', state.filters.source);
+    if (state.filters.minScore > 0) params.set('min_score', String(state.filters.minScore));
+    if (state.filters.maxAge < 72) params.set('max_age_hours', String(state.filters.maxAge));
+    if (state.filters.alertableOnly) params.set('alertable_only', 'true');
+    if (state.filters.remoteOnly) params.set('remote_only', 'true');
 
     try {
       const [jobsRes, summaryRes] = await Promise.all([
@@ -1815,6 +1870,12 @@
       if (requestId !== jobsFeedRequestSequence) return;
 
       state.jobs = (jobsData.jobs || []).map(normalizeJob).filter(Boolean);
+      state.pagination = jobsData.pagination || {
+        page: state.feedPage, per_page: state.feedPageSize,
+        total: state.jobs.length, total_pages: 1,
+        has_previous: false, has_next: false,
+      };
+      state.feedPage = state.pagination.page || state.feedPage;
       state.summary = summaryData;
       state.isStaticFallback = false;
 
@@ -1829,6 +1890,7 @@
     } catch (err) {
       if (requestId !== jobsFeedRequestSequence) return;
       state.jobs = [];
+      state.pagination = { page: state.feedPage, per_page: state.feedPageSize, total: 0, total_pages: 0, has_previous: false, has_next: false };
       state.summary = null;
       state.isStaticFallback = false;
       updateTelemetry(0, 0, 0, 'Feed Offline');
@@ -1884,6 +1946,7 @@
       { value: 'linkedin', label: 'LinkedIn' },
       { value: 'naukri', label: 'Naukri' },
       { value: 'greenhouse', label: 'Greenhouse' },
+      { value: 'ashby', label: 'Ashby' },
       { value: 'instahyre', label: 'Instahyre' },
     ];
     if (dropdowns.source) {
@@ -1908,6 +1971,7 @@
         if (searchClear) searchClear.style.display = val ? 'inline-flex' : 'none';
         searchDebounceTimer = setTimeout(() => {
           state.filters.search = val.trim();
+          state.feedPage = 1;
           loadJobsFeed();
         }, 250);
       });
@@ -1918,6 +1982,7 @@
         if (searchInp) searchInp.value = '';
         searchClear.style.display = 'none';
         state.filters.search = '';
+        state.feedPage = 1;
         loadJobsFeed();
       });
     }
@@ -1947,7 +2012,8 @@
         state.filters.alertableOnly = !state.filters.alertableOnly;
         alertableBtn.classList.toggle('active', state.filters.alertableOnly);
         alertableBtn.setAttribute('aria-pressed', String(state.filters.alertableOnly));
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       });
     }
 
@@ -1957,13 +2023,28 @@
         state.filters.remoteOnly = !state.filters.remoteOnly;
         remoteBtn.classList.toggle('active', state.filters.remoteOnly);
         remoteBtn.setAttribute('aria-pressed', String(state.filters.remoteOnly));
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       });
     }
 
     // Refresh buttons
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
     if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
+
+    // Server-side job feed pagination.
+    if ($('previousJobsPageBtn')) $('previousJobsPageBtn').addEventListener('click', () => {
+      if (state.pagination?.has_previous) {
+        state.feedPage = Math.max(1, state.feedPage - 1);
+        loadJobsFeed();
+      }
+    });
+    if ($('nextJobsPageBtn')) $('nextJobsPageBtn').addEventListener('click', () => {
+      if (state.pagination?.has_next) {
+        state.feedPage += 1;
+        loadJobsFeed();
+      }
+    });
 
     // Inspector close button
     if ($('inspCloseBtn')) $('inspCloseBtn').addEventListener('click', closeJobInspector);
@@ -2016,7 +2097,8 @@
       value: state.filters.source,
       onChange: (val) => {
         state.filters.source = val;
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
 
@@ -2033,7 +2115,8 @@
       value: String(state.filters.minScore),
       onChange: (val) => {
         state.filters.minScore = Number(val);
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
 
@@ -2050,7 +2133,8 @@
       value: String(state.filters.maxAge),
       onChange: (val) => {
         state.filters.maxAge = Number(val);
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
 
@@ -2066,7 +2150,8 @@
       value: state.filters.sort,
       onChange: (val) => {
         state.filters.sort = val;
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
   }

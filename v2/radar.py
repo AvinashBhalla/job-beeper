@@ -551,6 +551,9 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
     if not row:
         return None
     job = dict(row)
+    if job.get("experience_min_years") is not None or job.get("experience_max_years") is not None:
+        job["jd_experience_min_years"] = job.get("experience_min_years")
+        job["jd_experience_max_years"] = job.get("experience_max_years")
     # Reuse only a fresh, exact-JD Gemini cache result that has validated
     # verbatim evidence for required total-professional experience. The regex
     # parser remains the fallback whenever Gemini is unavailable or ambiguous.
@@ -750,6 +753,10 @@ def init_db() -> None:
             discovery_latency_seconds INTEGER,
             description TEXT NOT NULL DEFAULT '',
             description_format TEXT NOT NULL DEFAULT 'plain',
+            experience_min_years REAL,
+            experience_max_years REAL,
+            experience_provenance TEXT NOT NULL DEFAULT 'unknown',
+            experience_confidence TEXT NOT NULL DEFAULT 'unknown',
             source_details_json TEXT NOT NULL DEFAULT '{}',
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
@@ -815,6 +822,10 @@ def init_db() -> None:
         )
         """)
         _ensure_column(conn, "jobs", "description_format", "TEXT NOT NULL DEFAULT 'plain'")
+        _ensure_column(conn, "jobs", "experience_min_years", "REAL")
+        _ensure_column(conn, "jobs", "experience_max_years", "REAL")
+        _ensure_column(conn, "jobs", "experience_provenance", "TEXT NOT NULL DEFAULT 'unknown'")
+        _ensure_column(conn, "jobs", "experience_confidence", "TEXT NOT NULL DEFAULT 'unknown'")
         _ensure_column(conn, "jobs", "source_details_json", "TEXT NOT NULL DEFAULT '{}'")
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
@@ -857,6 +868,11 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
         for incoming in jobs:
             j = dict(incoming)
             incoming_description = str(j.get("description") or "")
+            experience_details = _experience_provenance_details(j)
+            j["experience_min_years"] = experience_details["min_years"]
+            j["experience_max_years"] = experience_details["max_years"]
+            j["experience_provenance"] = experience_details["provenance"]
+            j["experience_confidence"] = experience_details["confidence"]
             incoming_description_format = (
                 "markdown"
                 if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -876,10 +892,29 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 j["discovery_latency_seconds"] = None
 
             existing = conn.execute(
-                "SELECT id, canonical_opportunity_id, discovered_at FROM jobs WHERE source=? AND source_job_id=?",
+                """SELECT id, canonical_opportunity_id, discovered_at,
+                          experience_min_years, experience_max_years,
+                          experience_provenance, experience_confidence
+                   FROM jobs WHERE source=? AND source_job_id=?""",
                 (j["source"], j["source_job_id"])
             ).fetchone()
             if existing:
+                experience_rank = {"unknown": 0, "inferred": 1, "description": 2, "employer_stated": 3}
+                confidence_rank = {"unknown": 0, "low": 1, "medium": 2, "high": 3}
+                existing_experience_rank = (
+                    experience_rank.get(str(existing[5] or "unknown"), 0),
+                    confidence_rank.get(str(existing[6] or "unknown"), 0),
+                )
+                incoming_experience_rank = (
+                    experience_rank.get(str(j["experience_provenance"]), 0),
+                    confidence_rank.get(str(j["experience_confidence"]), 0),
+                )
+                if incoming_experience_rank < existing_experience_rank:
+                    j["experience_min_years"] = existing[3]
+                    j["experience_max_years"] = existing[4]
+                    j["experience_provenance"] = existing[5]
+                    j["experience_confidence"] = existing[6]
+
                 posted_at_for_update = j["source_posted_at"]
                 precision_for_update = j["posted_precision"]
                 first_discovered_at = parse_relative(existing[2])
@@ -907,6 +942,16 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
                         ELSE description_format
                     END,
+                    experience_min_years=COALESCE(?, experience_min_years),
+                    experience_max_years=COALESCE(?, experience_max_years),
+                    experience_provenance=CASE
+                        WHEN ?!='unknown' THEN ?
+                        ELSE experience_provenance
+                    END,
+                    experience_confidence=CASE
+                        WHEN ?!='unknown' THEN ?
+                        ELSE experience_confidence
+                    END,
                     source_details_json=CASE
                         WHEN ? <> '{}' THEN ?
                         ELSE source_details_json
@@ -917,6 +962,9 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     precision_for_update,
                     incoming_description_format, incoming_description, incoming_description,
                     incoming_description_format, incoming_description, incoming_description_format,
+                    j["experience_min_years"], j["experience_max_years"],
+                    j["experience_provenance"], j["experience_provenance"],
+                    j["experience_confidence"], j["experience_confidence"],
                     source_details_json, source_details_json, existing[0]
                 ))
                 if not existing[1]:
@@ -930,6 +978,11 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 # LinkedIn enrichment may replace the original search snippet
                 # with a full JD; persist the post-enrichment values.
                 incoming_description = str(j.get("description") or "")
+                experience_details = _experience_provenance_details(j)
+                j["experience_min_years"] = experience_details["min_years"]
+                j["experience_max_years"] = experience_details["max_years"]
+                j["experience_provenance"] = experience_details["provenance"]
+                j["experience_confidence"] = experience_details["confidence"]
                 incoming_description_format = (
                     "markdown"
                     if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -947,14 +1000,17 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         source, source_job_id, company, title, location, url,
                         source_posted_at, posted_precision, discovered_at,
                         discovery_latency_seconds, description, description_format,
-                        source_details_json, first_seen_at, last_seen_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        experience_min_years, experience_max_years, experience_provenance,
+                        experience_confidence, source_details_json, first_seen_at, last_seen_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
                     j["source"], j["source_job_id"], j["company"], j["title"],
                     j["location"], j["url"], j["source_posted_at"],
                     j["posted_precision"], j["discovered_at"],
                     j["discovery_latency_seconds"], incoming_description,
-                    incoming_description_format, source_details_json,
+                    incoming_description_format, j["experience_min_years"],
+                    j["experience_max_years"], j["experience_provenance"],
+                    j["experience_confidence"], source_details_json,
                     j["discovered_at"], j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
@@ -1857,6 +1913,48 @@ def extract_linkedin_labeled_experience(text: str) -> tuple[float | None, float 
         years = float(single_match.group(1))
         return years, years
     return None, None
+
+
+def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
+    """Resolve job-level experience bounds and where the evidence came from.
+
+    LinkedIn's explicit Experience label is treated as employer-stated source
+    metadata. Explicit requirements parsed from the job description are
+    description-derived. Generic year mentions remain marked inferred rather
+    than being presented as an employer requirement.
+    """
+    description = str(job.get("description") or "")
+    source = str(job.get("source") or "").casefold()
+
+    if job.get("jd_experience_source") == "gemini_verified":
+        low = job.get("jd_experience_min_years")
+        high = job.get("jd_experience_max_years")
+        if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "high"}
+
+    if source == "linkedin":
+        low, high = extract_linkedin_labeled_experience(description)
+        if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
+
+    low, high = extract_jd_experience(description)
+    explicit_context = bool(re.search(
+        r"\b(?:overall|total|professional)\b[^.!?]{0,120}\bexperience\b"
+        r"|\bwork\s+experience\b"
+        r"|\bexperience\b[^.!?]{0,80}\b(?:required|minimum|at\s+least)\b"
+        r"|\b(?:minimum|at\s+least|required|requires?)\b[^.!?]{0,100}\bexperience\b"
+        r"|\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+experience\b",
+        description,
+        re.I,
+    ))
+    if (low is not None or high is not None) and explicit_context:
+        return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
+
+    low, high = extract_experience(f"{job.get('title', '')} {description}")
+    if low is not None or high is not None:
+        return {"min_years": low, "max_years": high, "provenance": "inferred", "confidence": "low"}
+
+    return {"min_years": None, "max_years": None, "provenance": "unknown", "confidence": "unknown"}
 
 
 def _linkedin_job_id(url: str) -> str | None:
@@ -3845,6 +3943,18 @@ def jobs(
     limit: int = 100,
     today_only: bool = False,
     q: str = "",
+    search: str = "",
+    page: int | None = None,
+    per_page: int | None = None,
+    status: str | None = None,
+    source: str = "",
+    min_score: int = 0,
+    max_age_hours: int | None = None,
+    sort: str = "newest",
+    sort_by: str | None = None,
+    sort_order: str | None = None,
+    alertable_only: bool = False,
+    remote_only: bool = False,
     user: dict[str, Any] = Depends(require_authenticated),
 ):
     preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
@@ -3855,26 +3965,114 @@ def jobs(
         )
     ensure_user_job_evaluations_initialized(user["id"], preferences)
     minutes = max(1, min(minutes, 10080))
-    limit = max(1, min(limit, 500))
+    legacy_limit = max(1, min(limit, 500))
+    paginated = page is not None or per_page is not None
+    page_number = max(1, int(page or 1))
+    page_size = max(1, min(int(per_page or legacy_limit), 100)) if paginated else legacy_limit
+    offset = (page_number - 1) * page_size if paginated else 0
     cutoff = (
         iso(current_day_start_utc())
         if today_only
         else iso(now() - dt.timedelta(minutes=minutes))
     )
 
-    # Apply text search in SQLite before LIMIT. Otherwise a relevant older
-    # posting can be hidden by the newest 500 rows and never reach the UI.
-    query = (q or "").strip()[:200]
+    query = (search or q or "").strip()[:200]
     escaped_query = (
         query.replace("\\", "\\\\")
         .replace("%", "\\%")
         .replace("_", "\\_")
     )
     search_pattern = f"%{escaped_query.lower()}%" if query else "%"
+    source_filter = (source or "").strip().casefold()[:64]
+    min_score = max(0, min(int(min_score), 100))
+    max_age_hours = None if max_age_hours is None else max(1, min(int(max_age_hours), 72))
+    status = (status or ("all" if user["role"] == "admin" else "matched")).strip().casefold()
+    if status not in {"matched", "all", "unmatched"}:
+        raise HTTPException(status_code=422, detail="status must be matched, all, or unmatched.")
+    if user["role"] != "admin" and status != "matched":
+        raise HTTPException(status_code=403, detail="Users can only view their matched opportunities.")
+    legacy_sort = sort if sort in {"newest", "match", "company"} else "newest"
+    sort_by = sort_by or {
+        "newest": "created_at", "match": "match_score", "company": "company"
+    }[legacy_sort]
+    if sort_by not in {"created_at", "match_score", "company"}:
+        raise HTTPException(status_code=422, detail="sort_by must be created_at, match_score, or company.")
+    sort_order = (sort_order or ("asc" if sort_by == "company" else "desc")).casefold()
+    if sort_order not in {"asc", "desc"}:
+        raise HTTPException(status_code=422, detail="sort_order must be asc or desc.")
+    age_cutoff = iso(now() - dt.timedelta(hours=max_age_hours)) if max_age_hours else None
+    threshold = int(preferences.get("match_threshold", 55))
 
+    score_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.score, 0) ELSE COALESCE(e.score, 0) END"
+    match_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END"
+    alertable_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.alertable, 0) ELSE COALESCE(e.alertable, 0) END"
+    where_sql = """
+        WHERE (?='all'
+          OR (?='matched' AND (CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END)=1)
+          OR (?='unmatched' AND ?='admin' AND COALESCE(ge.match, 0)=0))
+          AND j.discovered_at >= ?
+          AND LOWER(
+                COALESCE(j.company, '') || ' ' ||
+                COALESCE(j.title, '') || ' ' ||
+                COALESCE(j.location, '') || ' ' ||
+                COALESCE(j.source, '') || ' ' ||
+                COALESCE(j.source_job_id, '') || ' ' ||
+                COALESCE(j.description, '') || ' ' ||
+                COALESCE(j.source_details_json, '{{}}') || ' ' ||
+                COALESCE(e.reasons_json, '') || ' ' ||
+                COALESCE(ge.reasons_json, '')
+              ) LIKE ? ESCAPE '\\'
+          AND (?='' OR LOWER(j.source)=?)
+          AND (?=0 OR (
+                {score_sql} >= ?
+                AND (? < ? OR {match_sql}=1)
+              ))
+          AND (? IS NULL OR julianday(COALESCE(j.source_posted_at, j.discovered_at)) >= julianday(?))
+          AND (?=0 OR {alertable_sql}=1)
+          AND (?=0 OR LOWER(COALESCE(j.location, '') || ' ' || COALESCE(j.description, '')) LIKE '%remote%')
+    """.format(score_sql=score_sql, match_sql=match_sql, alertable_sql=alertable_sql)
+
+    base_params = (
+        user["id"], status, status, user["role"], status, user["role"],
+        cutoff, search_pattern,
+        source_filter, source_filter,
+        min_score, user["role"], min_score, min_score, threshold, user["role"],
+        age_cutoff, age_cutoff,
+        int(bool(alertable_only)), user["role"],
+        int(bool(remote_only)),
+    )
+
+    order_expressions = {
+        "created_at": "COALESCE(j.source_posted_at, j.discovered_at)",
+        "match_score": score_sql,
+        "company": "j.company COLLATE NOCASE",
+    }
+    order_sql = (
+        "ORDER BY " + order_expressions[sort_by] + " " + sort_order.upper()
+        + ", COALESCE(j.source_posted_at, j.discovered_at) DESC, j.id DESC"
+    )
+    order_params = (user["role"],) if sort_by == "match_score" else ()
+
+    count_params = (user["id"], *base_params[1:])
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        total = int(conn.execute(
+            "SELECT COUNT(*) FROM jobs j "
+            "LEFT JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=? "
+            "LEFT JOIN job_evaluations ge ON ge.job_id=j.id "
+            + where_sql,
+            count_params,
+        ).fetchone()[0])
+        page_count = (total + page_size - 1) // page_size if total else 0
+        if paginated and page_count:
+            page_number = min(page_number, page_count)
+            offset = (page_number - 1) * page_size
+        elif paginated and not page_count:
+            page_number = 1
+            offset = 0
+
+        rows = conn.execute(
+            """
             SELECT
                 j.*,
                 e.match AS evaluation_match,
@@ -3898,23 +4096,12 @@ def jobs(
             LEFT JOIN notification_ledger nl
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
              AND ?='admin'
-            WHERE j.discovered_at >= ?
-              AND (?='admin' OR e.match=1)
-              AND LOWER(
-                    COALESCE(j.company, '') || ' ' ||
-                    COALESCE(j.title, '') || ' ' ||
-                    COALESCE(j.location, '') || ' ' ||
-                    COALESCE(j.source, '') || ' ' ||
-                    COALESCE(j.source_job_id, '') || ' ' ||
-                    COALESCE(j.description, '') || ' ' ||
-                    COALESCE(j.source_details_json, '{}')
-                  ) LIKE ? ESCAPE '\\'
-            ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
-                     j.discovered_at DESC
-            LIMIT ?
-        """, (
-            user["id"], user["role"], cutoff, user["role"], search_pattern, limit
-        )).fetchall()
+            """
+            + where_sql
+            + " " + order_sql
+            + " LIMIT ? OFFSET ?",
+            (user["id"], user["role"], *base_params[1:], *order_params, page_size, offset),
+        ).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:
@@ -3936,19 +4123,24 @@ def jobs(
         item["source_details"] = (
             parsed_source_details if isinstance(parsed_source_details, dict) else {}
         )
-        # Telegram reads job_evaluations and notification_ledger directly.
-        # The dashboard deliberately returns those same decisions rather than
-        # independently re-running the matcher at request time.
         item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
         score = item.pop("evaluation_score", None)
         item["match_score"] = int(score or 0)
-        item["match_reasons"] = parse_json_list(
-            item.pop("evaluation_reasons_json", None)
-        )
+        item["match_reasons"] = parse_json_list(item.pop("evaluation_reasons_json", None))
         exp_min = item.pop("evaluation_experience_min_years", None)
         exp_max = item.pop("evaluation_experience_max_years", None)
-        item["experience_min_years"] = exp_min
-        item["experience_max_years"] = exp_max
+        item["experience_min_years"] = exp_min if exp_min is not None else item.get("experience_min_years")
+        item["experience_max_years"] = exp_max if exp_max is not None else item.get("experience_max_years")
+        item["experience_provenance"] = item.get("experience_provenance") or "unknown"
+        item["experience_confidence"] = item.get("experience_confidence") or "unknown"
+        if item["experience_provenance"] == "unknown":
+            inferred_experience = _experience_provenance_details(item)
+            item["experience_provenance"] = inferred_experience["provenance"]
+            item["experience_confidence"] = inferred_experience["confidence"]
+            if item["experience_min_years"] is None:
+                item["experience_min_years"] = inferred_experience["min_years"]
+            if item["experience_max_years"] is None:
+                item["experience_max_years"] = inferred_experience["max_years"]
         user_alertable = item.pop("evaluation_alertable", 0)
         user_alertability_reasons = item.pop("evaluation_alertability_reasons_json", None)
         admin_alertable = item.pop("admin_evaluation_alertable", 0)
@@ -3967,7 +4159,16 @@ def jobs(
         item["notification_last_error"] = item.get("notification_last_error")
         item["notification_candidate_job_id"] = item.get("notification_candidate_job_id")
         result.append(item)
-    return {"jobs": result}
+
+    pagination = {
+        "page": page_number,
+        "per_page": page_size,
+        "total": total,
+        "total_pages": page_count,
+        "has_previous": page_number > 1,
+        "has_next": offset + len(result) < total,
+    }
+    return {"jobs": result, "pagination": pagination}
 
 
 @app.get("/api/notification-queue", dependencies=[Depends(require_admin)])
@@ -4115,7 +4316,8 @@ def job_detail(
         row = conn.execute(
             """SELECT j.*, e.match AS likely_match, e.score AS match_score,
                       e.reasons_json AS match_reasons_json,
-                      e.experience_min_years, e.experience_max_years
+                      e.experience_min_years AS evaluation_experience_min_years,
+                      e.experience_max_years AS evaluation_experience_max_years
                FROM jobs j
                JOIN user_job_evaluations e
                  ON e.job_id=j.id AND e.user_id=?
@@ -4125,6 +4327,26 @@ def job_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
     result = dict(row)
+    result["experience_min_years"] = (
+        result.pop("evaluation_experience_min_years")
+        if result.get("evaluation_experience_min_years") is not None
+        else result.get("experience_min_years")
+    )
+    result["experience_max_years"] = (
+        result.pop("evaluation_experience_max_years")
+        if result.get("evaluation_experience_max_years") is not None
+        else result.get("experience_max_years")
+    )
+    result["experience_provenance"] = result.get("experience_provenance") or "unknown"
+    result["experience_confidence"] = result.get("experience_confidence") or "unknown"
+    if result["experience_provenance"] == "unknown":
+        inferred_experience = _experience_provenance_details(result)
+        result["experience_provenance"] = inferred_experience["provenance"]
+        result["experience_confidence"] = inferred_experience["confidence"]
+        if result["experience_min_years"] is None:
+            result["experience_min_years"] = inferred_experience["min_years"]
+        if result["experience_max_years"] is None:
+            result["experience_max_years"] = inferred_experience["max_years"]
     try:
         result["match_reasons"] = json.loads(result.pop("match_reasons_json") or "[]")
     except (TypeError, json.JSONDecodeError):

@@ -3282,3 +3282,16 @@ Latest feature checkpoint:
 - Google OAuth variables remain empty.
 
 Next engineering priority: implement backward-compatible server-side numeric pagination (and move filtering so it works across all pages), then explicitly trace/store/display experience provenance with confidence. Continue evaluating Lever/Hirist through permitted public/authorized interfaces; source labels in JobBeeper are not proof of globally searchable public APIs. Do not replay authenticated private endpoints, retain secrets, merge PR #46 or promote feature work to shared dev/production without explicit approval.
+
+
+## 2026-11-07 — Second-round JobBeeper evidence and implementation progress
+
+The owner completed a second-round investigation and supplied the updated sanitized report. Six request parameters are now observed: search, numeric page, per_page=20, status=matched, sort_by=created_at, and sort_order=desc. Tested search reset page=1. Company/role/experience/source/notification-status/sort dropdown mappings remain unknown; page-ID overlap and response schemas remain unknown; exact experience-provenance fields remain unknown; two extra detail probes were not completed. Active-subscription and hidden-tab refresh tests were unavailable because the account remained expired. Ten minutes of passive one-minute observations showed no feed refresh traffic, which is not proof of no polling at a longer cadence.
+
+The feature branch implementation now independently supports this request contract at /api/jobs, including backwards-compatible legacy query aliases. The dashboard requests per_page=20, numeric pages, status=matched for members, and newest-first sort_by=created_at and sort_order=desc. Our own API returns page totals and has-next/previous metadata; JobBeeper's corresponding response schema remains unknown. Search and our local source/score/age/alertability/remote filters run in SQL before pagination.
+
+Experience evidence is stored with a qualitative rule-based grade: LinkedIn explicit experience label -> employer_stated/high; explicit overall/professional/work JD requirement -> description/medium; generic or skill-specific year match -> inferred/low; no evidence -> unknown/unknown. This evidence strength is not a calibrated probability. Existing stronger provenance is preserved against weaker later observations.
+
+Focused API/dashboard contract suite: 28 passed, 1 skipped. Full V2 test and final feature rebuild status must be checked at the next checkpoint.
+
+Telegram dev bot verification is now confirmed from the owner's Windows getMe call: YourJobBeeperDevBot, ID 9293830763. The token remains private. Webhook registration and real link/opt-in/delivery/opt-out testing are still pending because a public HTTPS route for loopback-only port 8002 has not been arranged. Production bot remains untouched.

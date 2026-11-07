@@ -2,7 +2,7 @@
 
 ## Current implementation boundary
 
-The feature branch implements account linking plus a separate, explicit per-user notification opt-in and delivery path. Linking alone never enables notifications. Member alerts default off and use their own settings/ledger and linked private chat; the legacy global Telegram destination remains reserved for admin/operational alerts. The owner supplied the intended dedicated development bot handle `@YourJobBeeperDevBot`; the BotFather token and webhook secret are not configured yet. A real-bot end-to-end smoke test also requires a public HTTPS webhook endpoint. Quiet hours, per-user time zones, configurable frequency controls and delivery history are not implemented yet.
+The feature branch implements account linking plus a separate, explicit per-user notification opt-in and delivery path. Linking alone never enables notifications. Member alerts default off and use their own settings/ledger and linked private chat; the legacy global Telegram destination remains reserved for admin/operational alerts. The dedicated development bot @YourJobBeeperDevBot has been verified from the owner's Windows machine using Telegram getMe (bot ID 9293830763). Its private token, username and webhook secret are present in the isolated feature environment. A real-bot end-to-end smoke test still requires an approved public HTTPS webhook endpoint. Quiet hours, per-user time zones, configurable frequency controls and delivery history are not implemented yet.
 
 ## Server configuration
 
@@ -174,14 +174,14 @@ Per-user Telegram linking and notification delivery are implemented and unit-tes
 - Owner asked where to run `python -c "import secrets; print(secrets.token_urlsafe(32))"`. It can run in Windows PowerShell on the owner's PC; use `py -c ...` if `python` is not on PATH. It can also run in an Ubuntu shell as `python3 -c ...`. It does not need to run inside Telegram or in the Python application. The output is a separate webhook secret and must remain private.
 - `.env.feature` is currently absent on the server. `.env.feature.example` is tracked; `.env.feature` is ignored by `.gitignore`. After receiving the BotFather token, create the private server file with `cp .env.feature.example .env.feature`, edit it with `nano .env.feature`, and place the token/webhook secret there. Never paste either secret into ChatGPT.
 - The feature Compose service now passes `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_REDIRECT_URI` from the same private `--env-file`, in addition to the three Telegram variables. All are empty until privately configured. This fixes the previous gap where Google OAuth values in an env file would not reach the feature container.
-- The feature service remains loopback-only on `127.0.0.1:8002`; no Telegram webhook can be registered yet. A dedicated public HTTPS route must be approved and configured before `setWebhook`. No token was configured, no webhook registered, and no messages sent.
+- The feature service remains loopback-only on 127.0.0.1:8002. Bot credentials are configured privately and the bot identity was verified from Windows. No webhook is registered and no real member message has been sent; an approved public HTTPS route is required before setWebhook.
 
 
 ## 2026-11-07 — Owner configured isolated development bot environment
 
 - The owner supplied intended public bot handle @YourJobBeeperDevBot and has now created the private .env.feature file on the feature VM with mode 600.
 - Read-only container inspection confirmed the Telegram bot token, username and webhook secret environment variables are populated. Secret values were not printed or copied into the repository.
-- The feature container was rebuilt/recreated and is healthy on 127.0.0.1:8002 (/health returned ok). The server's outbound request to Telegram getMe timed out, so BotFather/API token acceptance and the bot identity are not yet independently verified. Retry only after outbound connectivity is available; do not share the token.
-- No webhook was registered and no Telegram message was sent. The service remains loopback-only; a public HTTPS route is still required before setWebhook.
-- Still pending: successful getMe, approved HTTPS routing, webhook registration, member account link, explicit opt-in, fresh matching-job delivery to the correct private chat, opt-out and disconnect. Production bot and ports remain untouched.
+- The owner verified Telegram getMe from Windows: username YourJobBeeperDevBot, bot ID 9293830763. This supersedes the earlier server-side getMe timeout; outbound Telegram API connectivity from the VM remains unverified.
+- The feature container is healthy on 127.0.0.1:8002. No webhook was registered and no real member message was sent. The service remains loopback-only; a public HTTPS route is still required before setWebhook.
+- Still pending: approved HTTPS routing, webhook registration, member account link, explicit opt-in, fresh matching-job delivery to the correct private chat, opt-out and disconnect. Production bot and ports remain untouched.
 - Google OAuth environment variables remain empty; live Google sign-in is not yet configured.

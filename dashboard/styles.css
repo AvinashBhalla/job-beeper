@@ -2131,3 +2131,31 @@ body.user-ready #userWorkspace {
     flex-direction: column;
   }
 }
+
+
+/* Server-side job-feed pagination */
+.feed-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--divider);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.feed-pagination[hidden] { display: none; }
+.feed-pagination button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+
+.experience-provenance-label {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  vertical-align: 1px;
+}

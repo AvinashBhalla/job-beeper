@@ -256,3 +256,33 @@ The sanitized browser report is now tracked at docs/JOBBEEPER_NETWORK_EVIDENCE_2
 5. Repeat the refresh observation on an active subscription and test each visible filter independently. Record only sanitized parameter names, HTTP outcomes and timing; do not retain private payloads or replay authenticated third-party requests.
 
 The report is behavioral evidence, not an implementation specification for JobBeeper's private backend.
+
+
+## 2026-11-07 — Second-round JobBeeper evidence and implementation checkpoint
+
+The second-round report is in docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. It confirms the list request shape more precisely:
+
+GET /api/user/jobs?page=1&per_page=20&status=matched&sort_by=created_at&sort_order=desc&search=java
+
+- search is a server-requested keyword parameter and the tested search resets page to 1.
+- page is numeric (1 and 2 observed), per_page=20, status=matched, sort_by=created_at, sort_order=desc.
+- The other visible filter controls were not individually tested. Do not invent their parameter names or values.
+- Ten idle one-minute observations again showed no feed refresh traffic. Because the account remained expired with a six-hour delay notice, active-subscription and hidden-tab refresh behavior remain unverified.
+- Response bodies were not retained. Pagination total fields, stable-ID overlap, actual provenance field names, extra detail request behavior and save/application tracking remain unknown.
+- Two additional source-diverse detail opens were not completed.
+
+### Independent implementation completed on the isolated feature branch
+
+The feature API and dashboard now support the observed feed request contract while preserving legacy callers:
+
+- GET /api/jobs accepts search, page, per_page, status, sort_by and sort_order. Legacy q, limit and sort remain supported.
+- The dashboard requests 20 rows per page, uses numeric Previous/Next navigation, sends status=matched for regular users and status=all for admins, and maps newest-first to sort_by=created_at and sort_order=desc.
+- Our own API returns pagination metadata (page, per_page, total, total_pages, has_previous, has_next). These are our implementation choices; JobBeeper's response fields are still unknown.
+- Search, source, score, age, alertability and remote filters are applied in SQLite before LIMIT/OFFSET, so filtering spans the full result set. Our app-specific filter parameter names are not claimed to be JobBeeper's.
+- Experience evidence is persisted as a range, provenance (employer_stated, description, inferred, unknown) and qualitative evidence strength (high, medium, low, unknown). The confidence value is a transparent rule-based evidence grade, not a calibrated probability.
+- The resolver treats an explicit LinkedIn Experience label as employer-stated/high; a clearly framed overall/professional/work requirement in the captured JD as description/medium; a generic or skill-specific years mention as inferred/low; missing evidence as unknown. Exact JobBeeper response fields and its own classifier remain unknown.
+- Existing rows migrate additively. We retain stronger existing provenance when a later weaker scrape does not provide equal evidence.
+
+### Test status for this checkpoint
+
+Focused API/dashboard contract suite: 28 passed, 1 skipped. Full-suite verification and the final isolated feature rebuild are still required before treating this implementation as complete. The feature branch stays isolated; shared dev and production are not changed.

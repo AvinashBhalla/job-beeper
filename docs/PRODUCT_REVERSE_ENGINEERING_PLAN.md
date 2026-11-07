@@ -128,3 +128,12 @@ The owner clarified that ingestion-first product priorities do not require seria
 - Unknowns remain: API response schemas, exact filter parameters beyond keyword search, timestamp semantics, longer polling/push behavior and private ingestion architecture.
 - Local comparison is recorded in docs/INGESTION_FIRST_ROADMAP.md. The first product changes are to bound dashboard polling, plan server-side pagination and close the experience-provenance gap; source expansion remains governed by the ingestion acceptance gates.
 - Continue only with the sanitized evidence. Do not retain/replay authenticated request bodies, cookies, authorization headers or account/session material.
+
+
+## 2026-11-07 — Second-round JobBeeper evidence and local feed parity work
+
+The second-round sanitized report is now in docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. It confirms search, numeric page, per_page=20, status=matched, sort_by=created_at and sort_order=desc. Search reset page=1 in the tested browser action. Other filter dropdown mappings, response schemas, stable page-ID overlap, exact experience provenance fields, repeated detail-view behavior, save/application requests, and active/hidden refresh behavior remain unknown. Ten idle one-minute windows again showed no refresh traffic, but the account remained expired with a six-hour feed-delay message, so no inference about an active subscription is justified.
+
+Our own isolated implementation now supports the observed list query vocabulary at GET /api/jobs while retaining legacy aliases. It applies its own search/source/score/age/alertability/remote filters in SQL before pagination; those local filter names are not claims about JobBeeper. The dashboard requests 20 jobs per page and provides numeric navigation. Our total/page/has-next response fields are locally designed because JobBeeper's response body was intentionally not retained.
+
+Experience values now carry a provenance category and qualitative evidence-strength grade in our data model and dashboard. The grade is rule-based and not a calibrated probability. Do not claim that our classifier reproduces JobBeeper's private implementation; its underlying provenance fields remain unknown.

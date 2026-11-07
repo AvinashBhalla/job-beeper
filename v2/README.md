@@ -111,7 +111,8 @@ For isolated smoke testing, use v2/docker-compose.feature.yml (port 8002, separa
 
 ## Feed behavior and authenticated JobBeeper comparison (2026-11-07)
 
-- Current member feed: GET /api/jobs?minutes=...&limit=...&q=...; keyword search is applied in SQLite before the result limit, with newest-first ordering. GET /api/jobs/{job_id} returns the current user's authorized job detail.
-- Current dashboard request loads up to 500 jobs from the preceding 72 hours. Numeric page/per_page response metadata is not implemented yet; see docs/INGESTION_FIRST_ROADMAP.md for the planned backward-compatible pagination work.
+- Current member feed: GET /api/jobs accepts search, page, per_page, status, sort_by and sort_order. Legacy q, limit and sort parameters remain supported. Search, source, score, age, alertability and remote filters are applied in SQLite before LIMIT/OFFSET. GET /api/jobs/{job_id} returns the current user's authorized job detail.
+- The dashboard requests 20 jobs per page and uses numeric Previous/Next navigation. Our API returns its own total/total_pages/has_previous/has_next metadata; JobBeeper's response schema remains unknown.
+- Job records persist experience range, provenance (employer_stated, description, inferred, unknown) and qualitative rule-based evidence strength (high, medium, low, unknown). Evidence strength is not a calibrated probability; exact JobBeeper provenance fields remain unknown.
 - The dashboard refreshes the feed once per minute while visible and refreshes on tab return. Periodic feed/source-status requests are skipped while hidden.
 - The authenticated JobBeeper comparison is in docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. Treat its observed request shapes as product evidence only, not an instruction to replay JobBeeper endpoints or copy private implementation details.

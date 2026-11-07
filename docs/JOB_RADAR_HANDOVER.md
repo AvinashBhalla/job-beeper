@@ -6347,3 +6347,23 @@ Feature environment:
 Latest branch head: \`3c247e7\`. GitHub V2 CI run \`42374315505\` passed the JS syntax check, focused router/extractor tests and full V2 suite. PR #46 remains open/draft and unmerged.
 
 Next work, in order: implement server-side numeric pagination with compatible legacy limit behavior; ensure filters/search operate across pages; trace/store/expose experience provenance and confidence; then test on an active JobBeeper subscription to resolve refresh cadence and apply other filter controls individually. Keep source expansion evidence-led and do not replay JobBeeper private requests.
+
+
+## 2026-11-07 — Second-round evidence reviewed; paginated feed implementation underway
+
+The owner supplied the second-round sanitized evidence report; its findings are added to docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. Supersedes any earlier note that says only keyword search/pagination basics were known.
+
+New observed request parameters/values: search=java, page=1|2, per_page=20, status=matched, sort_by=created_at, sort_order=desc. Tested search reset to page 1. All other dropdown mappings remain unknown because they were not individually exercised. Page-ID overlap, response schemas, exact provenance fields, two extra detail probes, repeat view-marking, save/application tracking and active/hidden refresh remain unknown. Ten passive one-minute captures again showed no feed traffic; the observed account was expired and showed a six-hour delay state, so do not generalize this to active subscription behavior.
+
+### Feature implementation in progress
+
+- GET /api/jobs now supports the observed list query vocabulary (search, page, per_page, status, sort_by, sort_order) and keeps legacy q, limit, sort behavior for existing clients.
+- Dashboard now fetches 20 jobs at a time, supports Previous/Next, resets to page 1 on search/filter changes, and uses the observed matched/newest-first request values for member feed requests.
+- App-specific source, score, age, alertable and remote filters are SQL-applied before pagination; do not report these filter parameter names as observed from JobBeeper.
+- Jobs persist extracted experience range, provenance and qualitative rule-based evidence strength. LinkedIn's explicit experience label is classified employer-stated/high; clearly framed JD requirements are description/medium; incidental or skill-specific years are inferred/low; missing evidence is unknown. This is our transparent heuristic, not proof of JobBeeper's underlying schema.
+- API/dashboard-focused suite passed 28 tests, 1 skipped after the new contract and evidence classification changes. Full V2 suite and final feature image rebuild are still pending at this point.
+- The branch remains feat/user-preferences-evaluations-20261106, PR #46 draft. Only the isolated port-8002 feature project may be rebuilt. Do not promote to shared dev or production without explicit approval.
+
+### Telegram bot verification update
+
+The owner verified the dedicated dev bot from Windows using Telegram getMe: username YourJobBeeperDevBot, bot ID 9293830763. The token remains private and must not enter Git/chat/logs. This verifies bot identity/token acceptance from the owner's machine; it does not complete webhook registration or message delivery. No public HTTPS webhook is registered yet; the isolated app remains loopback-only. Production bot Qdhorvbot remains untouched.

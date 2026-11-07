@@ -88,6 +88,105 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.assertIn("target role and location", response.json()["detail"])
 
 
+    def test_job_feed_numeric_pagination_has_stable_pages_and_total(self):
+        config = {**radar.get_config(), "notifications_enabled": False}
+        extra_jobs = [
+            radar.normalize_job(
+                "naukri", f"python-extra-{index}", "Acme", "Python Developer",
+                "Bengaluru, Karnataka, India", f"https://example.com/python-{index}",
+                None, "unknown", "Overall experience required: 1-2 years. Build Python APIs.",
+            )
+            for index in range(5)
+        ]
+        radar.upsert_jobs(extra_jobs, config)
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+
+        first = self.client.get("/api/jobs?minutes=10080&page=1&per_page=2&status=matched&sort_by=created_at&sort_order=desc&search=python")
+        second = self.client.get("/api/jobs?minutes=10080&page=2&per_page=2&status=matched&sort_by=created_at&sort_order=desc&search=python")
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        first_data = first.json()
+        second_data = second.json()
+        self.assertEqual(len(first_data["jobs"]), 2)
+        self.assertEqual(len(second_data["jobs"]), 2)
+        self.assertEqual(first_data["pagination"]["page"], 1)
+        self.assertEqual(first_data["pagination"]["per_page"], 2)
+        self.assertEqual(first_data["pagination"]["total"], 6)
+        self.assertEqual(first_data["pagination"]["total_pages"], 3)
+        self.assertTrue(first_data["pagination"]["has_next"])
+        self.assertTrue(second_data["pagination"]["has_previous"])
+        self.assertEqual(
+            set(job["id"] for job in first_data["jobs"]).intersection(
+                job["id"] for job in second_data["jobs"]
+            ),
+            set(),
+        )
+        self.assertEqual(self.client.get("/api/jobs?status=all").status_code, 403)
+        self.assertEqual(self.client.get("/api/jobs?status=not-a-status").status_code, 422)
+
+    def test_job_feed_exposes_experience_evidence_provenance(self):
+        config = {**radar.get_config(), "notifications_enabled": False}
+        jobs = [
+            radar.normalize_job(
+                "linkedin", "python-employer-exp", "Acme", "Python Developer",
+                "Bengaluru, Karnataka, India", "https://example.com/linkedin-exp",
+                None, "unknown", "Experience: 1-2 Years. Build Python backend services.",
+            ),
+            radar.normalize_job(
+                "naukri", "python-description-exp", "Acme", "Python Developer",
+                "Bengaluru, Karnataka, India", "https://example.com/naukri-exp",
+                None, "unknown", "Overall experience required: 1-2 years. Build Python APIs.",
+            ),
+            radar.normalize_job(
+                "instahyre", "python-inferred-exp", "Acme", "Python Developer",
+                "Bengaluru, Karnataka, India", "https://example.com/instahyre-exp",
+                None, "unknown", "Work with Python and Django; 2 years of Python experience preferred.",
+            ),
+        ]
+        radar.upsert_jobs(jobs, config)
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        response = self.client.get("/api/jobs?minutes=10080&page=1&per_page=20&status=matched")
+        self.assertEqual(response.status_code, 200, response.text)
+        by_source_job_id = {job["source_job_id"]: job for job in response.json()["jobs"]}
+        self.assertEqual(by_source_job_id["python-employer-exp"]["experience_provenance"], "employer_stated")
+        self.assertEqual(by_source_job_id["python-employer-exp"]["experience_confidence"], "high")
+        self.assertEqual(by_source_job_id["python-description-exp"]["experience_provenance"], "description")
+        self.assertEqual(by_source_job_id["python-description-exp"]["experience_confidence"], "medium")
+        self.assertEqual(by_source_job_id["python-inferred-exp"]["experience_provenance"], "inferred")
+        self.assertEqual(by_source_job_id["python-inferred-exp"]["experience_confidence"], "low")
+
+    def test_weaker_experience_observation_does_not_overwrite_stronger_provenance(self):
+        config = {**radar.get_config(), "notifications_enabled": False}
+        employer_stated = radar.normalize_job(
+            "linkedin", "same-source-job", "Acme", "Python Developer",
+            "Bengaluru, Karnataka, India", "https://example.com/same-source-job",
+            None, "unknown", "Experience: 4-6 Years. Build Python backend services.",
+        )
+        weaker_snippet = radar.normalize_job(
+            "linkedin", "same-source-job", "Acme", "Python Developer",
+            "Bengaluru, Karnataka, India", "https://example.com/same-source-job",
+            None, "unknown", "2 years of Python experience preferred.",
+        )
+        radar.upsert_jobs([employer_stated], config)
+        radar.upsert_jobs([weaker_snippet], config)
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT experience_min_years, experience_max_years, experience_provenance "
+                "FROM jobs WHERE source_job_id='same-source-job'"
+            ).fetchone()
+        self.assertEqual(row, (4.0, 6.0, "employer_stated"))
+
+    def test_job_feed_filters_and_match_sort_apply_before_pagination(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        response = self.client.get(
+            "/api/jobs?minutes=10080&page=1&per_page=20&status=matched&source=naukri&min_score=55&sort_by=match_score&sort_order=desc"
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        self.assertEqual(data["pagination"]["total"], 1)
+        self.assertEqual(len(data["jobs"]), 1)
+        self.assertEqual(data["jobs"][0]["source"], "naukri")
+
     def test_telegram_linking_requires_authentication_and_configuration(self):
         response = self.client.post("/api/telegram/link")
         self.assertEqual(response.status_code, 401)
