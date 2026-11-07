@@ -208,3 +208,8 @@ The owner has asked that the existing authentication, resume-assisted onboarding
 - The owner is creating a dedicated development Telegram bot. Configure it only in the isolated feature environment; keep the production bot untouched. Live webhook testing waits for a public HTTPS endpoint.
 - The owner is separately collecting sanitized JobBeeper Network evidence with Codex `@Chrome` and full CDP. The evidence report/HAR will be reviewed here when supplied; do not replay private endpoints or include credentials.
 - Latest isolated feature verification on 2026-11-07: 262 V2 tests passed, 1 skipped. See the handover files and `docs/TELEGRAM_PER_USER_SETUP.md` for exact changes and remaining live E2E steps.
+
+
+### Feature-track follow-up — resume parser tests (2026-11-07)
+
+- The parallel feature branch now has 15 focused resume-parser tests and the full isolated V2 suite passes 270 tests with 1 skipped. Coverage includes PDF page/encryption limits and DOCX archive expansion defenses. This does not change ingestion priorities; it keeps the separate feature work healthy while JobBeeper evidence gathering continues.

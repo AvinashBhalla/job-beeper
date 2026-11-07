@@ -6296,3 +6296,11 @@ See `docs/INGESTION_FIRST_ROADMAP.md` for adapter contract, source matrix, brows
 - No dev bot configured yet; no external Telegram message/webhook was used; production bot `Qdhorvbot` remains untouched. Live E2E still required: link, explicit opt-in, newly discovered matching job, correct recipient, opt-out and disconnect.
 - GitHub CI for the latest uncommitted changes is pending. After docs are updated, commit/push to the same feature branch and verify V2 CI. Keep branch isolated.
 - JobBeeper investigation deliverable is the sanitized report/HAR from the separate browser chat. On receipt, review the evidence, create `docs/JOBBEEPER_NETWORK_EVIDENCE_YYYY-MM-DD.md`, compare observed behavior to actual collectors, and update ingestion docs. Do not trust unsanitized HAR credentials or replay private endpoints.
+
+
+## 2026-11-07 — Resume parser boundary tests expanded
+
+- Expanded `v2/test_resume_parser.py` from 7 to 15 focused tests. New tests cover PDF page cap and encryption, DOCX tables, ZIP entry-count limit, aggregate uncompressed-size limit, unsafe compression ratio, invalid zero-compressed-size entries and extracted text cap. These test safeguards already present in `v2/resume_parser.py`; parser implementation was not changed.
+- Focused parser suite passed **15/15**. Full V2 suite in the isolated feature container passed **270 tests, 1 skipped**. `httpx2` was installed temporarily for tests; `JOB_BEEPER_COOKIE_SECURE=true` applied only to the test process.
+- Previous code/documentation commit `7088319` was pushed and its GitHub V2 CI run `42369403418` passed (Python syntax, modern Node dashboard syntax, focused tests and full V2 suite). The parser-only test additions and their documentation updates still need commit/push and a new CI run.
+- Branch remains `feat/user-preferences-evaluations-20261106`, PR #46 draft, feature container on 8002 only. Shared dev 8001 and production 8000 remain untouched.
