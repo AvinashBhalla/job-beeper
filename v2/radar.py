@@ -28,7 +28,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, google_oauth, resume_parser, telegram_linking, user_preferences
+from v2 import auth, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -845,6 +845,7 @@ def init_db() -> None:
     auth.init_auth_schema(DB_PATH)
     user_preferences.init_preferences_schema(DB_PATH)
     telegram_linking.init_schema(DB_PATH)
+    user_notifications.init_schema(DB_PATH)
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
@@ -3095,7 +3096,15 @@ async def notification_worker() -> None:
                 if delivered:
                     log.info("telegram: delivered=%s", delivered)
         except Exception:
-            log.exception("telegram worker failed")
+            log.exception("legacy Telegram worker failed")
+
+        # Member delivery is independent of the legacy admin chat ID.
+        try:
+            user_delivered = await asyncio.to_thread(user_notifications.dispatch, DB_PATH, 20, MATCHER_RULES_VERSION)
+            if user_delivered:
+                log.info("telegram: per-user delivered=%s", user_delivered)
+        except Exception:
+            log.exception("per-user Telegram worker failed")
 
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=15)
@@ -3441,6 +3450,30 @@ async def parse_user_resume(
         await file.close()
     # Deliberately return only bounded suggestions. No file, path, raw text, or DB write.
     return result
+
+
+@app.get("/api/notifications/settings")
+def read_user_notification_settings(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    settings = user_notifications.get_settings(DB_PATH, user["id"])
+    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    return {"settings": settings, "telegram_connected": bool(connection)}
+
+
+@app.put("/api/notifications/settings")
+def update_user_notification_settings(payload: dict[str, Any], user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    if set(payload) != {"enabled"} or not isinstance(payload.get("enabled"), bool):
+        raise HTTPException(status_code=422, detail="Provide only an enabled boolean.")
+    if payload["enabled"] and not telegram_linking.get_connection(DB_PATH, user["id"]):
+        raise HTTPException(status_code=409, detail="Connect a private Telegram chat before enabling notifications.")
+    try:
+        settings = user_notifications.set_enabled(DB_PATH, user["id"], payload["enabled"])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"settings": settings}
 
 
 @app.get("/api/telegram/status")

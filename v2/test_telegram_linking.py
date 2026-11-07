@@ -66,6 +66,15 @@ class TelegramLinkingTests(unittest.TestCase):
         self.assertFalse(telegram_linking.disconnect(self.db_path, self.user_a["id"]))
         self.assertIsNone(telegram_linking.get_connection(self.db_path, self.user_a["id"]))
 
+    def test_disconnect_turns_off_member_notifications(self):
+        from v2 import user_notifications
+        user_notifications.init_schema(self.db_path)
+        token, _ = telegram_linking.create_link_token(self.db_path, self.user_a["id"], now=100)
+        telegram_linking.consume_link_token(self.db_path, token, "123456", now=101)
+        user_notifications.set_enabled(self.db_path, self.user_a["id"], True)
+        self.assertTrue(telegram_linking.disconnect(self.db_path, self.user_a["id"]))
+        self.assertFalse(user_notifications.get_settings(self.db_path, self.user_a["id"])["enabled"])
+
     def test_database_stores_only_token_hash(self):
         token, _ = telegram_linking.create_link_token(self.db_path, self.user_a["id"], now=100)
         with sqlite3.connect(self.db_path) as connection:

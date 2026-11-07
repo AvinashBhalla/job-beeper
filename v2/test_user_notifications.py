@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from v2 import user_notifications
+
+
+class UserNotificationServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self.tmp.name) / 'notifications.sqlite3'
+        with user_notifications._connect(self.db) as conn:
+            conn.executescript('''
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE users(id INTEGER PRIMARY KEY);
+            CREATE TABLE jobs(id INTEGER PRIMARY KEY, canonical_opportunity_id INTEGER, discovered_at TEXT,
+              title TEXT, company TEXT, location TEXT, url TEXT, source TEXT);
+            CREATE TABLE canonical_opportunities(id INTEGER PRIMARY KEY);
+            CREATE TABLE user_preferences(user_id INTEGER PRIMARY KEY, preferences_json TEXT);
+            CREATE TABLE user_job_evaluations(user_id INTEGER, job_id INTEGER, preference_fingerprint TEXT, match INTEGER, score INTEGER, reasons_json TEXT);
+            CREATE TABLE user_telegram_chats(user_id INTEGER PRIMARY KEY, chat_id TEXT, chat_type TEXT);
+            INSERT INTO users VALUES(1),(2);
+            INSERT INTO canonical_opportunities VALUES(101),(102),(103);
+            INSERT INTO jobs VALUES(1,101,'2026-11-07T10:00:00+00:00','Python Dev','Acme','Pune','https://example.com/1','naukri');
+            INSERT INTO jobs VALUES(2,102,'2026-11-07T10:00:00+00:00','QA Dev','Beta','Delhi','https://example.com/2','naukri');
+            INSERT INTO jobs VALUES(3,103,'2026-11-06T10:00:00+00:00','Old Dev','OldCo','Pune','https://example.com/3','naukri');
+            INSERT INTO user_preferences VALUES(1,'{"match_threshold":55}'),(2,'{"match_threshold":55}');
+            INSERT INTO user_telegram_chats VALUES(1,'111','private'),(2,'222','private');
+            ''')
+        user_notifications.init_schema(self.db)
+        from v2 import user_preferences
+        for uid in (1, 2):
+            fingerprint = user_preferences.preferences_fingerprint({**user_preferences.PREFERENCE_DEFAULTS, "match_threshold": 55}, 3)
+            with user_notifications._connect(self.db) as conn:
+                job_id = 1 if uid == 1 else 2
+                score = 90 if uid == 1 else 88
+                conn.execute("INSERT INTO user_job_evaluations VALUES(?,?,?,?,?,?)", (uid, job_id, fingerprint, 1, score, '[]'))
+        fingerprint = user_preferences.preferences_fingerprint({**user_preferences.PREFERENCE_DEFAULTS, "match_threshold": 55}, 3)
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_job_evaluations VALUES(?,?,?,?,?,?)", (1, 3, fingerprint, 1, 99, '[]'))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_default_is_off_and_explicit_enable_sets_baseline(self):
+        self.assertFalse(user_notifications.get_settings(self.db, 1)['enabled'])
+        enabled = user_notifications.set_enabled(self.db, 1, True)
+        self.assertTrue(enabled['enabled'])
+        self.assertIsNotNone(enabled['enabled_at'])
+        self.assertFalse(user_notifications.set_enabled(self.db, 1, False)['enabled'])
+
+    def test_queue_is_user_scoped_and_never_replays_pre_opt_in_jobs(self):
+        # Baseline is after the old job and before the two fresh jobs.
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings VALUES(2,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+        with user_notifications._connect(self.db) as conn:
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
+            self.assertEqual(user_notifications._queue_new_matches(conn, 2, '2026-11-07T00:00:00+00:00'), 1)
+            rows = [tuple(row) for row in conn.execute('SELECT user_id,candidate_job_id FROM user_notification_ledger ORDER BY user_id').fetchall()]
+        self.assertEqual(rows, [(1, 1), (2, 2)])
+
+    def test_disconnect_or_disable_cancels_pending_work_and_turns_off(self):
+        user_notifications.set_enabled(self.db, 1, True)
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_ledger(user_id,canonical_opportunity_id,candidate_job_id,status,created_at,updated_at) VALUES(1,101,1,'queued','x','x')")
+        user_notifications.set_enabled(self.db, 1, False)
+        with user_notifications._connect(self.db) as conn:
+            status = conn.execute('SELECT status FROM user_notification_ledger WHERE user_id=1').fetchone()[0]
+        self.assertEqual(status, 'cancelled')
+
+    def test_stale_preference_evaluation_is_not_queued(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("UPDATE user_job_evaluations SET preference_fingerprint='stale' WHERE user_id=1 AND job_id=1")
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 0)
+
+    def test_queue_is_idempotent_for_same_user_and_opportunity(self):
+        with user_notifications._connect(self.db) as conn:
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 0)
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM user_notification_ledger WHERE user_id=1').fetchone()[0], 1)
+
+    def test_transient_delivery_failure_is_recorded_for_retry(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
+        response = unittest.mock.Mock(status_code=503)
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response):
+            self.assertEqual(user_notifications.dispatch(self.db, 1), 0)
+        with user_notifications._connect(self.db) as conn:
+            row = conn.execute('SELECT status,attempt_count,next_attempt_at,last_error FROM user_notification_ledger').fetchone()
+        self.assertEqual(row['status'], 'failed')
+        self.assertEqual(row['attempt_count'], 1)
+        self.assertIsNotNone(row['next_attempt_at'])
+        self.assertEqual(row['last_error'], 'RuntimeError')
+
+    def test_dispatch_sends_only_to_owner_chat_and_marks_sent(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
+        response = unittest.mock.Mock(status_code=200)
+        response.json.return_value = {'ok': True}
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response) as post:
+            self.assertEqual(user_notifications.dispatch(self.db, 5), 1)
+        self.assertEqual(post.call_args.kwargs['json']['chat_id'], '111')
+        with user_notifications._connect(self.db) as conn:
+            self.assertEqual(conn.execute('SELECT status FROM user_notification_ledger').fetchone()[0], 'sent')
+
+
+if __name__ == '__main__':
+    unittest.main()

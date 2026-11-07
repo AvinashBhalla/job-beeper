@@ -5,6 +5,7 @@ import hashlib
 import secrets
 import sqlite3
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -111,5 +112,23 @@ def get_connection(db_path: Path, user_id: int) -> dict[str, Any] | None:
 
 def disconnect(db_path: Path, user_id: int) -> bool:
     with _connect(Path(db_path)) as connection:
+        connection.execute("BEGIN IMMEDIATE")
         cursor = connection.execute("DELETE FROM user_telegram_chats WHERE user_id=?", (int(user_id),))
+        tables = {
+            row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        stamp = datetime.now(timezone.utc).isoformat()
+        if "user_notification_settings" in tables:
+            connection.execute(
+                "UPDATE user_notification_settings SET enabled=0,enabled_at=NULL,updated_at=? WHERE user_id=?",
+                (stamp, int(user_id)),
+            )
+        if "user_notification_ledger" in tables:
+            connection.execute(
+                "UPDATE user_notification_ledger SET status='cancelled',updated_at=? "
+                "WHERE user_id=? AND status IN ('queued','failed','sending')",
+                (stamp, int(user_id)),
+            )
     return cursor.rowcount > 0

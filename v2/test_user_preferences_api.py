@@ -95,6 +95,29 @@ class UserScopedJobFeedTests(unittest.TestCase):
         response = self.client.post("/api/telegram/link", headers={"X-CSRF-Token": self.client.cookies.get("job_beeper_csrf")})
         self.assertEqual(response.status_code, 503)
 
+    def test_member_notification_settings_are_opt_in_and_require_linked_chat_and_csrf(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        initial = self.client.get("/api/notifications/settings")
+        self.assertEqual(initial.status_code, 200)
+        self.assertFalse(initial.json()["settings"]["enabled"])
+        self.assertFalse(initial.json()["telegram_connected"])
+        denied_csrf = self.client.put("/api/notifications/settings", json={"enabled": True})
+        self.assertEqual(denied_csrf.status_code, 403)
+        not_linked = self.client.put("/api/notifications/settings", json={"enabled": True}, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(not_linked.status_code, 409)
+        from v2 import telegram_linking
+        token, _ = telegram_linking.create_link_token(self.db_path, self.user_a["id"])
+        self.assertIsNotNone(telegram_linking.consume_link_token(self.db_path, token, "123456789", "private"))
+        enabled = self.client.put("/api/notifications/settings", json={"enabled": True}, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(enabled.status_code, 200, enabled.text)
+        self.assertTrue(enabled.json()["settings"]["enabled"])
+        self.assertIsNotNone(enabled.json()["settings"]["enabled_at"])
+        self.assertEqual(self.client.put("/api/notifications/settings", json={"enabled": "yes"}, headers={"X-CSRF-Token": csrf}).status_code, 422)
+        disabled = self.client.put("/api/notifications/settings", json={"enabled": False}, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(disabled.status_code, 200)
+        self.assertFalse(disabled.json()["settings"]["enabled"])
+
     def test_telegram_link_api_and_webhook_are_secret_protected(self):
         self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
         csrf = self.client.cookies.get("job_beeper_csrf")

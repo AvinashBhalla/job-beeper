@@ -60,3 +60,24 @@ A member disconnect removes only their chat mapping. If a chat is compromised, d
 ## Tests and deployment status
 
 Automated tests cover valid linking, hashed token storage, expiry, replay, old-token invalidation, private-chat-only behavior, duplicate chat ownership, relink, disconnect, authentication, CSRF, webhook secret rejection, and cross-user isolation. The code has not been deployed or tested against a real Telegram bot yet. A bot username, bot token, webhook secret, and public HTTPS webhook origin are required for a live end-to-end smoke test. Configure them privately; never send secrets in this conversation.
+
+## Per-user notification delivery — implementation in progress (2026-11-07)
+
+The first opt-in delivery slice is now implemented on the feature branch; it is **not yet pushed to the dev deployment or production**.
+
+- `v2/user_notifications.py` owns a separate `user_notification_settings` table and tenant-scoped `user_notification_ledger`. It does not reuse or mutate the legacy global `notification_ledger`.
+- Member settings default to off. `PUT /api/notifications/settings` accepts only `{ "enabled": true|false }`, requires the authenticated member session and CSRF protection, and refuses opt-in until a private Telegram chat is linked.
+- Enabling records `enabled_at`; only matching jobs whose `discovered_at` is at or after that activation boundary are queued. Previously discovered jobs are not backfilled. The user's saved `match_threshold` is applied.
+- Queue identity is `(user_id, canonical_opportunity_id)`, preventing duplicate delivery to the same member while allowing the same opportunity to be independently evaluated for another member.
+- Dispatch resolves the recipient only by joining the ledger owner to that owner's private `user_telegram_chats` mapping. The chat ID is never accepted from a browser request or returned by the settings API.
+- Disconnecting Telegram turns member alerts off and cancels queued/retryable/in-flight ledger rows. Turning alerts off does the same. Re-enabling creates a fresh activation boundary.
+- Delivery attempts are claimed transactionally, use bounded exponential retry for transient failures, stop after six attempts, and recover stale claims after a process restart. The worker runs member delivery independently of the legacy admin chat ID requirement.
+- Dashboard now exposes an explicit opt-in checkbox, disabled until Telegram is connected. Link and notification opt-in remain distinct actions.
+- The production bot token is used only as an outbound API credential by this code; no webhook, production config, or production service was changed during implementation.
+
+### Verification and remaining work
+
+- Seven focused service tests pass locally: default-off, explicit activation, no historical replay, per-user isolation, idempotent queueing, owner-chat delivery, disable/cancel, and retry scheduling.
+- The host Python environment does not have the application's FastAPI/argon2 dependencies, and Docker access is denied to the development SSH user. Therefore the API integration suite and full project suite still need to run in CI or an authorized dev runtime. The host's Node runtime is also too old for existing optional-chaining/nullish-coalescing syntax in `dashboard/app.js`; this is an environment limitation, not a new syntax regression.
+- Before dev rollout: run the complete Python suite and frontend checks in the project's supported container/runtime; review retry/disable race behavior; confirm the dev environment has a separate test bot token and webhook configuration; then deploy to dev and smoke-test link → opt-in → new matching job → delivery → disable/disconnect. Do not register the production bot webhook or send production member alerts before an approved production release.
+- Quiet hours, per-user time zones, configurable frequency limits, and a user-facing delivery history are intentionally not included in this first slice and should be assessed before enabling member notifications broadly.

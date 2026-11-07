@@ -3169,3 +3169,18 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Old production checkout `/home/ubuntu/job-beeper` at `61d8271` is 613 commits behind; its Compose passes only legacy token/chat ID, not the new bot username/webhook secret and does not have the new endpoint. Do not deploy from it or register webhook until updated app is deployed.
 - Decision: existing production bot `Qdhorvbot` can be reused in final release. Add `JOB_BEEPER_TELEGRAM_BOT_USERNAME=Qdhorvbot` and a new private webhook secret only during approved deployment; preserve admin chat ID. Use a dedicated test bot for dev. No production config changes/restart/deployment. See `docs/TELEGRAM_PER_USER_SETUP.md`.
 - Next: tenant-scoped opt-in + delivery ledger + per-user notifier, separate from global admin `v2/telegram.py`; fix global alertability coupling without changing admin semantics; tests for default-off, multi-user isolation, dedupe/retry, disconnect.
+
+## 2026-11-07 — Per-user Telegram alerts implementation checkpoint
+
+Current branch: `feat/user-preferences-evaluations-20261106` (uncommitted at checkpoint creation; inspect `git status` and latest commit before continuing).
+
+Implementation added:
+- `v2/user_notifications.py` — per-user settings and ledger, default-off, activation cutoff, per-user score threshold, tenant-scoped dedupe, private owner-chat routing, transactional claim, retry/backoff and stale claim recovery, and a preference-fingerprint freshness check that prevents dispatch against stale evaluations.
+- `v2/radar.py` — schema initialization, authenticated/CSRF settings endpoints, and a separate notification-worker call independent from legacy admin chat credentials.
+- `v2/telegram_linking.py` — disconnect now disables alerts and cancels outstanding member delivery rows.
+- `dashboard/index.html` and `dashboard/app.js` — explicit opt-in checkbox and settings/status wiring.
+- `v2/test_user_notifications.py`, plus API and linking regression tests.
+
+Validation so far: six focused `v2.test_user_notifications` tests pass. Python AST parsing and `git diff --check` pass. Full API suite could not run on the host because FastAPI and argon2 are not installed; Docker is inaccessible to the SSH user. The host Node is old enough to reject pre-existing `??` syntax in `dashboard/app.js`, so use the supported CI Node runtime.
+
+Important boundaries: no production deployment or webhook change; no actual Telegram sends; no member alerts are enabled by default. Dev push/deployment should wait for full CI, code review, and a separate test bot/dev webhook smoke test. See `docs/TELEGRAM_PER_USER_SETUP.md` for the detailed behavior and rollout checklist.

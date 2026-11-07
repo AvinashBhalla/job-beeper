@@ -1592,8 +1592,46 @@
       if (createButton) createButton.hidden = !data.configured;
       const disconnectButton = $('disconnectTelegramBtn');
       if (disconnectButton) disconnectButton.hidden = !connected;
+      const notificationToggle = $('telegramNotificationsEnabled');
+      const notificationStatus = $('telegramNotificationSettingsStatus');
+      try {
+        const settingsResponse = await authClient.request('/notifications/settings', { cache: 'no-store' });
+        const settingsData = await settingsResponse.json().catch(() => ({}));
+        if (!settingsResponse.ok) throw new Error(settingsData.detail || 'Could not load notification settings.');
+        if (notificationToggle) {
+          notificationToggle.checked = Boolean(settingsData.settings?.enabled);
+          notificationToggle.disabled = !connected;
+        }
+        if (notificationStatus) notificationStatus.textContent = settingsData.settings?.enabled
+          ? `Job alerts are on. Only jobs discovered after ${new Date(settingsData.settings.enabled_at).toLocaleString()} are eligible.`
+          : connected ? 'Job alerts are off. Turn them on to receive matching jobs discovered from that point forward.' : 'Connect Telegram before enabling alerts. Alerts are off by default.';
+      } catch (settingsError) {
+        if (notificationStatus) notificationStatus.textContent = settingsError.message || 'Could not load notification settings.';
+      }
     } catch (error) {
       if (status) status.textContent = error.message || 'Could not load Telegram status.';
+    }
+  }
+
+  async function updateTelegramNotificationSetting() {
+    const toggle = $('telegramNotificationsEnabled');
+    const status = $('telegramNotificationSettingsStatus');
+    if (!toggle) return;
+    toggle.disabled = true;
+    try {
+      const response = await authClient.request('/notifications/settings', {
+        method: 'PUT', body: { enabled: Boolean(toggle.checked) },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not update notification settings.');
+      if (status) status.textContent = data.settings.enabled
+        ? 'Job alerts are on. Only jobs discovered after now are eligible; older jobs will not be sent.'
+        : 'Job alerts are off. No further member alerts will be sent.';
+    } catch (error) {
+      toggle.checked = !toggle.checked;
+      if (status) status.textContent = error.message || 'Could not update notification settings.';
+    } finally {
+      await loadTelegramStatus();
     }
   }
 
@@ -1959,6 +1997,7 @@
     if ($('savePreferencesBtn')) $('savePreferencesBtn').addEventListener('click', savePreferences);
     if ($('parseResumeBtn')) $('parseResumeBtn').addEventListener('click', parseResumeForSuggestions);
     if ($('createTelegramLinkBtn')) $('createTelegramLinkBtn').addEventListener('click', createTelegramLink);
+    if ($('telegramNotificationsEnabled')) $('telegramNotificationsEnabled').addEventListener('change', updateTelegramNotificationSetting);
     if ($('refreshTelegramStatusBtn')) $('refreshTelegramStatusBtn').addEventListener('click', loadTelegramStatus);
     if ($('disconnectTelegramBtn')) $('disconnectTelegramBtn').addEventListener('click', disconnectTelegram);
 

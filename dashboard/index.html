@@ -461,6 +461,11 @@
               <p class="form-help-text">Connect your private Telegram chat to this Job Beeper account. Linking is optional and does not enable job notifications by itself.</p>
               <p id="telegramConnectionStatus" class="auth-description" role="status" aria-live="polite">Checking Telegram connection…</p>
               <div class="form-field-group">
+                <label class="form-field-label" for="telegramNotificationsEnabled">Job alerts</label>
+                <label><input id="telegramNotificationsEnabled" type="checkbox" disabled> Send matching new-job alerts to my connected Telegram chat</label>
+                <p id="telegramNotificationSettingsStatus" class="form-help-text">Connect Telegram before enabling alerts. Alerts are off by default.</p>
+              </div>
+              <div class="form-field-group">
                 <button id="createTelegramLinkBtn" class="btn btn-secondary" type="button">Generate Telegram connection link</button>
                 <button id="refreshTelegramStatusBtn" class="btn btn-secondary" type="button">Refresh connection status</button>
                 <a id="openTelegramLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Open Job Beeper in Telegram</a>
