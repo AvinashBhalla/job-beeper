@@ -3175,7 +3175,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 Current branch: `feat/user-preferences-evaluations-20261106` (uncommitted at checkpoint creation; inspect `git status` and latest commit before continuing).
 
 Implementation added:
-- `v2/user_notifications.py` — per-user settings and ledger, default-off, activation cutoff, per-user score threshold, tenant-scoped dedupe, private owner-chat routing, transactional claim, retry/backoff and stale claim recovery, and a preference-fingerprint freshness check that prevents dispatch against stale evaluations.
+- `v2/user_notifications.py` — per-user settings and ledger, default-off, activation and freshness cutoffs, per-user score threshold, tenant-scoped dedupe, private owner-chat routing, transactional claim, retry/backoff and stale claim recovery, and a preference-fingerprint freshness check that prevents dispatch against stale evaluations.
 - `v2/radar.py` — schema initialization, authenticated/CSRF settings endpoints, and a separate notification-worker call independent from legacy admin chat credentials.
 - `v2/telegram_linking.py` — disconnect now disables alerts and cancels outstanding member delivery rows.
 - `dashboard/index.html` and `dashboard/app.js` — explicit opt-in checkbox and settings/status wiring.

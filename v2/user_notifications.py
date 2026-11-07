@@ -97,11 +97,14 @@ def _queue_new_matches(conn: sqlite3.Connection, user_id: int, enabled_at: str, 
     expected_fingerprint = user_preferences.preferences_fingerprint(
         {**user_preferences.PREFERENCE_DEFAULTS, **prefs}, matcher_rules_version
     )
+    max_age_hours = max(1, min(720, int(prefs.get("max_age_hours", 72))))
+    fresh_after = _stamp(_now() - timedelta(hours=max_age_hours))
     rows = conn.execute("""SELECT j.id,j.canonical_opportunity_id FROM jobs j
       JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
-      WHERE e.match=1 AND e.score>=? AND e.preference_fingerprint=? AND j.discovered_at>=?
+      WHERE e.match=1 AND e.score>=? AND e.preference_fingerprint=?
+        AND j.discovered_at>=? AND j.discovered_at>=?
         AND j.canonical_opportunity_id IS NOT NULL
-      ORDER BY j.discovered_at,j.id""", (user_id, threshold, expected_fingerprint, enabled_at)).fetchall()
+      ORDER BY j.discovered_at,j.id""", (user_id, threshold, expected_fingerprint, enabled_at, fresh_after)).fetchall()
     stamp = _stamp()
     queued = 0
     for row in rows:

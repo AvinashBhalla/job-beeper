@@ -67,7 +67,7 @@ The first opt-in delivery slice is now implemented on the feature branch; it is 
 
 - `v2/user_notifications.py` owns a separate `user_notification_settings` table and tenant-scoped `user_notification_ledger`. It does not reuse or mutate the legacy global `notification_ledger`.
 - Member settings default to off. `PUT /api/notifications/settings` accepts only `{ "enabled": true|false }`, requires the authenticated member session and CSRF protection, and refuses opt-in until a private Telegram chat is linked.
-- Enabling records `enabled_at`; only matching jobs whose `discovered_at` is at or after that activation boundary are queued. Previously discovered jobs are not backfilled. The user's saved `match_threshold` is applied.
+- Enabling records `enabled_at`; only matching jobs whose `discovered_at` is at or after that activation boundary and within the user's `max_age_hours` window are queued. Previously discovered jobs are not backfilled. The user's saved `match_threshold` is applied.
 - Queue identity is `(user_id, canonical_opportunity_id)`, preventing duplicate delivery to the same member while allowing the same opportunity to be independently evaluated for another member.
 - Dispatch resolves the recipient only by joining the ledger owner to that owner's private `user_telegram_chats` mapping. The chat ID is never accepted from a browser request or returned by the settings API.
 - Disconnecting Telegram turns member alerts off and cancels queued/retryable/in-flight ledger rows. Turning alerts off does the same. Re-enabling creates a fresh activation boundary.
