@@ -3138,3 +3138,9 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - No deploy; Docker access unavailable. PR remains draft; prod untouched.
 - Pushed code commit `7065cc6abb1d2d5a2d4ccab6db2a0c8f95e85cae` and docs commit `b6911c8304673acecbc04d0899bc3e3e0f289aff`; CI #1275 passed. Node v12 on VM is too old for dashboard syntax check; use modern Node/CI. No deployment. PR #46 remains draft.
 - Next: inspect CI, add realistic PDF/DOCX/page-limit/ZIP-limit tests, validate UI with modern Node/browser and deploy only to isolated dev after an authorized Docker path is available. Then implement per-user Telegram linking and delivery.
+
+
+## 2026-11-07 — PR description synchronized
+
+- PR #46 description now reflects Google OIDC, resume parser/API/onboarding UI, security posture, local 237-test result, CI #1275, no deployment, and deferred Telegram milestone. PR remains draft/open/unmerged against `v2-live-radar`, head `b61e76ba65653acba273048a97ae6e290ffb4fa7`.
+- No code change. Next: Telegram link-token + webhook + chat mapping/disconnect, then explicit per-user notification opt-in and dispatcher.
