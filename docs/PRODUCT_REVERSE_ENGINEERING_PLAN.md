@@ -118,3 +118,13 @@ The owner clarified that ingestion-first product priorities do not require seria
 - Isolated feature runtime is rebuilt and healthy on loopback port 8002. Shared dev and production remain untouched.
 - Dedicated dev Telegram bot and public HTTPS webhook are pending. Do not use production bot `Qdhorvbot` for testing.
 - The JobBeeper sanitized HAR/report will be reviewed separately; ingestion engineering remains active and is not blocked by this feature track.
+
+
+## 2026-11-07 — Authenticated JobBeeper network investigation completed
+
+- Sanitized report added: docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md.
+- Direct observations: page-number feed pagination (page, per_page=20), server-side keyword search, separate metadata/tracker detail GETs, a view-marking POST, visible source labels and experience-provenance labels.
+- Ten minutes of idle observation on an expired-subscription account showed no feed-related network events. It does not establish active-account refresh cadence.
+- Unknowns remain: API response schemas, exact filter parameters beyond keyword search, timestamp semantics, longer polling/push behavior and private ingestion architecture.
+- Local comparison is recorded in docs/INGESTION_FIRST_ROADMAP.md. The first product changes are to bound dashboard polling, plan server-side pagination and close the experience-provenance gap; source expansion remains governed by the ingestion acceptance gates.
+- Continue only with the sanitized evidence. Do not retain/replay authenticated request bodies, cookies, authorization headers or account/session material.
