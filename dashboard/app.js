@@ -2152,10 +2152,19 @@
     else { state.jobs = []; renderFeed(); }
     await loadSourceStatusTelemetry();
 
+    const refreshFeedIfVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (state.isAdmin || (state.config && state.config.onboarding_complete)) {
+        void loadJobsFeed();
+      }
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refreshFeedIfVisible();
+    });
+    setInterval(refreshFeedIfVisible, 60000);
     setInterval(() => {
-      if (state.isAdmin || (state.config && state.config.onboarding_complete)) loadJobsFeed();
-    }, 10000);
-    setInterval(loadSourceStatusTelemetry, 30000);
+      if (document.visibilityState === 'visible') void loadSourceStatusTelemetry();
+    }, 30000);
   }
 
   async function refreshAuthentication() {

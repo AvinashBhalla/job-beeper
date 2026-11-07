@@ -120,6 +120,13 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             self.assertIn(required, source, f"shared dashboard must implement {required}")
         self.assertIn("admin-only-setting", (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
 
+    def test_dashboard_feed_polling_is_bounded_and_skips_hidden_tabs(self):
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("setInterval(refreshFeedIfVisible, 60000)", source)
+        self.assertIn("document.visibilityState !== 'visible'", source)
+        self.assertIn("addEventListener('visibilitychange'", source)
+        self.assertNotIn("}, 10000);", source, "the feed must not poll every ten seconds")
+
     def test_admin_dashboard_initialization_is_gated_by_session_bootstrap(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         for required in ("JobBeeperAuth.resolveApiBase", "JobBeeperAuth.createClient", "authClient.bootstrap", "initializeWorkspace"):
