@@ -285,4 +285,4 @@ The feature API and dashboard now support the observed feed request contract whi
 
 ### Test status for this checkpoint
 
-Focused API/dashboard contract suite: 28 passed, 1 skipped. Full-suite verification and the final isolated feature rebuild are still required before treating this implementation as complete. The feature branch stays isolated; shared dev and production are not changed.
+Focused API/dashboard contract suite: 28 passed, 1 skipped. Full isolated V2 suite: 279 passed, 1 skipped. The final feature image was rebuilt from v2/docker-compose.feature.yml and /health is healthy on 127.0.0.1:8002. GitHub V2 CI run 42383162683 passed Python compilation, modern dashboard JavaScript syntax, focused router/extractor tests and the full V2 suite. Shared dev 8001 and production 8000 were not changed.

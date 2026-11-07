@@ -6361,7 +6361,7 @@ New observed request parameters/values: search=java, page=1|2, per_page=20, stat
 - Dashboard now fetches 20 jobs at a time, supports Previous/Next, resets to page 1 on search/filter changes, and uses the observed matched/newest-first request values for member feed requests.
 - App-specific source, score, age, alertable and remote filters are SQL-applied before pagination; do not report these filter parameter names as observed from JobBeeper.
 - Jobs persist extracted experience range, provenance and qualitative rule-based evidence strength. LinkedIn's explicit experience label is classified employer-stated/high; clearly framed JD requirements are description/medium; incidental or skill-specific years are inferred/low; missing evidence is unknown. This is our transparent heuristic, not proof of JobBeeper's underlying schema.
-- API/dashboard-focused suite passed 28 tests, 1 skipped after the new contract and evidence classification changes. Full V2 suite and final feature image rebuild are still pending at this point.
+- API/dashboard-focused suite passed 28 tests, 1 skipped. Full V2 suite passed 279 tests, 1 skipped. The final feature image was rebuilt from v2/docker-compose.feature.yml and is healthy on 127.0.0.1:8002. GitHub V2 CI run 42383162683 passed all checks, including the modern Node dashboard syntax check.
 - The branch remains feat/user-preferences-evaluations-20261106, PR #46 draft. Only the isolated port-8002 feature project may be rebuilt. Do not promote to shared dev or production without explicit approval.
 
 ### Telegram bot verification update

@@ -3292,6 +3292,6 @@ The feature branch implementation now independently supports this request contra
 
 Experience evidence is stored with a qualitative rule-based grade: LinkedIn explicit experience label -> employer_stated/high; explicit overall/professional/work JD requirement -> description/medium; generic or skill-specific year match -> inferred/low; no evidence -> unknown/unknown. This evidence strength is not a calibrated probability. Existing stronger provenance is preserved against weaker later observations.
 
-Focused API/dashboard contract suite: 28 passed, 1 skipped. Full V2 test and final feature rebuild status must be checked at the next checkpoint.
+Focused API/dashboard contract suite: 28 passed, 1 skipped. Full V2 suite: 279 passed, 1 skipped. Final isolated feature image rebuilt and healthy at 127.0.0.1:8002. GitHub V2 CI run 42383162683 passed Python compilation, modern dashboard JavaScript syntax, focused router/extractor tests and the full suite.
 
 Telegram dev bot verification is now confirmed from the owner's Windows getMe call: YourJobBeeperDevBot, ID 9293830763. The token remains private. Webhook registration and real link/opt-in/delivery/opt-out testing are still pending because a public HTTPS route for loopback-only port 8002 has not been arranged. Production bot remains untouched.
