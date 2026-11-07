@@ -3156,7 +3156,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 ## 2026-11-07 — Telegram linking pushed; next milestone is per-user delivery
 
-- Pushed `50155d5cc116a67d07019f49ae7e81ab1b1d6c46` with per-user link token/webhook/API/UI, Compose env wiring, tests and `docs/TELEGRAM_PER_USER_SETUP.md`. PR #46 description synchronized; remains draft.
-- Local full V2 suite **248 passed, 0 failures/errors**; focused Telegram/API/auth suite **23 passed**; Python AST and Compose YAML parsing passed. CI #1279 run ID `42360827606`: Python compile, modern Node syntax and focused tests passed; full suite still in progress at checkpoint.
+- Pushed code commit `50155d5cc116a67d07019f49ae7e81ab1b1d6c46` and docs commit `c1f1e29beb7fd8f1749135c2bc3bb97396acaabd` with per-user link token/webhook/API/UI, Compose env wiring, tests and `docs/TELEGRAM_PER_USER_SETUP.md`. PR #46 description synchronized; remains draft.
+- Local full V2 suite **248 passed, 0 failures/errors**; focused Telegram/API/auth suite **23 passed**; Python AST and Compose YAML parsing passed. CI #1279 run ID `42360827606` completed successfully including Python compile, modern Node syntax, focused tests and full V2 suite.
 - No bot credentials, live webhook, deployment or production changes. Owner needs dedicated test bot token+username, webhook secret configured privately, and public HTTPS webhook origin for live smoke test; never send secrets in chat.
 - Critical next design note: current per-user evaluation `alertable` is coupled to global `notifications_enabled`, while existing sender uses global `notification_ledger` + one global chat ID. Do not reuse these for member alerts. Build a separate per-user opt-in/default-off setting, separate user/opportunity delivery ledger, matcher over each user's evaluation rows, quiet hours/frequency, retries/dedupe, and send only to linked `user_telegram_chats.chat_id`. Preserve global admin operational Telegram path untouched.
