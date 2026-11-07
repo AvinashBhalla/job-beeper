@@ -3263,3 +3263,22 @@ Current code and feature test state remain as documented in the preceding handov
 - Isolated feature Compose now passes all three `GOOGLE_OAUTH_*` variables as well as the three Telegram variables. Previously it passed only Telegram settings, so live Google OAuth configuration would not have reached the app. All remain unset today.
 - The feature service is still loopback-only on `127.0.0.1:8002`. No webhook registration until a public HTTPS dev route is configured. No production bot/OAuth settings changed; shared dev 8001 and production 8000 untouched.
 - The exact steps are documented in `docs/TELEGRAM_PER_USER_SETUP.md` and `docs/GOOGLE_OAUTH_SETUP.md`.
+
+
+## 2026-11-07 — JobBeeper network evidence completed and current feature checkpoint
+
+Supersedes prior handover notes that say the JobBeeper network report is still awaited. The sanitized report is now tracked at \`docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md\`; implementation comparison and action order are recorded in \`docs/INGESTION_FIRST_ROADMAP.md\`.
+
+Evidence: JobBeeper's authenticated UI requested numeric page pagination (\`page\`, \`per_page=20\`), server-side keyword search, separate metadata/tracker detail requests and a view-marking POST. Visible sources included LinkedIn, Ashby, Naukri, Lever and Hirist. The UI distinguishes employer-stated and description-derived experience. Ten minutes of idle observation on an expired-subscription account showed no feed network activity; this does not prove there is no longer cadence or no refresh when the subscription is active. Response schemas, exact additional filter parameters, timestamp semantics and private backend architecture remain unknown.
+
+Our code already does server-side keyword search before LIMIT, newest-first ordering and separate source-posted/discovered timestamps. It still loads up to 500 jobs in a single request and lacks page metadata; experience provenance is not exposed end-to-end. Dashboard feed polling has been reduced from 10 seconds to 60 seconds while visible, with a refresh on tab return and no periodic feed/source-status calls while hidden (commit \`82991f3\`).
+
+Latest feature checkpoint:
+- Branch \`feat/user-preferences-evaluations-20261106\`; head \`3c247e7\`; PR #46 open/draft, not merged.
+- Sanitized evidence report and summaries are committed in the reference, ingestion, reverse-engineering, Telegram setup and V2 README documents.
+- GitHub CI run \`42374315505\` passed, including modern dashboard syntax, focused router/extractor tests and full V2 unittest suite.
+- Isolated feature service rebuilt using \`v2/docker-compose.feature.yml\`, healthy at \`127.0.0.1:8002\`; named feature data volume preserved. Shared dev 8001 and production 8000 remain untouched.
+- Private \`.env.feature\` is present with mode 600 and Telegram variables are present in the feature container. VM-side Telegram \`getMe\` timed out; bot/token identity is not yet verified. No webhook or message sent; public HTTPS route still needed.
+- Google OAuth variables remain empty.
+
+Next engineering priority: implement backward-compatible server-side numeric pagination (and move filtering so it works across all pages), then explicitly trace/store/display experience provenance with confidence. Continue evaluating Lever/Hirist through permitted public/authorized interfaces; source labels in JobBeeper are not proof of globally searchable public APIs. Do not replay authenticated private endpoints, retain secrets, merge PR #46 or promote feature work to shared dev/production without explicit approval.
