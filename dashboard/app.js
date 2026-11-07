@@ -1456,14 +1456,27 @@
     if (!tbody) return;
 
     if (state.sourceStatus.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-20);">Loading source telemetry…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:var(--space-20);">Loading source telemetry…</td></tr>`;
       return;
     }
 
     tbody.innerHTML = state.sourceStatus.map(src => {
       const runtime = src.runtime || {};
+      const metrics24h = src.last_24h || {};
+      const measuredRuns = Number(metrics24h.measured_runs || 0);
+      const totalRuns = Number(metrics24h.runs || 0);
+      const metricsMeasured = measuredRuns > 0;
+      const runCoverage = metricsMeasured
+        ? `${measuredRuns} / ${totalRuns}`
+        : '<span style="color:var(--text-muted);">Not measured</span>';
+      const metricValue = value => metricsMeasured ? esc(value ?? 0) : '<span style="color:var(--text-muted);">Not measured</span>';
+      const pageBoardFailures = metricsMeasured
+        ? `${Number(metrics24h.pages_failed || 0)}/${Number(metrics24h.pages_attempted || 0)} pages · ${Number(metrics24h.boards_failed || 0)}/${Number(metrics24h.boards_attempted || 0)} boards`
+        : '<span style="color:var(--text-muted);">Not measured</span>';
       const errorText = runtime.error || src.last_error || '';
-      const isError = Boolean(errorText);
+      const runOutcome = src.last_run_outcome || runtime.last_run_outcome || '';
+      const isPartial = runOutcome === 'partial_failed' || runOutcome === 'partial_rate_limited';
+      const isError = Boolean(errorText) && !isPartial;
       const isRunning = Boolean(runtime.running);
       const isDisabled = src.enabled === false;
       const sourceLabels = {
@@ -1471,15 +1484,18 @@
         naukri: 'Naukri (Relay)',
         instahyre: 'Instahyre',
         greenhouse: 'Greenhouse',
+        ashby: 'Ashby',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
       if (isDisabled) {
         statusBadge = `<span class="signal-pill" style="background:var(--surface-muted);color:var(--text-muted);border-color:var(--border-default);">DISABLED</span>`;
-      } else if (isError) {
-        statusBadge = `<span class="signal-pill" style="background:var(--status-error-subtle);color:var(--status-error);border-color:var(--status-error-border);">${SVG_ICONS.x} ERROR</span>`;
       } else if (isRunning) {
         statusBadge = `<span class="signal-pill signal-warning">${SVG_ICONS.rotateCw} RUNNING</span>`;
+      } else if (isPartial) {
+        statusBadge = `<span class="signal-pill signal-warning">PARTIAL</span>`;
+      } else if (isError) {
+        statusBadge = `<span class="signal-pill" style="background:var(--status-error-subtle);color:var(--status-error);border-color:var(--status-error-border);">${SVG_ICONS.x} ERROR</span>`;
       }
 
       return `
@@ -1488,9 +1504,15 @@
           <td>${statusBadge}</td>
           <td class="meta-mono">${esc(src.jobs_seen ?? 0)}</td>
           <td class="meta-mono">${esc(src.new_jobs ?? 0)}</td>
+          <td class="meta-mono">${runCoverage}</td>
+          <td class="meta-mono">${metricValue(metrics24h.requests_attempted)}</td>
+          <td class="meta-mono">${metricValue(metrics24h.http_429)}</td>
+          <td class="meta-mono">${metricValue(metrics24h.retry_attempts)}</td>
+          <td class="meta-mono">${metricsMeasured ? `${esc(metrics24h.avg_request_duration_ms ?? '—')} ms` : '<span style="color:var(--text-muted);">Not measured</span>'}</td>
+          <td class="meta-mono">${pageBoardFailures}</td>
           <td class="meta-mono" style="font-size:12px;">${esc(fmtTimestamp(runtime.last_success, 'minute'))}</td>
           <td>
-            ${isError ? `<code style="color:var(--status-error);font-family:var(--font-mono);font-size:11px;">${esc(errorText)}</code>` : '<span style="color:var(--text-muted);font-size:12px;">Operational</span>'}
+            ${errorText ? `<code style="color:${isPartial ? 'var(--status-warning)' : 'var(--status-error)'};font-family:var(--font-mono);font-size:11px;">${esc(errorText)}</code>` : '<span style="color:var(--text-muted);font-size:12px;">Operational</span>'}
           </td>
         </tr>
       `;

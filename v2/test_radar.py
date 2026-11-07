@@ -2777,6 +2777,130 @@ class DedupeCandidatesSourceCoverageTests(unittest.TestCase):
                 radar.DB_PATH = original_db
 
 
+class SourceRequestMetricsTests(unittest.TestCase):
+    def test_tracked_requests_count_statuses_retries_exceptions_and_logical_work(self):
+        responses = [
+            type("Response", (), {"status_code": 503})(),
+            type("Response", (), {"status_code": 200})(),
+        ]
+        original_metrics = dict(radar.active_source_metrics)
+        try:
+            with patch.object(
+                radar.requests,
+                "get",
+                side_effect=[*responses, radar.requests.ConnectionError("private-value")],
+            ):
+                radar._begin_source_run_metrics("test-source")
+                radar._tracked_source_get(
+                    "test-source", "https://example.test/feed", params={"token": "private-value"}
+                )
+                radar._tracked_source_get(
+                    "test-source", "https://example.test/feed", retry_attempt=True
+                )
+                with self.assertRaises(radar.requests.ConnectionError):
+                    radar._tracked_source_get(
+                        "test-source", "https://example.test/detail", retry_attempt=True
+                    )
+                radar._record_source_page("test-source", True)
+                radar._record_source_page("test-source", False)
+                radar._record_source_board("test-source", True)
+                metrics = radar._finish_source_run_metrics("test-source")
+
+            self.assertEqual(metrics["requests_attempted"], 3)
+            self.assertEqual(metrics["responses_received"], 2)
+            self.assertEqual(metrics["request_exceptions"], 1)
+            self.assertEqual(metrics["http_2xx"], 1)
+            self.assertEqual(metrics["http_5xx"], 1)
+            self.assertEqual(metrics["retry_attempts"], 2)
+            self.assertEqual(metrics["http_status_counts"], {"503": 1, "200": 1})
+            self.assertGreaterEqual(metrics["request_duration_ms_total"], 0.0)
+            self.assertEqual((metrics["pages_attempted"], metrics["pages_succeeded"], metrics["pages_failed"]), (2, 1, 1))
+            self.assertEqual((metrics["boards_attempted"], metrics["boards_succeeded"], metrics["boards_failed"]), (1, 1, 0))
+            self.assertNotIn("private-value", repr(metrics))
+        finally:
+            radar.active_source_metrics.clear()
+            radar.active_source_metrics.update(original_metrics)
+
+    def test_record_run_persists_request_metrics_and_source_status_aggregates_24h(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                finished = radar.now()
+                metrics = {
+                    **{field: 0 for field in radar.SOURCE_METRIC_FIELDS},
+                    "requests_attempted": 4,
+                    "responses_received": 4,
+                    "http_2xx": 3,
+                    "http_4xx": 1,
+                    "http_429": 1,
+                    "retry_attempts": 1,
+                    "request_duration_ms_total": 125.5,
+                    "pages_attempted": 2,
+                    "pages_succeeded": 2,
+                    "boards_attempted": 1,
+                    "boards_succeeded": 1,
+                    "http_status_counts": {"200": 3, "429": 1},
+                }
+                radar.record_run(
+                    "linkedin", finished - radar.dt.timedelta(seconds=2), finished,
+                    jobs_seen=25, new_jobs=4, request_metrics=metrics,
+                )
+                with (
+                    patch.object(radar, "get_config", return_value={"source_enabled": {"linkedin": True}}),
+                    patch.object(radar, "source_state", {}),
+                ):
+                    payload = radar.source_status()
+                linkedin = next(item for item in payload["sources"] if item["source"] == "linkedin")
+                self.assertEqual(linkedin["last_request_metrics"]["requests_attempted"], 4)
+                self.assertEqual(linkedin["last_request_metrics"]["http_status_counts"], {"200": 3, "429": 1})
+                self.assertEqual(linkedin["last_24h"]["runs"], 1)
+                self.assertEqual(linkedin["last_24h"]["measured_runs"], 1)
+                self.assertEqual(linkedin["last_24h"]["requests_attempted"], 4)
+                self.assertEqual(linkedin["last_24h"]["http_429"], 1)
+                self.assertEqual(linkedin["last_24h"]["jobs_seen"], 25)
+                self.assertEqual(linkedin["last_24h"]["new_jobs"], 4)
+                self.assertEqual(linkedin["last_24h"]["http_status_counts"], {"200": 3, "429": 1})
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_run_source_marks_mixed_employer_board_results_as_partial_failure(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                def partial_collector(_config):
+                    radar._record_source_board("greenhouse", True)
+                    radar._record_source_board("greenhouse", False)
+                    return [{"source": "greenhouse", "source_job_id": "g-1", "title": "Backend Engineer"}]
+
+                collectors = dict(radar.COLLECTORS)
+                collectors["greenhouse"] = partial_collector
+                runtime_state = {}
+                with (
+                    patch.object(radar, "COLLECTORS", collectors),
+                    patch.object(radar, "source_state", runtime_state),
+                    patch.object(radar, "title_allowed", return_value=False),
+                    patch.object(radar, "shadow_extract_jobs"),
+                    patch.object(radar, "upsert_jobs", return_value=1),
+                    patch.object(radar, "refresh_job_evaluations"),
+                    patch.object(radar, "refresh_notification_decisions"),
+                    patch("v2.telegram.credentials_available", return_value=False),
+                ):
+                    radar.run_source("greenhouse", {})
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT outcome, boards_attempted, boards_succeeded, boards_failed "
+                        "FROM source_runs WHERE source='greenhouse'"
+                    ).fetchone()
+                self.assertEqual(row, ("partial_failed", 2, 1, 1))
+                self.assertEqual(runtime_state["greenhouse"]["last_run_outcome"], "partial_failed")
+            finally:
+                radar.DB_PATH = original_db
+
+
 class SourceStatusPersistenceTests(unittest.TestCase):
     def _source_status_for_rows(self, rows):
         with TemporaryDirectory() as tmp:
@@ -2799,7 +2923,24 @@ class SourceStatusPersistenceTests(unittest.TestCase):
                             error_type TEXT,
                             http_status INTEGER,
                             retry_after_seconds REAL,
-                            cooldown_seconds INTEGER
+                        cooldown_seconds INTEGER,
+                        requests_attempted INTEGER,
+                        responses_received INTEGER,
+                        request_exceptions INTEGER,
+                        http_2xx INTEGER,
+                        http_3xx INTEGER,
+                        http_4xx INTEGER,
+                        http_5xx INTEGER,
+                        http_429 INTEGER,
+                        retry_attempts INTEGER,
+                        request_duration_ms_total REAL,
+                        http_status_counts_json TEXT,
+                        pages_attempted INTEGER,
+                        pages_succeeded INTEGER,
+                        pages_failed INTEGER,
+                        boards_attempted INTEGER,
+                        boards_succeeded INTEGER,
+                        boards_failed INTEGER
                         )
                     """)
                     for row in rows:
@@ -2983,6 +3124,8 @@ class SourceLatencySummaryTests(unittest.TestCase):
             self.assertTrue({
                 "run_id", "outcome", "duration_seconds", "error_type",
                 "http_status", "retry_after_seconds", "cooldown_seconds",
+                "requests_attempted", "http_status_counts_json", "pages_attempted",
+                "boards_attempted", "request_duration_ms_total",
             }.issubset(columns))
             self.assertEqual(preserved, ("naukri", 12, 3, None))
 
@@ -3005,7 +3148,24 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         error_type TEXT,
                         http_status INTEGER,
                         retry_after_seconds REAL,
-                        cooldown_seconds INTEGER
+                        cooldown_seconds INTEGER,
+                        requests_attempted INTEGER,
+                        responses_received INTEGER,
+                        request_exceptions INTEGER,
+                        http_2xx INTEGER,
+                        http_3xx INTEGER,
+                        http_4xx INTEGER,
+                        http_5xx INTEGER,
+                        http_429 INTEGER,
+                        retry_attempts INTEGER,
+                        request_duration_ms_total REAL,
+                        http_status_counts_json TEXT,
+                        pages_attempted INTEGER,
+                        pages_succeeded INTEGER,
+                        pages_failed INTEGER,
+                        boards_attempted INTEGER,
+                        boards_succeeded INTEGER,
+                        boards_failed INTEGER
                     )
                 """)
             original_rate_state = (
@@ -3105,7 +3265,24 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         error_type TEXT,
                         http_status INTEGER,
                         retry_after_seconds REAL,
-                        cooldown_seconds INTEGER
+                        cooldown_seconds INTEGER,
+                        requests_attempted INTEGER,
+                        responses_received INTEGER,
+                        request_exceptions INTEGER,
+                        http_2xx INTEGER,
+                        http_3xx INTEGER,
+                        http_4xx INTEGER,
+                        http_5xx INTEGER,
+                        http_429 INTEGER,
+                        retry_attempts INTEGER,
+                        request_duration_ms_total REAL,
+                        http_status_counts_json TEXT,
+                        pages_attempted INTEGER,
+                        pages_succeeded INTEGER,
+                        pages_failed INTEGER,
+                        boards_attempted INTEGER,
+                        boards_succeeded INTEGER,
+                        boards_failed INTEGER
                     )
                 """)
             response = type(
@@ -3186,7 +3363,24 @@ class SourceRegistryApiCoverageTests(unittest.TestCase):
                             error_type TEXT,
                             http_status INTEGER,
                             retry_after_seconds REAL,
-                            cooldown_seconds INTEGER
+                            cooldown_seconds INTEGER,
+                        requests_attempted INTEGER,
+                        responses_received INTEGER,
+                        request_exceptions INTEGER,
+                        http_2xx INTEGER,
+                        http_3xx INTEGER,
+                        http_4xx INTEGER,
+                        http_5xx INTEGER,
+                        http_429 INTEGER,
+                        retry_attempts INTEGER,
+                        request_duration_ms_total REAL,
+                        http_status_counts_json TEXT,
+                        pages_attempted INTEGER,
+                        pages_succeeded INTEGER,
+                        pages_failed INTEGER,
+                        boards_attempted INTEGER,
+                        boards_succeeded INTEGER,
+                        boards_failed INTEGER
                         )
                     """)
                 with patch.object(

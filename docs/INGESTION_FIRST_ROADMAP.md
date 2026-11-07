@@ -15,16 +15,17 @@ The primary product promise is fresh, useful job discovery. Jobs should enter th
 
 The collector registry contains LinkedIn, Naukri, Instahyre, Greenhouse and Ashby adapters. A registry entry does not mean the source is enabled or globally searchable. Runtime enablement must be verified from the running environment's configuration and source status; never infer it from code.
 
-The source-run observability branch adds backward-compatible run-level telemetry:
+The source-observability branch now adds backward-compatible run-level and request-level telemetry:
 
-- unique run ID and run outcome;
-- monotonic run duration;
-- sanitized error type/text and HTTP status;
-- Retry-After and full applied cooldown duration;
-- explicit `partial_rate_limited` outcome when LinkedIn returns some jobs but a 429 interrupts the scan;
-- admin-only visibility through `/api/source-status`.
+- unique run ID, run outcome and monotonic run duration;
+- sanitized error type/text, HTTP status, Retry-After and full applied cooldown duration;
+- physical request attempts/responses/exceptions, status-class totals, HTTP 429 count and exact status histogram;
+- retry attempts for existing collector retries and aggregate HTTP request duration;
+- logical search/feed page counts and Greenhouse/Ashby employer-board counts;
+- `partial_rate_limited` and `partial_failed` outcomes when usable data is returned alongside failures;
+- latest-run and rolling 24-hour summaries through admin-only `/api/source-status`.
 
-Existing source-run history is preserved by additive SQLite migration. Collector request behavior and source enablement are unchanged by this work.
+Existing source-run history is preserved by additive SQLite migration; historical metrics remain NULL and are reported as unmeasured. No collector cadence, retry behavior, source enablement or notification behavior was changed. See `docs/SOURCE_LEVEL_METRICS.md` for the complete contract.
 
 ## Priority sequence
 
@@ -46,4 +47,4 @@ Before production enablement, require permitted access, deterministic fixtures/t
 
 ## Current next action
 
-Review draft PR #47 and merge into `v2-live-radar` only after human review/approval. CI #1303 passed, but no merge or deployment is authorized by that result. After merge, add request/page-level telemetry and partial-board outcomes before tuning collection cadence or adding more sources. The older telemetry PR #40 is closed unmerged as superseded by #47.
+Review draft PR #47 and merge into `v2-live-radar` only after human review/approval. CI #1303 validated the initial run-level slice; the new request-level implementation needs a fresh CI pass on the latest head. A local preview is available on isolated port 8003 with synthetic rows and all collectors disabled. After CI/review, the next metric slice is durable last-success/last-new-job and Naukri relay freshness telemetry. The older telemetry PR #40 is closed unmerged as superseded by #47.

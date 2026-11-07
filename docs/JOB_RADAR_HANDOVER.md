@@ -5932,3 +5932,29 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 4. Make Naukri relay freshness and incremental processing measurable; retain date-only posting precision.
 5. Continue source-by-source public/authorized adapter validation only after request budgets, stable IDs, timestamp precision, failure isolation and useful unique-job yield are documented.
 6. Keep the separate multi-user/resume/Telegram feature branch isolated; do not merge PR #46 or promote any feature environment without explicit approval.
+
+
+## 2026-11-07 — Source-level request metrics implemented; local preview ready
+
+### Implementation
+- Expanded `source_runs` additively with request attempts, responses, request exceptions, status-class counts, HTTP 429, exact status-code histogram JSON, existing-retry attempts, cumulative request duration, logical page outcomes and employer-board outcomes. Legacy rows remain NULL for these fields.
+- All collector HTTP GETs now pass through one metrics wrapper: LinkedIn (including detail enrichment), Naukri relay, Instahyre, Greenhouse and Ashby. Metrics contain status/timing/count aggregates only; URL paths, query values, headers, bodies, descriptions and secrets are not persisted.
+- `/api/source-status` returns latest request metrics plus rolling 24-hour aggregates with measured-run coverage. Dashboard adds 24h request/429/retry/average-duration/page-board columns and makes unmeasured history explicit. Partial results display PARTIAL; they are not shown as full outages.
+- Outcomes now include `partial_failed` for mixed page/board success and failure, alongside `success`, `failed`, `rate_limited`, and `partial_rate_limited`. Existing collector retry and cooldown behavior is unchanged.
+- See `docs/SOURCE_LEVEL_METRICS.md` for field definitions, semantics, privacy and validation detail.
+
+### Tests
+- Focused source/request metrics, status API, schema migration, partial board and LinkedIn 429 tests: 14 passed.
+- Full V2 suite: 199 passed in 81.744 seconds on `/tmp/job-radar-observability-venv` (Python 3.10).
+- Python compilation and `git diff --check` passed. Local Node 12 is too old for the dashboard's existing optional-chaining/nullish-coalescing syntax; GitHub V2 CI on Node 24 is required to validate dashboard syntax.
+
+### Local preview for owner testing
+- Separate preview server is running on remote loopback `127.0.0.1:8003`, backed by `/tmp/job-radar-source-metrics-local/jobs.db`. It is not the production or shared-dev process.
+- It is configured with all collectors disabled, notifications off, Telegram credentials blank and LLM providers disabled. The five source rows shown in this instance are synthetic illustrative metrics, not live source measurements; no external source requests were made.
+- Owner can open a Windows PowerShell terminal and tunnel it with `ssh -N -L 18003:127.0.0.1:8003 ubuntu@130.210.27.197`, then visit `http://localhost:18003/dashboard`.
+- Preview-only admin: `metrics-admin@local.test`; its temporary password was supplied in the chat, not recorded in Git or this handover. This account/database is disposable; do not reuse the password anywhere else.
+- The separate OAuth feature application remains on `127.0.0.1:8002` and is unaffected. User OAuth tunnel is port 18002. Shared dev 8001 and production 8000 were not touched.
+
+### Safety and next gate
+- No deployment, source enablement, scheduler change, rate-limit-policy change, notification, Telegram send or LLM call was made.
+- Commit and push these changes to `feat/source-observability-20261107`, update draft PR #47, then verify GitHub V2 CI on the latest commit before requesting review. Keep PR #47 draft and do not merge/deploy without approval.

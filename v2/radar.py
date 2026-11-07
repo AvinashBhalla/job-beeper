@@ -101,9 +101,15 @@ linkedin_rate_limit_streak = 0
 linkedin_rate_limit_generation = 0
 stop_event = asyncio.Event()
 config_lock = threading.RLock()
-
-
-
+source_metrics_lock = threading.Lock()
+active_source_metrics: dict[str, dict[str, Any]] = {}
+SOURCE_METRIC_FIELDS = (
+    "requests_attempted", "responses_received", "request_exceptions",
+    "http_2xx", "http_3xx", "http_4xx", "http_5xx", "http_429",
+    "retry_attempts", "request_duration_ms_total",
+    "pages_attempted", "pages_succeeded", "pages_failed",
+    "boards_attempted", "boards_succeeded", "boards_failed",
+)
 
 
 def _default_config() -> dict[str, Any]:
@@ -806,7 +812,24 @@ def init_db() -> None:
             error_type TEXT,
             http_status INTEGER,
             retry_after_seconds REAL,
-            cooldown_seconds INTEGER
+            cooldown_seconds INTEGER,
+            requests_attempted INTEGER,
+            responses_received INTEGER,
+            request_exceptions INTEGER,
+            http_2xx INTEGER,
+            http_3xx INTEGER,
+            http_4xx INTEGER,
+            http_5xx INTEGER,
+            http_429 INTEGER,
+            retry_attempts INTEGER,
+            request_duration_ms_total REAL,
+            http_status_counts_json TEXT,
+            pages_attempted INTEGER,
+            pages_succeeded INTEGER,
+            pages_failed INTEGER,
+            boards_attempted INTEGER,
+            boards_succeeded INTEGER,
+            boards_failed INTEGER
         )
         """)
         conn.execute("""
@@ -838,6 +861,23 @@ def init_db() -> None:
         _ensure_column(conn, "source_runs", "http_status", "INTEGER")
         _ensure_column(conn, "source_runs", "retry_after_seconds", "REAL")
         _ensure_column(conn, "source_runs", "cooldown_seconds", "INTEGER")
+        _ensure_column(conn, "source_runs", "requests_attempted", "INTEGER")
+        _ensure_column(conn, "source_runs", "responses_received", "INTEGER")
+        _ensure_column(conn, "source_runs", "request_exceptions", "INTEGER")
+        _ensure_column(conn, "source_runs", "http_2xx", "INTEGER")
+        _ensure_column(conn, "source_runs", "http_3xx", "INTEGER")
+        _ensure_column(conn, "source_runs", "http_4xx", "INTEGER")
+        _ensure_column(conn, "source_runs", "http_5xx", "INTEGER")
+        _ensure_column(conn, "source_runs", "http_429", "INTEGER")
+        _ensure_column(conn, "source_runs", "retry_attempts", "INTEGER")
+        _ensure_column(conn, "source_runs", "request_duration_ms_total", "REAL")
+        _ensure_column(conn, "source_runs", "http_status_counts_json", "TEXT")
+        _ensure_column(conn, "source_runs", "pages_attempted", "INTEGER")
+        _ensure_column(conn, "source_runs", "pages_succeeded", "INTEGER")
+        _ensure_column(conn, "source_runs", "pages_failed", "INTEGER")
+        _ensure_column(conn, "source_runs", "boards_attempted", "INTEGER")
+        _ensure_column(conn, "source_runs", "boards_succeeded", "INTEGER")
+        _ensure_column(conn, "source_runs", "boards_failed", "INTEGER")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_canonical ON jobs(canonical_opportunity_id)")
         conn.execute("UPDATE jobs SET discovery_latency_seconds=NULL WHERE discovery_latency_seconds < 0")
         # Repair records written by older builds where source metadata placed
@@ -1440,6 +1480,123 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
 
     return changed
 
+def _new_source_run_metrics() -> dict[str, Any]:
+    return {
+        **{field: 0 for field in SOURCE_METRIC_FIELDS},
+        "http_status_counts": {},
+        "_lock": threading.Lock(),
+    }
+
+
+def _begin_source_run_metrics(source: str) -> None:
+    metrics = _new_source_run_metrics()
+    with source_metrics_lock:
+        active_source_metrics[source] = metrics
+
+
+def _source_metric_update(source: str, update) -> None:
+    with source_metrics_lock:
+        metrics = active_source_metrics.get(source)
+        if metrics is None:
+            return
+        with metrics["_lock"]:
+            update(metrics)
+
+
+def _record_source_request(
+    source: str,
+    *,
+    status_code: int | None,
+    duration_ms: float,
+    exception: bool = False,
+    retry_attempt: bool = False,
+) -> None:
+    def update(metrics: dict[str, Any]) -> None:
+        metrics["requests_attempted"] += 1
+        metrics["request_duration_ms_total"] += max(0.0, duration_ms)
+        if retry_attempt:
+            metrics["retry_attempts"] += 1
+        if exception:
+            metrics["request_exceptions"] += 1
+        if status_code is None:
+            return
+        metrics["responses_received"] += 1
+        status_key = str(int(status_code))
+        status_counts = metrics["http_status_counts"]
+        status_counts[status_key] = status_counts.get(status_key, 0) + 1
+        if 200 <= status_code < 300:
+            metrics["http_2xx"] += 1
+        elif 300 <= status_code < 400:
+            metrics["http_3xx"] += 1
+        elif 400 <= status_code < 500:
+            metrics["http_4xx"] += 1
+        elif 500 <= status_code < 600:
+            metrics["http_5xx"] += 1
+        if status_code == 429:
+            metrics["http_429"] += 1
+
+    _source_metric_update(source, update)
+
+
+def _tracked_source_get(
+    source: str,
+    endpoint: str,
+    *,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 20,
+    retry_attempt: bool = False,
+) -> requests.Response:
+    """Record safe request metadata; never persist URLs, query strings or payloads."""
+    started_monotonic = time.monotonic()
+    try:
+        response = requests.get(
+            endpoint, params=params, headers=headers, timeout=timeout
+        )
+    except Exception:
+        _record_source_request(
+            source,
+            status_code=None,
+            duration_ms=(time.monotonic() - started_monotonic) * 1000,
+            exception=True,
+            retry_attempt=retry_attempt,
+        )
+        raise
+    _record_source_request(
+        source,
+        status_code=getattr(response, "status_code", None),
+        duration_ms=(time.monotonic() - started_monotonic) * 1000,
+        retry_attempt=retry_attempt,
+    )
+    return response
+
+
+def _record_source_page(source: str, succeeded: bool) -> None:
+    def update(metrics: dict[str, Any]) -> None:
+        metrics["pages_attempted"] += 1
+        metrics["pages_succeeded" if succeeded else "pages_failed"] += 1
+    _source_metric_update(source, update)
+
+
+def _record_source_board(source: str, succeeded: bool) -> None:
+    def update(metrics: dict[str, Any]) -> None:
+        metrics["boards_attempted"] += 1
+        metrics["boards_succeeded" if succeeded else "boards_failed"] += 1
+    _source_metric_update(source, update)
+
+
+def _finish_source_run_metrics(source: str) -> dict[str, Any]:
+    with source_metrics_lock:
+        metrics = active_source_metrics.pop(source, None)
+        if metrics is None:
+            return {**{field: 0 for field in SOURCE_METRIC_FIELDS}, "http_status_counts": {}}
+        with metrics["_lock"]:
+            return {
+                **{field: metrics[field] for field in SOURCE_METRIC_FIELDS},
+                "http_status_counts": dict(metrics["http_status_counts"]),
+            }
+
+
 def record_run(
     source: str,
     started_at: dt.datetime,
@@ -1455,25 +1612,35 @@ def record_run(
     http_status: int | None = None,
     retry_after_seconds: float | None = None,
     cooldown_seconds: int | None = None,
+    request_metrics: dict[str, Any] | None = None,
 ) -> None:
     run_id = run_id or uuid.uuid4().hex
     if outcome is None:
         outcome = "failed" if error else "success"
     if duration_seconds is None:
         duration_seconds = max(0.0, (finished - started_at).total_seconds())
+    metrics = request_metrics or {}
+    status_counts_json = json.dumps(
+        metrics.get("http_status_counts", {}), sort_keys=True
+    )
+    fields = list(SOURCE_METRIC_FIELDS)
+    columns = ", ".join(fields)
+    placeholders = ", ".join("?" for _ in fields)
+    metric_values = [metrics.get(field) for field in fields]
     with db_lock, sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            """
+            f"""
             INSERT INTO source_runs(
                 source, started_at, finished_at, jobs_seen, new_jobs, error,
                 run_id, outcome, duration_seconds, error_type, http_status,
-                retry_after_seconds, cooldown_seconds
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                retry_after_seconds, cooldown_seconds, {columns}, http_status_counts_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,{placeholders},?)
             """,
             (
                 source, iso(started_at), iso(finished), jobs_seen, new_jobs, error,
                 run_id, outcome, max(0.0, float(duration_seconds)), error_type,
                 http_status, retry_after_seconds, cooldown_seconds,
+                *metric_values, status_counts_json,
             ),
         )
         conn.commit()
@@ -2243,6 +2410,7 @@ def _linkedin_http_get(
     params: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = 25,
+    retry_attempt: bool = False,
 ) -> requests.Response:
     """Serialize and pace all LinkedIn HTTP calls, including JD enrichment."""
     global linkedin_last_http_request_monotonic
@@ -2268,11 +2436,13 @@ def _linkedin_http_get(
             )
 
         linkedin_last_http_request_monotonic = time.monotonic()
-        response = requests.get(
+        response = _tracked_source_get(
+            "linkedin",
             endpoint,
             params=params,
             headers=headers or UA,
             timeout=timeout,
+            retry_attempt=retry_attempt,
         )
         if response.status_code == 429:
             _activate_linkedin_rate_limit(response)
@@ -2283,7 +2453,11 @@ def _linkedin_http_get(
 def _linkedin_request(endpoint: str, params: dict[str, Any]) -> requests.Response:
     for attempt in range(3):
         response = _linkedin_http_get(
-            endpoint, params=params, headers=UA, timeout=25
+            endpoint,
+            params=params,
+            headers=UA,
+            timeout=25,
+            retry_attempt=attempt > 0,
         )
         if response.status_code not in {500, 502, 503, 504}:
             response.raise_for_status()
@@ -2416,8 +2590,11 @@ def linkedin_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         for attempted, (query, location, start, fast) in enumerate(targets, start=1):
             search_requests_attempted += 1
             try:
-                jobs.extend(_linkedin_search_page(query, location, start, fast))
+                page_jobs = _linkedin_search_page(query, location, start, fast)
+                _record_source_page("linkedin", True)
+                jobs.extend(page_jobs)
             except Exception as exc:
+                _record_source_page("linkedin", False)
                 failed_pages += 1
                 response = getattr(exc, "response", None)
                 status_code = getattr(response, "status_code", None)
@@ -2521,13 +2698,15 @@ def naukri_collect() -> list[dict[str, Any]]:
     retryable_statuses = {429, 500, 502, 503, 504}
     for attempt in range(4):
         try:
-            candidate = requests.get(
+            candidate = _tracked_source_get(
+                "naukri",
                 NAUKRI_RELAY_URL,
                 # GitHub's raw-content CDN can briefly serve the previous feed
                 # after the relay branch advances. Bust that cache on each poll.
                 params={"t": int(time.time())},
                 headers=relay_headers,
                 timeout=20,
+                retry_attempt=attempt > 0,
             )
             if candidate.status_code in retryable_statuses:
                 if attempt == 3:
@@ -2546,17 +2725,25 @@ def naukri_collect() -> list[dict[str, Any]]:
             response = candidate
             break
         except requests.HTTPError:
+            _record_source_page("naukri", False)
             raise
         except requests.RequestException:
             if attempt == 3:
+                _record_source_page("naukri", False)
                 raise
             wait = min(8, 2 ** attempt)
             log.warning("naukri relay network fetch failed; retrying in %ss", wait)
             time.sleep(wait)
 
     if response is None:
+        _record_source_page("naukri", False)
         raise RuntimeError("Naukri relay fetch returned no response")
-    payload = response.json()
+    try:
+        payload = response.json()
+    except Exception:
+        _record_source_page("naukri", False)
+        raise
+    _record_source_page("naukri", True)
     relay_jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
     relay_collected_at = payload.get("updated_at") if isinstance(payload, dict) else None
     collected_at = parse_relative(relay_collected_at) if relay_collected_at else now()
@@ -2613,20 +2800,30 @@ def naukri_collect() -> list[dict[str, Any]]:
 
 def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
-    response = requests.get(
-        endpoint,
-        params={
-            "jobLocations": next(
-                (str(x).split(",")[0] for x in config.get("locations", []) if "remote" not in str(x).lower()),
-                "Bangalore",
-            ),
-            "limit": 35,
-        },
-        headers={**UA, "Referer": "https://www.instahyre.com/"},
-        timeout=25,
-    )
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        response = _tracked_source_get(
+            "instahyre",
+            endpoint,
+            params={
+                "jobLocations": next(
+                    (
+                        str(x).split(",")[0]
+                        for x in config.get("locations", [])
+                        if "remote" not in str(x).lower()
+                    ),
+                    "Bangalore",
+                ),
+                "limit": 35,
+            },
+            headers={**UA, "Referer": "https://www.instahyre.com/"},
+            timeout=25,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception:
+        _record_source_page("instahyre", False)
+        raise
+    _record_source_page("instahyre", True)
     items = []
     if isinstance(payload, list):
         items = payload
@@ -2681,12 +2878,14 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         token = str(board.get("token") or "").strip() if isinstance(board, dict) else ""
         company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
         if not token or not company:
+            _record_source_board("greenhouse", False)
             failures.append(f"{token or '<missing-token>'}: invalid board configuration")
             continue
 
         endpoint = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
         try:
-            response = requests.get(
+            response = _tracked_source_get(
+                "greenhouse",
                 endpoint,
                 params={"content": "true"},
                 headers={**UA, "Accept": "application/json"},
@@ -2697,7 +2896,9 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
                 raise ValueError("Greenhouse response did not contain a jobs list")
             successful_boards += 1
+            _record_source_board("greenhouse", True)
         except Exception as exc:
+            _record_source_board("greenhouse", False)
             failures.append(f"{token}: {exc!r}")
             log.warning("greenhouse: board=%s failed: %r", token, exc)
             continue
@@ -2829,18 +3030,23 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         name = str(board.get("board") or "").strip() if isinstance(board, dict) else ""
         company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
         if not name or not company or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", name):
+            _record_source_board("ashby", False)
             failures.append(f"{name or '<missing-board>'}: invalid board configuration")
             continue
 
         endpoint = f"https://api.ashbyhq.com/posting-api/job-board/{name}"
         try:
-            response = requests.get(endpoint, headers={**UA, "Accept": "application/json"}, timeout=15)
+            response = _tracked_source_get(
+                "ashby", endpoint, headers={**UA, "Accept": "application/json"}, timeout=15
+            )
             response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
                 raise ValueError("Ashby response did not contain a jobs list")
             successful_boards += 1
+            _record_source_board("ashby", True)
         except Exception as exc:
+            _record_source_board("ashby", False)
             failures.append(f"{name}: {type(exc).__name__}")
             log.warning("ashby: board=%s failed error_type=%s", name, type(exc).__name__)
             continue
@@ -2931,8 +3137,16 @@ def run_source(source: str, config: dict[str, Any]) -> None:
     runtime_at_start["current_run_id"] = run_id
     jobs: list[dict[str, Any]] = []
     new_jobs = 0
+    request_metrics: dict[str, Any] | None = None
+    _begin_source_run_metrics(source)
     try:
-        jobs = COLLECTORS[source](config)
+        try:
+            jobs = COLLECTORS[source](config)
+        except Exception:
+            request_metrics = _finish_source_run_metrics(source)
+            raise
+        else:
+            request_metrics = _finish_source_run_metrics(source)
 
         # Gemini is deliberately shadow-only: store a separately validated
         # extraction for evaluation, but never modify matcher inputs or alerts.
@@ -2985,19 +3199,50 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             source == "linkedin"
             and linkedin_rate_limit_generation != rate_limit_generation_at_start
         )
+        metrics = request_metrics or {}
+        partial_page_failure = (
+            metrics.get("pages_failed", 0) > 0
+            and metrics.get("pages_succeeded", 0) > 0
+        )
+        partial_board_failure = (
+            metrics.get("boards_failed", 0) > 0
+            and metrics.get("boards_succeeded", 0) > 0
+        )
+        total_page_failure = (
+            metrics.get("pages_failed", 0) > 0
+            and metrics.get("pages_succeeded", 0) == 0
+        )
+        total_board_failure = (
+            metrics.get("boards_failed", 0) > 0
+            and metrics.get("boards_succeeded", 0) == 0
+        )
+        partial_failure = partial_page_failure or partial_board_failure
+        total_failure = total_page_failure or total_board_failure
         outcome = (
             "partial_rate_limited" if jobs and rate_limit_seen
             else "rate_limited" if rate_limit_seen
+            else "partial_failed" if partial_failure
+            else "failed" if total_failure
             else "success"
         )
+        if rate_limit_seen:
+            error = "HTTP 429"
+            error_type = "HTTPError"
+        elif partial_failure:
+            error = "Some source pages or boards failed"
+            error_type = "PartialSourceError"
+        elif total_failure:
+            error = "Source pages or boards failed"
+            error_type = "SourceError"
+        else:
+            error = None
+            error_type = None
         current_runtime = source_state.get(source, {})
         retry_after_seconds = (
             current_runtime.get("rate_limit_retry_after_seconds")
             if rate_limit_seen else None
         )
         http_status = 429 if rate_limit_seen else None
-        error = "HTTP 429" if rate_limit_seen else None
-        error_type = "HTTPError" if rate_limit_seen else None
         cooldown_seconds = (
             int(
                 current_runtime.get("rate_limit_cooldown_seconds")
@@ -3014,6 +3259,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             http_status=http_status,
             retry_after_seconds=retry_after_seconds,
             cooldown_seconds=cooldown_seconds,
+            request_metrics=request_metrics,
         )
         runtime = dict(source_state.get(source, {}))
         runtime.update({
@@ -3029,6 +3275,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             "http_status": http_status,
             "retry_after_seconds": retry_after_seconds,
             "cooldown_seconds": cooldown_seconds,
+            "request_metrics": request_metrics,
         })
         if outcome == "success":
             runtime["last_success"] = iso(finished)
@@ -3052,6 +3299,8 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             source, len(jobs), new_jobs, outcome, run_id,
         )
     except Exception as exc:
+        if request_metrics is None:
+            request_metrics = _finish_source_run_metrics(source)
         finished = now()
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         metadata = _source_run_error_metadata(exc)
@@ -3084,6 +3333,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             http_status=metadata["http_status"],
             retry_after_seconds=retry_after_seconds,
             cooldown_seconds=cooldown_seconds,
+            request_metrics=request_metrics,
         )
         runtime = dict(source_state.get(source, {}))
         runtime.update({
@@ -3100,6 +3350,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             "http_status": metadata["http_status"],
             "retry_after_seconds": retry_after_seconds,
             "cooldown_seconds": cooldown_seconds,
+            "request_metrics": request_metrics,
         })
         if cooldown_remaining > 0:
             runtime["rate_limited_until"] = iso(
@@ -3411,12 +3662,18 @@ def latency_summary(hours: int = 24):
 @app.get("/api/source-status", dependencies=[Depends(require_admin)])
 def source_status():
     config = get_config()
+    cutoff = iso(now() - dt.timedelta(hours=24))
     with sqlite3.connect(DB_PATH) as conn:
-        rows = conn.execute("""
+        latest_rows = conn.execute("""
             SELECT
                 sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs, sr.error,
                 sr.run_id, sr.outcome, sr.duration_seconds, sr.error_type,
-                sr.http_status, sr.retry_after_seconds, sr.cooldown_seconds
+                sr.http_status, sr.retry_after_seconds, sr.cooldown_seconds,
+                sr.requests_attempted, sr.responses_received, sr.request_exceptions,
+                sr.http_2xx, sr.http_3xx, sr.http_4xx, sr.http_5xx, sr.http_429,
+                sr.retry_attempts, sr.request_duration_ms_total,
+                sr.http_status_counts_json, sr.pages_attempted, sr.pages_succeeded,
+                sr.pages_failed, sr.boards_attempted, sr.boards_succeeded, sr.boards_failed
             FROM source_runs sr
             JOIN (
                 SELECT source, MAX(finished_at) AS latest_finished_at
@@ -3427,9 +3684,56 @@ def source_status():
              AND latest.latest_finished_at = sr.finished_at
             ORDER BY sr.source
         """).fetchall()
+        window_rows = conn.execute("""
+            SELECT
+                source,
+                COUNT(*) AS runs,
+                SUM(CASE WHEN requests_attempted IS NOT NULL THEN 1 ELSE 0 END) AS measured_runs,
+                SUM(COALESCE(requests_attempted, 0)),
+                SUM(COALESCE(responses_received, 0)),
+                SUM(COALESCE(request_exceptions, 0)),
+                SUM(COALESCE(http_2xx, 0)),
+                SUM(COALESCE(http_3xx, 0)),
+                SUM(COALESCE(http_4xx, 0)),
+                SUM(COALESCE(http_5xx, 0)),
+                SUM(COALESCE(http_429, 0)),
+                SUM(COALESCE(retry_attempts, 0)),
+                SUM(COALESCE(request_duration_ms_total, 0)),
+                SUM(COALESCE(pages_attempted, 0)),
+                SUM(COALESCE(pages_succeeded, 0)),
+                SUM(COALESCE(pages_failed, 0)),
+                SUM(COALESCE(boards_attempted, 0)),
+                SUM(COALESCE(boards_succeeded, 0)),
+                SUM(COALESCE(boards_failed, 0)),
+                SUM(COALESCE(jobs_seen, 0)),
+                SUM(COALESCE(new_jobs, 0)),
+                SUM(CASE WHEN outcome IN ('failed', 'rate_limited') THEN 1 ELSE 0 END),
+                SUM(CASE WHEN outcome IN ('partial_failed', 'partial_rate_limited') THEN 1 ELSE 0 END)
+            FROM source_runs
+            WHERE finished_at >= ?
+            GROUP BY source
+        """, (cutoff,)).fetchall()
+        status_rows = conn.execute("""
+            SELECT source, http_status_counts_json
+            FROM source_runs
+            WHERE finished_at >= ? AND http_status_counts_json IS NOT NULL
+        """, (cutoff,)).fetchall()
 
-    history = {
-        row[0]: {
+    history = {}
+    for row in latest_rows:
+        status_counts = {}
+        try:
+            parsed_counts = json.loads(row[22] or "{}")
+            if isinstance(parsed_counts, dict):
+                status_counts = {
+                    str(code): int(count)
+                    for code, count in parsed_counts.items()
+                    if str(code).isdigit() and isinstance(count, int) and count >= 0
+                }
+        except (TypeError, ValueError, json.JSONDecodeError):
+            status_counts = {}
+        metrics_measured = row[12] is not None
+        history[row[0]] = {
             "last_run": row[1],
             "jobs_seen": row[2] or 0,
             "new_jobs": row[3] or 0,
@@ -3441,9 +3745,78 @@ def source_status():
             "last_http_status": row[9],
             "last_retry_after_seconds": row[10],
             "last_cooldown_seconds": row[11],
+            "last_request_metrics": ({
+                "measured": True,
+                "requests_attempted": row[12] or 0,
+                "responses_received": row[13] or 0,
+                "request_exceptions": row[14] or 0,
+                "http_2xx": row[15] or 0,
+                "http_3xx": row[16] or 0,
+                "http_4xx": row[17] or 0,
+                "http_5xx": row[18] or 0,
+                "http_429": row[19] or 0,
+                "retry_attempts": row[20] or 0,
+                "request_duration_ms_total": round(row[21] or 0.0, 3),
+                "avg_request_duration_ms": round((row[21] or 0.0) / row[12], 2) if row[12] else None,
+                "http_status_counts": status_counts,
+                "pages_attempted": row[23] or 0,
+                "pages_succeeded": row[24] or 0,
+                "pages_failed": row[25] or 0,
+                "boards_attempted": row[26] or 0,
+                "boards_succeeded": row[27] or 0,
+                "boards_failed": row[28] or 0,
+            } if metrics_measured else None),
         }
-        for row in rows
-    }
+
+    windows = {}
+    for row in window_rows:
+        windows[row[0]] = {
+            "runs": row[1] or 0,
+            "measured_runs": row[2] or 0,
+            "requests_attempted": row[3] or 0,
+            "responses_received": row[4] or 0,
+            "request_exceptions": row[5] or 0,
+            "http_2xx": row[6] or 0,
+            "http_3xx": row[7] or 0,
+            "http_4xx": row[8] or 0,
+            "http_5xx": row[9] or 0,
+            "http_429": row[10] or 0,
+            "retry_attempts": row[11] or 0,
+            "request_duration_ms_total": round(row[12] or 0.0, 3),
+            "avg_request_duration_ms": round((row[12] or 0.0) / row[3], 2) if row[3] else None,
+            "pages_attempted": row[13] or 0,
+            "pages_succeeded": row[14] or 0,
+            "pages_failed": row[15] or 0,
+            "boards_attempted": row[16] or 0,
+            "boards_succeeded": row[17] or 0,
+            "boards_failed": row[18] or 0,
+            "jobs_seen": row[19] or 0,
+            "new_jobs": row[20] or 0,
+            "failed_runs": row[21] or 0,
+            "partial_runs": row[22] or 0,
+            "http_status_counts": {},
+        }
+    for source, raw_counts in status_rows:
+        try:
+            parsed_counts = json.loads(raw_counts or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(parsed_counts, dict):
+            continue
+        target = windows.setdefault(source, {
+            "runs": 0, "measured_runs": 0, **{field: 0 for field in (
+                "requests_attempted", "responses_received", "request_exceptions",
+                "http_2xx", "http_3xx", "http_4xx", "http_5xx", "http_429",
+                "retry_attempts", "request_duration_ms_total", "pages_attempted",
+                "pages_succeeded", "pages_failed", "boards_attempted", "boards_succeeded",
+                "boards_failed", "jobs_seen", "new_jobs", "failed_runs", "partial_runs",
+            )}, "http_status_counts": {},
+        })
+        for code, count in parsed_counts.items():
+            if str(code).isdigit() and isinstance(count, int) and count >= 0:
+                target["http_status_counts"][str(code)] = (
+                    target["http_status_counts"].get(str(code), 0) + count
+                )
 
     sources = []
     for source in SOURCE_NAMES:
@@ -3462,10 +3835,21 @@ def source_status():
             "last_http_status": item.get("last_http_status"),
             "last_retry_after_seconds": item.get("last_retry_after_seconds"),
             "last_cooldown_seconds": item.get("last_cooldown_seconds"),
+            "last_request_metrics": item.get("last_request_metrics"),
+            "last_24h": windows.get(source, {
+                "runs": 0, "measured_runs": 0, "requests_attempted": 0,
+                "responses_received": 0, "request_exceptions": 0,
+                "http_2xx": 0, "http_3xx": 0, "http_4xx": 0, "http_5xx": 0,
+                "http_429": 0, "retry_attempts": 0, "request_duration_ms_total": 0.0,
+                "avg_request_duration_ms": None, "pages_attempted": 0, "pages_succeeded": 0, "pages_failed": 0,
+                "boards_attempted": 0, "boards_succeeded": 0, "boards_failed": 0,
+                "jobs_seen": 0, "new_jobs": 0, "failed_runs": 0, "partial_runs": 0,
+                "http_status_counts": {},
+            }),
             "runtime": source_state.get(source, {}),
         })
 
-    return {"sources": sources}
+    return {"window_hours": 24, "sources": sources}
 
 
 @app.get("/api/dedupe-candidates", dependencies=[Depends(require_admin)])
