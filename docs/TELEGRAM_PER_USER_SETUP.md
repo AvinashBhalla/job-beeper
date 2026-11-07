@@ -8,11 +8,20 @@ This milestone implements **account linking only**. It does not send job alerts 
 
 Configure these variables in the deployment's private environment/secret store; never commit them or paste their values into chat:
 
-- `JOB_RADAR_TELEGRAM_BOT_TOKEN` — bot token from BotFather. This variable already exists for the legacy admin/operational Telegram path; the linking webhook reuses the same bot token.
+- `JOB_RADAR_TELEGRAM_BOT_TOKEN` — bot token from BotFather. The existing production bot token is already configured for the legacy admin/operational outbound notifier. The same bot can technically be reused for member linking and member DMs; Telegram's webhook handles inbound updates while `sendMessage` continues to handle outbound messages.
 - `JOB_BEEPER_TELEGRAM_BOT_USERNAME` — public bot username, without `@`.
 - `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET` — random 1–256 character value using only letters, digits, `_` or `-`. Generate a strong value, e.g. `openssl rand -hex 32`.
 
-The application requires all three values before it exposes the connect action. Development and isolated feature Compose files deliberately set these values blank by default. Production Compose passes the username and webhook secret from its private environment, but no live configuration has been made by this change.
+### Existing production bot discovery (2026-11-07)
+
+- Read-only `getMe` against the token already present in `/home/ubuntu/job-beeper/.env` confirmed the existing bot username is **`Qdhorvbot`**. The token itself was never printed or copied into this repository/chat.
+- Read-only `getWebhookInfo` reported **no webhook currently configured**, zero pending updates and no last webhook error. This means there is no existing Telegram webhook URL to preserve or migrate.
+- The production `.env` currently contains both `JOB_RADAR_TELEGRAM_BOT_TOKEN` and `JOB_RADAR_TELEGRAM_CHAT_ID`. The old production Compose file currently passes only those two variables; it does not yet pass `JOB_BEEPER_TELEGRAM_BOT_USERNAME` or `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET`.
+- Searches across the known production, dev and feature checkouts found no `getUpdates`, `setWebhook`, or `deleteWebhook` consumer. The existing `v2/telegram.py` notifier only calls outbound `sendMessage` and continues to use the global admin chat ID. Thus reuse of the same bot is technically compatible with the code paths inspected: inbound `/start` updates will be handled by the new webhook, while admin/member outbound messages use `sendMessage`.
+- **Not configured or changed:** no webhook was registered, no production environment variable was added, no production Compose file/container was modified, and no live bot message was sent as part of this inspection. The production checkout is stale (613 commits behind the active branch), so do not deploy from it or treat it as containing the new webhook endpoint.
+- **Decision:** reuse of the existing production bot is a viable option for the eventual production release. Do not repoint it yet. First deploy and smoke-test the webhook endpoint through an approved release. If a separate development smoke test is needed, use a dedicated test bot so production bot updates are not diverted to an unfinished/dev endpoint. Before registering the production webhook, set the public username to `Qdhorvbot`, add a newly generated webhook secret to the private production environment, ensure the deployed production Compose/app passes both values, then register the webhook to the deployed HTTPS `/api/telegram/webhook` endpoint. Preserve the existing global admin chat ID and verify its outbound notifications still work after release.
+
+The application requires all three values before it exposes the connect action. Development and isolated feature Compose files deliberately set these values blank by default. The active feature branch Compose passes the username and webhook secret from its private environment. The currently deployed production checkout is older and does not yet pass the two new values; update them only as part of an approved release. No live configuration has been made by this change.
 
 ## Webhook registration
 
