@@ -3186,3 +3186,12 @@ Validation so far: six focused `v2.test_user_notifications` tests pass. Python A
 Important boundaries: no production deployment or webhook change; no actual Telegram sends; no member alerts are enabled by default. Dev push/deployment should wait for full CI, code review, and a separate test bot/dev webhook smoke test. See `docs/TELEGRAM_PER_USER_SETUP.md` for the detailed behavior and rollout checklist.
 
 - CI follow-up: first full run found that the new notification settings route was missing from the explicit member-route allowlist in `test_auth.py` (the route itself already depends on `require_authenticated`). Added the route to that contract test; rerun CI on the new head.
+
+## 2026-11-07 — Feature deployment/test checkpoint
+
+- Feature head at test time: `8e7bc28ca5978f8a3c949d99f7039e4a9b9f785c`.
+- GitHub V2 CI run `42363352501`: success (full V2 unittest suite and dashboard JS syntax included).
+- Isolated feature Compose service `job-radar-user-preferences` was rebuilt and is healthy at `127.0.0.1:8002`. This is not shared dev/production. `/dashboard/` serves the opt-in checkbox; anonymous notification settings endpoint returns 401.
+- Full container suite: 257 passed, 1 skipped. `httpx2`/`httpcore2`/`truststore` installed temporarily to satisfy test dependencies absent from production image, then uninstalled. Test run overrode `JOB_BEEPER_COOKIE_SECURE=true` only for tests because local feature HTTP config is intentionally false; full suite then passed.
+- Telegram external E2E is still pending a separate test bot and webhook secret. No production bot credentials used, no Telegram messages sent, no webhook changed.
+- Next action: obtain/configure dedicated dev bot credentials privately, run end-to-end Telegram test on isolated feature service, then promote to shared dev. Preserve production bot `Qdhorvbot` for production rollout only.

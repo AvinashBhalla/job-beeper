@@ -6242,3 +6242,13 @@ On the same onboarding page, show a Telegram connection panel/link that opens th
 - Next: run complete test suite and frontend checks in supported CI/dev runtime; fix any failures; review edge cases; configure a dedicated dev test bot; deploy/smoke-test dev; only then consider production rollout with explicit approval. Quiet hours, time zones, frequency controls and delivery history remain future work.
 
 - CI follow-up: first full run found that the new notification settings route was missing from the explicit member-route allowlist in `test_auth.py` (the route itself already depends on `require_authenticated`). Added the route to that contract test; rerun CI on the new head.
+
+## 2026-11-07 — Isolated feature environment deployment and full test verification
+
+- Latest feature branch commit before this documentation update: `8e7bc28ca5978f8a3c949d99f7039e4a9b9f785c`.
+- GitHub V2 CI run `42363352501` completed successfully on that commit. Steps include Python syntax, dashboard JS syntax, focused router/extractor tests, and full V2 unittest suite.
+- Built and restarted only Compose project `job-radar-user-preferences` from `/tmp/job-radar-user-preferences`; its service binds to `127.0.0.1:8002`. It is not shared dev or production.
+- Feature app health returns OK; anonymous `/api/notifications/settings` returns 401; `/dashboard/` contains the new `telegramNotificationsEnabled` checkbox.
+- Full in-container suite: 257 tests passed, 1 skipped. Test-only `httpx2` dependencies were installed temporarily to satisfy TestClient imports, then removed. First local run had one expected config-only failure because the feature app runs HTTP with `JOB_BEEPER_COOKIE_SECURE=false`; rerun set `JOB_BEEPER_COOKIE_SECURE=true` only for the test process and passed. Runtime config was not changed.
+- No dedicated Telegram test bot credentials are configured. No external Telegram message was sent, no webhook registered, no production bot used, and production/shared-dev untouched.
+- Next: configure a separate dev/test bot privately in the isolated feature Compose environment, set webhook only for that bot, then run real link → opt-in → matching new job → Telegram delivery → opt-out/disconnect smoke test. After that, promote to shared dev. Do not use the production bot for feature testing.
