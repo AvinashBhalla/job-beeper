@@ -5922,7 +5922,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 ### Runtime safety
 - No production or shared-dev container, database, volume, config, source schedule, Telegram bot or notification was touched. No LLM/provider calls were made.
-- The earlier temporary worktree used for test execution showed a whitespace-only local diff in its tracked `v2/config.json` (parsed JSON keys and values were unchanged). That file was not copied, staged or committed. The clean PR worktree contains only the intended source and test changes plus these docs.
+- Test execution produced a whitespace-only local diff in tracked `v2/config.json` in the validation worktrees; parsed JSON keys and values are unchanged. The current worktree diff remains unstaged and is excluded from the PR. The committed PR changes contain only the intended source, tests and documentation.
 - No deployment or merge is authorized. Keep production port 8000 and shared dev port 8001 unchanged.
 
 ### Next actions
