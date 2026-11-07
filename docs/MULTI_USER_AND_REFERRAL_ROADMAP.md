@@ -382,4 +382,15 @@ Implement `user_preferences` and `user_job_evaluations`, migrate the current glo
 
 ## 2026-11-07 — Priority status
 
-This roadmap is intentionally paused while the team prioritizes ingestion. The implementation already on PR #46 remains isolated on its feature branch and isolated feature container; it has not been promoted to shared dev or production. Do not spend time configuring the Telegram test bot yet. Resume after source coverage/freshness/429 observability and the first source-expansion canaries meet the acceptance gates in `docs/INGESTION_FIRST_ROADMAP.md`.
+The product roadmap continues to prioritize ingestion for production readiness, but the owner requested on 2026-11-07 that ongoing authentication/signup, resume parser and per-user Telegram work continue in parallel on isolated PR #46. Keep it on `feat/user-preferences-evaluations-20261106`, draft and not promoted to shared dev or production. The owner is creating a dedicated dev bot; live Telegram E2E waits for private credentials and an approved public HTTPS webhook endpoint. The JobBeeper network investigation proceeds independently. Ingestion acceptance gates still govern any production release and source expansion.
+
+
+## 2026-11-07 — Parallel execution checkpoint (supersedes pause above)
+
+The owner explicitly requested parallel execution rather than waiting for the ingestion milestones to finish before continuing the existing feature branch. Continue this roadmap's auth, preferences, resume and Telegram implementation work in parallel with the ingestion-first roadmap. Do not change production priority or deployment boundaries.
+
+- Branch/PR: `feat/user-preferences-evaluations-20261106`, PR #46 draft.
+- Latest commit: `51db2f9`; GitHub V2 CI run `42370884022` passed.
+- Isolated suite: **272 passed, 1 skipped**; notification tests 12/12; resume parser tests 15/15; Google OAuth tests 15/15.
+- Isolated feature runtime healthy on 8002. Shared dev 8001 and production 8000 unchanged.
+- Pending: dedicated Telegram bot configuration, public HTTPS webhook and full link/opt-in/new-match/delivery/opt-out smoke test. Production bot remains untouched.

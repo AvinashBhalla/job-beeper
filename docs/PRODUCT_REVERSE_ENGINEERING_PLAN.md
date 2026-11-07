@@ -103,6 +103,18 @@ The previous 2026-11-06 multi-user-first sequence is superseded. The primary pro
 - P1: inspect JobBeeper's observable authenticated UI/network behavior using a sanitized HAR from the user's own browser session. Do not infer private backend implementation or bypass access controls.
 - P2: build a measured source/provider catalog and add public/authorized adapters incrementally toward 100 useful sources.
 - P3: validate 24–72 hour canaries, useful unique-job yield and freshness.
-- P4: resume multi-user signup/preferences, resume parsing, Telegram fan-out and referral intelligence. PR #46 stays draft/isolated; no Telegram test bot is needed yet.
+- P4: continue multi-user signup/preferences, resume parsing and Telegram work in parallel on isolated PR #46, per the owner's 2026-11-07 update. Referral intelligence remains later scope. Do not merge or promote the feature branch while ingestion acceptance gates remain open.
 
 Verified 2026-11-07: current feature code has five collectors (LinkedIn, Naukri, Instahyre, Greenhouse, Ashby); production has only LinkedIn and Naukri enabled; shared dev has only Naukri enabled. Production logged 36 LinkedIn HTTP 429 events in the previous 24 hours. In the same period, production recorded 313 new LinkedIn rows and 173 new Naukri rows; Naukri's relay is polled every five minutes and its current feed uses date-level posting timestamps. These findings mean we are not yet at 100-source coverage or reliably minute-level discovery. All runtime inspection was read-only.
+
+
+## 2026-11-07 — Owner-requested parallel feature development
+
+The owner clarified that ingestion-first product priorities do not require serializing engineering work. Continue the authentication/Google signup, resume parser and per-user Telegram work on the existing isolated feature branch while the owner performs the JobBeeper `@Chrome`/CDP network investigation. Earlier instructions in this document to pause all multi-user/resume/Telegram code work are superseded.
+
+- Feature branch: `feat/user-preferences-evaluations-20261106`; PR #46 remains draft.
+- Latest code commit at this checkpoint: `51db2f9`; GitHub V2 CI run `42370884022` passed.
+- Full isolated V2 suite: **272 passed, 1 skipped**; focused tests: Google OAuth 15/15, resume parser 15/15, per-user notifications 12/12.
+- Isolated feature runtime is rebuilt and healthy on loopback port 8002. Shared dev and production remain untouched.
+- Dedicated dev Telegram bot and public HTTPS webhook are pending. Do not use production bot `Qdhorvbot` for testing.
+- The JobBeeper sanitized HAR/report will be reviewed separately; ingestion engineering remains active and is not blocked by this feature track.

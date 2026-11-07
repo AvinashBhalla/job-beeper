@@ -241,4 +241,12 @@ The public product claims remain reference points, not verified implementation d
 
 Next reverse-engineering pass should use the user's authorized logged-in browser session to capture sanitized Network metadata for initial load, background refresh, filters, pagination, job detail loading, timestamps and source labels. Record observed facts separately from inferences. Do not extract private backend code, replay authenticated endpoints, expose session tokens, bypass access controls or evade rate limits. The evidence report belongs in `docs/JOBBEEPER_NETWORK_EVIDENCE_YYYY-MM-DD.md`.
 
-The priority is now ingestion reliability and source expansion, not multi-user onboarding. Keep signup, resume parser and Telegram enhancements paused until the ingestion acceptance gates in `docs/INGESTION_FIRST_ROADMAP.md` pass.
+The product priority remains ingestion reliability and source expansion. However, on 2026-11-07 the owner explicitly asked to continue existing authentication, resume-parser and Telegram feature work in parallel on isolated PR #46 while the JobBeeper browser/network investigation proceeds. Keep that branch draft and isolated; do not merge or promote it until explicit approval and release gates. The ingestion-first strategy still governs production priorities.
+
+
+## 2026-11-07 — Parallel feature work confirmation
+
+- The owner's Codex `@Chrome`/CDP JobBeeper network investigation is a separate workstream. Await its sanitized report/HAR; do not claim private backend behavior from frontend network evidence.
+- Continue auth/Google signup, resume parser and per-user Telegram feature development on `feat/user-preferences-evaluations-20261106` in parallel. PR #46 stays draft.
+- Current checkpoint: commit `51db2f9`, CI run `42370884022` green; isolated full suite **272 passed, 1 skipped**. Dedicated Telegram dev bot and public HTTPS webhook E2E remain pending.
+- Keep shared dev (8001) and production (8000) untouched absent explicit approval.
