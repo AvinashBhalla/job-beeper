@@ -3046,3 +3046,15 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Verification: final V2 suite 189 passed in 79.321s in a throwaway `--network none` Docker run (one Node-only test skipped there); Node-enabled dashboard contract 4/4 passed separately in 0.655s; esbuild 0.19.12 JS parse checks passed; dev Compose config resolved. No LLM/Telegram actions.
 - Live dev and production were not deployed or migrated. Dev still uses `job-radar-dev-rich-jd:20261106`; production `v2-radar-1` remains unchanged. `JOB_BEEPER_COOKIE_SECURE` defaults true; require HTTPS. The loopback-only dev Compose defaults it false for SSH-tunnel use; production stays Secure. Set `JOB_BEEPER_PUBLIC_ORIGIN` when TLS termination means Uvicorn sees an internal origin. Termalin encrypted backup remains DRAFT.
 - Next: verify CI and automated re-review on PR #45, merge into `v2-live-radar` when checks and review threads are clear, then implement user-scoped preferences and evaluations. Keep production untouched.
+
+
+## 2026-11-07 — Source-run observability continuation checkpoint
+
+- Current base: `v2-live-radar` at `dd7aeb1` (secure auth foundation merged). New isolated branch/worktree: `feat/source-observability-20261107` at `/tmp/job-radar-source-observability-clean`.
+- Implemented additive `source_runs` metadata: `run_id`, `outcome`, `duration_seconds`, `error_type`, `http_status`, `retry_after_seconds`, `cooldown_seconds`. Legacy schema migration preserves existing rows.
+- Run outcomes: `success`, `failed`, `rate_limited`, `partial_rate_limited`. LinkedIn 429s caught inside a collector are now recorded even when some jobs are returned. Partial results no longer look like a clean success. Sanitized error strings never persist exception URLs/query values. Full applied cooldown duration is stored separately from remaining time; a rate-limited run does not update `last_success`.
+- Admin-only `/api/source-status` exposes the latest structured run metadata. Collector registry remains the source of truth for source enumeration.
+- Verification on the VM host: 11 focused tests passed; full V2 unittest discovery 196 passed in 88.014s; Python compile and `git diff --check` passed. Test venv: `/tmp/job-radar-observability-venv` (Python 3.10). Docker access was unavailable, so no container validation was run. GitHub CI is still required on the pushed branch.
+- Scope guard: no source cadence, concurrency, retry behavior, enablement, matcher, notification, credentials or deployment changed. Production/shared-dev and their databases/volumes were not touched. No Telegram sends or LLM calls.
+- Separate feature track `feat/user-preferences-evaluations-20261106` / PR #46 remains draft and isolated. Do not merge or promote it.
+- Next: push/open draft PR against `v2-live-radar`; pass GitHub CI; then add per-request/page/status-class metrics and partial outcomes for ATS multi-board adapters. Use telemetry to diagnose LinkedIn 429s conservatively, then measure Naukri relay freshness/incremental behavior. Do not evade provider limits or enable new sources without a canary and explicit approval.

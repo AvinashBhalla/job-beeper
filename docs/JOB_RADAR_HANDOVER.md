@@ -5894,3 +5894,39 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - `JOB_BEEPER_COOKIE_SECURE` defaults to true; HTTPS is required. The loopback-only dev Compose service defaults it to false for SSH-tunnel development; production remains true. Set `JOB_BEEPER_PUBLIC_ORIGIN` if the TLS reverse proxy origin differs from Uvicorn’s request base URL. Do not disable Secure publicly.
 - The Termalin encrypted backup job remains DRAFT. Local snapshots do not prove an off-host encrypted archive exists.
 - Next: verify CI and automated re-review on PR #45, merge into `v2-live-radar` when all checks/review threads are clear, then continue with user-scoped preferences/evaluations. No production deployment is authorized.
+
+
+## 2026-11-07 — Source-run observability restacked on current V2 foundation
+
+### Branch and scope
+- New isolated worktree: `/tmp/job-radar-source-observability-clean`; branch: `feat/source-observability-20261107`; base: `v2-live-radar` at `dd7aeb1eea4790564a73367df90f7d4a07e012ea` (includes the merged secure multi-user authentication foundation).
+- This is the ingestion P0 track. It is separate from `feat/user-preferences-evaluations-20261106` / draft PR #46. Keep PR #46 open/draft and do not merge or promote it as part of this task.
+- Scope is observability only: no collector query cadence, request concurrency, retry policy, source enablement, matcher, notification policy, credentials or runtime configuration changes.
+
+### Implemented
+- `source_runs` gains additive nullable columns: `run_id`, `outcome`, `duration_seconds`, `error_type`, `http_status`, `retry_after_seconds`, and `cooldown_seconds`. Existing SQLite rows are retained; legacy databases are migrated with `_ensure_column`.
+- `record_run()` remains backward-compatible with existing callers and assigns a run ID, outcome and monotonic duration when callers omit them.
+- `run_source()` now distinguishes `success`, `failed`, `rate_limited`, and `partial_rate_limited`. It detects HTTP 429 events that LinkedIn catches internally while returning jobs, so partial results are no longer reported as clean success.
+- Persisted error text is sanitized (`HTTP 429`, `HTTP 503`, or exception class); exception URLs, query strings and possible tokens are not stored. Structured fields preserve status, error class, Retry-After and the full applied cooldown duration.
+- A rate-limited run does not advance `last_success`; prior successful timestamp is retained. Runtime state exposes current/last run IDs and outcome metadata.
+- Admin-only `/api/source-status` now returns the latest structured run fields. Source lists continue to derive from the collector registry.
+- No collector behavior or rate-limit evasion was added. LinkedIn's existing cooldown behavior remains unchanged.
+
+### Validation
+- Focused source-status, registry, migration and rate-limit tests: **11 passed**.
+- Full V2 unittest discovery: **196 passed** in 88.014 seconds using an isolated Python 3.10 virtual environment on the VM host.
+- `python -m compileall -q v2` and `git diff --check` passed.
+- Docker socket access was denied to the Termalin user, so no container build/runtime validation was attempted. GitHub CI on the new branch is the next validation gate; its Python 3.12 result must be checked before considering this work complete.
+
+### Runtime safety
+- No production or shared-dev container, database, volume, config, source schedule, Telegram bot or notification was touched. No LLM/provider calls were made.
+- The earlier temporary worktree used for test execution showed a whitespace-only local diff in its tracked `v2/config.json` (parsed JSON keys and values were unchanged). That file was not copied, staged or committed. The clean PR worktree contains only the intended source and test changes plus these docs.
+- No deployment or merge is authorized. Keep production port 8000 and shared dev port 8001 unchanged.
+
+### Next actions
+1. Commit and push this branch, open a draft PR targeting `v2-live-radar`, and verify GitHub CI.
+2. Add request/page/status-class counters and explicit partial-board outcomes for multi-board adapters; current telemetry is run-level and captures LinkedIn 429 specifically, not a complete per-request histogram.
+3. Use the new telemetry to diagnose LinkedIn 429 frequency/cooldown without increasing pressure or bypassing provider limits.
+4. Make Naukri relay freshness and incremental processing measurable; retain date-only posting precision.
+5. Continue source-by-source public/authorized adapter validation only after request budgets, stable IDs, timestamp precision, failure isolation and useful unique-job yield are documented.
+6. Keep the separate multi-user/resume/Telegram feature branch isolated; do not merge PR #46 or promote any feature environment without explicit approval.

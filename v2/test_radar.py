@@ -2734,8 +2734,6 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 
@@ -2794,15 +2792,37 @@ class SourceStatusPersistenceTests(unittest.TestCase):
                             finished_at TEXT NOT NULL,
                             jobs_seen INTEGER NOT NULL,
                             new_jobs INTEGER NOT NULL,
-                            error TEXT
+                            error TEXT,
+                            run_id TEXT,
+                            outcome TEXT,
+                            duration_seconds REAL,
+                            error_type TEXT,
+                            http_status INTEGER,
+                            retry_after_seconds REAL,
+                            cooldown_seconds INTEGER
                         )
                     """)
-                    conn.executemany(
-                        "INSERT INTO source_runs "
-                        "(source, started_at, finished_at, jobs_seen, new_jobs, error) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                        rows,
-                    )
+                    for row in rows:
+                        if len(row) == 6:
+                            conn.execute(
+                                "INSERT INTO source_runs "
+                                "(source, started_at, finished_at, jobs_seen, new_jobs, error) "
+                                "VALUES (?, ?, ?, ?, ?, ?)",
+                                row,
+                            )
+                        elif len(row) == 13:
+                            conn.execute(
+                                """
+                                INSERT INTO source_runs (
+                                    source, started_at, finished_at, jobs_seen, new_jobs, error,
+                                    run_id, outcome, duration_seconds, error_type, http_status,
+                                    retry_after_seconds, cooldown_seconds
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                row,
+                            )
+                        else:
+                            raise AssertionError(f"Unsupported source_runs fixture row length: {len(row)}")
                 with patch.object(
                     radar,
                     "get_config",
@@ -2870,6 +2890,33 @@ class SourceStatusPersistenceTests(unittest.TestCase):
         self.assertEqual(ashby["new_jobs"], 3)
 
 
+    def test_source_status_includes_structured_run_metadata(self):
+        payload = self._source_status_for_rows([
+            (
+                "linkedin",
+                "2026-11-05T10:00:00+00:00",
+                "2026-11-05T10:00:02+00:00",
+                7,
+                3,
+                "HTTP 429",
+                "run-abc123",
+                "partial_rate_limited",
+                2.0,
+                "HTTPError",
+                429,
+                600.0,
+                600,
+            )
+        ])
+        linkedin = next(item for item in payload["sources"] if item["source"] == "linkedin")
+        self.assertEqual(linkedin["last_run_id"], "run-abc123")
+        self.assertEqual(linkedin["last_run_outcome"], "partial_rate_limited")
+        self.assertEqual(linkedin["last_run_duration_seconds"], 2.0)
+        self.assertEqual(linkedin["last_error_type"], "HTTPError")
+        self.assertEqual(linkedin["last_http_status"], 429)
+        self.assertEqual(linkedin["last_retry_after_seconds"], 600.0)
+        self.assertEqual(linkedin["last_cooldown_seconds"], 600)
+
 class SourceLatencySummaryTests(unittest.TestCase):
     def test_latency_summary_includes_ashby_samples(self):
         with TemporaryDirectory() as tmp:
@@ -2899,6 +2946,327 @@ class SourceLatencySummaryTests(unittest.TestCase):
                 self.assertEqual(ashby["samples"], 2)
                 self.assertEqual(ashby["max_seconds"], 120)
                 self.assertEqual(ashby["under_60_seconds"], 1)
+            finally:
+                radar.DB_PATH = original_db
+
+
+    def test_init_db_migrates_legacy_source_run_table(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE source_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT NOT NULL,
+                        jobs_seen INTEGER NOT NULL,
+                        new_jobs INTEGER NOT NULL,
+                        error TEXT
+                    )
+                """)
+                conn.execute(
+                    """INSERT INTO source_runs
+                       (source, started_at, finished_at, jobs_seen, new_jobs, error)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    ("naukri", "2026-11-05T10:00:00+00:00", "2026-11-05T10:01:00+00:00", 12, 3, None),
+                )
+            with patch.object(radar, "DB_PATH", db_path):
+                radar.init_db()
+                with sqlite3.connect(db_path) as conn:
+                    columns = {
+                        row[1] for row in conn.execute("PRAGMA table_info(source_runs)")
+                    }
+                    preserved = conn.execute(
+                        "SELECT source, jobs_seen, new_jobs, error FROM source_runs"
+                    ).fetchone()
+            self.assertTrue({
+                "run_id", "outcome", "duration_seconds", "error_type",
+                "http_status", "retry_after_seconds", "cooldown_seconds",
+            }.issubset(columns))
+            self.assertEqual(preserved, ("naukri", 12, 3, None))
+
+    def test_run_source_records_429_caught_inside_collector_as_partial_success(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE source_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT NOT NULL,
+                        jobs_seen INTEGER NOT NULL,
+                        new_jobs INTEGER NOT NULL,
+                        error TEXT,
+                        run_id TEXT,
+                        outcome TEXT,
+                        duration_seconds REAL,
+                        error_type TEXT,
+                        http_status INTEGER,
+                        retry_after_seconds REAL,
+                        cooldown_seconds INTEGER
+                    )
+                """)
+            original_rate_state = (
+                radar.linkedin_last_http_request_monotonic,
+                radar.linkedin_rate_limited_until_monotonic,
+                radar.linkedin_last_rate_limit_monotonic,
+                radar.linkedin_rate_limit_streak,
+                radar.linkedin_rate_limit_generation,
+            )
+            radar.linkedin_last_http_request_monotonic = 0.0
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = 0.0
+            radar.linkedin_rate_limit_streak = 0
+            radar.linkedin_rate_limit_generation = 0
+            response = type(
+                "Response",
+                (),
+                {"status_code": 429, "headers": {"Retry-After": "600"}},
+            )()
+            job = {
+                "title": "Backend Engineer",
+                "description": "Python backend role",
+                "location": "Bengaluru, India",
+            }
+
+            def collector(_config):
+                radar._activate_linkedin_rate_limit(response)
+                return [job]
+
+            collectors = dict(radar.COLLECTORS)
+            collectors["linkedin"] = collector
+            cooldown_values = iter([0.0, 575.0])
+            try:
+                with (
+                    patch.object(radar, "DB_PATH", db_path),
+                    patch.object(radar, "COLLECTORS", collectors),
+                    patch.object(
+                        radar,
+                        "source_state",
+                        {"linkedin": {"last_success": "2026-11-05T09:00:00+00:00"}},
+                    ),
+                    patch.object(
+                        radar,
+                        "_linkedin_cooldown_remaining",
+                        side_effect=lambda: next(cooldown_values),
+                    ),
+                    patch.object(radar, "title_allowed", return_value=False),
+                    patch.object(radar, "shadow_extract_jobs"),
+                    patch.object(radar, "upsert_jobs", return_value=1),
+                    patch.object(radar, "refresh_job_evaluations"),
+                    patch.object(radar, "refresh_notification_decisions"),
+                    patch("v2.telegram.credentials_available", return_value=False),
+                ):
+                    radar.run_source("linkedin", {})
+                    with sqlite3.connect(db_path) as conn:
+                        row = conn.execute(
+                            """
+                            SELECT jobs_seen, new_jobs, outcome, http_status,
+                                   retry_after_seconds, cooldown_seconds, error
+                            FROM source_runs WHERE source='linkedin'
+                            """
+                        ).fetchone()
+                    runtime = radar.source_state["linkedin"]
+                self.assertEqual(row[:4], (1, 1, "partial_rate_limited", 429))
+                self.assertEqual(row[4], 600.0)
+                self.assertEqual(row[5], 600)
+                self.assertEqual(row[6], "HTTP 429")
+                self.assertEqual(runtime["last_run_outcome"], "partial_rate_limited")
+                self.assertEqual(runtime["last_success"], "2026-11-05T09:00:00+00:00")
+                self.assertEqual(runtime["rate_limit_retry_after_seconds"], 600.0)
+                self.assertGreater(runtime["rate_limit_cooldown_seconds"], 0)
+            finally:
+                (
+                    radar.linkedin_last_http_request_monotonic,
+                    radar.linkedin_rate_limited_until_monotonic,
+                    radar.linkedin_last_rate_limit_monotonic,
+                    radar.linkedin_rate_limit_streak,
+                    radar.linkedin_rate_limit_generation,
+                ) = original_rate_state
+
+    def test_run_source_persists_sanitized_429_and_preserves_cooldown(self):
+        with TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "jobs.db"
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE source_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        started_at TEXT NOT NULL,
+                        finished_at TEXT NOT NULL,
+                        jobs_seen INTEGER NOT NULL,
+                        new_jobs INTEGER NOT NULL,
+                        error TEXT,
+                        run_id TEXT,
+                        outcome TEXT,
+                        duration_seconds REAL,
+                        error_type TEXT,
+                        http_status INTEGER,
+                        retry_after_seconds REAL,
+                        cooldown_seconds INTEGER
+                    )
+                """)
+            response = type(
+                "Response",
+                (),
+                {"status_code": 429, "headers": {"Retry-After": "600"}},
+            )()
+            error = radar.requests.HTTPError(
+                "429 Too Many Requests for https://example.test/jobs?token=must-not-persist",
+                response=response,
+            )
+            original_generation = radar.linkedin_rate_limit_generation
+            try:
+                radar.linkedin_rate_limit_generation = 0
+                source_runtime = {
+                    "rate_limited_until": "2026-11-05T10:10:00+00:00",
+                    "rate_limit_cooldown_seconds": 600,
+                    "rate_limit_retry_after_seconds": 600.0,
+                }
+                collectors = dict(radar.COLLECTORS)
+                collectors["linkedin"] = lambda _config: (_ for _ in ()).throw(error)
+                with (
+                    patch.object(radar, "DB_PATH", db_path),
+                    patch.object(radar, "COLLECTORS", collectors),
+                    patch.object(radar, "source_state", {"linkedin": source_runtime}),
+                    patch.object(radar, "_linkedin_cooldown_remaining", return_value=599.0),
+                ):
+                    radar.run_source("linkedin", {})
+                    with sqlite3.connect(db_path) as conn:
+                        row = conn.execute(
+                            """
+                            SELECT error, run_id, outcome, duration_seconds, error_type,
+                                   http_status, retry_after_seconds, cooldown_seconds
+                            FROM source_runs
+                            WHERE source='linkedin'
+                        """
+                        ).fetchone()
+                    runtime = radar.source_state["linkedin"]
+                self.assertEqual(row[0], "HTTP 429")
+                self.assertTrue(row[1])
+                self.assertEqual(row[2], "rate_limited")
+                self.assertGreaterEqual(row[3], 0.0)
+                self.assertEqual(row[4], "HTTPError")
+                self.assertEqual(row[5], 429)
+                self.assertEqual(row[6], 600.0)
+                self.assertEqual(row[7], 600)
+                self.assertNotIn("must-not-persist", row[0])
+                rate_limited_until = radar.parse_relative(runtime["rate_limited_until"])
+                remaining_seconds = (rate_limited_until - radar.now()).total_seconds()
+                self.assertGreaterEqual(remaining_seconds, 598)
+                self.assertLessEqual(remaining_seconds, 600)
+                self.assertEqual(runtime["rate_limit_cooldown_seconds"], 600)
+                self.assertFalse(runtime["running"])
+                self.assertEqual(runtime["run_id"], row[1])
+            finally:
+                radar.linkedin_rate_limit_generation = original_generation
+
+
+class SourceRegistryApiCoverageTests(unittest.TestCase):
+    def test_source_status_includes_every_registered_collector(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE source_runs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            source TEXT NOT NULL,
+                            started_at TEXT NOT NULL,
+                            finished_at TEXT NOT NULL,
+                            jobs_seen INTEGER NOT NULL,
+                            new_jobs INTEGER NOT NULL,
+                            error TEXT,
+                            run_id TEXT,
+                            outcome TEXT,
+                            duration_seconds REAL,
+                            error_type TEXT,
+                            http_status INTEGER,
+                            retry_after_seconds REAL,
+                            cooldown_seconds INTEGER
+                        )
+                    """)
+                with patch.object(
+                    radar,
+                    "get_config",
+                    return_value={"source_enabled": {}},
+                ), patch.object(radar, "source_state", {}):
+                    payload = radar.source_status()
+                self.assertEqual(
+                    {item["source"] for item in payload["sources"]},
+                    set(radar.COLLECTORS),
+                )
+                self.assertIn("ashby", {item["source"] for item in payload["sources"]})
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_latency_summary_includes_ashby(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE jobs (
+                            source TEXT NOT NULL,
+                            discovery_latency_seconds INTEGER,
+                            discovered_at TEXT NOT NULL
+                        )
+                    """)
+                    conn.execute(
+                        "INSERT INTO jobs (source, discovery_latency_seconds, discovered_at) "
+                        "VALUES (?, ?, ?)",
+                        ("ashby", 125, radar.iso(radar.now())),
+                    )
+                payload = radar.latency_summary(hours=24)
+                self.assertIn("ashby", payload["sources"])
+                self.assertEqual(payload["sources"]["ashby"]["samples"], 1)
+                self.assertEqual(payload["sources"]["ashby"]["p50_seconds"], 125)
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_dedupe_candidates_includes_ashby_observations(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE jobs (
+                            id INTEGER PRIMARY KEY,
+                            source TEXT NOT NULL,
+                            source_job_id TEXT NOT NULL,
+                            company TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            location TEXT NOT NULL,
+                            url TEXT NOT NULL,
+                            description TEXT NOT NULL
+                        )
+                    """)
+                    conn.executemany(
+                        """
+                        INSERT INTO jobs
+                        (id, source, source_job_id, company, title, location, url, description)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        [
+                            (
+                                1, "linkedin", "li-123", "Example Corp",
+                                "Backend Engineer", "Bengaluru, India",
+                                "https://www.linkedin.com/jobs/view/123", "Python backend role",
+                            ),
+                            (
+                                2, "ashby", "ashby-example-123", "Example Corp",
+                                "Backend Engineer", "Bengaluru, India",
+                                "https://jobs.example.com/backend-engineer", "Python backend role",
+                            ),
+                        ],
+                    )
+                payload = radar.dedupe_candidates(limit=100)
+                self.assertEqual(payload["jobs_considered"], 2)
             finally:
                 radar.DB_PATH = original_db
 
@@ -2980,3 +3348,7 @@ class AshbyCollectorTests(unittest.TestCase):
         with self.assertRaises(radar.HTTPException): radar.validate_config(base)
         with self.assertRaises(radar.HTTPException):
             radar.validate_config({**BASE_CONFIG,"ashby_boards":[{"board":"../unsafe","company":"Bad"}]})
+
+
+if __name__ == "__main__":
+    unittest.main()
