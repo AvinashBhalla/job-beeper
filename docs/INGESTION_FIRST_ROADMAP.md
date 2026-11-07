@@ -5,6 +5,8 @@
 **Primary branch:** `v2-live-radar`  
 **Current implementation branch:** `feat/source-observability-20261107`
 
+**Draft PR:** [#47](https://github.com/AvinashBhalla/job-beeper/pull/47) — V2 CI #1303 passed (196 tests on Python 3.12).
+
 ## Product priority
 
 The primary product promise is fresh, useful job discovery. Jobs should enter the portal promptly after a source makes them available, with trustworthy source identity, timestamps, deduplication and visible source health. User signup, resume parsing and Telegram delivery are downstream of reliable shared ingestion.
@@ -44,4 +46,4 @@ Before production enablement, require permitted access, deterministic fixtures/t
 
 ## Current next action
 
-Push `feat/source-observability-20261107`, open a draft PR against `v2-live-radar`, and require GitHub CI to pass. Then add request/page-level telemetry before tuning collection cadence or adding more sources.
+Review draft PR #47 and merge into `v2-live-radar` only after human review/approval. CI #1303 passed, but no merge or deployment is authorized by that result. After merge, add request/page-level telemetry and partial-board outcomes before tuning collection cadence or adding more sources. The older telemetry PR #40 is closed unmerged as superseded by #47.

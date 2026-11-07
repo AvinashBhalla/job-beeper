@@ -5916,7 +5916,9 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Focused source-status, registry, migration and rate-limit tests: **11 passed**.
 - Full V2 unittest discovery: **196 passed** in 88.014 seconds using an isolated Python 3.10 virtual environment on the VM host.
 - `python -m compileall -q v2` and `git diff --check` passed.
-- Docker socket access was denied to the Termalin user, so no container build/runtime validation was attempted. GitHub CI on the new branch is the next validation gate; its Python 3.12 result must be checked before considering this work complete.
+- GitHub draft PR #47 is open against `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/47. Head `a2ec0ba59919704c849cb0c5d7ee2e7c18daf6cf`; V2 CI run #1303 / ID `42388082207` passed on Python 3.12: syntax, focused router/extractor tests and the full suite (**196 tests in 28.011 seconds — OK**).
+- Older draft PR #40 was closed unmerged as superseded by #47; a comment links the replacement. PR #47 remains draft pending review; passing CI is not approval to merge.
+- Docker socket access was denied to the Termalin user, so no container build/runtime validation was attempted.
 
 ### Runtime safety
 - No production or shared-dev container, database, volume, config, source schedule, Telegram bot or notification was touched. No LLM/provider calls were made.
@@ -5924,7 +5926,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - No deployment or merge is authorized. Keep production port 8000 and shared dev port 8001 unchanged.
 
 ### Next actions
-1. Commit and push this branch, open a draft PR targeting `v2-live-radar`, and verify GitHub CI.
+1. Review draft PR #47 and merge it into `v2-live-radar` only after human review/approval; do not deploy it to shared dev or production automatically.
 2. Add request/page/status-class counters and explicit partial-board outcomes for multi-board adapters; current telemetry is run-level and captures LinkedIn 429 specifically, not a complete per-request histogram.
 3. Use the new telemetry to diagnose LinkedIn 429 frequency/cooldown without increasing pressure or bypassing provider limits.
 4. Make Naukri relay freshness and incremental processing measurable; retain date-only posting precision.
