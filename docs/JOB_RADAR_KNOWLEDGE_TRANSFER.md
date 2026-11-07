@@ -1,9 +1,9 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-11-06 — Multi-user auth foundation implemented on isolated feature branch; not deployed
+**Snapshot:** 2026-11-07 — OAuth branch revalidated (226 tests green); resume/Telegram implementation not started; no deployment
 **Release integration branch:** `v2-live-radar`
 
-**Active feature branch:** `feat/multi-user-foundation-20261106`
+**Active feature branch:** `feat/user-preferences-evaluations-20261106`
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
 This is the current operating summary for an engineer taking over. `docs/JOB_RADAR_HANDOVER.md` is the detailed chronological record; `docs/JOBBEEPER_REFERENCE.md` describes the product architecture. **Mandatory rule: update both this file and the detailed handover after every user prompt before ending the turn/session, including decisions or evidence-only turns (record “no code change” when applicable).** After every code/config change, document what changed, tests/CI, commit SHA, deployment evidence, remaining work, exact commands/output expected from the user, and the next-chat continuation prompt. Newest handoff supersedes older instructions; explicitly label older checklists historical. Never rely on the current chat alone.
@@ -3117,10 +3117,12 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Verify latest test status; the last confirmed focused run before final browser-state hardening was 60 passed. A subsequent full suite was initiated but its result was not captured. Do not assume it passed.
 
 
-### Verification update — 2026-11-06
-- After the latest OAuth browser-state changes and handover docs were pulled to the working VM, the full V2 suite completed: **226 tests run, 225 passed, 1 skipped** in 152.153s. Command installed `v2/requirements-dev.txt` into a disposable container and ran unittest discovery; no project runtime container was replaced.
-- Node 22 syntax checks for `dashboard/auth.js` and `dashboard/app.js` completed successfully (no output/errors).
-- Working tree was clean after pulling the documentation updates.
-- This is local disposable-container verification, not a CI status assertion and not a dev deployment. Dev 8001 still runs the previous image; production 8000 untouched.
+## 2026-11-07 — Current continuation state
 
-- GitHub Actions CI: V2 CI run **#1265** for code/test commit `2e78e01` completed with conclusion **success**. Run #1262 for `de893b8` also succeeded. The latest handover-only documentation commits do not change runtime code.
+- Work only in `/tmp/job-radar-user-preferences` on `feat/user-preferences-evaluations-20261106`; initial inspected HEAD `7a1928997ba57286c4d7d1d4955db691014d12df`, clean. Remote branch had advanced to `49389a322952a3255d15291d269f15a6bfe9ebbd` with four docs-only commits. The first push was rejected non-fast-forward; rebase the one new documentation commit onto that remote tip and push normally. Never force-push.
+- Full V2 unittest suite: **226 passed, 0 failed**, exit code 0, 130.509s using dedicated `/tmp/job-radar-user-preferences-venv` with `v2/requirements-dev.txt`. CI #1265 (run ID `42189400335`) succeeded for code commit `2e78e01e0979963ce4e485871ad7f26acf36e7bd`; later local changes are docs-only.
+- Reviewed Google OIDC flow: state/nonce/PKCE, 10-minute one-time hashed state, browser-bound HttpOnly state cookie, google-auth token verification, verified email, identity linking, role=user, preference initialization and session issuance. No live OAuth test; credentials absent. Provider-cancelled state rows expire via TTL cleanup.
+- No application code changed in this turn. No resume parser/upload or Telegram per-user linking/dispatcher implemented yet. These remain next product phases, in that order.
+- Runtime: Termalin host is online but `ubuntu` lacks Docker socket access (`/var/run/docker.sock` is root:docker). No sudo/permission workaround. No container rebuild, dev deployment, production action or notification was performed. Treat dev 8001 as last known older image `f43cd4a`; production 8000 untouched. Do not modify dirty/stale `/home/ubuntu/job-beeper-dev` or `/home/ubuntu/job-beeper`.
+- Key learning: the full suite must run with `httpx2` from `v2/requirements-dev.txt`; the older dev image lacked this test dependency and produced misleading import errors. Use the dedicated venv for host-side test validation. CI and local tests are separate evidence and must be recorded separately.
+- Next: push these docs, inspect latest PR #46 checks/review threads, then implement resume parsing as a bounded slice: PDF/DOCX limits, deterministic parser, safe text extraction, authenticated CSRF-protected upload, per-user ownership, private temporary storage and delete-after-parse default; present editable suggestions and only persist after explicit user confirmation through `/api/preferences`. Telegram per-user link-token/webhook/dispatcher follows after resume tests pass. No merge/deploy without explicit approval.
