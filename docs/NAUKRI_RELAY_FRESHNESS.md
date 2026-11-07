@@ -61,5 +61,5 @@ Admin GET /api/source-status now returns last_feed for Naukri, including current
 - Naukri tests cover stale/empty/count-mismatched snapshots, last-good state preservation, same-content snapshots with a newer relay timestamp, source-health reporting, date-only timestamp precision and repeat-upsert evaluation avoidance.
 - Full V2 suite: 205 tests passed on the isolated Python 3.10 test environment.
 - python -m compileall -q v2 and git diff --check passed.
-- The VM's system Node is v12.22.9, below the syntax level already used by the dashboard; the GitHub CI Node step is required for the final dashboard syntax check.
+- The VM's system Node is v12.22.9, below the syntax level already used by the dashboard; the dashboard was therefore checked with esbuild 0.25.12 locally. GitHub V2 CI #1311 / run 42398484593 passed for implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a: dashboard JavaScript syntax passed, focused router/extractor tests 32 passed, and full V2 suite 205 passed in 15.336 seconds.
 - This implementation has not been deployed to port 8003, shared dev (8001) or production (8000).

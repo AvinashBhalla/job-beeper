@@ -5970,7 +5970,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Admin /api/source-status includes Naukri last_feed metadata; dashboard Source Health displays last-good relay age, job count and whether the snapshot content is unchanged.
 - Added regression coverage for stale snapshot/last-good retention, empty/count mismatch, unchanged jobs with advancing relay timestamp, feed-health response, repeat-upsert evaluation skip, plus adjusted old test fixtures to use current timestamps.
 - Full V2 suite: 205 passed (Python 3.10 isolated venv). compileall and git diff --check passed. Local Node is 12.22.9 and cannot parse the dashboard's existing modern syntax, so GitHub CI must validate JavaScript after push.
-- Commit 04c0605 (feat: validate Naukri relay freshness and reduce repeat evaluation) has been pushed to feat/source-observability-20261107; PR #47 title/body now include the Naukri scope. PR remains draft/open/unmerged. GitHub workflow/status lookup did not yet return a run for this head at the time of this note; do not treat CI as passed until rechecked. No deploy, feature config change, source schedule change, source enablement change or production/shared-dev operation. Keep PR #47 draft and do not deploy to 8001/8000 without explicit approval.
+- Commit 04c0605 (feat: validate Naukri relay freshness and reduce repeat evaluation) has been pushed to feat/source-observability-20261107; PR #47 title/body now include the Naukri scope. PR remains draft/open/unmerged. GitHub V2 CI #1311 / run 42398484593 subsequently passed for implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a: dashboard JavaScript syntax passed, focused router/extractor tests 32 passed, full V2 suite 205 passed in 15.336 seconds. No deploy, feature config change, source schedule change, source enablement change or production/shared-dev operation. Keep PR #47 draft and do not deploy to 8001/8000 without explicit approval.
 - Remaining relay investigation: verify workflow schedule/run durations; consider publisher-side per-job observed_at metadata and reliable conditional requests. Do not call the full-feed polling path per-job incremental yet.
 
 
@@ -5980,3 +5980,9 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Final local verification at push: full V2 suite 205 passed; Python compilation, esbuild 0.25.12 dashboard build and git diff --check passed.
 - GitHub workflow/status lookup returned no run/check for this head yet. Re-check GitHub CI before calling the PR ready for review.
 - No runtime deployment. The source metrics preview on 8003 and OAuth feature on 8002 remain separate; shared dev 8001 and production 8000 are untouched.
+
+
+## 2026-11-07 — GitHub CI passed for source observability plus Naukri freshness
+
+- GitHub V2 CI run #1311 / ID 42398484593 passed on implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a. Syntax job passed including dashboard JavaScript; focused router/extractor tests 32 passed; full V2 test suite 205 passed in 15.336 seconds.
+- The later docs-only handover commit does not change implementation code. PR #47 remains draft/open/unmerged and no runtime rollout was performed.

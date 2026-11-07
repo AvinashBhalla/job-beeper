@@ -77,3 +77,9 @@ This remains a full-snapshot integration: the consumer still downloads and parse
 - The isolated metrics preview at remote loopback `127.0.0.1:8003` is seeded with clearly synthetic example rows and has every collector disabled and notifications off. It makes no external source requests. It is separate from the OAuth feature service on 8002, shared dev on 8001 and production on 8000.
 - GitHub V2 CI #1307 / run `42391947214` passed for implementation commit `a9da22f92f9003e5317b8285fbcd5102ea348be9` on Python 3.12 and the current Node runner: dashboard JavaScript syntax passed, focused router/extractor tests **32 passed**, and the full V2 suite **199 passed in 27.721 seconds**.
 - The VM's Node 12 is too old for the dashboard's existing modern JavaScript syntax; GitHub CI is the authoritative dashboard syntax check.
+
+## Latest validation after Naukri freshness addition
+
+- Full V2 suite: 205 tests passed locally on the isolated Python 3.10 environment.
+- GitHub V2 CI #1311 / run 42398484593 passed on commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a: dashboard JavaScript syntax passed, focused router/extractor tests 32 passed, and full V2 suite 205 passed in 15.336 seconds.
+- No deployment was performed; keep PR #47 draft until reviewed and approved.
