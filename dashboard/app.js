@@ -1573,6 +1573,72 @@
     };
   }
 
+  async function loadTelegramStatus() {
+    const panel = $('telegramConnectPanel');
+    if (panel) panel.hidden = Boolean(state.isAdmin);
+    if (state.isAdmin) return;
+    const status = $('telegramConnectionStatus');
+    try {
+      const response = await authClient.request('/telegram/status', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not load Telegram status.');
+      const connected = Boolean(data.connection?.connected);
+      if (status) status.textContent = connected
+        ? 'Telegram is connected to your Job Beeper account. Notifications are not enabled by this link.'
+        : data.configured
+          ? 'Telegram is not connected yet.'
+          : 'Telegram linking is not configured by the administrator yet.';
+      const createButton = $('createTelegramLinkBtn');
+      if (createButton) createButton.hidden = !data.configured;
+      const disconnectButton = $('disconnectTelegramBtn');
+      if (disconnectButton) disconnectButton.hidden = !connected;
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not load Telegram status.';
+    }
+  }
+
+  async function createTelegramLink() {
+    const status = $('telegramConnectionStatus');
+    const button = $('createTelegramLinkBtn');
+    const anchor = $('openTelegramLink');
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Generating a secure, one-time link…';
+    try {
+      const response = await authClient.request('/telegram/link', { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not create Telegram link.');
+      if (anchor) {
+        anchor.href = data.url;
+        anchor.hidden = false;
+        anchor.textContent = `Open Job Beeper in Telegram (link expires in ${Math.ceil(data.expires_in_seconds / 60)} minutes)`;
+      }
+      if (status) status.textContent = 'Link created. Open it in Telegram and press Start. Return here and refresh the connection status. Generate a new link if this one expires.';
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not create Telegram link.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function disconnectTelegram() {
+    const status = $('telegramConnectionStatus');
+    const button = $('disconnectTelegramBtn');
+    if (button) button.disabled = true;
+    try {
+      const response = await authClient.request('/telegram/link', { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not disconnect Telegram.');
+      const anchor = $('openTelegramLink');
+      if (anchor) { anchor.hidden = true; anchor.removeAttribute('href'); }
+      if (status) status.textContent = 'Telegram has been disconnected from this account.';
+      await loadTelegramStatus();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not disconnect Telegram.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   async function parseResumeForSuggestions() {
     const input = $('resumeUploadInput');
     const status = $('resumeParseStatus');
@@ -1674,6 +1740,8 @@
       if (onboardingNotice) onboardingNotice.hidden = Boolean(data.preferences?.onboarding_complete || state.isAdmin);
       const resumePanel = $('resumeAssistPanel');
       if (resumePanel) resumePanel.hidden = Boolean(state.isAdmin || data.preferences?.onboarding_complete);
+      const telegramPanel = $('telegramConnectPanel');
+      if (telegramPanel) telegramPanel.hidden = Boolean(state.isAdmin);
       if (!state.isAdmin && !data.preferences?.onboarding_complete) {
         window.showSection?.('preferencesSection', false);
       }
@@ -1890,6 +1958,9 @@
     // Preferences save button
     if ($('savePreferencesBtn')) $('savePreferencesBtn').addEventListener('click', savePreferences);
     if ($('parseResumeBtn')) $('parseResumeBtn').addEventListener('click', parseResumeForSuggestions);
+    if ($('createTelegramLinkBtn')) $('createTelegramLinkBtn').addEventListener('click', createTelegramLink);
+    if ($('refreshTelegramStatusBtn')) $('refreshTelegramStatusBtn').addEventListener('click', loadTelegramStatus);
+    if ($('disconnectTelegramBtn')) $('disconnectTelegramBtn').addEventListener('click', disconnectTelegram);
 
 
   }
@@ -2037,6 +2108,7 @@
     handleHashRoute();
 
     await loadConfig();
+    if (!state.isAdmin) await loadTelegramStatus();
     if (state.isAdmin || state.config?.onboarding_complete) await loadJobsFeed();
     else { state.jobs = []; renderFeed(); }
     await loadSourceStatusTelemetry();

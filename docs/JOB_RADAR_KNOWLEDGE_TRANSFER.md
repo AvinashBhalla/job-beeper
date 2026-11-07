@@ -3144,3 +3144,12 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 - PR #46 description now reflects Google OIDC, resume parser/API/onboarding UI, security posture, local 237-test result, CI #1275, no deployment, and deferred Telegram milestone. PR remains draft/open/unmerged against `v2-live-radar`, head `b61e76ba65653acba273048a97ae6e290ffb4fa7`.
 - No code change. Next: Telegram link-token + webhook + chat mapping/disconnect, then explicit per-user notification opt-in and dispatcher.
+
+## 2026-11-07 — Telegram account linking (implementation slice, not deployed)
+
+- Added `v2/telegram_linking.py`: hashed 32-byte random link tokens, 10-minute expiry, per-user previous-token invalidation, atomic one-time consumption, private-chat-only, unique chat ID per account, one chat per user, relink/disconnect. DB tables initialized at app startup and cascade on account deletion.
+- API: member-authenticated + CSRF `GET /api/telegram/status`, `POST /api/telegram/link`, `DELETE /api/telegram/link`; secret-header-protected `POST /api/telegram/webhook` validates `X-Telegram-Bot-Api-Secret-Token`, max 64 KiB request, accepts private `/start TOKEN`, rejects replay/expired/unknown tokens and browser-supplied chat IDs. Sends a generic confirmation DM after linking; no job alert delivery.
+- Env: existing `JOB_RADAR_TELEGRAM_BOT_TOKEN` plus `JOB_BEEPER_TELEGRAM_BOT_USERNAME` and `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET`. Production compose passes new values by interpolation; dev/feature compose defaults blank. Member UI adds generate/open/refresh/disconnect controls and explains linking does not turn on alerts. Admin linking blocked.
+- New setup runbook: `docs/TELEGRAM_PER_USER_SETUP.md`. Updated `v2/README.md`. Focused tests: **23 passed**; full V2 suite job `ywzycm1yla` still running when checkpoint was written. No deployment or live Telegram call; Docker access remains unavailable.
+- Not yet built: per-user opt-in/frequency/quiet hours, preference matcher dispatcher, dedupe/retry/ledger. Global admin Telegram route remains unchanged. Do not send member alerts before the separate dispatcher milestone.
+- Owner input needed only for live integration: dedicated test bot username/token, webhook secret configured privately on VM, and public HTTPS webhook origin. Never paste secrets into chat. Code/test continuation does not require owner input.

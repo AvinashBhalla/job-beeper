@@ -341,10 +341,14 @@ class AuthApiTests(unittest.TestCase):
                 "/api/auth/google/start", "/api/auth/google/callback",
             }:
                 self.assertNotIn(radar.require_admin, dependency_calls, route.path)
+            elif route.path == "/api/telegram/webhook":
+                # Telegram authenticates this server-to-server route with its dedicated secret header.
+                self.assertNotIn(radar.require_authenticated, dependency_calls, route.path)
+                self.assertNotIn(radar.require_admin, dependency_calls, route.path)
             elif route.path in {"/api/auth/me", "/api/auth/logout"}:
                 self.assertIn(radar.get_current_user, dependency_calls, route.path)
             elif route.path in {
-                "/api/preferences", "/api/preferences/resume", "/api/jobs", "/api/daily-summary", "/api/jobs/{job_id}",
+                "/api/preferences", "/api/preferences/resume", "/api/telegram/status", "/api/telegram/link", "/api/jobs", "/api/daily-summary", "/api/jobs/{job_id}",
                 "/api/source-status/summary"
             }:
                 self.assertIn(radar.require_authenticated, dependency_calls, route.path)

@@ -28,7 +28,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, google_oauth, resume_parser, user_preferences
+from v2 import auth, google_oauth, resume_parser, telegram_linking, user_preferences
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -844,6 +844,7 @@ def init_db() -> None:
     backfill_notification_ledger()
     auth.init_auth_schema(DB_PATH)
     user_preferences.init_preferences_schema(DB_PATH)
+    telegram_linking.init_schema(DB_PATH)
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
@@ -3440,6 +3441,107 @@ async def parse_user_resume(
         await file.close()
     # Deliberately return only bounded suggestions. No file, path, raw text, or DB write.
     return result
+
+
+@app.get("/api/telegram/status")
+def telegram_connection_status(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+    configured = bool(
+        username
+        and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username)
+        and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
+    )
+    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    return {"configured": configured, "bot_username": username if configured else None,
+            "connection": connection or {"connected": False}}
+
+
+@app.post("/api/telegram/link")
+def create_telegram_link(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+    configured = bool(
+        username
+        and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username)
+        and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
+    )
+    if not configured:
+        raise HTTPException(status_code=503, detail="Telegram linking is not configured yet.")
+    token, expires_at = telegram_linking.create_link_token(DB_PATH, user["id"])
+    return {"url": f"https://t.me/{username}?start={token}", "expires_in_seconds": telegram_linking.TOKEN_TTL_SECONDS,
+            "expires_at": expires_at}
+
+
+@app.delete("/api/telegram/link")
+def disconnect_telegram_account(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    disconnected = telegram_linking.disconnect(DB_PATH, user["id"])
+    return {"connected": False, "disconnected": disconnected}
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_link_webhook(request: Request, background_tasks: BackgroundTasks):
+    expected_secret = os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", "")
+    supplied_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not expected_secret or not supplied_secret or not secrets.compare_digest(expected_secret, supplied_secret):
+        raise HTTPException(status_code=403, detail="Webhook authentication failed.")
+    if not os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN"):
+        raise HTTPException(status_code=503, detail="Telegram bot is not configured.")
+    if request.headers.get("content-length", "").isdigit() and int(request.headers["content-length"]) > 65536:
+        raise HTTPException(status_code=413, detail="Telegram update is too large.")
+    try:
+        raw_update = await request.body()
+        if len(raw_update) > 65536:
+            raise HTTPException(status_code=413, detail="Telegram update is too large.")
+        update = json.loads(raw_update)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.") from None
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.")
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return {"ok": True}
+    chat = message.get("chat")
+    text = message.get("text")
+    if not isinstance(chat, dict) or not isinstance(text, str):
+        return {"ok": True}
+    chat_id = str(chat.get("id", ""))
+    chat_type = str(chat.get("type", ""))
+    match = re.fullmatch(r"/start(?:@\w+)?\s+([A-Za-z0-9_-]{20,128})", text.strip())
+    if match is None:
+        return {"ok": True}
+    try:
+        linked_user_id = telegram_linking.consume_link_token(
+            DB_PATH, match.group(1), chat_id, chat_type
+        )
+    except ValueError:
+        log.warning("Telegram link attempt rejected: chat is already linked to another account")
+        return {"ok": True}
+    if linked_user_id is not None:
+        background_tasks.add_task(
+            _send_telegram_link_confirmation,
+            os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN", ""), chat_id,
+        )
+    return {"ok": True}
+
+
+def _send_telegram_link_confirmation(bot_token: str, chat_id: str) -> None:
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": "Your Telegram account is now connected to Job Beeper. You can return to the dashboard."},
+            timeout=10,
+        ).raise_for_status()
+    except requests.RequestException:
+        log.warning("Could not send Telegram account-link confirmation")
 
 
 @app.put("/api/preferences")

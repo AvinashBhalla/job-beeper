@@ -23,6 +23,8 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.config_patch.start()
         radar.init_db()
         user_preferences.init_preferences_schema(self.db_path)
+        from v2 import telegram_linking
+        telegram_linking.init_schema(self.db_path)
         self.user_a = auth.create_user(self.db_path, "a@example.com", "user-a-password-long")
         self.user_b = auth.create_user(self.db_path, "b@example.com", "user-b-password-long")
         user_preferences.save_user_preferences(
@@ -85,6 +87,58 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("target role and location", response.json()["detail"])
 
+
+    def test_telegram_linking_requires_authentication_and_configuration(self):
+        response = self.client.post("/api/telegram/link")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        response = self.client.post("/api/telegram/link", headers={"X-CSRF-Token": self.client.cookies.get("job_beeper_csrf")})
+        self.assertEqual(response.status_code, 503)
+
+    def test_telegram_link_api_and_webhook_are_secret_protected(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        with patch.dict("os.environ", {
+            "JOB_BEEPER_TELEGRAM_BOT_USERNAME": "JobBeeperTestBot",
+            "JOB_RADAR_TELEGRAM_BOT_TOKEN": "test-bot-token",
+            "JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret-value",
+        }):
+            status = self.client.get("/api/telegram/status")
+            self.assertTrue(status.json()["configured"])
+            link = self.client.post("/api/telegram/link", headers={"X-CSRF-Token": csrf})
+            self.assertEqual(link.status_code, 200, link.text)
+            self.assertIn("https://t.me/JobBeeperTestBot?start=", link.json()["url"])
+            token = link.json()["url"].split("start=", 1)[1]
+            update = {"update_id": 1, "message": {"text": f"/start {token}", "chat": {"id": 123456, "type": "private"}}}
+            denied = self.client.post("/api/telegram/webhook", json=update)
+            self.assertEqual(denied.status_code, 403)
+            with patch.object(radar, "_send_telegram_link_confirmation") as confirmation:
+                linked = self.client.post("/api/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "test-webhook-secret-value"})
+                confirmation.assert_called_once()
+            self.assertEqual(linked.status_code, 200, linked.text)
+            status = self.client.get("/api/telegram/status")
+            self.assertTrue(status.json()["connection"]["connected"])
+            replay = self.client.post("/api/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "test-webhook-secret-value"})
+            self.assertEqual(replay.status_code, 200)
+            disconnected = self.client.delete("/api/telegram/link", headers={"X-CSRF-Token": csrf})
+            self.assertEqual(disconnected.status_code, 200)
+            self.assertFalse(self.client.get("/api/telegram/status").json()["connection"]["connected"])
+
+    def test_telegram_link_endpoints_reject_admin_and_mutations_require_csrf(self):
+        admin = auth.create_first_admin(self.db_path, "admin@example.com", "admin-password-long")
+        self.assertEqual(self._login("admin@example.com", "admin-password-long").status_code, 200)
+        self.assertEqual(self.client.get("/api/telegram/status").status_code, 403)
+        self.assertEqual(self.client.delete("/api/telegram/link").status_code, 403)
+
+    def test_telegram_webhook_rejects_non_private_chat_and_unknown_commands(self):
+        with patch.dict("os.environ", {
+            "JOB_RADAR_TELEGRAM_BOT_TOKEN": "test-bot-token",
+            "JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret-value",
+        }):
+            update = {"message": {"text": "/start abcdefghijklmnopqrstuvwxyz", "chat": {"id": -100123, "type": "group"}}}
+            response = self.client.post("/api/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "test-webhook-secret-value"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"ok": True})
 
     def test_resume_parse_requires_authentication(self):
         response = self.client.post(

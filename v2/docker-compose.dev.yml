@@ -22,6 +22,8 @@ services:
       # Deliberately blank: development must never Telegram-alert users.
       JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
       JOB_RADAR_TELEGRAM_CHAT_ID: ""
+      JOB_BEEPER_TELEGRAM_BOT_USERNAME: ""
+      JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET: ""
       LOG_LEVEL: INFO
       # Shadow-only Gemini JD extraction; never changes match decisions or alerts.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

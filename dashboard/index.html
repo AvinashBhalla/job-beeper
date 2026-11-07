@@ -456,6 +456,17 @@
                 <p id="resumeParseStatus" class="auth-description" role="status" aria-live="polite"></p>
               </div>
             </div>
+            <div id="telegramConnectPanel" class="settings-block" hidden>
+              <span class="settings-block-title">Connect Telegram (optional)</span>
+              <p class="form-help-text">Connect your private Telegram chat to this Job Beeper account. Linking is optional and does not enable job notifications by itself.</p>
+              <p id="telegramConnectionStatus" class="auth-description" role="status" aria-live="polite">Checking Telegram connection…</p>
+              <div class="form-field-group">
+                <button id="createTelegramLinkBtn" class="btn btn-secondary" type="button">Generate Telegram connection link</button>
+                <button id="refreshTelegramStatusBtn" class="btn btn-secondary" type="button">Refresh connection status</button>
+                <a id="openTelegramLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Open Job Beeper in Telegram</a>
+                <button id="disconnectTelegramBtn" class="btn btn-secondary" type="button" hidden>Disconnect Telegram</button>
+              </div>
+            </div>
 
             <!-- Matching Criteria Group -->
             <div class="settings-block">

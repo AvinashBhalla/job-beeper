@@ -61,7 +61,7 @@ python -m v2.auth_admin create-user --email beta-user@example.com
 
 The first command creates only the first admin; the second creates an ordinary user and requires an admin to exist. Both prompt for the password twice with `getpass`; never put passwords in command-line arguments. `JOB_BEEPER_COOKIE_SECURE` defaults to `true` and requires HTTPS. The loopback-only `docker-compose.dev.yml` defaults it to `false` for SSH-tunnel development; never disable Secure on a public service. When TLS terminates at a reverse proxy and Uvicorn does not see the external scheme/host, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact browser-visible origin (for example, `https://jobs.example.com`) so login-Origin validation uses the public origin.
 
-This is a transitional security foundation, not full tenant isolation. Per-user preferences, evaluations, Telegram destinations/ledger and server-side applications are still future milestones. Do not invite ordinary beta users to use the job feed until those user-scoped features are implemented.
+Per-user preferences and job evaluations are implemented on the current draft feature branch. Per-user Telegram account linking is implemented but not yet configured or deployed; per-user notification opt-in, matching, delivery ledger, quiet hours and deduplication remain future work. Server-side applications are also a future milestone. Keep the PR draft and do not treat these features as production-ready until review, CI and browser smoke tests are complete.
 
 ### Running the test suite
 
@@ -104,6 +104,6 @@ Authenticated endpoints:
 - GET /api/jobs/{job_id} — detail only when an evaluation row exists for the authenticated user.
 - GET /api/daily-summary — shared discovered count and user-scoped match count. Normal users do not see global alert delivery counts.
 
-Admin operational routes such as /api/config, source status, latency, dedupe, notification queue and LLM diagnostics remain admin-only. The first admin's legacy global candidate profile is migrated to that admin's preference row; new ordinary users never inherit it. Per-user Telegram and server-side applications are later milestones.
+Admin operational routes such as /api/config, source status, latency, dedupe, notification queue and LLM diagnostics remain admin-only. The first admin's legacy global candidate profile is migrated to that admin's preference row; new ordinary users never inherit it. Members can link one private Telegram chat through the one-time `/api/telegram/link` flow; member notifications are not sent by this linking feature. Server-side applications remain a later milestone.
 
 For isolated smoke testing, use v2/docker-compose.feature.yml (port 8002, separate radar-feature-data volume, all source/Telegram/LLM integrations disabled). The feature-only seed command, python -m v2.seed_feature_demo, inserts four synthetic listings and refuses to run unless JOB_BEEPER_FEATURE_DEMO=true is set in the isolated feature container. See the root README's Multi-user feature smoke test section for PowerShell commands. This feature Compose project is separate from the existing dev service and must not be confused with a production rollout.
