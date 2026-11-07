@@ -3253,3 +3253,13 @@ Current code and feature test state remain as documented in the preceding handov
 - Focused Google OAuth suite **15/15**. Complete V2 suite in the isolated feature container **272 passed, 1 skipped**. Test-only `httpx2` installed temporarily; secure-cookie override applied only to test process.
 - Host checkout contains the new callback code; rebuild only `v2/docker-compose.feature.yml` project on port 8002 so the isolated feature runtime receives it. Do not touch shared dev 8001 or production 8000. GitHub CI for the new head is pending after commit/push.
 - Google OAuth remains unconfigured for live provider testing; no Google client secrets or production OAuth configuration were changed.
+
+
+## 2026-11-07 — Dev bot handle and local secret-generation clarification
+
+- Owner supplied intended dev Telegram username `@YourJobBeeperDevBot`. The corresponding env value is `YourJobBeeperDevBot` without `@`. This is not verified as created yet; BotFather must confirm availability and issue the bot token. No token was shared.
+- To generate the independent webhook secret, run in Windows PowerShell: `python -c "import secrets; print(secrets.token_urlsafe(32))"`; use `py -c ...` if needed. On Ubuntu use `python3 -c ...`. This is a normal terminal command, not a Telegram command. Do not paste the output into chat.
+- `.env.feature` is not yet present on the server; it is git-ignored. The tracked `.env.feature.example` now has the owner-provided bot username and blank placeholders for Telegram and Google OAuth. After obtaining the BotFather token and generating the secret, create/edit the file in `/tmp/job-radar-user-preferences` and fill it privately.
+- Isolated feature Compose now passes all three `GOOGLE_OAUTH_*` variables as well as the three Telegram variables. Previously it passed only Telegram settings, so live Google OAuth configuration would not have reached the app. All remain unset today.
+- The feature service is still loopback-only on `127.0.0.1:8002`. No webhook registration until a public HTTPS dev route is configured. No production bot/OAuth settings changed; shared dev 8001 and production 8000 untouched.
+- The exact steps are documented in `docs/TELEGRAM_PER_USER_SETUP.md` and `docs/GOOGLE_OAUTH_SETUP.md`.

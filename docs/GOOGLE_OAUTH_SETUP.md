@@ -25,9 +25,15 @@ Set these in the environment file used by the relevant Compose service:
 - `GOOGLE_OAUTH_CLIENT_SECRET`
 - `GOOGLE_OAUTH_REDIRECT_URI`
 
-For the isolated dev Compose project, the env file is `/home/ubuntu/job-beeper-dev/.env`. Do not print the file or its values in logs or chat. After setting values, recreate only the dev radar service with the documented dev Compose command so the container receives the new environment.
+For the older shared-dev Compose project, the env file is `/home/ubuntu/job-beeper-dev/.env`. Do not print the file or its values in logs or chat. For the current PR #46 isolated feature Compose project, use `/tmp/job-radar-user-preferences/.env.feature` as documented in the dedicated section below; do not configure shared dev for this feature test.
 
 If any value is missing or the redirect URI is invalid, the API reports Google sign-in disabled and the login page hides the Google signup control. Password login continues to work.
+
+## Isolated feature branch configuration
+
+The current auth/resume/Telegram implementation is being tested in the isolated Compose project `job-radar-user-preferences` on loopback port 8002. Its `v2/docker-compose.feature.yml` now passes `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_REDIRECT_URI` from the private `.env.feature` file. The values are optional; Google signup stays hidden while any is blank.
+
+Before enabling Google sign-in, decide the actual browser-visible local origin used to reach port 8002 (for example, an SSH tunnel forwarding remote 8002 to local 18002). Register that exact origin and callback in Google Cloud. The redirect URI must be exactly `<browser-origin>/api/auth/google/callback`, and for local HTTP it must use `localhost` or `127.0.0.1`; do not assume the earlier shared-dev `18001` callback is correct for this separate feature service. Add all three values to `/tmp/job-radar-user-preferences/.env.feature`, then recreate only the feature Compose service using the command in `docs/TELEGRAM_PER_USER_SETUP.md`. Do not put OAuth credentials in chat or Git.
 
 ## Flow and security controls
 

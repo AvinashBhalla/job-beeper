@@ -218,3 +218,8 @@ The owner has asked that the existing authentication, resume-assisted onboarding
 ### Feature-track follow-up — Google OAuth state lifecycle (2026-11-07)
 
 - Google OAuth callback now consumes one-time state for both provider success and cancellation/error responses after verifying the browser-bound state cookie. New regressions cover cancellation cleanup and mismatched-state rejection. Full isolated V2 suite is **272 passed, 1 skipped**. This feature work remains parallel to the JobBeeper evidence investigation and does not change ingestion priorities.
+
+
+## 2026-11-07 — Dev bot and local secret setup clarification
+
+The owner supplied `@YourJobBeeperDevBot` as the intended development Telegram bot handle. BotFather token creation/verification remains pending. The webhook secret is generated separately in Windows PowerShell (`python -c "import secrets; print(secrets.token_urlsafe(32))"`, or `py -c ...`) or Ubuntu (`python3 -c ...`); it is not a Telegram command. `.env.feature` is currently absent and git-ignored; the documented setup is in `docs/TELEGRAM_PER_USER_SETUP.md`. Google OAuth env passthrough was added to the isolated feature Compose, but all three Google OAuth values remain blank. Feature port 8002 is loopback-only, so webhook registration still waits for an approved public HTTPS dev route.

@@ -2,15 +2,15 @@
 
 ## Current implementation boundary
 
-The feature branch implements account linking plus a separate, explicit per-user notification opt-in and delivery path. Linking alone never enables notifications. Member alerts default off and use their own settings/ledger and linked private chat; the legacy global Telegram destination remains reserved for admin/operational alerts. A real-bot end-to-end smoke test is still pending a dedicated dev bot and a public HTTPS webhook endpoint. Quiet hours, per-user time zones, configurable frequency controls and delivery history are not implemented yet.
+The feature branch implements account linking plus a separate, explicit per-user notification opt-in and delivery path. Linking alone never enables notifications. Member alerts default off and use their own settings/ledger and linked private chat; the legacy global Telegram destination remains reserved for admin/operational alerts. The owner supplied the intended dedicated development bot handle `@YourJobBeeperDevBot`; the BotFather token and webhook secret are not configured yet. A real-bot end-to-end smoke test also requires a public HTTPS webhook endpoint. Quiet hours, per-user time zones, configurable frequency controls and delivery history are not implemented yet.
 
 ## Server configuration
 
 Configure these variables in the deployment's private environment/secret store; never commit them or paste their values into chat:
 
 - `JOB_RADAR_TELEGRAM_BOT_TOKEN` — bot token from BotFather. The existing production bot token is already configured for the legacy admin/operational outbound notifier. The same bot can technically be reused for member linking and member DMs; Telegram's webhook handles inbound updates while `sendMessage` continues to handle outbound messages.
-- `JOB_BEEPER_TELEGRAM_BOT_USERNAME` — public bot username, without `@`.
-- `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET` — random 1–256 character value using only letters, digits, `_` or `-`. Generate a strong value, e.g. `openssl rand -hex 32`.
+- `JOB_BEEPER_TELEGRAM_BOT_USERNAME` — public bot username, without `@`. Owner-supplied value: `YourJobBeeperDevBot` (public handle `@YourJobBeeperDevBot`).
+- `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET` — random 1–256 character value using only letters, digits, `_` or `-`. Generate a strong value with Python `secrets.token_urlsafe(32)` or `openssl rand -hex 32`. It is a separate secret from the BotFather token.
 
 ### Existing production bot discovery (2026-11-07)
 
@@ -32,6 +32,41 @@ sudo docker compose --env-file .env.feature -p job-radar-user-preferences -f v2/
 ```
 
 The `.env.feature` file is git-ignored. Keep `JOB_RADAR_TELEGRAM_CHAT_ID` blank in this feature environment so legacy admin messages cannot be routed to a production chat. The app is intentionally bound to loopback; port 8002 is not a public Telegram webhook. Do not register `setWebhook` until an approved public HTTPS endpoint has been configured for this isolated service.
+
+### Create and configure the dev bot
+
+1. In Telegram, open the official **@BotFather** account and send `/newbot`. Enter a display name, then a unique username ending in `bot`. The intended handle supplied by the owner is `@YourJobBeeperDevBot`; BotFather must confirm that it is available and create it.
+2. BotFather returns a bot token. Keep it private. Do not paste it into this chat, screenshots, GitHub or repository files. Open `@YourJobBeeperDevBot` and press **Start** once the bot has been created.
+3. Generate the separate webhook secret on Windows PowerShell (on the owner's PC):
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+If `python` is not on PATH, try `py -c "import secrets; print(secrets.token_urlsafe(32))"`. The command can also be run on the Ubuntu server as `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`. It works from any directory. Save the output privately; do not send it in chat.
+
+4. On the Ubuntu server, from the feature checkout, create the private file and edit it:
+
+Run these commands in an Ubuntu server shell where the feature checkout exists (not in Telegram and not in a Windows-only local folder):
+
+```bash
+cd /tmp/job-radar-user-preferences
+cp .env.feature.example .env.feature
+chmod 600 .env.feature
+nano .env.feature
+```
+
+Set `JOB_RADAR_TELEGRAM_BOT_TOKEN` to the BotFather token, leave `JOB_BEEPER_TELEGRAM_BOT_USERNAME=YourJobBeeperDevBot` (no `@`), and set `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET` to the random value generated above. Leave `JOB_RADAR_TELEGRAM_CHAT_ID` out of the file; Compose forces it blank. Leave the three `GOOGLE_OAUTH_*` values blank until Google OAuth is separately configured. Save the file and exit.
+
+5. Recreate only the isolated feature service so it receives the private values:
+
+```bash
+sudo docker compose --env-file .env.feature -p job-radar-user-preferences -f v2/docker-compose.feature.yml up -d --build
+```
+
+The file is ignored by Git. Never display it with `cat`, commit it, or send its contents in chat. Verify only that the variables are present (not their values) and that the dashboard's Telegram connection status reports configured.
+
+6. Do **not** set the webhook yet. The feature service currently listens only on `127.0.0.1:8002`, which Telegram cannot reach. First arrange an approved, temporary public HTTPS route to this isolated service; only then register the dev bot webhook using the secret header mechanism below. Never point the production bot at a development tunnel.
 
 ## Webhook registration
 
@@ -98,7 +133,7 @@ The opt-in delivery slice is implemented on the feature branch and running in th
 - Verified `GET /health` returns `status=ok`, `/api/notifications/settings` returns 401 to an anonymous request (route exists and is protected), and `/dashboard/` serves the new `telegramNotificationsEnabled` control.
 - GitHub V2 CI passed on commit `8e7bc28ca5978f8a3c949d99f7039e4a9b9f785c`, including the full V2 suite and dashboard syntax check.
 - Earlier checkpoints: **257**, **262**, then **270 tests passed (1 skipped)**. Latest checkpoint after Google OAuth cancellation-state hardening: **272 passed, 1 skipped**. Test-only `httpx2` dependencies are installed temporarily inside the running feature container; the feature Compose runtime still sets `JOB_BEEPER_COOKIE_SECURE=false` for local HTTP while the test process overrides it to `true`. The running app environment was not changed.
-- No Telegram test bot is configured in this isolated environment. No real Telegram message was sent and the production bot was not used. Full external Telegram E2E remains pending a dedicated dev bot token and webhook secret configured privately in the feature environment.
+- The owner supplied the intended public dev bot handle `@YourJobBeeperDevBot`. The BotFather token and webhook secret are not yet configured in this isolated environment. No real Telegram message was sent and the production bot was not used. Full external Telegram E2E remains pending private credential setup and an approved public HTTPS route.
 - Current readiness: code is pushed to the feature branch, CI green, feature instance healthy, full suite green. Promote to shared dev after a dedicated test bot is configured and the real link → opt-in → delivery → disable/disconnect smoke test passes. Production remains untouched.
 
 ## Priority status update (2026-11-07)
@@ -131,3 +166,12 @@ Per-user Telegram linking and notification delivery are implemented and unit-tes
 - Added two `v2/test_google_oauth.py` API regressions: matching `access_denied` consumes the one-time state and redirects to the cancellation UX; an error callback with an unbound/mismatched state is treated as failure. Removed a duplicate test import and corrected the auth CLI module description.
 - Focused Google OAuth suite: **15 tests passed**. Full V2 suite on the isolated feature container: **272 passed, 1 skipped**. `httpx2` installed temporarily for tests; `JOB_BEEPER_COOKIE_SECURE=true` used only by test process.
 - OAuth credentials are still not configured for a live sign-in test. The feature branch's Google OAuth setup guide remains the source for exact redirect-origin/callback configuration. No client secret or production OAuth configuration has been changed.
+
+
+## 2026-11-07 — Development bot identity and secret-generation handover
+
+- Owner provided the intended public development bot handle: `@YourJobBeeperDevBot` (Compose/env value is `YourJobBeeperDevBot`, without `@`). This is owner-provided information; it has not been verified with BotFather because no token is available. BotFather must confirm the username was actually created and issue its token.
+- Owner asked where to run `python -c "import secrets; print(secrets.token_urlsafe(32))"`. It can run in Windows PowerShell on the owner's PC; use `py -c ...` if `python` is not on PATH. It can also run in an Ubuntu shell as `python3 -c ...`. It does not need to run inside Telegram or in the Python application. The output is a separate webhook secret and must remain private.
+- `.env.feature` is currently absent on the server. `.env.feature.example` is tracked; `.env.feature` is ignored by `.gitignore`. After receiving the BotFather token, create the private server file with `cp .env.feature.example .env.feature`, edit it with `nano .env.feature`, and place the token/webhook secret there. Never paste either secret into ChatGPT.
+- The feature Compose service now passes `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_REDIRECT_URI` from the same private `--env-file`, in addition to the three Telegram variables. All are empty until privately configured. This fixes the previous gap where Google OAuth values in an env file would not reach the feature container.
+- The feature service remains loopback-only on `127.0.0.1:8002`; no Telegram webhook can be registered yet. A dedicated public HTTPS route must be approved and configured before `setWebhook`. No token was configured, no webhook registered, and no messages sent.
