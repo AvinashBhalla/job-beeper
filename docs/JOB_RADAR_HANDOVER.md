@@ -5916,7 +5916,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Focused source-status, registry, migration and rate-limit tests: **11 passed**.
 - Full V2 unittest discovery: **196 passed** in 88.014 seconds using an isolated Python 3.10 virtual environment on the VM host.
 - `python -m compileall -q v2` and `git diff --check` passed.
-- GitHub draft PR #47 is open against `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/47. Head `a2ec0ba59919704c849cb0c5d7ee2e7c18daf6cf`; V2 CI run #1303 / ID `42388082207` passed on Python 3.12: syntax, focused router/extractor tests and the full suite (**196 tests in 28.011 seconds — OK**).
+- GitHub draft PR #47 is open against `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/47. Implementation commit `a2ec0ba59919704c849cb0c5d7ee2e7c18daf6cf` (followed by documentation-only commit `c498ce8`); V2 CI run #1303 / ID `42388082207` passed on Python 3.12: syntax, focused router/extractor tests and the full suite (**196 tests in 28.011 seconds — OK**).
 - Older draft PR #40 was closed unmerged as superseded by #47; a comment links the replacement. PR #47 remains draft pending review; passing CI is not approval to merge.
 - Docker socket access was denied to the Termalin user, so no container build/runtime validation was attempted.
 
