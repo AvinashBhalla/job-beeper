@@ -1103,9 +1103,10 @@ def _persist_user_job_evaluation(
     fingerprint = user_preferences.preferences_fingerprint(
         preferences, MATCHER_RULES_VERSION
     )
-    # Per-user Telegram delivery is a later milestone. Store the matching
-    # result now, but never surface the global admin notification ledger.
-    alertability_reasons = ["per-user notifications are not enabled"]
+    # These legacy alertability fields are admin-policy metadata only.
+    # Member delivery uses user_notifications with explicit opt-in, a
+    # user-scoped ledger and a separately linked private Telegram chat.
+    alertability_reasons = ["member alerts use separate per-user opt-in and delivery policy"]
     conn.execute(
         """INSERT INTO user_job_evaluations (
                user_id, job_id, preference_fingerprint, evaluated_at, match, score,

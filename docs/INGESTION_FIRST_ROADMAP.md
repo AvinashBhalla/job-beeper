@@ -198,3 +198,13 @@ Before enabling a source in production, require:
 ## 9. Current owner action
 
 The only immediate owner-assisted action is to run the JobBeeper browser inspection in the already authenticated desktop browser and provide a sanitized HAR or the redacted evidence summary. No Telegram bot creation or credential sharing is required now.
+
+
+## 2026-11-07 owner update — ingestion and feature work run in parallel
+
+The owner has asked that the existing authentication, resume-assisted onboarding and Telegram feature branch continue in parallel with the JobBeeper browser/network investigation. Earlier wording above that says to pause all multi-user/resume/Telegram development is superseded by this update. The ingestion-first product strategy remains authoritative for source priorities and production release readiness, but it is not a reason to stop isolated feature work.
+
+- Feature work remains isolated on `feat/user-preferences-evaluations-20261106` and PR #46 stays draft. No shared-dev or production promotion without explicit approval.
+- The owner is creating a dedicated development Telegram bot. Configure it only in the isolated feature environment; keep the production bot untouched. Live webhook testing waits for a public HTTPS endpoint.
+- The owner is separately collecting sanitized JobBeeper Network evidence with Codex `@Chrome` and full CDP. The evidence report/HAR will be reviewed here when supplied; do not replay private endpoints or include credentials.
+- Latest isolated feature verification on 2026-11-07: 262 V2 tests passed, 1 skipped. See the handover files and `docs/TELEGRAM_PER_USER_SETUP.md` for exact changes and remaining live E2E steps.

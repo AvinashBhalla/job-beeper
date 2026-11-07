@@ -71,10 +71,21 @@ def set_enabled(db_path: Path, user_id: int, enabled: bool) -> dict[str, Any]:
         raise ValueError("enabled must be a boolean.")
     stamp = _stamp()
     with _connect(Path(db_path)) as conn:
+        current = conn.execute(
+            "SELECT enabled,enabled_at FROM user_notification_settings WHERE user_id=?",
+            (int(user_id),),
+        ).fetchone()
+        # Repeated enable requests are idempotent: they must not move the
+        # no-backlog boundary forward or silently discard the user's history.
+        enabled_at = (
+            current["enabled_at"]
+            if enabled and current and bool(current["enabled"]) and current["enabled_at"]
+            else stamp if enabled else None
+        )
         conn.execute("""INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at)
           VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET
           enabled=excluded.enabled, enabled_at=excluded.enabled_at, updated_at=excluded.updated_at""",
-          (int(user_id), int(enabled), stamp if enabled else None, stamp))
+          (int(user_id), int(enabled), enabled_at, stamp))
         if not enabled:
             conn.execute("UPDATE user_notification_ledger SET status='cancelled',updated_at=? WHERE user_id=? AND status IN ('queued','failed','sending')", (stamp, int(user_id)))
     return get_settings(db_path, user_id)
@@ -137,14 +148,52 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
         return dict(row)
 
 
-def _still_deliverable(db_path: Path, item: dict[str, Any]) -> bool:
+def _still_deliverable(
+    db_path: Path,
+    item: dict[str, Any],
+    matcher_rules_version: int = 3,
+) -> bool:
+    """Revalidate opt-in, destination, freshness and current matching before send.
+
+    A queue row can outlive a preference edit or a long evaluation refresh. Never
+    send it based only on the fact that it was eligible when it was first queued.
+    """
     with _connect(Path(db_path)) as conn:
-        row = conn.execute("""SELECT 1 FROM user_notification_ledger l
+        row = conn.execute("""SELECT l.user_id,s.enabled_at,t.chat_id,j.discovered_at,
+          e.preference_fingerprint,e.match,e.score,p.preferences_json
+          FROM user_notification_ledger l
           JOIN user_notification_settings s ON s.user_id=l.user_id AND s.enabled=1
           JOIN user_telegram_chats t ON t.user_id=l.user_id AND t.chat_type='private'
+          JOIN jobs j ON j.id=l.candidate_job_id
+          JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
+          JOIN user_preferences p ON p.user_id=l.user_id
           WHERE l.id=? AND l.status='sending' AND t.chat_id=?""",
           (item["id"], item["chat_id"])).fetchone()
-    return row is not None
+    if row is None:
+        return False
+    if not row["enabled_at"] or row["discovered_at"] < row["enabled_at"] or not bool(row["match"]):
+        return False
+    try:
+        preferences = json.loads(row["preferences_json"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        preferences = {}
+    if not isinstance(preferences, dict):
+        preferences = {}
+    try:
+        threshold = max(0, min(100, int(preferences.get("match_threshold", 55))))
+    except (TypeError, ValueError):
+        threshold = 55
+    try:
+        max_age_hours = max(1, min(720, int(preferences.get("max_age_hours", 72))))
+    except (TypeError, ValueError):
+        max_age_hours = 72
+    expected_fingerprint = user_preferences.preferences_fingerprint(
+        {**user_preferences.PREFERENCE_DEFAULTS, **preferences}, matcher_rules_version
+    )
+    if row["preference_fingerprint"] != expected_fingerprint or int(row["score"]) < threshold:
+        return False
+    fresh_after = _stamp(_now() - timedelta(hours=max_age_hours))
+    return row["discovered_at"] >= fresh_after
 
 
 def dispatch(db_path: Path, limit: int = 20, matcher_rules_version: int = 3) -> int:
@@ -161,7 +210,7 @@ def dispatch(db_path: Path, limit: int = 20, matcher_rules_version: int = 3) -> 
         item = _claim_one(db_path)
         if item is None:
             break
-        if not _still_deliverable(db_path, item):
+        if not _still_deliverable(db_path, item, matcher_rules_version):
             with _connect(Path(db_path)) as conn:
                 conn.execute("UPDATE user_notification_ledger SET status='cancelled',updated_at=? WHERE id=? AND status='sending'", (_stamp(), item["id"]))
             continue

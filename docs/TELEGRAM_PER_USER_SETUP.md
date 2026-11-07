@@ -2,7 +2,7 @@
 
 ## Current implementation boundary
 
-This milestone implements **account linking only**. It does not send job alerts to member chats, and linking a Telegram account does not enable notifications. The existing global Telegram destination remains reserved for admin/operational alerts. Per-user opt-in, preference-matched dispatch, quiet hours, deduplication and disconnect-aware delivery must be implemented and tested separately before member notifications are enabled.
+The feature branch implements account linking plus a separate, explicit per-user notification opt-in and delivery path. Linking alone never enables notifications. Member alerts default off and use their own settings/ledger and linked private chat; the legacy global Telegram destination remains reserved for admin/operational alerts. A real-bot end-to-end smoke test is still pending a dedicated dev bot and a public HTTPS webhook endpoint. Quiet hours, per-user time zones, configurable frequency controls and delivery history are not implemented yet.
 
 ## Server configuration
 
@@ -21,7 +21,17 @@ Configure these variables in the deployment's private environment/secret store; 
 - **Not configured or changed:** no webhook was registered, no production environment variable was added, no production Compose file/container was modified, and no live bot message was sent as part of this inspection. The production checkout is stale (613 commits behind the active branch), so do not deploy from it or treat it as containing the new webhook endpoint.
 - **Decision:** reuse of the existing production bot is a viable option for the eventual production release. Do not repoint it yet. First deploy and smoke-test the webhook endpoint through an approved release. If a separate development smoke test is needed, use a dedicated test bot so production bot updates are not diverted to an unfinished/dev endpoint. Before registering the production webhook, set the public username to `Qdhorvbot`, add a newly generated webhook secret to the private production environment, ensure the deployed production Compose/app passes both values, then register the webhook to the deployed HTTPS `/api/telegram/webhook` endpoint. Preserve the existing global admin chat ID and verify its outbound notifications still work after release.
 
-The application requires all three values before it exposes the connect action. Development and isolated feature Compose files deliberately set these values blank by default. The active feature branch Compose passes the username and webhook secret from its private environment. The currently deployed production checkout is older and does not yet pass the two new values; update them only as part of an approved release. No live configuration has been made by this change.
+The application requires all three values before it exposes the connect action. Development and isolated feature Compose files default to blank values. The isolated feature Compose now accepts the three dev-bot values through a private `--env-file`; use the tracked `.env.feature.example` as a template, copy it to the ignored `.env.feature`, and never commit that private file. The currently deployed production checkout is older and does not yet pass the two new values; update them only as part of an approved release. No live configuration has been made by this change.
+
+## Isolated dev-bot environment
+
+The isolated feature project is `job-radar-user-preferences`, using `v2/docker-compose.feature.yml`, the separate `radar-feature-data` volume and loopback-only host port `127.0.0.1:8002`. Its Compose file reads `JOB_RADAR_TELEGRAM_BOT_TOKEN`, `JOB_BEEPER_TELEGRAM_BOT_USERNAME` and `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET` from a private environment file. From the repository root, after securely creating `.env.feature` from `.env.feature.example`, run:
+
+```bash
+sudo docker compose --env-file .env.feature -p job-radar-user-preferences -f v2/docker-compose.feature.yml up -d --build
+```
+
+The `.env.feature` file is git-ignored. Keep `JOB_RADAR_TELEGRAM_CHAT_ID` blank in this feature environment so legacy admin messages cannot be routed to a production chat. The app is intentionally bound to loopback; port 8002 is not a public Telegram webhook. Do not register `setWebhook` until an approved public HTTPS endpoint has been configured for this isolated service.
 
 ## Webhook registration
 
@@ -61,9 +71,9 @@ A member disconnect removes only their chat mapping. If a chat is compromised, d
 
 Automated tests cover valid linking, hashed token storage, expiry, replay, old-token invalidation, private-chat-only behavior, duplicate chat ownership, relink, disconnect, authentication, CSRF, webhook secret rejection, and cross-user isolation. The code has not been deployed or tested against a real Telegram bot yet. A bot username, bot token, webhook secret, and public HTTPS webhook origin are required for a live end-to-end smoke test. Configure them privately; never send secrets in this conversation.
 
-## Per-user notification delivery — implementation in progress (2026-11-07)
+## Per-user notification delivery — implemented on feature branch; live E2E pending (2026-11-07)
 
-The first opt-in delivery slice is now implemented on the feature branch; it is **not yet pushed to the dev deployment or production**.
+The opt-in delivery slice is implemented on the feature branch and running in the isolated feature environment; it is **not deployed to shared dev or production**.
 
 - `v2/user_notifications.py` owns a separate `user_notification_settings` table and tenant-scoped `user_notification_ledger`. It does not reuse or mutate the legacy global `notification_ledger`.
 - Member settings default to off. `PUT /api/notifications/settings` accepts only `{ "enabled": true|false }`, requires the authenticated member session and CSRF protection, and refuses opt-in until a private Telegram chat is linked.
@@ -71,15 +81,15 @@ The first opt-in delivery slice is now implemented on the feature branch; it is 
 - Queue identity is `(user_id, canonical_opportunity_id)`, preventing duplicate delivery to the same member while allowing the same opportunity to be independently evaluated for another member.
 - Dispatch resolves the recipient only by joining the ledger owner to that owner's private `user_telegram_chats` mapping. The chat ID is never accepted from a browser request or returned by the settings API.
 - Disconnecting Telegram turns member alerts off and cancels queued/retryable/in-flight ledger rows. Turning alerts off does the same. Re-enabling creates a fresh activation boundary.
-- Delivery attempts are claimed transactionally, use bounded exponential retry for transient failures, stop after six attempts, and recover stale claims after a process restart. The worker runs member delivery independently of the legacy admin chat ID requirement.
+- Delivery attempts are claimed transactionally, use bounded exponential retry for transient failures, stop after six attempts, and recover stale claims after a process restart. The worker runs member delivery independently of the legacy admin chat ID requirement. A final pre-send check revalidates that opt-in remains enabled, the same private chat is still linked, the job is within the activation/freshness window, and the stored evaluation fingerprint/match/score still satisfy current preferences. Repeated enable requests preserve the original no-backlog boundary; turning off and back on starts a new boundary.
 - Dashboard now exposes an explicit opt-in checkbox, disabled until Telegram is connected. Link and notification opt-in remain distinct actions.
 - The production bot token is used only as an outbound API credential by this code; no webhook, production config, or production service was changed during implementation.
 
 ### Verification and remaining work
 
-- Seven focused service tests pass locally: default-off, explicit activation, no historical replay, per-user isolation, idempotent queueing, owner-chat delivery, disable/cancel, and retry scheduling.
-- The host Python environment does not have the application's FastAPI/argon2 dependencies, and Docker access is denied to the development SSH user. Therefore the API integration suite and full project suite still need to run in CI or an authorized dev runtime. The host's Node runtime is also too old for existing optional-chaining/nullish-coalescing syntax in `dashboard/app.js`; this is an environment limitation, not a new syntax regression.
-- Before dev rollout: run the complete Python suite and frontend checks in the project's supported container/runtime; review retry/disable race behavior; confirm the dev environment has a separate test bot token and webhook configuration; then deploy to dev and smoke-test link → opt-in → new matching job → delivery → disable/disconnect. Do not register the production bot webhook or send production member alerts before an approved production release.
+- Twelve focused service tests pass in the rebuilt isolated feature container. They cover default-off, activation boundary, stale evaluation cancellation, no historical replay, cross-user delivery isolation, idempotent queueing and opt-in, owner-chat delivery, disable/cancel, retry scheduling and permanent Telegram errors.
+- The complete V2 suite passes on the rebuilt isolated feature image: **262 passed, 1 skipped**. `httpx2` test dependencies were installed temporarily inside the container because the production image intentionally ships runtime dependencies only. The test process set `JOB_BEEPER_COOKIE_SECURE=true` to satisfy the secure-cookie contract; this did not alter the running app environment. Frontend syntax remains delegated to CI because the host Node runtime is too old for the existing dashboard syntax.
+- Before real-bot dev smoke test: configure a dedicated dev bot privately through `.env.feature`, expose the isolated app through an approved public HTTPS endpoint, and register only the dev bot webhook. Then test link → opt-in → newly discovered matching job → delivery → opt-out/disconnect. Do not register the production bot webhook or send production member alerts before an approved production release.
 - Quiet hours, per-user time zones, configurable frequency limits, and a user-facing delivery history are intentionally not included in this first slice and should be assessed before enabling member notifications broadly.
 
 ### Isolated feature environment checkpoint (2026-11-07)
@@ -87,10 +97,22 @@ The first opt-in delivery slice is now implemented on the feature branch; it is 
 - Built and restarted only the isolated feature Compose project `job-radar-user-preferences` from this branch. It binds to `127.0.0.1:8002`; it is separate from shared dev and production.
 - Verified `GET /health` returns `status=ok`, `/api/notifications/settings` returns 401 to an anonymous request (route exists and is protected), and `/dashboard/` serves the new `telegramNotificationsEnabled` control.
 - GitHub V2 CI passed on commit `8e7bc28ca5978f8a3c949d99f7039e4a9b9f785c`, including the full V2 suite and dashboard syntax check.
-- Ran the full suite in the feature container: **257 tests passed, 1 skipped**. The test-only `httpx2` dependencies were temporarily installed because the runtime image intentionally contains production requirements only, then removed after the run. The feature Compose runtime sets `JOB_BEEPER_COOKIE_SECURE=false` for local HTTP; the test process used `JOB_BEEPER_COOKIE_SECURE=true` to match the secure-cookie test contract. This was a test-process override only and did not change the running app's environment.
+- Earlier checkpoint: full suite **257 passed, 1 skipped**. Latest 2026-11-07 checkpoint after notification safety hardening: **262 passed, 1 skipped**. Test-only `httpx2` dependencies are installed temporarily inside the running feature container; the feature Compose runtime still sets `JOB_BEEPER_COOKIE_SECURE=false` for local HTTP while the test process overrides it to `true`. The running app environment was not changed.
 - No Telegram test bot is configured in this isolated environment. No real Telegram message was sent and the production bot was not used. Full external Telegram E2E remains pending a dedicated dev bot token and webhook secret configured privately in the feature environment.
 - Current readiness: code is pushed to the feature branch, CI green, feature instance healthy, full suite green. Promote to shared dev after a dedicated test bot is configured and the real link → opt-in → delivery → disable/disconnect smoke test passes. Production remains untouched.
 
 ## Priority status update (2026-11-07)
 
-Per-user Telegram linking and notification delivery are implemented and fully unit-tested on the isolated feature branch, but this work is now **paused behind the ingestion-first roadmap**. Do not configure a Telegram dev/test bot yet; it is not needed for source-ingestion work. Keep PR #46 draft and the feature service isolated. When ingestion acceptance gates pass, configure a separate test bot privately and run the documented end-to-end smoke test. Keep production bot `Qdhorvbot` reserved for an approved production release.
+Per-user Telegram linking and notification delivery are implemented and unit-tested on the isolated feature branch. The owner subsequently requested that this existing feature work continue in parallel with the ingestion-first investigation. Keep PR #46 draft and the feature service isolated; do not promote to shared dev or production. Configure a separate dev bot privately and complete the real E2E smoke test when the public HTTPS dev endpoint is ready. Keep production bot `Qdhorvbot` reserved for an approved production release.
+
+
+## 2026-11-07 — Parallel feature work resumed; notification safety hardening
+
+- Owner requested two parallel tracks: continue the existing authentication, resume-assisted onboarding and Telegram feature branch while the owner investigates JobBeeper network behavior in a separate Codex `@Chrome`/CDP session. Ingestion-first work remains active when the sanitized HAR/report arrives; it no longer blocks isolated feature development. PR #46 remains draft and isolated.
+- Hardened `v2/user_notifications.py`: repeated enable requests preserve the original `enabled_at` boundary; final pre-send validation now checks active opt-in, unchanged private-chat ownership, activation/freshness windows, current preferences fingerprint, current match state and current score threshold. A stale or no-longer-matching queued item is cancelled rather than delivered.
+- Added five service regression tests: idempotent enable boundary, changed-preference stale queue cancellation, non-matching reevaluation cancellation, two-user recipient/content isolation, and permanent Telegram 4xx terminal handling. `v2.test_user_notifications`: **12 tests passed** in the rebuilt feature container.
+- Updated isolated feature Compose to accept only dedicated dev bot token/username/webhook secret through an explicit private `--env-file`; the legacy admin chat ID remains blank. Added `.env.feature.example` and ignored `.env.feature`. Do not place the production token in this file.
+- Rebuilt the isolated feature service using the correct `v2/docker-compose.feature.yml`; confirmed it is healthy on `127.0.0.1:8002` and mounted to the existing `job-radar-user-preferences_radar-feature-data` volume. Shared dev on 8001 and production on 8000 were not changed.
+- Full suite on this rebuilt image: **262 tests passed, 1 skipped**. The feature image contains runtime dependencies only, so `httpx2` is installed temporarily inside the running container for tests. `JOB_BEEPER_COOKIE_SECURE=true` is set only on the test process; the feature app stays HTTP/local with secure cookies disabled. GitHub CI for the new head is still pending.
+- Owner is creating a dedicated BotFather test bot. Required private environment values: `JOB_RADAR_TELEGRAM_BOT_TOKEN`, `JOB_BEEPER_TELEGRAM_BOT_USERNAME`, `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET`. Only the public username should be shared in chat. No webhook registration or external Telegram sends until a public HTTPS route is available.
+- Outstanding real-world validation: public HTTPS dev endpoint; bot webhook registration; private-chat link confirmation; opt-in; a newly discovered matching job sent to the correct chat; opt-out/disconnect; no cross-user leakage. Quiet hours, time zones, frequency controls and delivery history remain future scope.

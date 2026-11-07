@@ -110,6 +110,78 @@ class UserNotificationServiceTests(unittest.TestCase):
         with user_notifications._connect(self.db) as conn:
             self.assertEqual(conn.execute('SELECT status FROM user_notification_ledger').fetchone()[0], 'sent')
 
+    def test_repeated_enable_preserves_the_original_no_backlog_boundary(self):
+        first = user_notifications.set_enabled(self.db, 1, True)
+        with patch.object(user_notifications, "_stamp", return_value="2099-01-01T00:00:00+00:00"):
+            repeated = user_notifications.set_enabled(self.db, 1, True)
+        self.assertEqual(repeated["enabled_at"], first["enabled_at"])
+        user_notifications.set_enabled(self.db, 1, False)
+        with patch.object(user_notifications, "_stamp", return_value="2099-01-01T00:00:00+00:00"):
+            reenabled = user_notifications.set_enabled(self.db, 1, True)
+        self.assertEqual(reenabled["enabled_at"], "2099-01-01T00:00:00+00:00")
+
+    def test_preference_change_cancels_a_queued_job_that_no_longer_has_a_fresh_evaluation(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
+            conn.execute("UPDATE user_preferences SET preferences_json=? WHERE user_id=1", ('{"match_threshold":95}',))
+        response = unittest.mock.Mock(status_code=200)
+        response.json.return_value = {"ok": True}
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response) as post:
+            self.assertEqual(user_notifications.dispatch(self.db, 5), 0)
+        post.assert_not_called()
+        with user_notifications._connect(self.db) as conn:
+            status = conn.execute("SELECT status FROM user_notification_ledger WHERE user_id=1").fetchone()[0]
+        self.assertEqual(status, "cancelled")
+
+    def test_current_nonmatching_evaluation_cancels_previously_queued_notification(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
+            conn.execute("UPDATE user_job_evaluations SET match=0 WHERE user_id=1 AND job_id=1")
+        response = unittest.mock.Mock(status_code=200)
+        response.json.return_value = {"ok": True}
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response) as post:
+            self.assertEqual(user_notifications.dispatch(self.db, 5), 0)
+        post.assert_not_called()
+        with user_notifications._connect(self.db) as conn:
+            status = conn.execute("SELECT status FROM user_notification_ledger WHERE user_id=1").fetchone()[0]
+        self.assertEqual(status, "cancelled")
+
+    def test_two_users_receive_only_their_own_matching_job_and_chat(self):
+        with user_notifications._connect(self.db) as conn:
+            for uid in (1, 2):
+                conn.execute(
+                    "INSERT INTO user_notification_settings VALUES(?,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')",
+                    (uid,),
+                )
+        response = unittest.mock.Mock(status_code=200)
+        response.json.return_value = {"ok": True}
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response) as post:
+            self.assertEqual(user_notifications.dispatch(self.db, 5), 2)
+        delivered = {
+            (call.kwargs["json"]["chat_id"], call.kwargs["json"]["text"].splitlines()[2])
+            for call in post.call_args_list
+        }
+        self.assertEqual(delivered, {("111", "Python Dev"), ("222", "QA Dev")})
+        with user_notifications._connect(self.db) as conn:
+            rows = conn.execute("SELECT user_id,status FROM user_notification_ledger ORDER BY user_id").fetchall()
+        self.assertEqual([(row["user_id"], row["status"]) for row in rows], [(1, "sent"), (2, "sent")])
+
+    def test_permanent_telegram_client_error_is_not_retried(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
+        response = unittest.mock.Mock(status_code=400)
+        response.raise_for_status.side_effect = user_notifications.requests.HTTPError("bad request", response=response)
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response):
+            self.assertEqual(user_notifications.dispatch(self.db, 1), 0)
+        with user_notifications._connect(self.db) as conn:
+            row = conn.execute("SELECT status,next_attempt_at,attempt_count FROM user_notification_ledger").fetchone()
+        self.assertEqual(row["status"], "dead")
+        self.assertIsNone(row["next_attempt_at"])
+        self.assertEqual(row["attempt_count"], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
