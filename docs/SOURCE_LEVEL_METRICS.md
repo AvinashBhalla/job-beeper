@@ -69,4 +69,5 @@ The admin Source Health table displays 24-hour measured-run coverage, requests, 
 - Full V2 unittest discovery: **199 passed** in 81.744 seconds on the isolated Python 3.10 test environment.
 - `python -m compileall -q v2`, `python -m py_compile v2/radar.py v2/test_radar.py`, and `git diff --check` passed.
 - The isolated metrics preview at remote loopback `127.0.0.1:8003` is seeded with clearly synthetic example rows and has every collector disabled and notifications off. It makes no external source requests. It is separate from the OAuth feature service on 8002, shared dev on 8001 and production on 8000.
-- GitHub V2 CI for the current PR head must pass before review can be considered complete. The VM's Node 12 is too old for the dashboard's existing modern JavaScript syntax; the repository's Node 24 CI check is authoritative for the dashboard code.
+- GitHub V2 CI #1307 / run `42391947214` passed for implementation commit `a9da22f92f9003e5317b8285fbcd5102ea348be9` on Python 3.12 and the current Node runner: dashboard JavaScript syntax passed, focused router/extractor tests **32 passed**, and the full V2 suite **199 passed in 27.721 seconds**.
+- The VM's Node 12 is too old for the dashboard's existing modern JavaScript syntax; GitHub CI is the authoritative dashboard syntax check.
