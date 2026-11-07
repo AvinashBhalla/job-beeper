@@ -6367,3 +6367,15 @@ New observed request parameters/values: search=java, page=1|2, per_page=20, stat
 ### Telegram bot verification update
 
 The owner verified the dedicated dev bot from Windows using Telegram getMe: username YourJobBeeperDevBot, bot ID 9293830763. The token remains private and must not enter Git/chat/logs. This verifies bot identity/token acceptance from the owner's machine; it does not complete webhook registration or message delivery. No public HTTPS webhook is registered yet; the isolated app remains loopback-only. Production bot Qdhorvbot remains untouched.
+
+## 2026-11-07 — Live Google OAuth and parser UAT; follow-ups deferred
+
+- Owner completed the first live Google OAuth sign-in against the isolated feature service on port 8002. The owner also confirmed the resume parser worked in the same test session.
+- The three Google OAuth values are configured only in /tmp/job-radar-user-preferences/.env.feature on the VM (file mode 600, git-ignored) and are passed to the isolated feature container. Never copy these secrets into chat, Git, screenshots or logs.
+- The OAuth status endpoint returned enabled; the start route redirected to Google's authorization host and carried the registered http://localhost:18002/api/auth/google/callback redirect URI.
+- Production 8000 and shared dev 8001 were not changed. PR #46 remains draft/unmerged; feature service 8002 remains isolated.
+- Owner observed Google's consent page showing "n8nApp" rather than JobBeeper. This is the Google Auth Platform branding name, not the OAuth client ID label; update Branding settings (app display name, logo, support email, privacy and terms URLs) before public beta. Not a live-test blocker.
+- Owner noted there is no self-service email/password signup screen; only the Google signup action is visible. Add email registration, verification and password-reset UX to the product backlog; not current priority.
+- Owner's preferences-save attempt showed a Network preferences response with detail: "At least one target role is required before accessing the job feed." while a "Graphic designer" role chip was visible. The frontend displayed no error. HTTP status and payload were not visible in the supplied screenshot, so root cause is not diagnosed. Backlog: reproduce safely, inspect validation/request state and show an accessible frontend error. Do not silently swallow failed saves.
+- Parser UAT was reported successful. No code fixes were requested for the above UAT issues; defer them while ingestion remains the priority.
+- Detailed setup and deferred UAT list: docs/GOOGLE_OAUTH_SETUP.md.

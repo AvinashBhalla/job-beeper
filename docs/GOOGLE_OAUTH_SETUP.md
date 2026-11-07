@@ -8,10 +8,10 @@ This enables open beta registration with Google. Every new Google identity is pr
 2. Configure the OAuth consent screen. Choose the audience appropriate for the beta and add the authorized test users if the app remains in Testing.
 3. Create an OAuth Client ID with application type **Web application**.
 4. Add the exact browser origin under Authorized JavaScript origins:
-   - Isolated SSH-tunnel dev: `http://127.0.0.1:18001`
+   - Isolated SSH-tunnel dev: `http://localhost:18002`
    - Production: the final HTTPS Job Beeper origin, once selected.
 5. Add the exact callback URI under Authorized redirect URIs:
-   - Isolated SSH-tunnel dev: `http://127.0.0.1:18001/api/auth/google/callback`
+   - Isolated SSH-tunnel dev: `http://localhost:18002/api/auth/google/callback`
    - Production: `https://YOUR_PRODUCTION_HOST/api/auth/google/callback`
 6. Keep the generated client secret private. Do not commit it, paste it into chat, or put it in dashboard JavaScript.
 
@@ -66,3 +66,22 @@ Before enabling Google sign-in, decide the actual browser-visible local origin u
 - [ ] Only after dev smoke test approval, configure the production HTTPS callback and separately plan a production deployment.
 
 No real Google OAuth credentials or live Google authorization flow have been configured or tested as part of this code change.
+
+## 2026-11-07 — Isolated OAuth smoke-test result and remaining product notes
+
+The owner completed the live Google OAuth smoke test against the isolated feature instance using the localhost:18002 tunnel.
+
+- The client ID, client secret and callback URL are saved only in the server-side /tmp/job-radar-user-preferences/.env.feature file (mode 600, git-ignored). The feature Compose passes them to the container. Do not copy the values into Git, chat, screenshots or logs.
+- The OAuth status endpoint returned enabled, and the OAuth start route redirected to Google's authorization host with the expected callback URI.
+- The owner confirmed the end-to-end OAuth sign-in succeeded and the resume parser worked in the same test session.
+- Production (8000) and shared development (8001) were not changed. Only the isolated feature instance (8002) has Google OAuth configured.
+- Google's consent page displayed "n8nApp" rather than "JobBeeper". The OAuth client's internal name is not the public consent-screen brand. Before public rollout, update Google Auth Platform Branding/app name and review logo, support email, privacy policy and terms URLs. This is cosmetic/configuration backlog, not a blocker for the isolated test.
+- The local test callback is http://localhost:18002/api/auth/google/callback; do not reuse it for a remotely hosted production origin. Production needs its own HTTPS origin, callback registration and separately managed credentials.
+
+### Owner UAT backlog (not fixed in this pass)
+
+1. Email/password signup page — product backlog, not current priority. The login UI currently exposes "Continue with Google" but no public email/password registration flow. Existing password login is not the same as a self-service signup page. Design email registration, verification, password reset and abuse controls as a separate scope.
+2. Preferences-save error not surfaced — UI bug to reproduce. During the owner's save test, the Network panel showed a preferences request response with detail: "At least one target role is required before accessing the job feed." The UI visibly contained a "Graphic designer" target-role chip, but the frontend did not show an error. The screenshot does not establish the HTTP status or request payload, so the root cause is unconfirmed. Reproduce with a redacted request/response, determine why the backend validation sees no role, and display actionable field-level/global feedback on failure.
+3. Google consent branding — cosmetic backlog. Replace the visible "n8nApp" label with "JobBeeper" through Google Auth Platform Branding settings before broader beta rollout.
+
+These items are intentionally recorded, not changed as part of the current ingestion-priority work.

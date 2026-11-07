@@ -286,3 +286,9 @@ The feature API and dashboard now support the observed feed request contract whi
 ### Test status for this checkpoint
 
 Focused API/dashboard contract suite: 28 passed, 1 skipped. Full isolated V2 suite: 279 passed, 1 skipped. The final feature image was rebuilt from v2/docker-compose.feature.yml and /health is healthy on 127.0.0.1:8002. GitHub V2 CI run 42383162683 passed Python compilation, modern dashboard JavaScript syntax, focused router/extractor tests and the full V2 suite. Shared dev 8001 and production 8000 were not changed.
+
+## 2026-11-07 owner UAT update — authentication validated; ingestion remains priority
+
+- Owner confirmed live Google OAuth sign-in and resume parser success on isolated feature port 8002. Google credentials are configured only in server-side /tmp/job-radar-user-preferences/.env.feature (git-ignored, mode 600). Production 8000 and shared dev 8001 remain untouched.
+- Deferred PR #46 product/UI backlog: email/password self-service signup, Google consent branding still showing n8nApp, and a preferences-save failure that was not surfaced in the frontend. The reported response detail was "At least one target role is required before accessing the job feed." despite a visible target-role chip; request payload/status and root cause are unknown. See docs/GOOGLE_OAUTH_SETUP.md; no fixes requested now.
+- Current highest-priority ingestion follow-up remains Naukri relay freshness/incremental processing: preserve the last-known-good snapshot, distinguish relay collection time from the main app's observation time, avoid reprocessing unchanged jobs where safe, and measure feed staleness without treating date-only posted values as exact timestamps.
