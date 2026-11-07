@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from fastapi.testclient import TestClient
@@ -214,6 +213,31 @@ class GoogleOAuthApiTests(unittest.TestCase):
                 "/api/auth/google/callback?code=authorization-code&state=invalid-state",
                 follow_redirects=False,
             )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/dashboard/?google_auth=failed")
+
+    def test_google_cancellation_consumes_matching_one_time_state(self):
+        config = google_oauth.GoogleOAuthConfig(
+            "client-id", "client-secret",
+            "https://jobs.example/api/auth/google/callback",
+        )
+        with patch.object(google_oauth, "load_config", return_value=config):
+            start = self.client.get("/api/auth/google/start", follow_redirects=False)
+        state = parse_qs(urlsplit(start.headers["location"]).query)["state"][0]
+        with patch.object(google_oauth, "load_config", return_value=config):
+            response = self.client.get(
+                "/api/auth/google/callback?error=access_denied&state=" + state,
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/dashboard/?google_auth=cancelled")
+        self.assertIsNone(google_oauth.consume_authorization_state(self.db_path, state))
+
+    def test_google_error_without_matching_state_is_not_trusted_as_cancellation(self):
+        response = self.client.get(
+            "/api/auth/google/callback?error=access_denied&state=not-our-state",
+            follow_redirects=False,
+        )
         self.assertEqual(response.status_code, 303)
         self.assertEqual(response.headers["location"], "/dashboard/?google_auth=failed")
 

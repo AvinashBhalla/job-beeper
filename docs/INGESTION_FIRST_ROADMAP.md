@@ -213,3 +213,8 @@ The owner has asked that the existing authentication, resume-assisted onboarding
 ### Feature-track follow-up — resume parser tests (2026-11-07)
 
 - The parallel feature branch now has 15 focused resume-parser tests and the full isolated V2 suite passes 270 tests with 1 skipped. Coverage includes PDF page/encryption limits and DOCX archive expansion defenses. This does not change ingestion priorities; it keeps the separate feature work healthy while JobBeeper evidence gathering continues.
+
+
+### Feature-track follow-up — Google OAuth state lifecycle (2026-11-07)
+
+- Google OAuth callback now consumes one-time state for both provider success and cancellation/error responses after verifying the browser-bound state cookie. New regressions cover cancellation cleanup and mismatched-state rejection. Full isolated V2 suite is **272 passed, 1 skipped**. This feature work remains parallel to the JobBeeper evidence investigation and does not change ingestion priorities.

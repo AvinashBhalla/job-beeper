@@ -1,4 +1,4 @@
-"""Out-of-band account provisioning for the invite-only JobBeeper beta."""
+"""Out-of-band administrator bootstrap and password-account provisioning."""
 from __future__ import annotations
 
 import argparse

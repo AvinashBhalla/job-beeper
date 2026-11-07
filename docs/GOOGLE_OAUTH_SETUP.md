@@ -39,7 +39,7 @@ If any value is missing or the redirect URI is invalid, the API reports Google s
 - A stable Google subject is linked to one Job Beeper account. A verified Google email can link to an existing same-email account; a subject cannot be attached to another account. Disabled accounts are rejected.
 - New accounts receive role=user, a random unusable password hash, and empty user preferences. Existing password login remains available.
 - Existing opaque Job Beeper session and CSRF cookies are issued after successful Google sign-in.
-- OAuth state is consumed even when token verification or account linking fails. Browser-visible errors are generic; logs record only the exception type.
+- OAuth state is validated against the HttpOnly browser cookie and consumed before handling either a successful callback or a provider cancellation/error. Mismatched, missing or replayed state fails closed. State is also consumed before later configuration/token/account-link checks, so failures cannot leave a reusable authorization attempt. Browser-visible errors are generic; logs record only the exception type.
 
 ## Routes
 

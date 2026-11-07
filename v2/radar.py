@@ -3335,19 +3335,22 @@ def google_auth_callback(
         )
         return redirect
 
+    # Validate and consume the one-time state before interpreting either a
+    # successful authorization or Google's cancellation/error response.
+    browser_state = request.cookies.get(GOOGLE_STATE_COOKIE_NAME, "")
+    if not browser_state or not state or not secrets.compare_digest(browser_state, state):
+        return finish_redirect(failure_url)
+    state_data = google_oauth.consume_authorization_state(DB_PATH, state)
+    if state_data is None:
+        return finish_redirect(failure_url)
     if error:
         return finish_redirect("/dashboard/?google_auth=cancelled")
-    browser_state = request.cookies.get(GOOGLE_STATE_COOKIE_NAME, "")
-    if not browser_state or not secrets.compare_digest(browser_state, state):
-        return finish_redirect(failure_url)
+
     try:
         config = google_oauth.load_config()
     except ValueError:
         return finish_redirect(failure_url)
     if config is None:
-        return finish_redirect(failure_url)
-    state_data = google_oauth.consume_authorization_state(DB_PATH, state)
-    if state_data is None:
         return finish_redirect(failure_url)
 
     expected_nonce, code_verifier = state_data

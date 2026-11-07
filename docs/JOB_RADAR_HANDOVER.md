@@ -6304,3 +6304,12 @@ See `docs/INGESTION_FIRST_ROADMAP.md` for adapter contract, source matrix, brows
 - Focused parser suite passed **15/15**. Full V2 suite in the isolated feature container passed **270 tests, 1 skipped**. `httpx2` was installed temporarily for tests; `JOB_BEEPER_COOKIE_SECURE=true` applied only to the test process.
 - Previous code/documentation commit `7088319` was pushed and its GitHub V2 CI run `42369403418` passed (Python syntax, modern Node dashboard syntax, focused tests and full V2 suite). The parser-only test additions and their documentation updates still need commit/push and a new CI run.
 - Branch remains `feat/user-preferences-evaluations-20261106`, PR #46 draft, feature container on 8002 only. Shared dev 8001 and production 8000 remain untouched.
+
+
+## 2026-11-07 — Google OAuth cancellation-state hardening
+
+- Hardened `google_auth_callback`: first validate that the callback state matches the HttpOnly browser state cookie, then consume the one-time SQLite state before interpreting successful authorization or Google cancellation/error. Invalid/missing/replayed state fails closed; provider cancellation no longer leaves a valid state row reusable until expiry.
+- Added two API tests to `v2/test_google_oauth.py`: matching cancellation consumes state and returns the cancellation UX; unbound/mismatched cancellation state returns generic failure. Removed a duplicate test import and corrected the auth CLI description.
+- Focused Google OAuth suite **15/15**. Complete V2 suite in the isolated feature container **272 passed, 1 skipped**. Test-only `httpx2` installed temporarily; secure-cookie override applied only to test process.
+- Host checkout contains the new callback code; rebuild only `v2/docker-compose.feature.yml` project on port 8002 so the isolated feature runtime receives it. Do not touch shared dev 8001 or production 8000. GitHub CI for the new head is pending after commit/push.
+- Google OAuth remains unconfigured for live provider testing; no Google client secrets or production OAuth configuration were changed.
