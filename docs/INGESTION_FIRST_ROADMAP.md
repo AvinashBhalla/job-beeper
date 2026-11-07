@@ -48,3 +48,13 @@ Before production enablement, require permitted access, deterministic fixtures/t
 ## Current next action
 
 Review draft PR #47 and merge into `v2-live-radar` only after human review/approval. Latest request-level implementation CI #1307 (`42391947214`) passed on Python 3.12/modern Node: focused tests 32 passed and full V2 suite 199 passed. A local preview is available on isolated port 8003 with synthetic rows and all collectors disabled. After review, the next metric slice is durable last-success/last-new-job and Naukri relay freshness telemetry. The older telemetry PR #40 is closed unmerged as superseded by #47.
+
+
+## 2026-11-07 — Naukri feed freshness and repeated evaluation reduction (local branch)
+
+- Public relay JSON was inspected read-only: top-level updated_at, count, and a full jobs array. The inspected snapshot had 322 jobs. Job records have IDs/URLs and date-only posted values, but no per-job relay-observed timestamp.
+- Naukri consumer changes are implemented locally on feat/source-observability-20261107: reject malformed, empty, count-mismatched, stale (>15 minutes) or implausibly future snapshots; preserve last-known-good feed metadata; persist content hash/count/age/observed time; expose freshness and unchanged-content state in admin Source Health; skip repeated matcher evaluation when stored job evaluation inputs did not change.
+- The 15-minute threshold is provisional (three nominal five-minute relay intervals), not a measured SLA. Actual workflow cadence and completion timing still need verification.
+- The full feed is still fetched and parsed on every poll. True per-job incremental ingestion requires publisher-side per-item observed/updated timestamps or a supported cursor/conditional-fetch contract. Never infer exact discovery time from date-only posted values.
+- Validation on the isolated Python 3.10 environment: full V2 suite 205 passed. Node 12 on the VM is too old for the dashboard syntax already present; final JavaScript syntax check must be confirmed by GitHub CI.
+- Not pushed/deployed yet. Keep PR #47 draft; no changes to shared dev 8001 or production 8000.

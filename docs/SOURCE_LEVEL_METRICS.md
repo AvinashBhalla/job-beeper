@@ -56,6 +56,12 @@ A recovered HTTP 503 followed by a successful retry can produce a successful run
 
 The admin Source Health table displays 24-hour measured-run coverage, requests, HTTP 429s, retries, average request duration, and page/board failures alongside the latest job yield and last successful run. Historical periods with no instrumentation show **Not measured**. Partial failures are shown as **PARTIAL**, not as a total source outage.
 
+## Naukri feed freshness
+
+Naukri additionally exposes the last accepted relay snapshot through a small additive source_feed_state table and the per-source last_feed API object. This reports the relay timestamp, consumer observation time, snapshot age, job count, freshness state and whether job content matches the preceding accepted snapshot. It rejects stale, malformed, empty and count-mismatched relay snapshots without replacing last-good feed state.
+
+This remains a full-snapshot integration: the consumer still downloads and parses the whole JSON file. Repeated job observations update last-seen time but skip matcher reevaluation when matcher inputs have not changed. See docs/NAUKRI_RELAY_FRESHNESS.md for the evidence, provisional 15-minute threshold, limitations and follow-up.
+
 ## Privacy and operational safety
 
 - Persist aggregate status codes and durations only; do not persist full exception strings, request URLs, query strings, request headers, response payloads, job descriptions or secret material.

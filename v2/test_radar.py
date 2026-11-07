@@ -1492,26 +1492,53 @@ class MatcherTests(unittest.TestCase):
         self.assertTrue(merged["source_enabled"]["instahyre"])
 
     def test_naukri_relay_reads_public_feed_without_a_token(self):
-        class Response:
-            status_code = 200
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                updated_at = radar.iso(radar.now() - radar.dt.timedelta(minutes=1))
 
-            def raise_for_status(self):
-                return None
+                class Response:
+                    status_code = 200
 
-            def json(self):
-                return {"updated_at": "2026-10-09T05:04:08+00:00", "jobs": []}
+                    def raise_for_status(self):
+                        return None
 
-        with patch.object(radar.requests, "get", return_value=Response()) as request:
-            jobs = radar.naukri_collect()
+                    def json(self):
+                        return {
+                            "updated_at": updated_at,
+                            "count": 1,
+                            "jobs": [{
+                                "id": "n-1",
+                                "url": "https://www.naukri.com/job-listings-n-1",
+                                "title": "Software Engineer",
+                                "company": "Example",
+                                "location": "Bengaluru",
+                                "posted": "2026-11-07",
+                            }],
+                        }
 
-        self.assertEqual(jobs, [])
-        request.assert_called_once()
-        args, kwargs = request.call_args
-        self.assertEqual(args[0], radar.NAUKRI_RELAY_URL)
-        self.assertIsInstance(kwargs["params"]["t"], int)
-        self.assertNotIn("Authorization", kwargs["headers"])
-        self.assertEqual(kwargs["headers"]["Accept"], "application/json")
-        self.assertEqual(kwargs["timeout"], 20)
+                with patch.object(radar.requests, "get", return_value=Response()) as request:
+                    jobs = radar.naukri_collect()
+
+                self.assertEqual(len(jobs), 1)
+                self.assertEqual(jobs[0]["discovered_at"], updated_at)
+                self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+                request.assert_called_once()
+                args, kwargs = request.call_args
+                self.assertEqual(args[0], radar.NAUKRI_RELAY_URL)
+                self.assertIsInstance(kwargs["params"]["t"], int)
+                self.assertNotIn("Authorization", kwargs["headers"])
+                self.assertEqual(kwargs["headers"]["Accept"], "application/json")
+                self.assertEqual(kwargs["timeout"], 20)
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    state = conn.execute(
+                        "SELECT feed_updated_at, jobs_count FROM source_feed_state WHERE source='naukri'"
+                    ).fetchone()
+                self.assertEqual(state, (updated_at, 1))
+            finally:
+                radar.DB_PATH = original_db
 
 
     def test_parse_relative_accepts_utc_z_suffix_without_lowercasing_iso_text(self):
@@ -1768,7 +1795,7 @@ class MatcherTests(unittest.TestCase):
 
             def json(self):
                 return {
-                    "updated_at": "2026-10-09T05:04:08+00:00",
+                    "updated_at": radar.iso(radar.now() - radar.dt.timedelta(seconds=90)),
                     "jobs": [{
                         "id": "naukri-1",
                         "url": "https://www.naukri.com/job-listings-example",
@@ -1779,8 +1806,15 @@ class MatcherTests(unittest.TestCase):
                     }],
                 }
 
-        with patch.object(radar.requests, "get", return_value=Response()):
-            jobs = radar.naukri_collect()
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                with patch.object(radar.requests, "get", return_value=Response()):
+                    jobs = radar.naukri_collect()
+            finally:
+                radar.DB_PATH = original_db
 
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["posted_precision"], "date")
@@ -1795,7 +1829,7 @@ class MatcherTests(unittest.TestCase):
 
             def json(self):
                 return {
-                    "updated_at": "2026-11-06T00:00:00+00:00",
+                    "updated_at": radar.iso(radar.now() - radar.dt.timedelta(seconds=90)),
                     "jobs": [{
                         "id": "nk-051126503145",
                         "url": "https://www.naukri.com/job-listings-example",
@@ -1817,8 +1851,15 @@ class MatcherTests(unittest.TestCase):
                     }],
                 }
 
-        with patch.object(radar.requests, "get", return_value=Response()):
-            jobs = radar.naukri_collect()
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                with patch.object(radar.requests, "get", return_value=Response()):
+                    jobs = radar.naukri_collect()
+            finally:
+                radar.DB_PATH = original_db
 
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["description_format"], "markdown")
@@ -2899,6 +2940,161 @@ class SourceRequestMetricsTests(unittest.TestCase):
                 self.assertEqual(runtime_state["greenhouse"]["last_run_outcome"], "partial_failed")
             finally:
                 radar.DB_PATH = original_db
+
+
+class NaukriRelayFreshnessTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.original_db = radar.DB_PATH
+        radar.DB_PATH = Path(self.temp_dir.name) / "jobs.db"
+        self.addCleanup(setattr, radar, "DB_PATH", self.original_db)
+        radar.init_db()
+
+    def _payload(self, *, age_seconds=60, jobs=None, count=None, updated_at=None):
+        jobs = jobs if jobs is not None else [{
+            "id": "naukri-1",
+            "url": "https://www.naukri.com/job-listings-naukri-1",
+            "title": "Software Engineer",
+            "company": "Example Labs",
+            "location": "Bengaluru",
+            "posted": "2026-11-07",
+            "description": "Python services",
+        }]
+        return {
+            "updated_at": updated_at or radar.iso(radar.now() - radar.dt.timedelta(seconds=age_seconds)),
+            "count": len(jobs) if count is None else count,
+            "jobs": jobs,
+        }
+
+    def _collect(self, payload):
+        class Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        radar._begin_source_run_metrics("naukri")
+        with patch.object(radar.requests, "get", return_value=Response()):
+            return radar.naukri_collect()
+
+    def test_rejects_stale_snapshot_and_keeps_last_good_feed_metadata(self):
+        first = self._payload(age_seconds=60)
+        self._collect(first)
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            before = conn.execute(
+                "SELECT feed_updated_at, payload_sha256, jobs_count FROM source_feed_state WHERE source='naukri'"
+            ).fetchone()
+
+        stale = self._payload(age_seconds=radar.NAUKRI_RELAY_MAX_AGE_SECONDS + 600)
+        with self.assertRaisesRegex(RuntimeError, "snapshot is stale"):
+            self._collect(stale)
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            after = conn.execute(
+                "SELECT feed_updated_at, payload_sha256, jobs_count FROM source_feed_state WHERE source='naukri'"
+            ).fetchone()
+        self.assertEqual(after, before)
+
+    def test_rejects_relay_timestamp_too_far_in_the_future(self):
+        future = radar.iso(
+            radar.now() + radar.dt.timedelta(seconds=radar.NAUKRI_RELAY_FUTURE_TOLERANCE_SECONDS + 1)
+        )
+        with self.assertRaisesRegex(RuntimeError, "too far in the future"):
+            self._collect(self._payload(updated_at=future))
+
+    def test_rejects_empty_or_count_mismatched_snapshot(self):
+        with self.assertRaisesRegex(RuntimeError, "snapshot is empty"):
+            self._collect(self._payload(jobs=[], count=0))
+
+        payload = self._payload(count=2)
+        with self.assertRaisesRegex(RuntimeError, "count does not match"):
+            self._collect(payload)
+
+    def test_persists_snapshot_hash_and_reports_unchanged_feed(self):
+        jobs = self._payload(age_seconds=30)["jobs"]
+        jobs.append({
+            "id": "naukri-2",
+            "url": "https://www.naukri.com/job-listings-naukri-2",
+            "title": "Python Developer",
+            "company": "Example Two",
+            "location": "Remote - India",
+            "posted": "2026-11-07",
+        })
+        payload = self._payload(age_seconds=30, jobs=jobs)
+        self._collect(payload)
+        same_jobs_new_relay_run = {
+            **payload,
+            "updated_at": radar.iso(radar.now() - radar.dt.timedelta(seconds=10)),
+            "jobs": list(reversed(jobs)),
+        }
+        self._collect(same_jobs_new_relay_run)
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            state = conn.execute(
+                "SELECT jobs_count, snapshot_unchanged, feed_age_seconds "
+                "FROM source_feed_state WHERE source='naukri'"
+            ).fetchone()
+        self.assertEqual(state[0], 2)
+        self.assertEqual(state[1], 1)
+        self.assertGreaterEqual(state[2], 0)
+
+        with (
+            patch.object(radar, "get_config", return_value={"source_enabled": {"naukri": True}}),
+            patch.object(radar, "source_state", {}),
+        ):
+            status = radar.source_status()
+        naukri = next(item for item in status["sources"] if item["source"] == "naukri")
+        self.assertEqual(naukri["last_feed"]["jobs_count"], 2)
+        self.assertTrue(naukri["last_feed"]["snapshot_unchanged"])
+        self.assertTrue(naukri["last_feed"]["fresh"])
+
+    def test_unchanged_markdown_observation_does_not_recompute_evaluation(self):
+        job = radar.normalize_job(
+            "naukri", "naukri-markdown", "Example", "Software Engineer", "Bengaluru, India",
+            "https://www.naukri.com/job-listings-naukri-markdown", None, "unknown",
+            "Build Python APIs", description_format="markdown",
+        )
+        radar.upsert_jobs([job], BASE_CONFIG)
+        with patch.object(radar, "_persist_job_evaluation") as evaluate:
+            radar.upsert_jobs([job], BASE_CONFIG)
+            evaluate.assert_not_called()
+
+        changed = {**job, "description": "Build Python APIs and distributed services"}
+        with patch.object(radar, "_persist_job_evaluation") as evaluate:
+            radar.upsert_jobs([changed], BASE_CONFIG)
+            evaluate.assert_called_once()
+
+
+    def test_unchanged_existing_job_skips_matcher_write_but_updates_last_seen(self):
+        first_seen = radar.now() - radar.dt.timedelta(minutes=2)
+        job = radar.normalize_job(
+            "naukri", "naukri-2", "Example", "Software Engineer", "Bengaluru, India",
+            "https://www.naukri.com/job-listings-naukri-2", None, "unknown",
+            "Build Python services",
+        )
+        job["discovered_at"] = radar.iso(first_seen)
+        radar.upsert_jobs([job], BASE_CONFIG)
+
+        next_seen = radar.iso(radar.now())
+        repeated = {**job, "discovered_at": next_seen}
+        with patch.object(radar, "_persist_job_evaluation") as evaluate:
+            radar.upsert_jobs([repeated], BASE_CONFIG)
+            evaluate.assert_not_called()
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            last_seen = conn.execute(
+                "SELECT last_seen_at FROM jobs WHERE source='naukri' AND source_job_id='naukri-2'"
+            ).fetchone()[0]
+        self.assertEqual(last_seen, next_seen)
+
+        changed = {**repeated, "description": "Build Python services and resilient distributed systems"}
+        with patch.object(radar, "_persist_job_evaluation") as evaluate:
+            radar.upsert_jobs([changed], BASE_CONFIG)
+            evaluate.assert_called_once()
 
 
 class SourceStatusPersistenceTests(unittest.TestCase):

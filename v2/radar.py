@@ -833,6 +833,17 @@ def init_db() -> None:
         )
         """)
         conn.execute("""
+        CREATE TABLE IF NOT EXISTS source_feed_state (
+            source TEXT PRIMARY KEY,
+            feed_updated_at TEXT NOT NULL,
+            last_observed_at TEXT NOT NULL,
+            feed_age_seconds REAL NOT NULL,
+            jobs_count INTEGER NOT NULL,
+            payload_sha256 TEXT NOT NULL,
+            snapshot_unchanged INTEGER NOT NULL DEFAULT 0
+        )
+        """)
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS canonical_opportunities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             canonical_url TEXT,
@@ -926,7 +937,7 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 j["discovery_latency_seconds"] = None
 
             existing = conn.execute(
-                "SELECT id, canonical_opportunity_id, discovered_at FROM jobs WHERE source=? AND source_job_id=?",
+                "SELECT id, canonical_opportunity_id, discovered_at, source_posted_at, posted_precision, description, description_format FROM jobs WHERE source=? AND source_job_id=?",
                 (j["source"], j["source_job_id"])
             ).fetchone()
             if existing:
@@ -971,7 +982,38 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 ))
                 if not existing[1]:
                     _assign_canonical(conn, int(existing[0]))
-                _persist_job_evaluation(conn, int(existing[0]), config)
+
+                existing_description = str(existing[5] or "")
+                existing_format = str(existing[6] or "plain")
+                update_description = (
+                    (
+                        incoming_description_format == "markdown"
+                        and (
+                            existing_format != "markdown"
+                            or incoming_description != existing_description
+                        )
+                    )
+                    or (
+                        existing_format != "markdown"
+                        and len(incoming_description) > len(existing_description)
+                    )
+                )
+                next_description = incoming_description if update_description else existing_description
+                next_format = incoming_description_format if update_description else existing_format
+                next_posted_at = posted_at_for_update or existing[3]
+                next_precision = (
+                    precision_for_update
+                    if precision_for_update == "minute"
+                    else existing[4]
+                )
+                evaluation_inputs_changed = (
+                    next_description != existing_description
+                    or next_format != existing_format
+                    or next_posted_at != existing[3]
+                    or next_precision != existing[4]
+                )
+                if evaluation_inputs_changed:
+                    _persist_job_evaluation(conn, int(existing[0]), config)
             else:
                 if j.get("needs_jd_enrichment"):
                     j = enrich_linkedin_job(j)
@@ -2688,11 +2730,54 @@ NAUKRI_RELAY_URL = (
     "https://raw.githubusercontent.com/AvinashBhalla/"
     "job-beeper-naukri-relay/naukri-relay/dashboard/data/naukri_relay.json"
 )
+NAUKRI_RELAY_MAX_AGE_SECONDS = 15 * 60
+NAUKRI_RELAY_FUTURE_TOLERANCE_SECONDS = 5 * 60
+
+
+def _record_naukri_feed_state(
+    feed_updated_at: dt.datetime,
+    observed_at: dt.datetime,
+    feed_age_seconds: float,
+    jobs_count: int,
+    payload_sha256: str,
+) -> bool:
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        previous = conn.execute(
+            "SELECT payload_sha256 FROM source_feed_state WHERE source='naukri'"
+        ).fetchone()
+        unchanged = bool(previous and previous[0] == payload_sha256)
+        conn.execute(
+            """
+            INSERT INTO source_feed_state(
+                source, feed_updated_at, last_observed_at, feed_age_seconds,
+                jobs_count, payload_sha256, snapshot_unchanged
+            ) VALUES('naukri', ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source) DO UPDATE SET
+                feed_updated_at=excluded.feed_updated_at,
+                last_observed_at=excluded.last_observed_at,
+                feed_age_seconds=excluded.feed_age_seconds,
+                jobs_count=excluded.jobs_count,
+                payload_sha256=excluded.payload_sha256,
+                snapshot_unchanged=excluded.snapshot_unchanged
+            """,
+            (
+                iso(feed_updated_at),
+                iso(observed_at),
+                max(0.0, float(feed_age_seconds)),
+                int(jobs_count),
+                payload_sha256,
+                int(unchanged),
+            ),
+        )
+        conn.commit()
+    return unchanged
+
+
 
 
 def naukri_collect() -> list[dict[str, Any]]:
-    # The separate public relay exposes only a generated feed, not the private
-    # application source. No GitHub token is required to read public JSON.
+    # The public relay exposes a full snapshot with one relay-run timestamp.
+    # Reject stale or empty snapshots before changing local job observations.
     relay_headers = {**UA, "Accept": "application/json"}
     response: requests.Response | None = None
     retryable_statuses = {429, 500, 502, 503, 504}
@@ -2701,8 +2786,6 @@ def naukri_collect() -> list[dict[str, Any]]:
             candidate = _tracked_source_get(
                 "naukri",
                 NAUKRI_RELAY_URL,
-                # GitHub's raw-content CDN can briefly serve the previous feed
-                # after the relay branch advances. Bust that cache on each poll.
                 params={"t": int(time.time())},
                 headers=relay_headers,
                 timeout=20,
@@ -2719,8 +2802,6 @@ def naukri_collect() -> list[dict[str, Any]]:
                 )
                 time.sleep(wait)
                 continue
-            # A missing feed or wrong public URL is a setup fault, not a
-            # transient server error. Fail quickly without retrying a 404.
             candidate.raise_for_status()
             response = candidate
             break
@@ -2738,65 +2819,119 @@ def naukri_collect() -> list[dict[str, Any]]:
     if response is None:
         _record_source_page("naukri", False)
         raise RuntimeError("Naukri relay fetch returned no response")
+
     try:
         payload = response.json()
+        if not isinstance(payload, dict):
+            raise RuntimeError("Naukri relay payload must be a JSON object")
+
+        relay_jobs = payload.get("jobs")
+        if not isinstance(relay_jobs, list) or not relay_jobs:
+            raise RuntimeError("Naukri relay snapshot is empty or has no jobs list")
+
+        reported_count = payload.get("count")
+        if reported_count is not None:
+            try:
+                reported_count = int(reported_count)
+            except (TypeError, ValueError):
+                raise RuntimeError("Naukri relay count is invalid")
+            if reported_count != len(relay_jobs):
+                raise RuntimeError("Naukri relay count does not match the snapshot")
+
+        relay_collected_at = payload.get("updated_at")
+        collected_at = parse_relative(relay_collected_at) if relay_collected_at else None
+        if collected_at is None:
+            raise RuntimeError("Naukri relay updated_at timestamp is missing or invalid")
+
+        observed_at = now()
+        feed_age_seconds = (observed_at - collected_at).total_seconds()
+        if feed_age_seconds < -NAUKRI_RELAY_FUTURE_TOLERANCE_SECONDS:
+            raise RuntimeError("Naukri relay timestamp is too far in the future")
+        if feed_age_seconds > NAUKRI_RELAY_MAX_AGE_SECONDS:
+            age_minutes = int(feed_age_seconds // 60)
+            raise RuntimeError(
+                f"Naukri relay snapshot is stale ({age_minutes} minutes old; "
+                f"limit {NAUKRI_RELAY_MAX_AGE_SECONDS // 60} minutes)"
+            )
+
+        jobs: list[dict[str, Any]] = []
+        for item in relay_jobs:
+            if not isinstance(item, dict):
+                continue
+            source_id = str(item.get("id") or item.get("url") or "")
+            url = str(item.get("url") or "")
+            if not source_id or not url:
+                continue
+
+            posted_raw = item.get("posted")
+            posted_at = parse_relative(str(posted_raw)) if posted_raw else None
+
+            experience = item.get("experience")
+            if not isinstance(experience, dict):
+                experience = {}
+            skills = item.get("skills_detected")
+            if not isinstance(skills, list):
+                skills = []
+            description = str(item.get("description") or "")
+            if experience:
+                description = f"{description} {experience.get('label', '')}".strip()
+            if skills:
+                description = f"{description} {' '.join(map(str, skills))}".strip()
+
+            job = normalize_job(
+                "naukri",
+                source_id,
+                str(item.get("company") or ""),
+                str(item.get("title") or ""),
+                str(item.get("jd_location") or item.get("location") or ""),
+                url,
+                posted_at,
+                "date" if posted_at else "unknown",
+                description,
+                description_format=str(item.get("description_format") or "plain"),
+                source_details=(
+                    item.get("source_details")
+                    if isinstance(item.get("source_details"), dict)
+                    else {}
+                ),
+            )
+            # This is the relay snapshot timestamp, not the exact instant a
+            # particular employer published the job. It is the per-job
+            # first/last-observed proxy while the relay has no item timestamp.
+            job["discovered_at"] = iso(collected_at) or job["discovered_at"]
+            job["discovery_latency_seconds"] = None
+            jobs.append(job)
+
+        if not jobs:
+            raise RuntimeError("Naukri relay snapshot contains no valid job records")
+
+        # The relay timestamp changes on every successful build; hash only
+        # job content so a fresh build with identical listings is detectable.
+        fingerprint_jobs = [item for item in relay_jobs if isinstance(item, dict)]
+        fingerprint_jobs.sort(
+            key=lambda item: (str(item.get("id") or ""), str(item.get("url") or ""))
+        )
+        fingerprint = hashlib.sha256(
+            json.dumps(fingerprint_jobs, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        unchanged = _record_naukri_feed_state(
+            collected_at,
+            observed_at,
+            feed_age_seconds,
+            len(jobs),
+            fingerprint,
+        )
+        _record_source_page("naukri", True)
+        log.info(
+            "naukri relay snapshot accepted: jobs=%s age_seconds=%s unchanged=%s",
+            len(jobs),
+            round(max(0.0, feed_age_seconds)),
+            unchanged,
+        )
+        return jobs
     except Exception:
         _record_source_page("naukri", False)
         raise
-    _record_source_page("naukri", True)
-    relay_jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
-    relay_collected_at = payload.get("updated_at") if isinstance(payload, dict) else None
-    collected_at = parse_relative(relay_collected_at) if relay_collected_at else now()
-
-    jobs: list[dict[str, Any]] = []
-    for item in relay_jobs:
-        if not isinstance(item, dict):
-            continue
-        source_id = str(item.get("id") or item.get("url") or "")
-        url = str(item.get("url") or "")
-        if not source_id or not url:
-            continue
-
-        posted_raw = item.get("posted")
-        posted_at = parse_relative(str(posted_raw)) if posted_raw else None
-
-        experience = item.get("experience") or {}
-        skills = item.get("skills_detected") or []
-        description = str(item.get("description") or "")
-        if experience:
-            description = f"{description} {experience.get('label', '')}".strip()
-        if skills:
-            description = f"{description} {' '.join(map(str, skills))}".strip()
-
-        job = normalize_job(
-            "naukri",
-            source_id,
-            str(item.get("company") or ""),
-            str(item.get("title") or ""),
-            str(item.get("jd_location") or item.get("location") or ""),
-            url,
-            posted_at,
-            "date" if posted_at else "unknown",
-            description,
-            description_format=str(item.get("description_format") or "plain"),
-            source_details=(
-                item.get("source_details")
-                if isinstance(item.get("source_details"), dict)
-                else {}
-            ),
-        )
-
-        # The actual Naukri acquisition happened on the external GitHub runner.
-        # Preserve that timestamp rather than pretending the Oracle VM fetched
-        # the job at the same moment.
-        job["discovered_at"] = iso(collected_at) or job["discovered_at"]
-        # Relay currently supplies date-level posting precision. Midnight
-        # parsed from a date is not an exact posting time, so do not report a
-        # misleading discovery-latency metric from it.
-        job["discovery_latency_seconds"] = None
-        jobs.append(job)
-
-    return jobs
 
 def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
@@ -3718,6 +3853,31 @@ def source_status():
             FROM source_runs
             WHERE finished_at >= ? AND http_status_counts_json IS NOT NULL
         """, (cutoff,)).fetchall()
+        try:
+            naukri_feed_row = conn.execute(
+                "SELECT feed_updated_at, last_observed_at, feed_age_seconds, jobs_count, snapshot_unchanged "
+                "FROM source_feed_state WHERE source='naukri'"
+            ).fetchone()
+        except sqlite3.OperationalError:
+            naukri_feed_row = None
+
+    last_naukri_feed = None
+    if naukri_feed_row:
+        relay_updated_at = parse_relative(naukri_feed_row[0])
+        current_feed_age = (
+            max(0.0, (now() - relay_updated_at).total_seconds())
+            if relay_updated_at else None
+        )
+        last_naukri_feed = {
+            "relay_updated_at": naukri_feed_row[0],
+            "last_observed_at": naukri_feed_row[1],
+            "age_seconds": round(current_feed_age, 1) if current_feed_age is not None else None,
+            "age_at_last_poll_seconds": round(naukri_feed_row[2], 1),
+            "jobs_count": naukri_feed_row[3],
+            "snapshot_unchanged": bool(naukri_feed_row[4]),
+            "fresh": current_feed_age is not None and current_feed_age <= NAUKRI_RELAY_MAX_AGE_SECONDS,
+            "max_age_seconds": NAUKRI_RELAY_MAX_AGE_SECONDS,
+        }
 
     history = {}
     for row in latest_rows:
@@ -3836,6 +3996,7 @@ def source_status():
             "last_retry_after_seconds": item.get("last_retry_after_seconds"),
             "last_cooldown_seconds": item.get("last_cooldown_seconds"),
             "last_request_metrics": item.get("last_request_metrics"),
+            "last_feed": last_naukri_feed if source == "naukri" else None,
             "last_24h": windows.get(source, {
                 "runs": 0, "measured_runs": 0, "requests_attempted": 0,
                 "responses_received": 0, "request_exceptions": 0,

@@ -1474,6 +1474,10 @@
         ? `${Number(metrics24h.pages_failed || 0)}/${Number(metrics24h.pages_attempted || 0)} pages · ${Number(metrics24h.boards_failed || 0)}/${Number(metrics24h.boards_attempted || 0)} boards`
         : '<span style="color:var(--text-muted);">Not measured</span>';
       const errorText = runtime.error || src.last_error || '';
+      const relayFeed = src.source === 'naukri' ? src.last_feed : null;
+      const relayFeedNote = relayFeed
+        ? '<div style="color:' + (relayFeed.fresh ? 'var(--text-muted)' : 'var(--status-warning)') + ';font-size:11px;margin-bottom:4px;">Last good relay: ' + Math.floor(Number(relayFeed.age_seconds || 0) / 60) + 'm old · ' + esc(relayFeed.jobs_count ?? 0) + ' jobs · ' + (relayFeed.fresh ? 'fresh' : 'STALE') + ' · ' + (relayFeed.snapshot_unchanged ? 'same snapshot' : 'updated snapshot') + '</div>'
+        : '';
       const runOutcome = src.last_run_outcome || runtime.last_run_outcome || '';
       const isPartial = runOutcome === 'partial_failed' || runOutcome === 'partial_rate_limited';
       const isError = Boolean(errorText) && !isPartial;
@@ -1512,6 +1516,7 @@
           <td class="meta-mono">${pageBoardFailures}</td>
           <td class="meta-mono" style="font-size:12px;">${esc(fmtTimestamp(runtime.last_success, 'minute'))}</td>
           <td>
+            ${relayFeedNote}
             ${errorText ? `<code style="color:${isPartial ? 'var(--status-warning)' : 'var(--status-error)'};font-family:var(--font-mono);font-size:11px;">${esc(errorText)}</code>` : '<span style="color:var(--text-muted);font-size:12px;">Operational</span>'}
           </td>
         </tr>

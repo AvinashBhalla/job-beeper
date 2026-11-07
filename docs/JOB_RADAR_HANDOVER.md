@@ -5958,3 +5958,17 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 ### Safety and next gate
 - No deployment, source enablement, scheduler change, rate-limit-policy change, notification, Telegram send or LLM call was made.
 - Implementation commit: `a9da22f92f9003e5317b8285fbcd5102ea348be9` on `feat/source-observability-20261107`; draft PR #47 is updated. CI #1307 passed all checks and 199 tests. Keep PR #47 draft pending human review; do not merge/deploy without approval.
+
+
+## 2026-11-07 — Naukri relay freshness and repeat-ingestion implementation (local, not deployed)
+
+- Worktree: /tmp/job-radar-source-observability-clean; branch feat/source-observability-20261107; base draft PR #47. This change is separate from the OAuth feature branch.
+- Read-only public relay inspection found top-level updated_at, count, jobs; the sampled snapshot had 322 records. Job objects had stable IDs/URLs and date-level posted, but no per-job relay-observed timestamp.
+- v2/radar.py adds additive source_feed_state for accepted relay timestamp, app observation timestamp, age, count, content hash and same-content indicator. Naukri now rejects malformed/empty/count-mismatched payloads, missing/invalid timestamps, snapshots older than 15 minutes, timestamps over five minutes in the future, and snapshots with no valid normalized jobs. Failed snapshots do not replace last-good feed state or upsert records.
+- The 15-minute staleness ceiling is provisional, derived as three nominal five-minute relay windows. We have not freshly verified actual scheduled-vs-manual relay cadence or workflow duration; measure those before treating the threshold as an operational SLA.
+- The snapshot hash excludes the changing top-level updated_at, so identical job content across relay builds is recognizable. Consumer still downloads/parses the full feed and updates last-seen observations. The upsert_jobs path skips expensive evaluation refresh for unchanged matcher inputs and re-evaluates when description/format/source-posted time/precision changes.
+- Admin /api/source-status includes Naukri last_feed metadata; dashboard Source Health displays last-good relay age, job count and whether the snapshot content is unchanged.
+- Added regression coverage for stale snapshot/last-good retention, empty/count mismatch, unchanged jobs with advancing relay timestamp, feed-health response, repeat-upsert evaluation skip, plus adjusted old test fixtures to use current timestamps.
+- Full V2 suite: 205 passed (Python 3.10 isolated venv). compileall and git diff --check passed. Local Node is 12.22.9 and cannot parse the dashboard's existing modern syntax, so GitHub CI must validate JavaScript after push.
+- Current code remains uncommitted at this handover point. No deploy, feature config change, source schedule change, source enablement change or production/shared-dev operation. Keep PR #47 draft and do not deploy to 8001/8000 without explicit approval.
+- Remaining relay investigation: verify workflow schedule/run durations; consider publisher-side per-job observed_at metadata and reliable conditional requests. Do not call the full-feed polling path per-job incremental yet.
