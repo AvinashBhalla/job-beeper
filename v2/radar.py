@@ -22,13 +22,13 @@ from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, google_oauth, user_preferences
+from v2 import auth, google_oauth, resume_parser, user_preferences
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -3408,6 +3408,38 @@ def read_user_preferences(user: dict[str, Any] = Depends(require_authenticated))
     if preferences["onboarding_complete"]:
         ensure_user_job_evaluations_initialized(user["id"], preferences)
     return {"preferences": preferences}
+
+
+@app.post("/api/preferences/resume")
+async def parse_user_resume(
+    file: UploadFile = File(...),
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    """Parse an optional resume into suggestions; never persist the uploaded file or preferences."""
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Resume-assisted preferences are for member accounts.")
+    filename = file.filename or "resume"
+    suffix = Path(filename).suffix.lower()
+    allowed_types = {
+        ".pdf": {"application/pdf", "application/octet-stream"},
+        ".docx": {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/octet-stream",
+        },
+    }
+    if suffix not in allowed_types or (file.content_type and file.content_type.lower() not in allowed_types[suffix]):
+        await file.close()
+        raise HTTPException(status_code=422, detail="File extension and content type must match a PDF or DOCX resume.")
+    try:
+        # Read at most one byte beyond the hard limit, rather than trusting Content-Length.
+        content = await file.read(resume_parser.MAX_RESUME_BYTES + 1)
+        result = resume_parser.parse_resume(filename, content)
+    except resume_parser.ResumeParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        await file.close()
+    # Deliberately return only bounded suggestions. No file, path, raw text, or DB write.
+    return result
 
 
 @app.put("/api/preferences")

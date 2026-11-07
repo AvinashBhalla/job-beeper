@@ -1,6 +1,6 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-11-07 — OAuth branch revalidated (226 tests green); resume/Telegram implementation not started; no deployment
+**Snapshot:** 2026-11-07 — resume parser/API and onboarding upload UI implemented; full-suite verification pending; Telegram not started; no deployment
 **Release integration branch:** `v2-live-radar`
 
 **Active feature branch:** `feat/user-preferences-evaluations-20261106`
@@ -3126,3 +3126,14 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Runtime: Termalin host is online but `ubuntu` lacks Docker socket access (`/var/run/docker.sock` is root:docker). No sudo/permission workaround. No container rebuild, dev deployment, production action or notification was performed. Treat dev 8001 as last known older image `f43cd4a`; production 8000 untouched. Do not modify dirty/stale `/home/ubuntu/job-beeper-dev` or `/home/ubuntu/job-beeper`.
 - Key learning: the full suite must run with `httpx2` from `v2/requirements-dev.txt`; the older dev image lacked this test dependency and produced misleading import errors. Use the dedicated venv for host-side test validation. CI and local tests are separate evidence and must be recorded separately.
 - Next: push these docs, inspect latest PR #46 checks/review threads, then implement resume parsing as a bounded slice: PDF/DOCX limits, deterministic parser, safe text extraction, authenticated CSRF-protected upload, per-user ownership, private temporary storage and delete-after-parse default; present editable suggestions and only persist after explicit user confirmation through `/api/preferences`. Telegram per-user link-token/webhook/dispatcher follows after resume tests pass. No merge/deploy without explicit approval.
+
+
+## 2026-11-07 — Resume parser/API first slice (not deployed)
+
+- Added `v2/resume_parser.py`: deterministic PDF/DOCX extraction into editable suggestions for target roles, skills, explicit allowlisted locations, clearly labelled total experience, and explicitly exclusive remote preference. Unknowns remain empty; resume text is untrusted and never treated as instructions. Limits: 5 MB, PDF max 10 pages, DOCX max 1,000 ZIP entries/20 MB uncompressed/200:1 per-entry ratio, extracted text max 100k chars. MIME/extension/signature validated; encrypted PDFs and malformed/empty files rejected.
+- Added `POST /api/preferences/resume` (authenticated + CSRF via `require_authenticated`, member-only). Upload is read in memory up to limit+1, parsed and closed; no original file or raw text is persisted/logged. Endpoint returns only suggestions and missing required fields; it never writes preferences. Explicit save remains existing `PUT /api/preferences`.
+- Onboarding UI now shows optional upload panel for incomplete members; extract action merges suggestions without replacing existing tags, fills experience only if blank, and leaves all suggestions editable. Manual flow remains. User must explicitly click Save Preferences.
+- Added requirements: pypdf, python-docx, python-multipart. Added 7 parser tests and 3 API tests plus route-auth inventory update. Focused suite: **19 passed**. First full suite: 237 tests with one failure caused by the auth route inventory not knowing the new member-auth endpoint; inventory updated. Second full suite job `cwxrsexv73` is pending final status.
+- Server Node v12 is too old to validate the existing dashboard syntax; `node --check` fails at existing nullish coalescing. Python AST checks and diff whitespace checks pass. CI modern Node remains necessary.
+- No deploy; Docker access unavailable. PR remains draft; prod untouched.
+- Next: collect full-suite result, push code/docs, inspect CI, browser-test on isolated dev only via authorized deployment path. Then implement per-user Telegram link tokens/webhook/chat mapping/disconnect and per-user delivery.

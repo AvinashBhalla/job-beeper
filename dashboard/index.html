@@ -446,6 +446,16 @@
             </div>
 
             <div id="userOnboardingNotice" class="auth-description" hidden>Complete at least one target role and one target location, then save your preferences to unlock your personalized job feed.</div>
+            <div id="resumeAssistPanel" class="settings-block" hidden>
+              <span class="settings-block-title">Prefill from your resume (optional)</span>
+              <p class="form-help-text">Upload a PDF or DOCX (up to 5 MB; PDF up to 10 pages). We suggest roles, skills, experience and locations. Review and edit everything before you save. Your file is processed for suggestions and is not retained.</p>
+              <div class="form-field-group">
+                <label class="form-field-label" for="resumeUploadInput">Resume file</label>
+                <input id="resumeUploadInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                <button id="parseResumeBtn" class="btn btn-secondary" type="button">Extract suggestions</button>
+                <p id="resumeParseStatus" class="auth-description" role="status" aria-live="polite"></p>
+              </div>
+            </div>
 
             <!-- Matching Criteria Group -->
             <div class="settings-block">

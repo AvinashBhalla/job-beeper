@@ -1573,6 +1573,51 @@
     };
   }
 
+  async function parseResumeForSuggestions() {
+    const input = $('resumeUploadInput');
+    const status = $('resumeParseStatus');
+    const file = input?.files?.[0];
+    if (!file) {
+      if (status) status.textContent = 'Choose a PDF or DOCX resume first.';
+      return;
+    }
+    if (status) status.textContent = 'Reading resume and extracting suggestions…';
+    const body = new FormData();
+    body.append('file', file);
+    try {
+      const response = await authClient.request('/preferences/resume', { method: 'POST', body });
+      if (response.status === 401) { window.location.reload(); return; }
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || 'Could not parse this resume.');
+      const suggestions = result.suggestions || {};
+      const mergeTags = (containerId, values) => {
+        const existing = tagInputs[containerId]?.getTags() || [];
+        const merged = [...existing];
+        for (const value of (values || [])) {
+          if (!merged.some(item => item.toLowerCase() === value.toLowerCase())) merged.push(value);
+        }
+        tagInputs[containerId]?.setTags(merged);
+      };
+      // Existing user edits take precedence; resume suggestions only fill empty controls.
+      mergeTags('rolesTagContainer', suggestions.target_roles);
+      mergeTags('locationsTagContainer', suggestions.locations);
+      mergeTags('skillsTagContainer', suggestions.skills);
+      const exp = $('cfgCandidateExp');
+      if (exp && !exp.value && suggestions.candidate_experience_years != null) {
+        exp.value = suggestions.candidate_experience_years;
+      }
+      const remote = $('cfgRemoteOnly');
+      if (remote && suggestions.remote_only === true) remote.checked = true;
+      const missing = result.missing_required_fields || [];
+      if (status) {
+        status.textContent = `Suggestions added for review. ${missing.length ? 'Still add: ' + missing.join(' and ') + '. ' : ''}Nothing has been saved yet. Review the fields, edit as needed, then choose Save Preferences.`;
+      }
+      input.value = '';
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Resume parsing failed. You can still enter preferences manually.';
+    }
+  }
+
   async function savePreferences() {
     const payload = state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload();
     if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saving preferences…';
@@ -1627,6 +1672,8 @@
       populatePreferencesForm();
       const onboardingNotice = $('userOnboardingNotice');
       if (onboardingNotice) onboardingNotice.hidden = Boolean(data.preferences?.onboarding_complete || state.isAdmin);
+      const resumePanel = $('resumeAssistPanel');
+      if (resumePanel) resumePanel.hidden = Boolean(state.isAdmin || data.preferences?.onboarding_complete);
       if (!state.isAdmin && !data.preferences?.onboarding_complete) {
         window.showSection?.('preferencesSection', false);
       }
@@ -1842,6 +1889,7 @@
 
     // Preferences save button
     if ($('savePreferencesBtn')) $('savePreferencesBtn').addEventListener('click', savePreferences);
+    if ($('parseResumeBtn')) $('parseResumeBtn').addEventListener('click', parseResumeForSuggestions);
 
 
   }

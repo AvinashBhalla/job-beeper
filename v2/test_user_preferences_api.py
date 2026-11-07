@@ -85,6 +85,61 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("target role and location", response.json()["detail"])
 
+
+    def test_resume_parse_requires_authentication(self):
+        response = self.client.post(
+            "/api/preferences/resume",
+            files={"file": ("resume.docx", b"PK-invalid", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_resume_parse_requires_csrf_and_does_not_save_preferences(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        before = user_preferences.get_user_preferences(self.db_path, self.user_a["id"])
+        content = __import__("io").BytesIO()
+        from docx import Document
+        document = Document()
+        document.add_paragraph("Python Developer. Bengaluru. Total experience: 4 years.")
+        document.save(content)
+        data = content.getvalue()
+        without_csrf = self.client.post(
+            "/api/preferences/resume",
+            files={"file": ("resume.docx", data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        self.assertEqual(without_csrf.status_code, 403)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        parsed = self.client.post(
+            "/api/preferences/resume",
+            files={"file": ("resume.docx", data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(parsed.status_code, 200, parsed.text)
+        self.assertIn("Python Developer", parsed.json()["suggestions"]["target_roles"])
+        after = user_preferences.get_user_preferences(self.db_path, self.user_a["id"])
+        self.assertEqual(before["version"], after["version"])
+        self.assertEqual(before["target_roles"], after["target_roles"])
+
+    def test_resume_parse_rejects_mismatched_mime_type(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        response = self.client.post(
+            "/api/preferences/resume",
+            files={"file": ("resume.pdf", b"%PDF-1.7\ninvalid", "text/plain")},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_resume_parse_rejects_invalid_file_without_leaking_details(self):
+        self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        response = self.client.post(
+            "/api/preferences/resume",
+            files={"file": ("resume.pdf", b"not-a-pdf", "application/pdf")},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertNotIn("/tmp/", response.text)
+
     def test_each_user_receives_independent_job_evaluations(self):
         self.assertEqual(self._login("a@example.com", "user-a-password-long").status_code, 200)
         feed_a = self.client.get("/api/jobs?minutes=10080&limit=20")
