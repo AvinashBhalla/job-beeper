@@ -250,3 +250,12 @@ The product priority remains ingestion reliability and source expansion. However
 - Continue auth/Google signup, resume parser and per-user Telegram feature development on `feat/user-preferences-evaluations-20261106` in parallel. PR #46 stays draft.
 - Current checkpoint: commit `51db2f9`, CI run `42370884022` green; isolated full suite **272 passed, 1 skipped**. Dedicated Telegram dev bot and public HTTPS webhook E2E remain pending.
 - Keep shared dev (8001) and production (8000) untouched absent explicit approval.
+
+
+## Authenticated browser evidence — 2026-11-07
+
+See JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md for the full sanitized request inventory and observation windows. This section supplements the public product reference above; it does not reveal or establish JobBeeper's private backend design.
+
+Observed in the owner's authenticated browser: browser-fetched list API with numeric page and page size 20; server-requested keyword search; separate metadata and tracker requests on detail open; a view-marking POST; source labels LinkedIn, Ashby, Naukri, Lever and Hirist; and experience provenance labels for employer-stated vs description-derived values. Ten minutes of idle observation in an expired-subscription account produced no feed-related Fetch/XHR, WebSocket or SSE events. Active-account refresh behavior remains unknown.
+
+Implications for this repository: implement stable server-side pagination; preserve experience provenance; keep source-posted and discovered timestamps distinct; measure each source's unique-job yield; and avoid adding detail-tracker endpoints without a user-facing requirement. Current local code already has server-side keyword search, newest-first ordering and separate source-posted/discovered timestamps, but still loads up to 500 jobs in one request and does not expose numeric page metadata. The dashboard feed refresh cadence has been reduced from 10 seconds to 60 seconds while visible.
