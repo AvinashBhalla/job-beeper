@@ -175,3 +175,13 @@ Per-user Telegram linking and notification delivery are implemented and unit-tes
 - `.env.feature` is currently absent on the server. `.env.feature.example` is tracked; `.env.feature` is ignored by `.gitignore`. After receiving the BotFather token, create the private server file with `cp .env.feature.example .env.feature`, edit it with `nano .env.feature`, and place the token/webhook secret there. Never paste either secret into ChatGPT.
 - The feature Compose service now passes `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_REDIRECT_URI` from the same private `--env-file`, in addition to the three Telegram variables. All are empty until privately configured. This fixes the previous gap where Google OAuth values in an env file would not reach the feature container.
 - The feature service remains loopback-only on `127.0.0.1:8002`; no Telegram webhook can be registered yet. A dedicated public HTTPS route must be approved and configured before `setWebhook`. No token was configured, no webhook registered, and no messages sent.
+
+
+## 2026-11-07 — Owner configured isolated development bot environment
+
+- The owner supplied intended public bot handle @YourJobBeeperDevBot and has now created the private .env.feature file on the feature VM with mode 600.
+- Read-only container inspection confirmed the Telegram bot token, username and webhook secret environment variables are populated. Secret values were not printed or copied into the repository.
+- The feature container was rebuilt/recreated and is healthy on 127.0.0.1:8002 (/health returned ok). The server's outbound request to Telegram getMe timed out, so BotFather/API token acceptance and the bot identity are not yet independently verified. Retry only after outbound connectivity is available; do not share the token.
+- No webhook was registered and no Telegram message was sent. The service remains loopback-only; a public HTTPS route is still required before setWebhook.
+- Still pending: successful getMe, approved HTTPS routing, webhook registration, member account link, explicit opt-in, fresh matching-job delivery to the correct private chat, opt-out and disconnect. Production bot and ports remain untouched.
+- Google OAuth environment variables remain empty; live Google sign-in is not yet configured.
