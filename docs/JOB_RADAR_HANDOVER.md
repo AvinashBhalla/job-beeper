@@ -5970,5 +5970,13 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Admin /api/source-status includes Naukri last_feed metadata; dashboard Source Health displays last-good relay age, job count and whether the snapshot content is unchanged.
 - Added regression coverage for stale snapshot/last-good retention, empty/count mismatch, unchanged jobs with advancing relay timestamp, feed-health response, repeat-upsert evaluation skip, plus adjusted old test fixtures to use current timestamps.
 - Full V2 suite: 205 passed (Python 3.10 isolated venv). compileall and git diff --check passed. Local Node is 12.22.9 and cannot parse the dashboard's existing modern syntax, so GitHub CI must validate JavaScript after push.
-- Current code remains uncommitted at this handover point. No deploy, feature config change, source schedule change, source enablement change or production/shared-dev operation. Keep PR #47 draft and do not deploy to 8001/8000 without explicit approval.
+- Commit 04c0605 (feat: validate Naukri relay freshness and reduce repeat evaluation) has been pushed to feat/source-observability-20261107; PR #47 title/body now include the Naukri scope. PR remains draft/open/unmerged. GitHub workflow/status lookup did not yet return a run for this head at the time of this note; do not treat CI as passed until rechecked. No deploy, feature config change, source schedule change, source enablement change or production/shared-dev operation. Keep PR #47 draft and do not deploy to 8001/8000 without explicit approval.
 - Remaining relay investigation: verify workflow schedule/run durations; consider publisher-side per-job observed_at metadata and reliable conditional requests. Do not call the full-feed polling path per-job incremental yet.
+
+
+## 2026-11-07 — Draft PR #47 updated with Naukri freshness work
+
+- New source implementation commit: 04c0605e078fbc376fc0688def66d3d0b9c18d5a; pushed to feat/source-observability-20261107. PR #47 title/body updated to include Naukri freshness and repeat-evaluation reduction. The PR remains draft and is not merged.
+- Final local verification at push: full V2 suite 205 passed; Python compilation, esbuild 0.25.12 dashboard build and git diff --check passed.
+- GitHub workflow/status lookup returned no run/check for this head yet. Re-check GitHub CI before calling the PR ready for review.
+- No runtime deployment. The source metrics preview on 8003 and OAuth feature on 8002 remain separate; shared dev 8001 and production 8000 are untouched.
