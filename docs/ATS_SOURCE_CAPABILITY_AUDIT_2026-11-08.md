@@ -65,3 +65,7 @@ A follow-up isolated QA check showed the earlier JG Summit example at `jgsummit.
 ### Preconfigured board activation safety
 
 The admin activation path now reuses an existing matching provider entry (Greenhouse token, Ashby board slug, Workday tenant/site, SmartRecruiters identifier, Workable account, Lever site/instance, Keka tenant or Darwinbox tenant/company ID) and adds its registry ID in place. It will not duplicate the configured board. A board linked to a different registry row is rejected. This lets existing Greenhouse/Ashby allowlists receive per-board baseline markers when activated.
+
+## Production first-poll observation — 2026-11-08
+
+Ten specific boards were re-probed on the production image and added to the employer registry. During initial collection, a notification-ledger ordering edge case was exposed: new canonical rows may start with a pending ledger entry and a null candidate ID before match evaluation. The earlier board-baseline helper only suppressed a ledger row after the candidate had already been set to that job, so the baseline marker could miss it. No new source-related Telegram send was observed; nevertheless, this was treated as a release blocker. The seven newly enabled ATS collectors were paused, LinkedIn/Naukri left enabled, and all 10 baseline markers reset while the code fix and regression tests were completed. Existing production jobs were retained.

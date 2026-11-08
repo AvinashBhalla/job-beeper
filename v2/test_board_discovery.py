@@ -306,6 +306,68 @@ class BoardDiscoveryApiTests(unittest.TestCase):
         self.assertEqual(ledger, ("suppressed", 1, None))
         self.assertEqual(baseline_pending, 0)
 
+    def test_new_board_baseline_suppresses_pending_ledger_without_candidate(self):
+        board_id = self._insert_verified_greenhouse_board()
+        timestamp = radar.iso(radar.now())
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE ats_board_registry SET review_status='active',baseline_pending=1 WHERE id=?", (board_id,))
+            conn.execute("""INSERT INTO canonical_opportunities
+                (company_norm,title_norm,location_norm,representative_job_id,first_seen_at,last_seen_at)
+                VALUES('acme','engineer','remote',1,?,?)""", (timestamp,timestamp))
+            canonical_id = conn.execute("SELECT id FROM canonical_opportunities ORDER BY id DESC LIMIT 1").fetchone()[0]
+            cursor = conn.execute("""INSERT INTO jobs
+                (source,source_job_id,company,title,location,url,source_posted_at,posted_precision,discovered_at,source_details_json,first_seen_at,last_seen_at,canonical_opportunity_id)
+                VALUES('greenhouse','gh-acme-pending','Acme','Engineer','Remote','https://boards.greenhouse.io/acme/2',?,'minute',?,?,?,?,?)""",
+                (timestamp,timestamp,json.dumps({"board_registry_id":board_id}),timestamp,timestamp,canonical_id))
+            job_id = int(cursor.lastrowid)
+            conn.execute("""INSERT INTO job_evaluations
+                (job_id,evaluated_at,config_fingerprint,match,score,reasons_json,experience_min_years,experience_max_years,alertable,alertability_reasons_json)
+                VALUES(?,?,?,1,99,'[]',NULL,NULL,1,'[]')""",
+                (job_id,timestamp,'test-baseline'))
+            conn.execute("""INSERT INTO notification_ledger
+                (canonical_opportunity_id,status,candidate_job_id,created_at,updated_at)
+                VALUES(?,'pending',NULL,?,?)""", (canonical_id,timestamp,timestamp))
+            conn.commit()
+
+        self.assertEqual(radar.suppress_activated_board_inventory("greenhouse"), 1)
+        radar.refresh_notification_decisions({**radar.get_config(), "notifications_enabled": True})
+        with sqlite3.connect(self.db_path) as conn:
+            ledger = conn.execute(
+                "SELECT status,baseline_suppressed,candidate_job_id FROM notification_ledger WHERE canonical_opportunity_id=?",
+                (canonical_id,),
+            ).fetchone()
+        self.assertEqual(ledger, ("suppressed", 1, None))
+
+    def test_new_board_baseline_preserves_existing_cross_source_canonical(self):
+        board_id = self._insert_verified_greenhouse_board()
+        earlier = radar.iso(radar.now() - radar.dt.timedelta(hours=1))
+        current = radar.iso(radar.now())
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("UPDATE ats_board_registry SET review_status='active',baseline_pending=1 WHERE id=?", (board_id,))
+            conn.execute("""INSERT INTO canonical_opportunities
+                (company_norm,title_norm,location_norm,representative_job_id,first_seen_at,last_seen_at)
+                VALUES('acme','engineer','remote',1,?,?)""", (earlier,current))
+            canonical_id = conn.execute("SELECT id FROM canonical_opportunities ORDER BY id DESC LIMIT 1").fetchone()[0]
+            conn.execute("""INSERT INTO jobs
+                (source,source_job_id,company,title,location,url,posted_precision,discovered_at,source_details_json,first_seen_at,last_seen_at,canonical_opportunity_id)
+                VALUES('linkedin','li-existing','Acme','Engineer','Remote','https://example.com/1','unknown',?,?,?,?,?)""",
+                (earlier,json.dumps({}),earlier,earlier,canonical_id))
+            conn.execute("""INSERT INTO jobs
+                (source,source_job_id,company,title,location,url,posted_precision,discovered_at,source_details_json,first_seen_at,last_seen_at,canonical_opportunity_id)
+                VALUES('greenhouse','gh-acme-duplicate','Acme','Engineer','Remote','https://boards.greenhouse.io/acme/3','unknown',?,?,?,?,?)""",
+                (current,json.dumps({"board_registry_id":board_id}),current,current,canonical_id))
+            conn.execute("""INSERT INTO notification_ledger
+                (canonical_opportunity_id,status,candidate_job_id,created_at,updated_at)
+                VALUES(?,'pending',NULL,?,?)""", (canonical_id,earlier,current))
+            conn.commit()
+        self.assertEqual(radar.suppress_activated_board_inventory("greenhouse"), 1)
+        with sqlite3.connect(self.db_path) as conn:
+            ledger = conn.execute(
+                "SELECT status,baseline_suppressed,candidate_job_id FROM notification_ledger WHERE canonical_opportunity_id=?",
+                (canonical_id,),
+            ).fetchone()
+        self.assertEqual(ledger, ("pending", 0, None))
+
     def test_discovery_post_requires_csrf(self):
         denied = self.client.post("/api/discovery/companies/scan", json={
             "company_name": "Acme", "website_url": "https://acme.example",
