@@ -3474,3 +3474,13 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - The global Telegram bot token/chat ID exist, but per-user bot linking is not configured: bot username, webhook secret and public origin are absent. Per-user notifications still require those settings plus a private-chat link and opt-in.
 - Active board rows in the current dashboard support activation/review but lacked disable action. Branch `feat/admin-board-disable-20261108` adds a per-board deactivate endpoint and UI. It needs exact-SHA CI, full V2 suite, QA review and separate production deployment; current production is not yet running this branch.
 - Read the detailed 2026-11-08 block in `docs/JOB_RADAR_HANDOVER.md` before changing production.
+
+
+## 2026-11-08 — Admin board disable now deployed
+
+- PR #54 merged as `00820f0eef9b6ddcd5e8b289cdb742fe88ca3b92`; exact PR-head GitHub CI passed; local V2 full suite passed 393 tests. Production canary against fresh DB copy passed (health 200, dashboard 200, anonymous admin routes 401, DB integrity `ok`).
+- Production image is now `job-radar-prod-canary:00820f0` on the same external `v2_radar-data` volume. Config v15, notifications and current enabled sources preserved. All 10 registry board rows remain active and baseline-complete. No config/board was disabled in deployment.
+- Admin Source Health workspace now shows **Disable board** on each active board. It is safe per-board removal from provider allowlist, preserving peer boards; provider turns off only if last board removed. Disabled entry stays verified for reactivation. It refuses while provider polling. Requires admin login and CSRF.
+- Pre-deploy DB backup and config checksums documented in `docs/JOB_RADAR_HANDOVER.md` in the latest deployment section.
+- Production admin still must be created interactively: `sudo docker exec -it v2-radar-1 python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com`. No account has been created yet. The first admin inherits the preserved candidate prefs once. Google OAuth requires owner-created client credentials and HTTPS redirect; per-user Telegram requires bot username/webhook secret/HTTPS webhook and private-chat opt-in.
+- Use the Termalin internal site open link `https://termal.in/account#open-site=54768be5-95ea-4d86-9360-96d0c38c2843` to open the private dashboard, then log in once the admin has been bootstrapped.

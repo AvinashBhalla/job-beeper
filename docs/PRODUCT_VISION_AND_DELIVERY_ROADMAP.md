@@ -241,3 +241,9 @@ Report sample size and timestamp precision. A source returning 1,000 old jobs is
 7. Design resume vault/tailoring using fact provenance and human review, then the answer bank before the browser companion. Keep auto-submit gated and off.
 
 **Reminder:** a source adapter in code is not a verified active production connector. A roadmap feature is not implemented until API, UI, tenant tests and release evidence exist.
+
+### Latest release state — 2026-11-08
+
+- Production release `00820f0` is deployed. The admin workspace now supports per-board disable, preserving other boards under the same ATS. All 10 verified production boards remain active; no board configuration was changed during deployment.
+- The first-admin account is not yet created; use the secure interactive bootstrap recorded in `JOB_RADAR_HANDOVER.md`. Google OAuth and member Telegram are not configured until owner-supplied credentials/public HTTPS routing are available.
+- Continue measured source soak and prioritize P0.5 server-owned application tracking next.
