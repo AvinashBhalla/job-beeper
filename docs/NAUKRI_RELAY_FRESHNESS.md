@@ -1,65 +1,59 @@
 # Naukri relay freshness and repeat-ingestion behavior
 
-**Status:** Implemented locally on feat/source-observability-20261107; not merged or deployed.
+**Status:** Consumer implementation pushed to the draft JobBeeper PR #47; publisher changes prepared separately on a draft branch in the public relay repository. Not merged or deployed.
 
-## Observed feed contract
+## Observed feed and scheduler contract
 
-A read-only inspection of the public relay JSON on 2026-11-07 found these top-level fields:
+The public relay JSON exposes top-level `updated_at`, `count`, and a full `jobs` array. At initial inspection on 2026-11-07, the snapshot contained 322 jobs; a later successful run produced 325. Job records had stable IDs/URLs and a date-like `posted` value, but no per-job relay-observed timestamp.
 
-- updated_at: one timestamp for the entire generated feed snapshot.
-- count: total number of entries in jobs.
-- jobs: a full snapshot, with stable id and url fields and a date-like posted value.
+The active publisher workflow in `AvinashBhalla/job-beeper-naukri-relay` is `workflow_dispatch` only; it has no GitHub `schedule` trigger. The VM's `job-radar-naukri-relay.timer` dispatches it every five minutes (`OnUnitActiveSec=5min`). Do not change this timer as part of consumer work.
 
-At the time of inspection, the snapshot contained 322 jobs. The job objects did not contain a per-job relay-observed timestamp. The top-level updated_at is therefore a feed-build/relay timestamp, not the employer's exact publication time and not an exact per-job discovery time.
+A read-only sample of the latest 15 successful runs on 2026-11-07 showed end-to-end durations from 138 to 164 seconds. Run #7599 took 154 seconds; its collector step scanned 18 configured query/location targets with all 18 successful and produced 325 unique jobs. This supports a conservative 15-minute consumer freshness ceiling (three nominal 5-minute dispatch intervals), but the threshold remains provisional and should be reassessed from ongoing operational data.
+
+## Publisher hardening and per-job timestamps
+
+A separate relay-repository feature branch is being prepared to:
+- Load the last successfully published `naukri-relay` branch snapshot before collecting.
+- Fail closed if fetching/parsing the last-good snapshot fails, rather than silently resetting first-seen metadata.
+- Preserve the previous complete snapshot when any configured query/location target fails; do not publish a partial feed.
+- Add `relay_first_observed_at` and `relay_last_observed_at` to each published job.
+- Preserve a job's existing first-observed timestamp by stable ID, with URL fallback. For pre-existing records that predate this schema, the previous feed-level `updated_at` is used as a migration baseline. This is not a claim about the job's true historic first-seen time.
+- Set each job's last-observed timestamp on every successful complete run.
+
+The fields represent when the relay first/last observed the listing, not when the employer posted it. Date-only `posted` values still cannot support exact publication latency.
 
 ## Consumer changes
 
-The Naukri collector now validates the snapshot before accepting it:
+The V2 consumer:
+- Requires a JSON object, a non-empty jobs list, a parseable top-level timestamp, count consistency when count is supplied, and at least one valid normalized job.
+- Rejects snapshots more than five minutes in the future or older than 15 minutes.
+- Does not replace last-good feed metadata or upsert listings from rejected snapshots.
+- Persists safe feed metadata in additive `source_feed_state`: relay timestamp, app observation timestamp, age, accepted normalized count, SHA-256 content hash and unchanged-content indicator.
+- Hashes job content independently of job order and excludes volatile `relay_last_observed_at`, so a fresh relay run containing the same jobs is detectable as unchanged.
+- Consumes the optional per-job relay first/last observation fields. Older snapshots fall back to the snapshot timestamp.
+- Keeps job `discovered_at` / `first_seen_at` stable and advances job/canonical `last_seen_at` monotonically.
+- Skips expensive matcher re-evaluation when the persisted matching inputs did not change, while still updating last-seen metadata.
 
-- JSON root must be an object; jobs must be a non-empty list.
-- When count is present, it must parse as an integer and match the list length.
-- updated_at must be parseable.
-- A timestamp more than five minutes in the future is rejected.
-- A snapshot older than 15 minutes is rejected. This is a provisional threshold set to three nominal five-minute relay intervals; it must be revisited after measuring actual publisher cadence and workflow completion times.
-- At least one valid job with a stable ID and URL must remain after normalization.
-
-A rejected snapshot raises a failed source run. It does not update source_feed_state, upsert any jobs from that snapshot, or erase existing job rows. The last accepted feed metadata remains available for diagnosis.
-
-The additive source_feed_state table stores only:
-
-- relay updated_at;
-- the consumer's last_observed_at;
-- relay age at the last poll;
-- accepted normalized job count;
-- SHA-256 hash of the job snapshot;
-- whether the job snapshot content was unchanged from the preceding accepted snapshot.
-
-The snapshot hash excludes the changing top-level timestamp, so a newly generated snapshot containing the same job records can be identified as unchanged. It does not store job content, URLs, descriptions or credentials.
-
-Repeated job observations still update last_seen_at. Existing job evaluations are recomputed only when matcher-relevant persisted inputs (description, description format, source-posted timestamp or precision) actually change. This avoids repeating expensive evaluation work for identical job data.
-
-Admin GET /api/source-status now returns last_feed for Naukri, including current age, age at last poll, count, freshness status and unchanged-snapshot indicator. The Source Health dashboard surfaces this alongside the ordinary source metrics.
+Admin `GET /api/source-status` returns `last_feed` for Naukri (age, age at poll, job count, freshness and unchanged snapshot). The Source Health dashboard displays the last accepted relay status.
 
 ## What this does not do
 
-- It does not turn the full snapshot into a cursor-based or per-job incremental endpoint. The current consumer still downloads and parses the entire JSON snapshot.
-- It does not provide an exact per-job relay-observed timestamp. That requires the relay publisher to add a per-item field such as first_seen_at / observed_at, ideally with stable semantics and a versioned schema.
-- It does not make the source real-time. Publisher schedule, job-board publication delay and feed update lag remain distinct.
-- It does not infer precise publication time from date-only posted values. Naukri discovery-latency remains unknown for date-only records.
-- It does not alter poll frequency, retries, source enablement, or notification behavior.
+- The consumer still downloads and parses the full JSON snapshot every poll. This is not cursor-based or per-job incremental fetching.
+- It does not infer precise publication time or latency from date-only posting labels.
+- It does not change source polling cadence, source enablement, retry policy, notifications or provider request pressure.
+- The 15-minute maximum age is a provisional safety threshold, not a formal SLA.
 
 ## Follow-up
 
-1. Inspect the relay workflow's actual schedule and recent start/completion times; distinguish scheduled time, manual workflow-dispatch time and successful feed publication time.
-2. Add per-job relay observation metadata at the publisher, preserving backward compatibility and explicit timestamp precision.
-3. Consider conditional HTTP requests (ETag/Last-Modified) only if the GitHub raw-content host exposes dependable validators; retain a safe cache-busting path where required.
-4. Reassess the 15-minute consumer freshness ceiling using measured publisher completion latency and actual relay failure patterns.
-5. Measure unique and newly relevant jobs per relay run before expanding query families or increasing poll pressure.
+1. Merge and validate the relay-publisher change only after its independent CI passes; confirm a published feed includes the two optional per-job timestamps.
+2. Observe failed target frequency and feed age for several days before adjusting the 15-minute cutoff.
+3. Consider ETag/Last-Modified only if the raw-content host exposes dependable validators.
+4. Measure new/unique/relevant yield over time before changing search targets or expanding source coverage.
 
 ## Validation
 
-- Naukri tests cover stale/empty/count-mismatched snapshots, last-good state preservation, same-content snapshots with a newer relay timestamp, source-health reporting, date-only timestamp precision and repeat-upsert evaluation avoidance.
-- Full V2 suite: 205 tests passed on the isolated Python 3.10 test environment.
-- python -m compileall -q v2 and git diff --check passed.
-- The VM's system Node is v12.22.9, below the syntax level already used by the dashboard; the dashboard was therefore checked with esbuild 0.25.12 locally. GitHub V2 CI #1311 / run 42398484593 passed for implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a: dashboard JavaScript syntax passed, focused router/extractor tests 32 passed, and full V2 suite 205 passed in 15.336 seconds.
-- This implementation has not been deployed to port 8003, shared dev (8001) or production (8000).
+- Consumer regression tests cover stale/empty/count-mismatched snapshots, last-good state retention, future timestamps, same-content snapshots with changing relay timestamps/order, feed health, per-job first/last observation import, monotonic last-seen persistence and matcher re-evaluation avoidance.
+- Full V2 suite after per-job timestamp integration: **207 tests passed** locally on the isolated Python 3.10 environment.
+- Python compileall, dashboard build using esbuild 0.25.12 and `git diff --check` passed locally.
+- GitHub V2 CI #1311 / run 42398484593 passed on the earlier consumer implementation commit 04c0605: dashboard JavaScript syntax, focused router/extractor tests 32 passed, and full V2 suite 205 passed. The newer per-job timestamp integration still needs a fresh GitHub CI run after push.
+- No deployment to the 8003 preview, shared dev 8001 or production 8000 has been made.

@@ -622,7 +622,7 @@ def _create_canonical_group(
         identity["location_norm"],
         job_id,
         job["discovered_at"],
-        job["discovered_at"],
+        job.get("last_seen_at") or job["discovered_at"],
     ))
     canonical_id = int(cur.lastrowid)
     conn.execute("""
@@ -930,6 +930,13 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 sort_keys=True,
             )
             observed_at = parse_relative(j.get("discovered_at"))
+            last_seen_at = parse_relative(j.get("last_seen_at")) or observed_at
+            if (
+                last_seen_at
+                and observed_at
+                and last_seen_at < observed_at
+            ):
+                last_seen_at = observed_at
             incoming_posted_at = parse_relative(j.get("source_posted_at"))
             if observed_at and incoming_posted_at and incoming_posted_at > observed_at:
                 j["source_posted_at"] = None
@@ -957,7 +964,10 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
 
                 conn.execute("""
                     UPDATE jobs SET
-                    last_seen_at=?,
+                    last_seen_at=CASE
+                        WHEN julianday(?) > julianday(last_seen_at) THEN ?
+                        ELSE last_seen_at
+                    END,
                     source_posted_at=COALESCE(?, source_posted_at),
                     posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
                     description=CASE
@@ -974,7 +984,9 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     END
                     WHERE id=?
                 """, (
-                    j["discovered_at"], posted_at_for_update, precision_for_update,
+                    iso(last_seen_at) or j["discovered_at"],
+                    iso(last_seen_at) or j["discovered_at"],
+                    posted_at_for_update, precision_for_update,
                     precision_for_update,
                     incoming_description_format, incoming_description, incoming_description,
                     incoming_description_format, incoming_description, incoming_description_format,
@@ -1046,7 +1058,7 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     j["posted_precision"], j["discovered_at"],
                     j["discovery_latency_seconds"], incoming_description,
                     incoming_description_format, source_details_json,
-                    j["discovered_at"], j["discovered_at"]
+                    j["discovered_at"], iso(last_seen_at) or j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
                 _persist_job_evaluation(conn, int(cur.lastrowid), config)
@@ -2895,10 +2907,38 @@ def naukri_collect() -> list[dict[str, Any]]:
                     else {}
                 ),
             )
-            # This is the relay snapshot timestamp, not the exact instant a
-            # particular employer published the job. It is the per-job
-            # first/last-observed proxy while the relay has no item timestamp.
-            job["discovered_at"] = iso(collected_at) or job["discovered_at"]
+            # Relay observation timestamps are distinct from the employer's
+            # posted date and are optional for older snapshots.
+            first_observed_at = parse_relative(item.get("relay_first_observed_at"))
+            last_observed_at = parse_relative(item.get("relay_last_observed_at"))
+            future_limit = observed_at + dt.timedelta(
+                seconds=NAUKRI_RELAY_FUTURE_TOLERANCE_SECONDS
+            )
+            if first_observed_at and first_observed_at > future_limit:
+                first_observed_at = None
+            if last_observed_at and last_observed_at > future_limit:
+                last_observed_at = None
+            if (
+                first_observed_at
+                and last_observed_at
+                and first_observed_at > last_observed_at
+            ):
+                first_observed_at = None
+                last_observed_at = None
+
+            # Older published feed items have no per-job fields. In that case,
+            # the previous snapshot-level timestamp is the best available
+            # observation proxy, with its coarser precision documented.
+            job["discovered_at"] = (
+                iso(first_observed_at)
+                or iso(collected_at)
+                or job["discovered_at"]
+            )
+            job["last_seen_at"] = (
+                iso(last_observed_at)
+                or iso(collected_at)
+                or job["discovered_at"]
+            )
             job["discovery_latency_seconds"] = None
             jobs.append(job)
 
@@ -2907,7 +2947,15 @@ def naukri_collect() -> list[dict[str, Any]]:
 
         # The relay timestamp changes on every successful build; hash only
         # job content so a fresh build with identical listings is detectable.
-        fingerprint_jobs = [item for item in relay_jobs if isinstance(item, dict)]
+        fingerprint_jobs = [
+            {
+                key: value
+                for key, value in item.items()
+                if key not in {"relay_last_observed_at"}
+            }
+            for item in relay_jobs
+            if isinstance(item, dict)
+        ]
         fingerprint_jobs.sort(
             key=lambda item: (str(item.get("id") or ""), str(item.get("url") or ""))
         )

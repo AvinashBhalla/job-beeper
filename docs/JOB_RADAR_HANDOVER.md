@@ -5986,3 +5986,13 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 
 - GitHub V2 CI run #1311 / ID 42398484593 passed on implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a. Syntax job passed including dashboard JavaScript; focused router/extractor tests 32 passed; full V2 test suite 205 passed in 15.336 seconds.
 - The later docs-only handover commit does not change implementation code. PR #47 remains draft/open/unmerged and no runtime rollout was performed.
+
+
+## 2026-11-08 — Relay scheduler, per-job observation and reverse-engineering decision
+
+- Verified active relay architecture: default-branch workflow is workflow_dispatch-only; VM unit timer is OnUnitActiveSec=5min. Latest 15 successful GitHub Actions runs on 2026-11-07 took 138–164 seconds; run #7599 scanned 18 targets (all successful) and generated 325 unique jobs. Do not change the timer or fanout/request pressure as part of this task.
+- Consumer branch now supports optional relay_first_observed_at / relay_last_observed_at, preserving job/canonical first_seen and monotonically updating last_seen. Its snapshot hash excludes volatile last-observed timestamps and is independent of record order. Legacy snapshot-level updated_at remains the compatibility fallback.
+- Consumer branch full V2 suite after the timestamp changes: 207 passed locally. Fresh CI is required after pushing these later changes.
+- Separate relay worktree: /tmp/job-beeper-naukri-relay-main; branch feat/relay-first-seen-preserve-last-good-20261107. Publisher diff adds fail-closed last-good load and aborts publication if any target fails, and publishes per-job observation timestamps. Workflow Python AST and YAML parse pass locally. This publisher change is not yet committed/pushed/CI-validated at this handover point.
+- Read docs/REVERSE_ENGINEERING_SCOPE.md for public product-contract baseline and current gaps. Decision: enough is known to build; do focused black-box acceptance testing only when it informs the next feature. Do not reverse-engineer private endpoints or internal implementation.
+- Current owner UAT backlog remains: email/password signup, Google consent app branding ("n8nApp"), and preferences-save validation error not surfaced (role chip visible but backend says at least one target role required). OAuth and resume parser UAT were confirmed successful.

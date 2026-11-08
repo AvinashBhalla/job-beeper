@@ -2960,6 +2960,8 @@ class NaukriRelayFreshnessTests(unittest.TestCase):
             "location": "Bengaluru",
             "posted": "2026-11-07",
             "description": "Python services",
+            "relay_first_observed_at": radar.iso(radar.now() - radar.dt.timedelta(minutes=4)),
+            "relay_last_observed_at": radar.iso(radar.now() - radar.dt.timedelta(minutes=1)),
         }]
         return {
             "updated_at": updated_at or radar.iso(radar.now() - radar.dt.timedelta(seconds=age_seconds)),
@@ -2980,6 +2982,62 @@ class NaukriRelayFreshnessTests(unittest.TestCase):
         radar._begin_source_run_metrics("naukri")
         with patch.object(radar.requests, "get", return_value=Response()):
             return radar.naukri_collect()
+
+    def test_collector_imports_per_job_relay_observation_timestamps(self):
+        payload = self._payload(age_seconds=30)
+        jobs = self._collect(payload)
+
+        self.assertEqual(
+            jobs[0]["discovered_at"],
+            payload["jobs"][0]["relay_first_observed_at"],
+        )
+        self.assertEqual(
+            jobs[0]["last_seen_at"],
+            payload["jobs"][0]["relay_last_observed_at"],
+        )
+        self.assertIsNone(jobs[0]["discovery_latency_seconds"])
+
+        radar.upsert_jobs(jobs, BASE_CONFIG)
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT discovered_at, first_seen_at, last_seen_at FROM jobs "
+                "WHERE source='naukri' AND source_job_id='naukri-1'"
+            ).fetchone()
+            canonical = conn.execute(
+                "SELECT co.first_seen_at, co.last_seen_at FROM canonical_opportunities co "
+                "JOIN jobs j ON j.canonical_opportunity_id=co.id "
+                "WHERE j.source='naukri' AND j.source_job_id='naukri-1'"
+            ).fetchone()
+        self.assertEqual(row[0], payload["jobs"][0]["relay_first_observed_at"])
+        self.assertEqual(row[1], payload["jobs"][0]["relay_first_observed_at"])
+        self.assertEqual(row[2], payload["jobs"][0]["relay_last_observed_at"])
+        self.assertEqual(canonical[0], row[1])
+        self.assertEqual(canonical[1], row[2])
+
+    def test_upsert_never_moves_last_seen_backwards(self):
+        first_seen = radar.now() - radar.dt.timedelta(minutes=10)
+        last_seen = radar.now() - radar.dt.timedelta(minutes=2)
+        job = radar.normalize_job(
+            "naukri", "naukri-monotonic", "Example", "Software Engineer", "Bengaluru, India",
+            "https://www.naukri.com/job-listings-monotonic", None, "unknown",
+            "Build Python services",
+        )
+        job["discovered_at"] = radar.iso(first_seen)
+        job["last_seen_at"] = radar.iso(last_seen)
+        radar.upsert_jobs([job], BASE_CONFIG)
+
+        older_observation = {
+            **job,
+            "last_seen_at": radar.iso(first_seen + radar.dt.timedelta(minutes=1)),
+        }
+        radar.upsert_jobs([older_observation], BASE_CONFIG)
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            saved = conn.execute(
+                "SELECT discovered_at, last_seen_at FROM jobs "
+                "WHERE source='naukri' AND source_job_id='naukri-monotonic'"
+            ).fetchone()
+        self.assertEqual(saved[0], radar.iso(first_seen))
+        self.assertEqual(saved[1], radar.iso(last_seen))
 
     def test_rejects_stale_snapshot_and_keeps_last_good_feed_metadata(self):
         first = self._payload(age_seconds=60)
@@ -3026,10 +3084,19 @@ class NaukriRelayFreshnessTests(unittest.TestCase):
         })
         payload = self._payload(age_seconds=30, jobs=jobs)
         self._collect(payload)
+        refreshed_jobs = [
+            {
+                **item,
+                "relay_last_observed_at": radar.iso(
+                    radar.now() - radar.dt.timedelta(seconds=5)
+                ),
+            }
+            for item in reversed(jobs)
+        ]
         same_jobs_new_relay_run = {
             **payload,
             "updated_at": radar.iso(radar.now() - radar.dt.timedelta(seconds=10)),
-            "jobs": list(reversed(jobs)),
+            "jobs": refreshed_jobs,
         }
         self._collect(same_jobs_new_relay_run)
 
