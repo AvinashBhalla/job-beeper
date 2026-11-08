@@ -16,8 +16,8 @@
   const API = window.JobBeeperAuth.resolveApiBase(requestedApi || '/api', window.location);
   const authClient = window.JobBeeperAuth.createClient({ apiBase: API, locationRef: window.location });
 
-  const LOCAL_STORAGE_APPLIED_KEY = 'job_beeper_applied_jobs_v1';
-  const appliedStorageKey = () => state.currentUser && state.currentUser.id ? `${LOCAL_STORAGE_APPLIED_KEY}_user_${state.currentUser.id}` : LOCAL_STORAGE_APPLIED_KEY;
+  const LEGACY_APPLIED_STORAGE_KEY = 'job_beeper_applied_jobs_v1';
+  const legacyAppliedStorageKey = () => state.currentUser && state.currentUser.id ? `${LEGACY_APPLIED_STORAGE_KEY}_user_${state.currentUser.id}` : LEGACY_APPLIED_STORAGE_KEY;
   const THEME_STORAGE_KEY = 'job_beeper_theme';
 
   const state = {
@@ -592,86 +592,150 @@
   }
 
   // =========================================================================
-  // 5. Local-First Applied Jobs Store
+  // 5. Server-Owned Applied Jobs Store
   // =========================================================================
-  function loadAppliedJobs() {
+  async function loadAppliedJobs() {
+    const storageKey = legacyAppliedStorageKey();
+    let legacyRecords = [];
     try {
-      const raw = localStorage.getItem(appliedStorageKey());
-      state.appliedJobs = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(state.appliedJobs)) state.appliedJobs = [];
-    } catch (e) {
-      console.warn('Failed to parse applied jobs from localStorage', e);
-      state.appliedJobs = [];
+      const raw = localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      legacyRecords = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Failed to read legacy applied jobs from localStorage', error);
     }
-    updateAppliedCountBadge();
-  }
 
-  function saveAppliedJobs() {
-    try {
-      localStorage.setItem(appliedStorageKey(), JSON.stringify(state.appliedJobs));
-    } catch (e) {
-      console.error('Failed to save applied jobs to localStorage', e);
+    const response = await authClient.request('/applications');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `Could not load applications (HTTP ${response.status}).`);
+
+    if (legacyRecords.length) {
+      let imported = 0;
+      let alreadyPresent = 0;
+      let skipped = 0;
+      let importFailed = false;
+      for (let offset = 0; offset < legacyRecords.length; offset += 500) {
+        const batch = legacyRecords.slice(offset, offset + 500);
+        const importResponse = await authClient.request('/applications/import', {
+          method: 'POST', body: { applications: batch },
+        });
+        const importData = await importResponse.json().catch(() => ({}));
+        if (!importResponse.ok) {
+          importFailed = true;
+          console.warn('Legacy application import failed', importData.detail || importResponse.status);
+          break;
+        }
+        imported += Number(importData.imported || 0);
+        alreadyPresent += Number(importData.already_present || 0);
+        skipped += Number(importData.skipped || 0);
+      }
+      if (!importFailed && skipped === 0) {
+        localStorage.removeItem(storageKey);
+      }
+      if (imported) showToast(`Imported ${imported} application record(s) from this browser`, 'success');
+      if (skipped) showToast(`${skipped} old application record(s) could not be matched to a saved job. Your local copy was kept.`, 'warning', 7000);
+      if (importFailed) showToast('Older application records could not all be imported. The browser copy was kept.', 'warning', 7000);
+      if (imported || alreadyPresent) {
+        const refreshed = await authClient.request('/applications');
+        const refreshedData = await refreshed.json().catch(() => ({}));
+        if (!refreshed.ok) throw new Error(refreshedData.detail || 'Could not refresh application records after import.');
+        state.appliedJobs = Array.isArray(refreshedData.applications) ? refreshedData.applications : [];
+      } else {
+        state.appliedJobs = Array.isArray(data.applications) ? data.applications : [];
+      }
+    } else {
+      state.appliedJobs = Array.isArray(data.applications) ? data.applications : [];
     }
     updateAppliedCountBadge();
   }
 
   function isJobApplied(jobId) {
-    return state.appliedJobs.some(item => String(item.id) === String(jobId));
+    return state.appliedJobs.some(item => String(item.job_id ?? item.id) === String(jobId));
   }
 
-  function toggleMarkJobApplied(job) {
-    const existingIndex = state.appliedJobs.findIndex(item => String(item.id) === String(job.id));
-    if (existingIndex >= 0) {
-      state.appliedJobs.splice(existingIndex, 1);
-      showToast(`Removed "${job.title}" from Applied tracking`, 'info');
-    } else {
-      state.appliedJobs.unshift({
-        id: String(job.id),
-        title: job.title,
-        company: job.company,
-        url: job.url,
-        source: job.source,
-        score: job.match_score,
-        applied_at: new Date().toISOString(),
-        status: 'Applied',
-        notes: '',
+  async function toggleMarkJobApplied(job) {
+    try {
+      const existing = state.appliedJobs.find(item => String(item.job_id ?? item.id) === String(job.id));
+      const url = existing ? `/applications/${encodeURIComponent(existing.id)}` : '/applications';
+      const response = await authClient.request(url, existing
+        ? { method: 'DELETE' }
+        : { method: 'POST', body: { job_id: Number(job.id) } });
+      const data = response.status === 204 ? {} : await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showToast(data.detail || `Could not update application tracking (HTTP ${response.status}).`, 'error', 7000);
+        return;
+      }
+
+      if (existing) {
+        state.appliedJobs = state.appliedJobs.filter(item => String(item.id) !== String(existing.id));
+        showToast(`Removed "${job.title}" from Applied tracking`, 'info');
+      } else {
+        const item = data.application;
+        if (item && !state.appliedJobs.some(current => String(current.id) === String(item.id))) {
+          state.appliedJobs.unshift(item);
+        }
+        showToast(`Marked "${job.title}" at ${job.company} as Applied`, 'success');
+      }
+      updateAppliedCountBadge();
+      renderFeed();
+      if (state.selectedJobId === String(job.id)) updateInspectorAppliedButton(job);
+      if (state.activeSection === 'appliedSection') renderAppliedTable();
+    } catch (error) {
+      showToast(error.message || 'Application tracking is temporarily unavailable.', 'error', 7000);
+    }
+  }
+
+  async function updateAppliedJobStatus(applicationId, newStatus) {
+    try {
+      const response = await authClient.request(`/applications/${encodeURIComponent(applicationId)}`, {
+        method: 'PATCH', body: { status: newStatus },
       });
-      showToast(`Marked "${job.title}" at ${job.company} as Applied`, 'success');
-    }
-    saveAppliedJobs();
-    renderFeed();
-    if (state.selectedJobId === String(job.id)) {
-      updateInspectorAppliedButton(job);
-    }
-    if (state.activeSection === 'appliedSection') {
-      renderAppliedTable();
-    }
-  }
-
-  function updateAppliedJobStatus(jobId, newStatus) {
-    const item = state.appliedJobs.find(x => String(x.id) === String(jobId));
-    if (item) {
-      item.status = newStatus;
-      saveAppliedJobs();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showToast(data.detail || 'Could not update application status.', 'error', 7000);
+        return;
+      }
+      const index = state.appliedJobs.findIndex(item => String(item.id) === String(applicationId));
+      if (index >= 0) state.appliedJobs[index] = data.application;
       renderAppliedStats();
       showToast(`Status updated to ${newStatus}`, 'info');
+    } catch (error) {
+      showToast(error.message || 'Could not update application status.', 'error', 7000);
     }
   }
 
-  function updateAppliedJobNotes(jobId, notes) {
-    const item = state.appliedJobs.find(x => String(x.id) === String(jobId));
-    if (item) {
-      item.notes = notes;
-      saveAppliedJobs();
+  async function updateAppliedJobNotes(applicationId, notes) {
+    try {
+      const response = await authClient.request(`/applications/${encodeURIComponent(applicationId)}`, {
+        method: 'PATCH', body: { notes },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) showToast(data.detail || 'Could not save application notes.', 'error', 7000);
+      else {
+        const index = state.appliedJobs.findIndex(item => String(item.id) === String(applicationId));
+        if (index >= 0) state.appliedJobs[index] = data.application;
+      }
+    } catch (error) {
+      showToast(error.message || 'Could not save application notes.', 'error', 7000);
     }
   }
 
-  function removeAppliedJob(jobId) {
-    state.appliedJobs = state.appliedJobs.filter(x => String(x.id) !== String(jobId));
-    saveAppliedJobs();
-    renderAppliedTable();
-    renderFeed();
-    showToast('Application record removed', 'info');
+  async function removeAppliedJob(applicationId) {
+    try {
+      const response = await authClient.request(`/applications/${encodeURIComponent(applicationId)}`, { method: 'DELETE' });
+      const data = response.status === 204 ? {} : await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showToast(data.detail || 'Could not remove application record.', 'error', 7000);
+        return;
+      }
+      state.appliedJobs = state.appliedJobs.filter(item => String(item.id) !== String(applicationId));
+      updateAppliedCountBadge();
+      renderAppliedTable();
+      renderFeed();
+      showToast('Application record removed', 'info');
+    } catch (error) {
+      showToast(error.message || 'Could not remove application record.', 'error', 7000);
+    }
   }
 
   function updateAppliedCountBadge() {
@@ -1416,7 +1480,7 @@
           <div id="statusMount_${esc(item.id)}" style="min-width:140px;"></div>
         </td>
         <td>
-          <input type="text" class="inline-notes-field" placeholder="Add notes…" value="${esc(item.notes || '')}" data-id="${esc(item.id)}">
+          <input type="text" class="inline-notes-field" maxlength="2000" placeholder="Add notes…" value="${esc(item.notes || '')}" data-id="${esc(item.id)}">
         </td>
         <td>
           <div style="display:flex;gap:6px;">
@@ -1491,9 +1555,10 @@
       a.click();
       URL.revokeObjectURL(url);
     } else {
-      const headers = ['ID', 'Job Title', 'Company', 'Source', 'Score', 'Status', 'Date Applied', 'URL', 'Notes'];
+      const headers = ['Application ID', 'Job ID', 'Job Title', 'Company', 'Source', 'Score', 'Status', 'Date Applied', 'URL', 'Notes'];
       const rows = state.appliedJobs.map(j => [
         `"${j.id}"`,
+        `"${j.job_id}"`,
         `"${(j.title || '').replace(/"/g, '""')}"`,
         `"${(j.company || '').replace(/"/g, '""')}"`,
         `"${j.source || ''}"`,
@@ -2501,7 +2566,13 @@
     const saveButton = $('savePreferencesBtn');
     if (saveButton) saveButton.textContent = state.isAdmin ? 'Save Preferences to V2' : 'Save My Preferences';
 
-    loadAppliedJobs();
+    try {
+      await loadAppliedJobs();
+    } catch (error) {
+      state.appliedJobs = [];
+      updateAppliedCountBadge();
+      showToast(error.message || 'Application tracking is temporarily unavailable.', 'error', 7000);
+    }
     setupNavigation();
     initFilterDropdowns();
 
