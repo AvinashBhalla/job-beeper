@@ -3220,3 +3220,5 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - Member notification suite: **17 passed**. Full integration suite: **336 passed** in 194.322 seconds. Python compilation and `git diff --check` passed.
 - No Telegram HTTP calls or messages occurred. Lever remains disabled and the candidate preview collector flags remain off. No shared-dev or production deployment.
 - Updated QA prompt with this additional safety invariant. Current candidate still awaits browser Prompt 1 and security Prompt 3.
+
+- Correction to earlier baseline-gate note: the member notification path did not previously consult the global canonical suppression marker. It now does so at enqueue, claim/cancel and final send revalidation (commit `08c256f`, integration candidate head `9ac6fab`). 17 notification tests and full 336-test suite pass.
