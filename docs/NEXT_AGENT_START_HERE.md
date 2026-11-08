@@ -1,6 +1,6 @@
 # Next Agent Start Here — Job Radar V2
 
-**Checkpoint:** 2026-11-08, 17:10 Asia/Kolkata  
+**Checkpoint:** 2026-11-08 — SQLite contention fix completed and awaiting PR CI
 **Read this first when taking over the Job Radar task.**
 
 ## Owner's product goal
@@ -41,6 +41,14 @@ Latest verified shared-dev data: SQLite integrity ok; jobs/canonical/global eval
 5. Keep the known 320px toolbar overlap deferred as requested; it is not the priority now.
 6. Do not deploy production yet. Production has live global Telegram credentials and notifications enabled; preserve its existing queue/delivery behaviour. The earlier disposable production DB migration preflight is not a production backup or deployment.
 7. Production promotion requires a fresh formal online SQLite backup, a reviewed safe delivery plan, all P0 gates, and separate explicit owner approval. Prior deployment approval covered shared dev only.
+
+## Newest branch / verification checkpoint
+
+- Branch: `fix/sqlite-notification-contention-20261108`, based on integration SHA `ce502e1f8be51d5f2123c3bc0a1cb916245ec260`. At the checkpoint it is local/unpushed; inspect current GitHub state before assuming otherwise.
+- Final V2 suite: **347 passed, 188.827s, zero failures**. Focused notification/SQLite tests: 24 passed.
+- Shared dev is still image `b16fb83`, `journal_mode=delete`, Naukri only, notifications false, Telegram credentials absent; lock-fix not yet live. Production remains untouched.
+- NVIDIA Workday public board probe returned HTTP 200 and 20/2,000 postings in one request. This validates a candidate endpoint pattern, not connector completeness or sustained polling. Workday tenant/site discovery remains required; Darwinbox official Recruitment API is key-authenticated.
+- While candidate WAL is active, backup only with SQLite online backup API; never copy just the live `jobs.db` file and omit its WAL sidecar.
 
 ## Required reading / handover
 

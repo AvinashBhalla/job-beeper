@@ -46,6 +46,21 @@ def make_job(title, description="", location="Bengaluru, India"):
     }
 
 
+class LegacyNotificationGateTests(unittest.TestCase):
+    def test_global_telegram_requires_credentials_and_enabled_switch(self):
+        self.assertFalse(
+            radar._legacy_notifications_enabled({"notifications_enabled": False}, True)
+        )
+        self.assertFalse(
+            radar._legacy_notifications_enabled({"notifications_enabled": True}, False)
+        )
+        self.assertTrue(
+            radar._legacy_notifications_enabled({"notifications_enabled": True}, True)
+        )
+        # Preserve legacy configuration compatibility when the field is absent.
+        self.assertTrue(radar._legacy_notifications_enabled({}, True))
+
+
 class MatcherTests(unittest.TestCase):
 
     def setUp(self):

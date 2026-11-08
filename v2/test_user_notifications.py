@@ -3,10 +3,13 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 from v2 import user_notifications
+from v2 import sqlite_store, telegram, radar
 
 
 class UserNotificationServiceTests(unittest.TestCase):
@@ -28,8 +31,11 @@ class UserNotificationServiceTests(unittest.TestCase):
               status TEXT NOT NULL DEFAULT 'suppressed',
               candidate_job_id INTEGER,
               attempt_count INTEGER NOT NULL DEFAULT 0,
+              next_attempt_at TEXT,
+              claimed_at TEXT,
               sent_at TEXT,
               updated_at TEXT,
+              last_error TEXT,
               decision_reason_json TEXT
             );
             CREATE TABLE user_preferences(user_id INTEGER PRIMARY KEY, preferences_json TEXT);
@@ -57,6 +63,35 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_dispatch_does_not_open_claim_write_transaction_without_opted_in_users(self):
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN': 'test-token'}):
+            with patch.object(user_notifications, "_claim_one") as claim:
+                self.assertEqual(user_notifications.dispatch(self.db, 5), 0)
+        claim.assert_not_called()
+
+    def test_member_claim_and_legacy_recovery_share_one_writer_lock(self):
+        self.assertIs(telegram.db_lock, sqlite_store.DB_LOCK)
+        self.assertIs(radar.db_lock, sqlite_store.DB_LOCK)
+        barrier = threading.Barrier(3)
+
+        def claim_repeatedly():
+            barrier.wait(timeout=3)
+            for _ in range(30):
+                user_notifications._claim_one(self.db)
+
+        def recover_repeatedly():
+            with patch.object(telegram, "DB_PATH", self.db):
+                barrier.wait(timeout=3)
+                for _ in range(30):
+                    telegram.recover_stale_claims()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            claim_future = executor.submit(claim_repeatedly)
+            recovery_future = executor.submit(recover_repeatedly)
+            barrier.wait(timeout=3)
+            claim_future.result(timeout=10)
+            recovery_future.result(timeout=10)
 
     def test_default_is_off_and_explicit_enable_sets_baseline(self):
         self.assertFalse(user_notifications.get_settings(self.db, 1)['enabled'])
@@ -222,6 +257,31 @@ class UserNotificationServiceTests(unittest.TestCase):
         self.assertEqual(row['attempt_count'], 1)
         self.assertIsNotNone(row['next_attempt_at'])
         self.assertEqual(row['last_error'], 'RuntimeError')
+
+    def test_zero_dispatch_limit_is_a_true_noop(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+            )
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN': 'test-token'}):
+            with patch.object(user_notifications, "_queue_new_matches") as queue:
+                with patch.object(user_notifications, "_claim_one") as claim:
+                    self.assertEqual(user_notifications.dispatch(self.db, 0), 0)
+        queue.assert_not_called()
+        claim.assert_not_called()
+
+    def test_dispatch_queues_each_enabled_user_once_per_cycle(self):
+        with user_notifications._connect(self.db) as conn:
+            for uid in (1, 2):
+                conn.execute(
+                    "INSERT INTO user_notification_settings VALUES(?,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')",
+                    (uid,),
+                )
+        with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN': 'test-token'}):
+            with patch.object(user_notifications, "_queue_new_matches", wraps=user_notifications._queue_new_matches) as queue:
+                with patch.object(user_notifications, "_claim_one", return_value=None):
+                    self.assertEqual(user_notifications.dispatch(self.db, 5), 0)
+        self.assertEqual(queue.call_count, 2)
 
     def test_dispatch_sends_only_to_owner_chat_and_marks_sent(self):
         with user_notifications._connect(self.db) as conn:

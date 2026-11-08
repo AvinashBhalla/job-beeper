@@ -203,3 +203,17 @@ Latest shared-dev check at 2026-11-08 11:39:59 UTC:
 Owner's full 36-platform source requirement is recorded in docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md. It distinguishes ATS vendors from marketplace sources, identifies Workday and Darwinbox as first missing connectors, requires company/board discovery and per-user Telegram outbox, and defines a 2-minute high-priority poll target where endpoints/terms permit. The V2 runtime currently has six adapters; five non-Naukri source pipelines have one-off live evidence but are not scheduler-enabled. Do not claim all 36 work.
 
 Next agent order: P0 notification-worker DB-lock fix + member/admin auth and per-user Telegram test; P1 Workday then Darwinbox; implement employer/career-site discovery; continue through the 36-row roadmap. No production promotion until these gates, a formal fresh prod backup and separate explicit approval.
+
+
+## 2026-11-08 — SQLite WAL candidate backup/rollback caution
+
+The isolated notification-contention candidate enables SQLite WAL during `radar.init_db()` and applies a 15-second standard busy timeout. **This code is not deployed yet** at the time of this note; shared dev continues on image `b16fb83` and its DB reports DELETE journal mode.
+
+For any candidate that has WAL enabled:
+- Take the pre-deploy snapshot with SQLite's online backup API from a live connection (or a controlled stopped database after a clean checkpoint), not by copying only `/data/jobs.db` while the process is running. The current host snapshot script `/usr/local/sbin/job-radar-sqlite-snapshot.sh` was inspected and uses Python `source.backup(destination)`; retain that mechanism.
+- Record the backup path, size, `PRAGMA integrity_check`, row counts and SHA-256. Verify the backup is readable independently.
+- Treat `jobs.db-wal` and `jobs.db-shm` as SQLite-managed sidecars. Do not delete or move them manually while the application is active.
+- Keep the database volume mounted across container recreation. For rollback to a DELETE-mode image, stop the app cleanly before any restore and use a verified online-backup artifact only if a schema/data issue actually requires restoring; do not replace the live DB merely because an HTTP smoke check fails.
+- After deployment, confirm the actual `PRAGMA journal_mode` from the running container, plus `PRAGMA integrity_check`, table counts, health and zero-send safety flags.
+
+The contention fix is on `fix/sqlite-notification-contention-20261108` and passed 347 full-suite tests (188.827s). It remains isolated until exact-SHA GitHub CI and the approved shared-dev-only deployment are complete. Production still requires separate owner approval.

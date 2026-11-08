@@ -43,7 +43,7 @@ Status legend:
 | 3 | BambooHR | ATS | Research lead; not implemented in V2 | Public careers list/detail pages may be available per tenant. Distinguish the public careers feed from the authenticated BambooHR customer API; do not use employee/applicant endpoints. |
 | 4 | Breezy HR | ATS | Research lead; not implemented in V2 | Employer subdomain career board; a public JSON board route has been observed by third parties, but verify response/terms per tenant and handle non-existent boards separately from throttling. |
 | 5 | Cutshort | Job marketplace | Not implemented in V2 | Marketplace connector requires a documented/authorized feed or permitted public listing access; do not assume it is an ATS. |
-| 6 | Darwinbox | ATS / HRMS | **Top priority requested by owner**; research lead; not implemented in V2 | Tenant-specific candidate career site. Community research identifies a possible candidate-facing JSON endpoint, but this is not treated as a vendor-guaranteed API. Validate tenant/company ID and response contract before use. |
+| 6 | Darwinbox | ATS / HRMS | **Top priority requested by owner**; official Recruitment API research indicates employer API key required; no V2 connector | Tenant-specific candidate career site. Community research identifies a possible candidate-facing JSON endpoint, but this is not treated as a vendor-guaranteed API. Validate tenant/company ID and response contract before use. |
 | 7 | Eightfold AI | ATS / talent platform | Research lead; not implemented in V2 | Tenant-specific public career site and job-search interface; verify pagination and domain scoping. Do not use authenticated recruiter APIs. |
 | 8 | Freshteam | ATS | Not implemented in V2 | Public career page / sitemap / JobPosting JSON-LD first; no stable unauthenticated contract is assumed until verified. |
 | 9 | Greenhouse | ATS | **V2 code exists; recurring scheduler disabled**; 3 boards live-tested | Public Job Board API, board token; tested 3/3 boards, 369 jobs on shared dev. |
@@ -71,7 +71,7 @@ Status legend:
 | 31 | UKG Pro / UltiPro | ATS / HCM | Not implemented in V2 | Customer career site / tenant-specific portal. Identify public job feed; do not use workforce/private HR endpoints. |
 | 32 | Wellfound | Job marketplace | Not implemented in V2 | Marketplace connector requires permitted public or partner access. Keep separate from employer ATS board polling. |
 | 33 | Workable | ATS | Research lead; not implemented in V2 | Public careers widget/account endpoint for public listings; distinguish it from authenticated customer API scopes. |
-| 34 | Workday | ATS / HCM | **Top priority requested by owner**; research lead; not implemented in V2 | Per-employer tenant + cluster + site. Public career sites commonly call a CXS jobs endpoint; this is not the same as Workday's authenticated tenant REST API. Treat the CXS interface as undocumented/subject to change unless a customer/vendor contract confirms otherwise. |
+| 34 | Workday | ATS / HCM | **Top priority requested by owner**; one NVIDIA public CXS endpoint probe succeeded; adapter not implemented | Per-employer tenant + cluster + site. Public career sites commonly call a CXS jobs endpoint; this is not the same as Workday's authenticated tenant REST API. Treat the CXS interface as undocumented/subject to change unless a customer/vendor contract confirms otherwise. |
 | 35 | Y Combinator | Job marketplace | Not implemented in V2 | Work at a Startup / YC company job marketplace; partner/public listing access must be verified. |
 | 36 | Zoho Recruit | ATS | Research lead; not implemented in V2 | Candidate-facing career portal per employer; distinguish public careers pages from authenticated Zoho Recruit APIs. |
 
@@ -233,3 +233,12 @@ Then take charge without asking the owner to repeat this list:
 6. Keep production untouched until all required gates and a separate explicit production approval are recorded.
 
 Never mark a connector done based only on source code, a mocked test, or HTTP 200. A real integration pass means two stable source polls or a documented webhook event, correct normalization and deduplication, live DB ingestion/evaluations, and verified per-user notification decisions.
+
+
+## 11. Workday/Darwinbox live validation leads — 2026-11-08
+
+**Workday public career-site CXS lead:** one live request against NVIDIA's public careers board succeeded: `POST https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs` with JSON body `{"appliedFacets":{},"limit":20,"offset":0,"searchText":""}`. It returned HTTP 200, JSON keys `facets`, `jobPostings`, `total`, `userAuthenticated`, 20 postings and a reported `total` of 2,000. Sample fields included `title`, `externalPath`, `postedOn`, `locationsText` and a requisition identifier in `bulletFields`. This is one real public endpoint probe, not an adapter, recurring integration, promise of all 2,000 results, or vendor-supported public API contract. A production-grade adapter still needs a verified employer-board registry, bounded page budget, pagination/cap handling, detail fetch rules, stable IDs, timestamp-quality rules, backoff and repeated-poll tests. CXS should be treated as an undocumented public career-site interface and kept separate from authenticated Workday REST APIs.
+
+**Darwinbox:** vendor Recruitment API documentation research indicates a customer/employer-issued API key is required for the Jobs API. A candidate-facing unauthenticated route is an independent research hypothesis only; test it only against a real public employer careers site and its permitted access terms. Do not claim general Darwinbox integration or assume the official Recruitment API can be used without employer credentials.
+
+**Next connector action:** implement Workday only after the P0 SQLite fix is merged into the integration candidate and shared-dev soak is green. Build the board registry/URL resolver as a first-class component; an adapter without real employer tenant/site identifiers will not produce broad coverage. Then investigate Darwinbox per employer and record which access pattern is public, vendor-authorized or customer-keyed.

@@ -33,6 +33,7 @@ from v2 import auth, google_oauth, resume_parser, telegram_linking, user_prefere
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
+from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -93,7 +94,7 @@ async def prevent_api_response_caching(request: Request, call_next):
     return response
 
 
-db_lock = threading.Lock()
+db_lock = DB_LOCK
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
@@ -389,7 +390,7 @@ def suppress_preexisting_unknown_experience_pending_notifications(
         "not replayed to avoid a historical Telegram alert burst",
         "future fresh source observations will use the updated threshold policy",
     ], ensure_ascii=False)
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         tables = {
             row[0] for row in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
@@ -760,7 +761,7 @@ def rebuild_canonical_opportunities(conn: sqlite3.Connection) -> None:
 
 
 def backfill_notification_ledger() -> None:
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.execute("""
             INSERT INTO notification_ledger (
                 canonical_opportunity_id, status, created_at, updated_at
@@ -775,7 +776,7 @@ def backfill_notification_ledger() -> None:
 
 
 def backfill_canonical_opportunities() -> None:
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         if canonical_schema_needs_rebuild(conn):
             rebuild_canonical_opportunities(conn)
@@ -791,7 +792,8 @@ def backfill_canonical_opportunities() -> None:
 
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
+        enable_wal(conn)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -994,7 +996,7 @@ def upsert_jobs(
     baseline_cutoff_text = iso(source_run_started_at or now())
     baseline_pending_by_source: dict[str, bool] = {}
 
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         def mark_initial_baseline(job_id: int, source: str) -> None:
             source_key = source.strip().lower()
             if source_key not in INITIAL_SNAPSHOT_BASELINE_SOURCES:
@@ -1338,7 +1340,7 @@ def _ensure_notification_state(
 def backfill_job_evaluations(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     count = 0
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT j.id
@@ -1358,7 +1360,7 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     fingerprint = _config_fingerprint(config)
     count = 0
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT j.id
@@ -1430,7 +1432,7 @@ def refresh_user_job_evaluations(
             refresh_user_job_evaluations(user_id, preferences, job_ids[start:start + 500])
             for start in range(0, len(job_ids), 500)
         )
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         tables = {row[0] for row in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
         )}
@@ -1440,7 +1442,7 @@ def refresh_user_job_evaluations(
         preferences, MATCHER_RULES_VERSION
     )
     changed = 0
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         sql = """SELECT j.id
                  FROM jobs j
@@ -1468,7 +1470,7 @@ def ensure_user_job_evaluations_initialized(
 ) -> int:
     if not preferences.get("target_roles") or not preferences.get("locations"):
         return 0
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         tables = {
             row[0] for row in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
@@ -1487,7 +1489,7 @@ def ensure_user_job_evaluations_initialized(
 
 
 def refresh_configured_user_evaluations(job_ids: list[int] | None = None) -> int:
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         tables = {
             row[0] for row in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
@@ -1547,7 +1549,7 @@ def suppress_initial_source_snapshot_alerts(
     if source not in INITIAL_SNAPSHOT_BASELINE_SOURCES:
         return 0
 
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         has_successful_run = conn.execute(
             """
@@ -1616,7 +1618,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     rediscovery_cutoff = iso(now_value - dt.timedelta(minutes=10))
     changed = 0
 
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
 
         candidates = conn.execute(
@@ -2089,7 +2091,7 @@ def record_run(
     columns = ", ".join(fields)
     placeholders = ", ".join("?" for _ in fields)
     metric_values = [metrics.get(field) for field in fields]
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.execute(
             f"""
             INSERT INTO source_runs(
@@ -2122,7 +2124,7 @@ def restore_linkedin_rate_limit_state() -> None:
         seconds=LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS
     ))
     try:
-        with db_lock, sqlite3.connect(DB_PATH) as conn:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
             rows = conn.execute(
                 """
                 SELECT started_at, finished_at, rate_limit_detected_at,
@@ -3285,7 +3287,7 @@ def _record_naukri_feed_state(
     jobs_count: int,
     payload_sha256: str,
 ) -> bool:
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         previous = conn.execute(
             "SELECT payload_sha256 FROM source_feed_state WHERE source='naukri'"
         ).fetchone()
@@ -4184,6 +4186,13 @@ COLLECTORS = {
 SOURCE_NAMES = tuple(COLLECTORS)
 
 
+def _legacy_notifications_enabled(
+    config: dict[str, Any], credentials_available: bool
+) -> bool:
+    """Require both configured credentials and the explicit global feature switch."""
+    return bool(credentials_available and config.get("notifications_enabled", True))
+
+
 def run_source(source: str, config: dict[str, Any]) -> None:
     if source_state.get(source, {}).get("running"):
         log.warning("%s: previous run still active; skipping this cycle", source)
@@ -4260,7 +4269,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         try:
             from v2.telegram import credentials_available, deliver_queued_notifications
 
-            if credentials_available():
+            if _legacy_notifications_enabled(config, credentials_available()):
                 delivered = deliver_queued_notifications(50)
                 if delivered:
                     log.info("telegram: delivered=%s source=%s", delivered, source)
@@ -4458,9 +4467,11 @@ async def notification_worker() -> None:
                 recover_stale_claims,
             )
 
-            await asyncio.to_thread(recover_stale_claims)
-
-            if credentials_available():
+            legacy_notifications_enabled = _legacy_notifications_enabled(
+                get_config(), credentials_available()
+            )
+            if legacy_notifications_enabled:
+                await asyncio.to_thread(recover_stale_claims)
                 delivered = await asyncio.to_thread(deliver_queued_notifications, 10)
                 if delivered:
                     log.info("telegram: delivered=%s", delivered)
@@ -4566,7 +4577,7 @@ def _issue_user_session(request: Request, response: Response, user: dict[str, An
     if previous_session:
         auth.revoke_session(DB_PATH, previous_session)
     session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
     cookie_options = {
         "path": "/",
@@ -4994,7 +5005,7 @@ def latency_summary(hours: int = 24):
     cutoff = iso(now() - dt.timedelta(hours=hours))
 
     source_placeholders = ",".join("?" for _ in SOURCE_NAMES)
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         rows = conn.execute(f"""
             SELECT source, discovery_latency_seconds
             FROM jobs
@@ -5038,7 +5049,7 @@ def latency_summary(hours: int = 24):
 def source_status_summary():
     """Return the reduced source summary to administrators only."""
     config = get_config()
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs
             FROM source_runs sr
@@ -5075,7 +5086,7 @@ def source_status_summary():
 def source_status():
     config = get_config()
     cutoff = iso(now() - dt.timedelta(hours=24))
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         latest_rows = conn.execute("""
             SELECT
                 sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs, sr.error,
@@ -5293,7 +5304,7 @@ def source_status():
 @app.get("/api/dedupe-candidates", dependencies=[Depends(require_admin)])
 def dedupe_candidates(limit: int = 100):
     limit = max(1, min(limit, 500))
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         source_placeholders = ",".join("?" for _ in SOURCE_NAMES)
         rows = conn.execute(f"""
@@ -5357,7 +5368,7 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     cutoff = iso(current_day_start_utc()) if today_only else iso(
         now() - dt.timedelta(minutes=minutes)
     )
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT
@@ -5501,7 +5512,7 @@ def jobs(
     order_params = (user["role"],) if sort_by == "match_score" else ()
 
     count_params = (user["id"], *base_params[1:])
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         total = int(conn.execute(
             "SELECT COUNT(*) FROM jobs j "
@@ -5621,7 +5632,7 @@ def jobs(
 @app.get("/api/notification-queue", dependencies=[Depends(require_admin)])
 def notification_queue(limit: int = 100):
     limit = max(1, min(limit, 500))
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT
@@ -5664,7 +5675,7 @@ def notification_queue(limit: int = 100):
 
 @app.get("/api/opportunities/{opportunity_id}", dependencies=[Depends(require_admin)])
 def opportunity_detail(opportunity_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         opportunity = conn.execute("""
             SELECT id, canonical_url, company_norm, title_norm, location_norm,
@@ -5707,7 +5718,7 @@ def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
         )
     ensure_user_job_evaluations_initialized(user["id"], preferences)
     cutoff = iso(current_day_start_utc())
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         total = conn.execute(
             "SELECT COUNT(*) FROM jobs WHERE discovered_at >= ?", (cutoff,)
@@ -5758,7 +5769,7 @@ def job_detail(
             detail="Complete your target role and location preferences before opening job details.",
         )
     ensure_user_job_evaluations_initialized(user["id"], preferences)
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             """SELECT j.*, e.match AS likely_match, e.score AS match_score,

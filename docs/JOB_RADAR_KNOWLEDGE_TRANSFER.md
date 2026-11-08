@@ -3303,3 +3303,45 @@ P2: remaining ATS/career-site families.
 P3: marketplaces (Cutshort, Hirist, Wellfound, YC, LinkedIn/Naukri/Instahyre) with legal/terms and API/access review.
 P4: company-board discovery, registry, scheduled recrawls, operator review queue.
 Every source completion means a real public board test over two polls or a real webhook event, stable IDs, correct ingestion and dedup, matching/evaluations, user-specific decisioning and successful notification test. Mocked test or HTTP 200 alone is not enough.
+
+
+## 2026-11-08 — SQLite notification contention fix implemented and fully tested (not deployed)
+
+**Branch:** `fix/sqlite-notification-contention-20261108` (based on integration head `ce502e1f8be51d5f2123c3bc0a1cb916245ec260`).
+
+### Root cause found
+
+- Shared dev logs showed `sqlite3.OperationalError: database is locked` in `notification_worker -> recover_stale_claims()` while collectors were ingesting. The DB uses a local Docker volume and was in SQLite `DELETE` journal mode.
+- The legacy collector/notification paths used `radar.db_lock`; the independent multi-user notification service opened its own connections and used `BEGIN IMMEDIATE` without that lock for claim/queue/status writes. Both worker families could therefore compete for the same SQLite writer lock.
+- `user_notifications.dispatch()` also repeated the full active-user queue scan once per attempted message. With no opted-in users it could still open claim/write transactions.
+- A global Telegram credential by itself was not a sufficient send gate; the legacy send path did not consistently enforce `notifications_enabled`. The active shared-dev runtime was confirmed safe (credentials absent, feature disabled), but the code now enforces that state.
+
+### Fix on the isolated branch
+
+- Added `v2/sqlite_store.py` as the shared SQLite policy: process-wide re-entrant `DB_LOCK`, a 15,000 ms busy timeout on app-managed connections, and a checked WAL enable helper. WAL is enabled during `radar.init_db()`.
+- Unified the radar and legacy Telegram connection helpers on that timeout and the same process-wide lock. Member notification schema/settings/queue/claim/final-state writes now use that same lock; no lock is held while making the outbound Telegram HTTP request.
+- Changed the member dispatcher to queue new eligible jobs once per dispatch cycle using a single `INSERT ... SELECT`, return immediately when the bot token is missing or there are no opted-in users, and preserve `limit=0` as a true no-op.
+- Gated both the legacy immediate-send and background-worker paths on credentials **and** the persisted `notifications_enabled` switch. Per-user notification delivery continues to use each user's own opt-in and private linked chat.
+- Extended `.github/workflows/v2-ci.yml` syntax compilation coverage to all new/changed SQLite and notification modules/tests.
+
+### Verification
+
+- Focused final tests: **24 passed** (`test_sqlite_store`, `test_user_notifications`, `LegacyNotificationGateTests`). Includes separate-connection SQLite busy waiting, WAL persistence, concurrent member-claim vs legacy-recovery, no-opt-in/no-op behavior, batching and two-user chat isolation.
+- Full final V2 suite on this exact code: **347 tests passed in 188.827 seconds; zero failures** (`python -m unittest discover -s v2 -p 'test_*.py' -v`).
+- `py_compile`/`compileall` and `git diff --check` passed. No Telegram HTTP message was sent by these tests (delivery uses mocks).
+
+### Deployment status and exact next steps
+
+- **Not committed or pushed at this checkpoint; not deployed.** The running shared-dev container remains `job-radar-dev-multitenant:b16fb83`, built from app SHA `754809fe406e8c5cb09f8e36140ac5cf3e4f7238`. Its live DB still reports `journal_mode=delete`. Production remains untouched.
+- A read-only shared-dev config check confirmed `notifications_enabled=false`, Telegram bot token/chat values absent, and `user_notification_settings` count 0. Existing dev scheduler remains Naukri-only.
+- Next: inspect final diff, commit on `fix/sqlite-notification-contention-20261108`, push it, then update the existing open/draft PR #51 integration branch from its current `ce502e1` base (do not merge PR #51 or close PR #46). Wait for GitHub V2 CI on the exact new SHA and inspect its job results.
+- The owner previously approved a **shared-dev port 8001** promotion only. After CI passes, use `docs/DEV_DEPLOYMENT_RUNBOOK_2026-11-08.md`: take a fresh SQLite online backup from the live container (integrity, size, SHA-256 recorded), build an immutable image, recreate only `job-radar-dev`, preserve volume/config/env/Telegram blanking and Naukri-only flags, and verify integrity/row counts/WAL/health/zero-send state. Do not touch production ports 8000/8002/8004/8005.
+- After shared-dev deployment, observe at least two Naukri scheduler cycles and inspect logs for any further lock errors. WAL and timeout are not a substitute for observing the actual live system. Production still needs a separate explicit approval and a reviewed migration/delivery plan.
+- WAL backup caution: while WAL is active, create snapshots with SQLite's online backup API. Do not copy only `jobs.db` from a live WAL database and omit `jobs.db-wal`; do not delete sidecar files manually.
+
+### Workday discovery evidence (research only; adapter not implemented)
+
+- A one-request probe against NVIDIA's public Workday career site succeeded: `POST https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs`, JSON `{"appliedFacets":{},"limit":20,"offset":0,"searchText":""}` returned HTTP 200, JSON keys `facets`, `jobPostings`, `total`, `userAuthenticated`, 20 postings and `total=2000`. Sample public fields included title, `externalPath`, `postedOn`, `locationsText` and a requisition ID in `bulletFields`. This is a real endpoint probe only, not recurring ingestion or a vendor-supported API guarantee.
+- A Workday adapter needs an employer registry of real careers URLs and must derive each employer's cluster/host, tenant and career-site name. Never guess tenant/site IDs from the company name. CXS is a public career-site interface and should be treated as undocumented/changeable; distinguish it from authenticated Workday REST APIs.
+- Darwinbox official recruitment API research indicates employer-issued API-key authentication. Validate a public candidate careers feed only against an actual employer URL and access terms; do not assume a universal unauthenticated API.
+- The 36-platform matrix remains authoritative. Workday then Darwinbox remain the next connector priorities, paired with company-board discovery; no new source was enabled.
