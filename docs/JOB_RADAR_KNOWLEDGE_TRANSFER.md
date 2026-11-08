@@ -3521,3 +3521,9 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - First production admin still needs owner to run secure interactive command: `sudo docker exec -it v2-radar-1 python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com`. No account/password exists yet. First admin receives preserved global preferences once.
 - Google OAuth and per-user Telegram remain disabled until owner provides actual public HTTPS origin and OAuth/client/webhook credentials. Global legacy Telegram remains configured.
 - Private Termalin dashboard: `https://termal.in/account#open-site=54768be5-95ea-4d86-9360-96d0c38c2843`.
+
+### Workday collector limit — explicitly partial coverage
+
+- Production Workday NVIDIA source currently polls one page of 20 per 120 seconds, detail lookups capped at 20. This is a deliberate low-pressure initial rollout; the collector has offset paging code but `WORKDAY_MAX_PAGES_PER_BOARD=1` today.
+- Workday CXS is an undocumented endpoint used by the public career-site UI. Empirical reports show hard page size 20, offsets by 20, total may cap at 2,000 or be reliable only on the first page; some sites repeat first-page data past end. See links in the Workday section of `JOB_RADAR_HANDOVER.md`.
+- Next agent should not simply set a huge page size. Validate offsets 20/40 at low request volume, duplicate/loop detection, short-page stop, 429 cooldown and detail budget; then consider a small fixed page cap. Do not call the current collector full board coverage.

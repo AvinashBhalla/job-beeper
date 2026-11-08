@@ -262,3 +262,7 @@ The current feature branch adds per-user server-owned application records and th
 - PR #55 is merged and production image `job-radar-prod-canary:6e5becb` is live. The Applied tracker is now server-owned and per-user, with idempotent localStorage import and canonical dedupe reconciliation. Local and exact-head CI passed 400 tests; production table migration/data integrity/auth boundary verified.
 - Production currently has zero accounts. Owner must run the secure interactive first-admin CLI command documented in `JOB_RADAR_HANDOVER.md` before signing in. Google OAuth and per-user Telegram need owner-supplied public HTTPS routing and credentials; they remain disabled.
 - Next priorities: finish owner onboarding, verify legacy Applied import in the owner browser, source soak/Workday page depth, then resume vault/factual tailoring and answer bank.
+
+### Workday source scope note — 2026-11-09
+
+The production NVIDIA Workday connector currently ingests one 20-job page per 120-second poll and fetches at most 20 details. It is active and healthy but intentionally partial. The public CXS endpoint is undocumented; empirical behaviour suggests 20 is a hard page size and some tenants cap totals or repeat data. Do not increase request volume until offsets 20/40, duplicate-page detection, 429 handling and short-page termination have been verified. Details and references are in `JOB_RADAR_HANDOVER.md`.
