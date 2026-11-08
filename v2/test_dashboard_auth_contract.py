@@ -115,10 +115,24 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         for required in (
             "initializeWorkspace(user)", "state.isAdmin ? '/config' : '/preferences'",
             "state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload()",
-            "state.currentUser.id", "'/source-status/summary'", "userOnboardingNotice",
+            "state.currentUser.id", "userOnboardingNotice",
+            "if (!state.isAdmin && target.id === 'sourcesSection')",
+            "if (!state.isAdmin) {\n      state.sourceStatus = [];\n      return;",
+            "authClient.request('/source-status'",
         ):
             self.assertIn(required, source, f"shared dashboard must implement {required}")
-        self.assertIn("admin-only-setting", (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="navSources" hidden', html)
+        self.assertIn('class="workspace-page admin-only-section"', html)
+        self.assertIn('class="mobile-tab-btn admin-only-navigation"', html)
+        self.assertIn("admin-only-setting", html)
+
+    def test_mobile_telemetry_header_uses_a_wrapping_grid_at_390px(self):
+        css = (ROOT / "dashboard" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn("@media (max-width: 560px)", css)
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", css)
+        self.assertIn("overflow-wrap: anywhere", css)
+        self.assertIn("flex-wrap: wrap", css)
 
     def test_preferences_save_uses_visible_tags_and_surfaces_backend_validation(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")

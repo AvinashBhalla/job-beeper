@@ -134,6 +134,13 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
         # Recover claims left behind by a process restart before retrying them.
         stale = _stamp(_now() - timedelta(minutes=5))
         conn.execute("UPDATE user_notification_ledger SET status='queued',claimed_at=NULL,updated_at=? WHERE status='sending' AND claimed_at<?", (stamp, stale))
+        # A job can become initial-inventory baseline after its member row was
+        # queued. Cancel it explicitly rather than leaving an unclaimable row.
+        conn.execute("""UPDATE user_notification_ledger
+          SET status='cancelled',claimed_at=NULL,updated_at=?,last_error='initial_source_baseline'
+          WHERE status IN ('queued','failed') AND candidate_job_id IN (
+            SELECT id FROM jobs WHERE COALESCE(source_initial_baseline,0)=1
+          )""", (stamp,))
         row = conn.execute("""SELECT l.id,l.user_id,l.attempt_count,t.chat_id,j.title,j.company,j.location,j.url,
           j.source,j.discovered_at,e.score,e.reasons_json
           FROM user_notification_ledger l
@@ -141,7 +148,8 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
           JOIN user_telegram_chats t ON t.user_id=l.user_id AND t.chat_type='private'
           JOIN jobs j ON j.id=l.candidate_job_id
           JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
-          WHERE l.status='queued' OR (l.status='failed' AND l.next_attempt_at IS NOT NULL AND l.next_attempt_at<=?)
+          WHERE (l.status='queued' OR (l.status='failed' AND l.next_attempt_at IS NOT NULL AND l.next_attempt_at<=?))
+            AND COALESCE(j.source_initial_baseline,0)=0
           ORDER BY l.created_at,l.id LIMIT 1""", (stamp,)).fetchone()
         if row is None:
             return None

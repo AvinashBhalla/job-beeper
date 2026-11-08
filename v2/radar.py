@@ -1008,15 +1008,9 @@ def upsert_jobs(
             if not baseline_pending_by_source[source_key]:
                 return
 
-            canonical = conn.execute(
-                "SELECT canonical_opportunity_id FROM jobs WHERE id=?",
-                (int(job_id),),
-            ).fetchone()
-            if not canonical or not canonical[0]:
-                return
             first_seen = conn.execute(
-                "SELECT first_seen_at FROM canonical_opportunities WHERE id=?",
-                (int(canonical[0]),),
+                "SELECT first_seen_at FROM jobs WHERE id=?",
+                (int(job_id),),
             ).fetchone()
             first_seen_at = parse_relative(first_seen[0]) if first_seen else None
             cutoff_at = parse_relative(baseline_cutoff_text)
@@ -4949,9 +4943,9 @@ def latency_summary(hours: int = 24):
     return {"hours": hours, "sources": summary}
 
 
-@app.get("/api/source-status/summary")
-def source_status_summary(user: dict[str, Any] = Depends(require_authenticated)):
-    """Expose operational availability without leaking collector diagnostics to members."""
+@app.get("/api/source-status/summary", dependencies=[Depends(require_admin)])
+def source_status_summary():
+    """Return the reduced source summary to administrators only."""
     config = get_config()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""

@@ -795,7 +795,11 @@
     const pageViews = [...document.querySelectorAll('.workspace-page')];
 
     function showSection(sectionId, pushHash = true) {
-      const target = $(sectionId) || $('jobsSection');
+      let target = $(sectionId) || $('jobsSection');
+      if (!state.isAdmin && target.id === 'sourcesSection') {
+        target = $('jobsSection');
+        history.replaceState(null, '', '#jobs');
+      }
       state.activeSection = target.id;
 
       pageViews.forEach(view => {
@@ -1964,9 +1968,12 @@
   }
 
   async function loadSourceStatusTelemetry() {
+    if (!state.isAdmin) {
+      state.sourceStatus = [];
+      return;
+    }
     try {
-      const endpoint = state.isAdmin ? '/source-status' : '/source-status/summary';
-      const res = await authClient.request(endpoint, { cache: 'no-store' });
+      const res = await authClient.request('/source-status', { cache: 'no-store' });
       if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -2270,7 +2277,9 @@
     if (userWorkspace) userWorkspace.hidden = true;
     if ($('accountEmail')) $('accountEmail').textContent = user?.email || '—';
     if ($('accountRole')) $('accountRole').textContent = state.isAdmin ? 'Administrator' : 'Member';
-    document.querySelectorAll('.admin-only-setting').forEach(el => { el.hidden = !state.isAdmin; });
+    document.querySelectorAll(
+      '.admin-only-setting, .admin-only-navigation, .admin-only-section'
+    ).forEach(el => { el.hidden = !state.isAdmin; });
     if ($('preferencesSubtitle')) $('preferencesSubtitle').textContent = state.isAdmin
       ? 'Candidate profile and global matching, source, and notification settings.'
       : 'Your personal target roles, locations, skills, and matching criteria. Changes affect only your feed.';

@@ -4194,7 +4194,10 @@ class InitialSourceBaselineMarkerTests(unittest.TestCase):
             BASE_CONFIG,
             source_run_started_at=run_start,
         )
-        self.assertEqual(self._flag("lever", "same-opportunity"), 0)
+        # Only the new Lever source row is initial inventory. The older
+        # Greenhouse row for the same canonical opportunity stays untouched.
+        self.assertEqual(self._flag("lever", "same-opportunity"), 1)
+        self.assertEqual(self._flag("greenhouse", "existing-1"), 0)
         with sqlite3.connect(radar.DB_PATH) as conn:
             canonical_ids = conn.execute(
                 "SELECT COUNT(DISTINCT canonical_opportunity_id) FROM jobs"

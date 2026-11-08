@@ -96,7 +96,7 @@
         <!-- Group 2: Intelligence -->
         <div class="nav-group">
           <span class="nav-group-title">Intelligence</span>
-          <a class="nav-link-item" href="#sources" data-section="sourcesSection" id="navSources">
+          <a class="nav-link-item admin-only-navigation" href="#sources" data-section="sourcesSection" id="navSources" hidden>
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
             <span>Source Health</span>
             <span class="pulse-dot" id="sidebarSourcePulse"></span>
@@ -590,7 +590,7 @@
         <!-- ===================================================================
              4. SOURCE HEALTH SECTION
              =================================================================== -->
-        <section id="sourcesSection" class="workspace-page" aria-label="Source Health Workspace">
+        <section id="sourcesSection" class="workspace-page admin-only-section" aria-label="Source Health Workspace" hidden>
           <div class="view-content-wrapper">
             <div class="view-headline-row">
               <div>
@@ -660,7 +660,7 @@
       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
       <span>Applied</span>
     </a>
-    <a href="#sources" class="mobile-tab-btn" data-section="sourcesSection">
+    <a href="#sources" class="mobile-tab-btn admin-only-navigation" data-section="sourcesSection" hidden>
       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
       <span>Health</span>
     </a>
