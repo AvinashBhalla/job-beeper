@@ -3253,3 +3253,53 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - Owner approval received; candidate is ready in GitHub, but Termalin's connected `ubuntu` account cannot access the `root:docker` mode-0660 socket and cannot trigger the root-owned SQLite snapshot service. The snapshot service last ran at 02:45:43 UTC and is not fresh enough for deployment; a start request returned `Interactive authentication required`.
 - No fresh backup or image/container action occurred. Port 8001 and port 8000 health reads both returned HTTP 200. No state changed.
 - An already authorized Docker/snapshot operator session is the single remaining infrastructure prerequisite. Don't use this session to alter sudoers, Docker groups or socket mode.
+
+# 2026-11-08 CONTINUATION — expanded product scope and exact next steps
+
+This is an appended checkpoint; preserve the complete existing knowledge transfer above.
+
+## Current deployment facts
+Shared dev is running candidate image job-radar-dev-multitenant:b16fb83 (sha256:75f8855338f150a79794d388c32733305e548165f71dd417cfa04e6443c8c917) on 127.0.0.1:8001. Its health and dashboard were HTTP 200 at 2026-11-08 11:39:59 UTC. Production on port 8000 remained healthy on the old image/container and was not modified.
+
+V2 app/test source head used for that image: 754809fe406e8c5cb09f8e36140ac5cf3e4f7238. PR #51 remains open/draft on integration/pr46-v2-rebase-20261108; later changes on the PR were documentation-only. Recheck its actual head and CI before any new build.
+
+The VM account ubuntu has passwordless full sudo (sudo -n -l => (ALL : ALL) ALL and (ALL) NOPASSWD: ALL). Use sudo docker/systemctl. No password needed.
+
+## Real source integration results
+V2 COLLECTORS currently includes only LinkedIn, Naukri, Instahyre, Greenhouse, Ashby and Lever. Real shared-dev live tests passed:
+- Naukri: repeated scheduled cycles; latest observed around 306 jobs, successful; earlier 307/3 new and 308/2 new.
+- Instahyre: patched parser now reads current objects payload and location aliases; 140 new jobs, four HTTP 200 pages.
+- Greenhouse: three boards succeeded, 369 new jobs.
+- Ashby: two boards succeeded, 828 observed, 34 new, all timestamped.
+- Lever: one-off paytmpayments public board, 500 new across five 200 pages, capped at five pages. Not persisted/enabled.
+- LinkedIn: after cooldown, one controlled HTTP 200 request gave 10 jobs; same results ingested through run_source, 10 new. Not persisted/enabled.
+The first real Instahyre test revealed and the candidate fixed a real parser/location mismatch. Three regression tests were added; full CI run 42474145630 passed.
+
+Latest dev DB: integrity ok, 9,444 jobs / canonical opportunities / global evaluations / per-user evaluations / notification ledger rows; 7,858 source runs; one admin account, one preferences row, no per-user notification ledger rows. Scheduler saved config is Naukri only. Telegram credentials blank, notifications disabled, Gemini and LLM router false, zero sent_at rows.
+An intermittent sqlite3 OperationalError database is locked was seen in the notification worker's recover_stale_claims during ingestion. It recurred once following LinkedIn ingestion. Fix and regression/load test this before production.
+
+## Expanded product requirement — all 36 platforms
+The owner now requires all of these as first-class sources, with low-latency new-job capture and per-user Telegram alerts:
+Ashby; Avature; BambooHR; Breezy HR; Cutshort; Darwinbox; Eightfold AI; Freshteam; Greenhouse; Hireology; Hirist; HRsmart; iCIMS; Instahyre; Jibe (iCIMS); Jobvite; Keka; Lever; LinkedIn; Naukri; Oracle Cloud Recruiting; Paycom; PeopleStrong; Phenom People; Recruitee; Rippling ATS; SmartRecruiters; SAP SuccessFactors; Oracle Taleo; Teamtailor; UKG Pro / UltiPro; Wellfound; Workable; Workday; Y Combinator; Zoho Recruit.
+
+See docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md for a complete ordered matrix and research links. Workday and Darwinbox are the owner's first missing connectors to build.
+
+The set mixes ATS vendors and job marketplaces. Employer ATS feeds are usually scoped to one company/tenant/career-board, so an employer registry and ATS/career-site discovery subsystem is required. Do not tell the owner that adding 36 collector functions magically yields all jobs: first discover and verify each employer's tenant/board ID.
+
+Latency target: webhooks when the employer authorizes them; otherwise 2-minute polling for high-priority boards where allowed, with jitter, per-host budgets, backoff and cooldown. Promise only near-real-time after public availability, never literal instant at the employer's internal publish click.
+
+## Per-user Telegram expectations
+Every account has its own profile/preferences and Telegram destination. Each ingested job must be evaluated separately for each active user. Only new matches create idempotent per-user outbox entries; do not replay board baseline/history. Track per-user sent status and Telegram message ID. Test with two different users and safe fake/test transport; no cross-user leakage. Do not send all member alerts to the global admin chat. Do not ask user to paste Telegram secrets into chat.
+
+## Production caution
+Production currently has global Telegram credentials and notifications enabled; candidate preflight on a disposable 20,971-job copy preserved all existing job/canonical/evaluation/notification counts, 1,482 sent entries and 10 failed entries (19,168 suppressed), SQLite integrity ok. Matching refresh took ~73 seconds. Production tables for users/per-user preferences were empty/absent on that old schema snapshot. Do not simply replace the container and hope member delivery works. Preserve global Telegram behaviour and audit queue before any prod deployment.
+
+Separate production approval is mandatory: prior explicit approval covered shared dev only. Do not merge/deploy production until SQLite contention fixed, user-specific Telegram verified, Workday/Darwinbox built/tested, board discovery working, fresh formal production backup recorded and owner approves.
+
+## Handover priorities
+P0: fix database-lock contention in legacy notification worker; prove auth/preferences/CSRF and per-user Telegram dispatch.
+P1: Workday then Darwinbox, then BambooHR, SmartRecruiters, Workable, Recruitee, Teamtailor, Rippling, Eightfold, Phenom, Oracle Recruiting, Avature, iCIMS/Jibe, SAP.
+P2: remaining ATS/career-site families.
+P3: marketplaces (Cutshort, Hirist, Wellfound, YC, LinkedIn/Naukri/Instahyre) with legal/terms and API/access review.
+P4: company-board discovery, registry, scheduled recrawls, operator review queue.
+Every source completion means a real public board test over two polls or a real webhook event, stable IDs, correct ingestion and dedup, matching/evaluations, user-specific decisioning and successful notification test. Mocked test or HTTP 200 alone is not enough.
