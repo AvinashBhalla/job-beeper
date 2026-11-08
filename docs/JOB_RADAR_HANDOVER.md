@@ -6018,3 +6018,10 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Focused backoff tests: 5 passed. Full V2 suite: 209 passed locally in 76.9s; compilation and diff check passed. GitHub CI still required. No production or shared-dev deployment was performed.
 - Detailed evidence, exact counters and caveats: docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md.
 - Remaining caveat: the LinkedIn cooldown streak remains in-memory and resets after container restart. A persistent breaker state can be considered separately after the backoff PR is validated.
+## 2026-11-08 — Persist LinkedIn cooldown state across process restarts
+
+- Follow-up branch `fix/linkedin-cooldown-persistence-20261108` adds nullable `source_runs.rate_limit_detected_at`, persists the exact UTC detection time on partial and failed runs containing a true HTTP 429, and restores the recent LinkedIn 429 streak/remaining cooldown on startup before the scheduler starts.
+- Restore uses only `source='linkedin' AND http_status=429` rows from the previous 24 hours. It reconstructs the monotonic deadline from the latest event's persisted cooldown minus elapsed wall-clock time. Legacy rows with NULL detection timestamp fall back to finished_at. Cooldown-blocked attempts are not counted as new 429s.
+- Focused persistence/migration/integration tests: 9 passed. Full V2 suite: **215 passed** in 81.413 seconds locally. Includes additive migration preserving old rows, active/expired cooldown restore, 24h reset, legacy fallback, source isolation, partial and failed run persistence. GitHub CI still needed.
+- Rollout limitation: production currently has the legacy source_runs table without http_status/cooldown fields. Its existing 27 429 events are only in container logs and cannot be backfilled by this migration. First deployment begins with empty persisted breaker history; persistence then protects subsequent restarts after new 429 events are recorded.
+- No production/shared-dev deployment, container restart, LinkedIn request or configuration change occurred. See `docs/LINKEDIN_COOLDOWN_PERSISTENCE_2026-11-08.md`.
