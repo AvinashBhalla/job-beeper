@@ -96,3 +96,16 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - IMPORTANT: the local candidate has not been pushed or deployed. Port 8004 still runs `/tmp/job-radar-user-preferences` (pre-fix PR #46 tree). Do not treat the old 18004 browser result as verification of the candidate. Rebuild/start the isolated candidate on a fresh loopback port (recommended 8005 / localhost tunnel 18005) with copied DB and all collectors/Telegram/OAuth/LLM disabled, then run Prompt 1.
 - Public reference research is summarized in `docs/PRODUCT_REVERSE_ENGINEERING_2026-11-08.md`; detailed Desktop tasks are in `docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md`. The public JobBeeper site mentions role/location/experience/company preferences, remote jobs, blocked companies, pause alerts, free browsing/application tracking, paid Telegram/browser/app alerts, and subscriber-first/public sharing. These are research leads, not verified account features; Prompt 2 should verify them without signing up or paying.
 - Remaining gates: browser-verify QA-001/QA-002 on the candidate; run security/tenant-isolation Prompt 3 (CSRF, IDOR, expiry, exact preference payload, keyboard/pagination/filter matrix); update docs with each Desktop artifact; then run candidate GitHub CI. Keep PR #46 and #50 open/draft until integration/review decisions are made. No merge, port 8004 restart, shared-dev or production deploy is authorized.
+
+## Follow-up integration review — per-user Lever baseline suppression
+
+During a code-level integration review, a remaining cross-source notification gap was found despite an earlier handover note claiming the member path was protected.
+
+- Lever initial-inventory suppression marks `notification_ledger.baseline_suppressed=1` at the canonical-opportunity level.
+- `user_notifications._queue_new_matches()` previously excluded only `jobs.source_initial_baseline=1`. A Lever row can be part of initial baseline while its canonical opportunity was first created by a different source; the job-row flag may therefore be 0 while the canonical flag is 1.
+- Fixed member queue creation, claim selection and final pre-send revalidation to also exclude any canonical opportunity with `notification_ledger.baseline_suppressed=1`.
+- Stale `queued`, `failed` or `sending` member rows for either job-level or canonical-level baseline items are cancelled as `initial_source_baseline`.
+- Added four tests around this: cross-source canonical suppression at enqueue, cancellation of a queued item at claim, final send revalidation if the canonical marker appears after claim, and the existing own-source baseline behavior.
+- All member notification tests: **17 passed**. Full integration V2 suite: **336 passed** in **194.322 seconds**. Python compile and `git diff --check` passed.
+- This is a verified source-level fix; no real Telegram message or outbound Telegram request occurred. Lever remains disabled, all candidate QA collector switches remain off, and production/shared-dev are untouched.
+- This correction supersedes the earlier wording that the member queue was fully protected before this change. The newly inspected code path was not covered by the prior test.
