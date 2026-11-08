@@ -67,3 +67,9 @@ This confirms the publisher change is live and the new feed schema is present. I
 ## Outstanding operational caveat
 
 The cooldown streak remains process-memory state. A production container restart resets the in-memory streak today. Persisting the LinkedIn breaker across restarts can be a separate small follow-up using the new source-run table; do not overcomplicate this first backoff correction. The production/shared-dev rollout of the updated consumer code still requires its own approval and canary plan.
+## Follow-up after PR #48 and PR #49 merges — 2026-11-08
+
+- Longer conservative cooldown policy from PR #48 is merged into `v2-live-radar` as `5b4b2fa` (CI run `42445585602`, full suite 209 passed). It has not been deployed.
+- Persistent breaker state from PR #49 is merged as `596bbbe` (CI run `42446515750`, full suite 215 passed). Actual LinkedIn 429 detections are recorded in additive `source_runs.rate_limit_detected_at` and restored on startup, including remaining cooldown and the 24-hour escalation streak.
+- Existing production DB has no structured HTTP 429 rows because its current source_runs schema is older. The first rollout cannot reconstruct the 27 previous log-only events; subsequent 429s persist after deployment.
+- No production/shared-dev runtime change or LinkedIn request was made. Request intervals, target count, detail worker count, source enablement and access method remain unchanged.
