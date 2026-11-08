@@ -127,6 +127,15 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         self.assertIn('class="mobile-tab-btn admin-only-navigation"', html)
         self.assertIn("admin-only-setting", html)
 
+    def test_admin_only_navigation_respects_hidden_attribute_against_author_display_rules(self):
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        css = (ROOT / "dashboard" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn('class="nav-link-item admin-only-navigation"', html)
+        self.assertIn('class="mobile-tab-btn admin-only-navigation"', html)
+        self.assertIn("[hidden] {\n  display: none !important;\n}", css)
+        self.assertIn(".nav-link-item {\n  display: flex;", css)
+        self.assertIn(".mobile-tab-btn {\n  display: flex;", css)
+
     def test_mobile_telemetry_header_uses_a_wrapping_grid_at_390px(self):
         css = (ROOT / "dashboard" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 560px)", css)
