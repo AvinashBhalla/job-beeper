@@ -83,3 +83,9 @@ This remains a full-snapshot integration: the consumer still downloads and parse
 - Full V2 suite: 205 tests passed locally on the isolated Python 3.10 environment.
 - GitHub V2 CI #1311 / run 42398484593 passed on commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a: dashboard JavaScript syntax passed, focused router/extractor tests 32 passed, and full V2 suite 205 passed in 15.336 seconds.
 - No deployment was performed; keep PR #47 draft until reviewed and approved.
+
+## Production LinkedIn 429 evidence snapshot — 2026-11-08
+
+The currently deployed production container has not yet received the additive request-metrics migration. A read-only log audit for the preceding 24 hours found 27 LinkedIn HTTP 429 warning events (18 at the previous 30-minute cooldown cap); all lacked Retry-After. Scan summaries reported 643 attempts and 24 failed scan requests; three additional 429s occurred during JD enrichment and are not included in the scan failure counter. These are log-derived counts, not a complete request-level rate. See docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md.
+
+A code-only backoff correction is prepared separately: the existing five-minute base remains, the cap becomes four hours, and escalation resets only after 24 hours without a 429. This does not change request spacing, scheduling or source enablement; it has not been deployed.

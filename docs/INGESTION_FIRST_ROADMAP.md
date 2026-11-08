@@ -74,3 +74,10 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - Relay publisher PR #4 is CI-green but remains draft because merging it changes the public feed on the VM's five-minute timer. Do not merge/dispatch without explicit owner approval.
 - PR #35 is the WIP V2-to-main promotion gate; main/V2 divergence and production migration still need deliberate reconciliation.
 - PR #37 and relay PR #3 were closed as superseded/deferred. See `docs/PR_BRANCH_AUDIT_2026-11-08.md` for exact branch cleanup.
+## 2026-11-08 — Relay publisher live verification and next LinkedIn 429 work
+
+- Relay publisher PR #4 is merged to relay main (359df41). The VM timer triggered run 42445116273 at 04:01:49 UTC; it published a 323-job feed at 04:03:47.799 UTC. All 323 feed entries contain relay first/last observation timestamps and satisfy first <= last.
+- Read-only production evidence found 27 LinkedIn HTTP 429s in 24h, with 18 reaching the former 30-minute cooldown cap. Production has LinkedIn and Naukri enabled; shared dev has LinkedIn off.
+- The production DB has not yet been migrated to request-level telemetry, so the 429 counts come from log analysis, not /api/source-status.
+- Code-only backoff correction is prepared on fix/linkedin-429-longer-backoff-20261108: four-hour maximum fallback and 24-hour clean-window reset; honor any larger Retry-After; no increase in request rate/volume. Focused tests 5 passed and full V2 suite 209 passed locally. Run GitHub CI before merging. No deploy.
+- See docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md for evidence, denominator limitations and the production rollout boundary.

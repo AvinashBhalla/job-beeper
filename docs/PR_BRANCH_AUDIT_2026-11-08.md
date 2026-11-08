@@ -42,3 +42,9 @@ Deleted: `feat/structured-naukri-details-20261106` (after #3 closure), `fix/rela
 - The parser-fix worktree is retained for its focused, unreviewed change.
 - The user-preferences worktree remains for open draft PR #46.
 - The relay feature worktree remains for open draft PR #4.
+
+## Follow-up after relay PR #4 merge — 2026-11-08
+
+- Relay PR #4 was merged to relay main as `359df41c22f1dd5d696fedbd926d813692c28728`. Its first natural VM timer run after merge was GitHub Actions run `42445116273`; it succeeded and published 323 jobs at `2026-11-08T04:03:47.799190+00:00`. Every item had `relay_first_observed_at` and `relay_last_observed_at`, with valid ordering. No manual dispatch occurred.
+- Relay PR #4 is now closed/merged; the remaining relay PR inventory is empty. Delete its now-merged feature branch after preserving the merge commit in main. Relay branches should then be only `main` and `naukri-relay`.
+- Open app PR inventory remains #35 (V2-to-main release gate) and #46 (user preferences). A new isolated LinkedIn backoff branch is being tested separately; it is not yet merged or deployed.

@@ -177,7 +177,7 @@ class MatcherTests(unittest.TestCase):
 
             class RateLimitedResponse:
                 status_code = 429
-                headers = {"Retry-After": "600"}
+                headers = {"Retry-After": "28800"}
 
                 def raise_for_status(self):
                     error = radar.requests.HTTPError("429 Client Error")
@@ -195,7 +195,7 @@ class MatcherTests(unittest.TestCase):
             self.assertEqual(request.call_count, 1)
             self.assertGreaterEqual(
                 radar.linkedin_rate_limited_until_monotonic - radar.time.monotonic(),
-                599,
+                28799,
             )
             self.assertEqual(radar.linkedin_rate_limit_streak, 1)
         finally:
@@ -256,7 +256,42 @@ class MatcherTests(unittest.TestCase):
             else:
                 radar.source_state.pop("linkedin", None)
 
-    def test_linkedin_rate_limit_streak_resets_after_one_clean_hour(self):
+    def test_linkedin_rate_limit_streak_escalates_to_four_hour_cap(self):
+        original_state = {
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            # Five hours since the preceding 429 is shorter than the new
+            # 24-hour clean-window reset, so escalation must be retained.
+            radar.linkedin_last_rate_limit_monotonic = radar.time.monotonic() - 5 * 3600
+            radar.linkedin_rate_limit_streak = 6
+            radar.linkedin_rate_limit_generation = 0
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+
+            cooldown = radar._activate_linkedin_rate_limit(response)
+
+            self.assertEqual(radar.linkedin_rate_limit_streak, 7)
+            self.assertEqual(cooldown, 4 * 3600)
+            self.assertEqual(
+                radar.LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS,
+                4 * 3600,
+            )
+        finally:
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_rate_limit_streak_is_retained_after_one_clean_hour(self):
         original_state = {
             "until": radar.linkedin_rate_limited_until_monotonic,
             "last_rate": radar.linkedin_last_rate_limit_monotonic,
@@ -267,6 +302,37 @@ class MatcherTests(unittest.TestCase):
         try:
             radar.linkedin_rate_limited_until_monotonic = 0.0
             radar.linkedin_last_rate_limit_monotonic = radar.time.monotonic() - 3601
+            radar.linkedin_rate_limit_streak = 3
+            radar.linkedin_rate_limit_generation = 0
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+
+            cooldown = radar._activate_linkedin_rate_limit(response)
+
+            self.assertEqual(radar.linkedin_rate_limit_streak, 4)
+            self.assertEqual(cooldown, 40 * 60)
+        finally:
+            radar.linkedin_rate_limited_until_monotonic = original_state["until"]
+            radar.linkedin_last_rate_limit_monotonic = original_state["last_rate"]
+            radar.linkedin_rate_limit_streak = original_state["streak"]
+            radar.linkedin_rate_limit_generation = original_state["generation"]
+            if original_state["linkedin_source"]:
+                radar.source_state["linkedin"] = original_state["linkedin_source"]
+            else:
+                radar.source_state.pop("linkedin", None)
+
+    def test_linkedin_rate_limit_streak_resets_after_24_hours_without_429(self):
+        original_state = {
+            "until": radar.linkedin_rate_limited_until_monotonic,
+            "last_rate": radar.linkedin_last_rate_limit_monotonic,
+            "streak": radar.linkedin_rate_limit_streak,
+            "generation": radar.linkedin_rate_limit_generation,
+            "linkedin_source": dict(radar.source_state.get("linkedin", {})),
+        }
+        try:
+            radar.linkedin_rate_limited_until_monotonic = 0.0
+            radar.linkedin_last_rate_limit_monotonic = (
+                radar.time.monotonic() - radar.LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS - 1
+            )
             radar.linkedin_rate_limit_streak = 3
             radar.linkedin_rate_limit_generation = 0
             response = type("Response", (), {"status_code": 429, "headers": {}})()
