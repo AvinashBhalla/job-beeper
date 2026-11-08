@@ -45,11 +45,24 @@ The preflight snapshot is evidence, not the final deployment backup. Take a fres
 - Restore the fresh database backup only if candidate initialization caused a confirmed data/schema issue and only after stopping the dev container and validating the backup. Do not restore merely because an HTTP smoke check failed.
 - Verify old-image health and row counts after rollback.
 
-## Current release blockers
+## Current release gates — updated 2026-11-08
 
-- QA-001 CSS fix is pushed and CI-tested; browser member/admin navigation retest on port 18005 is still required.
-- Manual bottom-navigation occlusion remains blocked from prior browser testing.
-- Manual CSRF negative mutation tests remain UNKNOWN; automated test coverage exists and passes.
-- Workday/SmartRecruiters are legacy-only and Darwinbox is generic discovery only; they are not part of the six-source V2 release scope.
+- **QA-001: PASS.** Final browser regression on candidate port 18005 verified member desktop/mobile Source Health hidden, direct member `#sources` redirect to Jobs, no member telemetry polling for 35 seconds, member source-health GETs returning 403, and admin desktop/mobile visibility plus API GETs returning 200. See `docs/QA/desktop-final-candidate-verification-2026-11-08.md` and `docs/QA/QA001_CSS_HIDDEN_ROOT_CAUSE_2026-11-08.md`.
+- **QA-002 responsive layout: PASS.** Member/admin were measured at 1536×900, 1280×800, 768×1024, 390×844, 375×812 and 320×740. No horizontal overflow or metric overlap was reported. “Discovered” wraps below “Today” at 320px but remains visible.
+- **QA-002 mobile bottom-navigation occlusion: BLOCKED.** The browser session could not provide a reliable archival obstruction rectangle or exported screenshot proving that the final content is not obscured by the mobile navigation.
+- **QA-002 screenshot artifact delivery: BLOCKED.** Inline captures were taken, but no PNG/JPEG files could be exported from the browser control surface. Re-run the evidence-only portion with a capture-capable local browser harness; do not fabricate screenshot files.
+- **QA-003 console smoke: PASS.** No member/admin console errors or warnings were observed.
+- **Manual CSRF negative mutation checks: UNKNOWN.** No state-changing request was sent in the read-only acceptance pass.
+- **Manual session/logout/expiry mutation checks: UNKNOWN.** These were also excluded by design. Automated CSRF/logout-protection tests passed in the previously recorded V2 CI run; that does not convert the manual browser checks to PASS.
+- **Candidate code validation:** GitHub Actions V2 CI run `42468551208` completed successfully on `cf778c1f1da33c773f820cafea991fb084c58da8`, with 337 tests passed. Subsequent documentation-only commits must not be described as independently CI-verified until the current branch status is checked.
+- **Promotion status:** no shared-dev promotion, service restart, config edit, database migration, feature-flag change, or production action has occurred. PR #51 remains draft. The existing preflight database snapshot is not a substitute for a fresh backup immediately before a future promotion.
 
-No dev promotion, service restart, config edit, database migration or feature-flag change has been performed as part of preparing this runbook.
+## Next actions before promotion
+
+1. Obtain screenshot files through a capture-capable harness and archive redacted desktop/member/admin-mobile evidence.
+2. Verify bottom-nav occlusion with stable geometry and hit-testing at the bottom of scrolled mobile content; retain actual measurements and screenshots.
+3. Decide how to close the manual CSRF/session checks: run them only in a separately scoped synthetic QA pass, or explicitly record them as accepted release unknowns after owner/security review. Never target shared dev or production with these mutation checks.
+4. Re-check CI against the final candidate code state and ensure the PR is still based on `v2-live-radar`.
+5. Obtain explicit owner approval before any shared-dev promotion. Immediately before promotion, take and integrity-check a fresh SQLite online backup, preserve the live Compose/env/config invariants, build an immutable candidate image, and follow the targeted rollback procedure above.
+
+Workday/SmartRecruiters remain legacy-only and Darwinbox is generic discovery only; they are not part of the six-source V2 release scope.
