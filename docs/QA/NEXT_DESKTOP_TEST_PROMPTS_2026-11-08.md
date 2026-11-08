@@ -2,6 +2,20 @@
 
 Run these as separate Desktop tasks. Attach one Markdown result per task. Do not combine them into one long session.
 
+## Candidate verification status — 2026-11-08
+
+The final read-only browser regression has now been completed against `http://localhost:18005/dashboard/` on candidate commit `cf778c1f1da33c773f820cafea991fb084c58da8`. See `docs/QA/desktop-final-candidate-verification-2026-11-08.md`.
+
+- QA-001 member/admin navigation, direct routing, telemetry and API authorization: **PASS**.
+- QA-002 responsive metrics/layout across six desktop/tablet/mobile viewports: **PASS** (minor text wrap at 320px, still visible).
+- QA-002 mobile bottom-navigation occlusion: **BLOCKED** because reliable obstruction geometry could not be retained.
+- Screenshot artifact export: **BLOCKED**; inline browser captures were taken but not saved as files.
+- QA-003 console smoke: **PASS**.
+- Manual CSRF mutation and session/logout/expiry checks: **UNKNOWN** because this run was deliberately read-only.
+
+**Do not rerun the old broad Prompt 1 just to repeat QA-001.** The remaining browser task is evidence-only: use a capture-capable harness to export redacted screenshots and prove mobile bottom-nav non-occlusion with geometry and hit-testing. Keep all activity on the synthetic-only candidate port 18005. No shared-dev or production testing.
+
+
 ## Prompt 1 — Verify the two QA fixes on the candidate build
 
 ```text
