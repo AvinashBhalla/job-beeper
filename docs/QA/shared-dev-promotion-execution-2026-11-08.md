@@ -60,3 +60,34 @@ An owner/operator must provide a Termalin or SSH execution session already autho
 The existing root-owned `job-radar-sqlite-snapshot.service` was inspected read-only. Its last successful run was 2026-11-08 02:45:43 UTC; systemd logs show the development snapshot had 8,333 jobs and 45,117,440 bytes at that time, with `integrity=ok`. This predates the current promotion window by several hours and is not an immediate pre-promotion backup.
 
 A normal `systemctl start --no-block job-radar-sqlite-snapshot.service` request as `ubuntu` was denied with `Interactive authentication required`. The service did not run; there was no fresh snapshot. No sudo or permission workaround was used.
+
+## 2026-11-08 — Access finding and candidate image present
+
+This update corrects the earlier access diagnosis in this report. The earlier Termalin checks invoked Docker and systemd as plain `ubuntu` and received permission errors; they did not test the account's sudo policy.
+
+The owner checked `sudo -n -l` from the existing SSH-key-authenticated `ubuntu` session on the Oracle Cloud VM. The host confirmed:
+
+```text
+User ubuntu may run the following commands on job-radar:
+    (ALL : ALL) ALL
+    (ALL) NOPASSWD: ALL
+```
+
+Thus, the existing `ubuntu` account has full passwordless sudo. No password, second SSH account, Docker-group change or socket permission change is required. Privileged Docker and snapshot operations should be run with `sudo`; plain `docker ...` remains expected to fail because the account is not directly in the Docker socket's group.
+
+The owner also supplied the successful output of:
+
+```bash
+sudo docker image inspect job-radar-dev-multitenant:cf778c1 \
+  --format 'Image ID: {{.Id}} | Created: {{.Created}}'
+```
+
+Host-reported result:
+
+- Tag: `job-radar-dev-multitenant:cf778c1`
+- Image ID: `sha256:843f86af0c40b1aab90d43b5d5bc15c0c1eac29aadc48e56eb580bb9dbbe866a`
+- Created: `2026-11-08T10:46:45.873218279Z` (UTC)
+
+This verifies the image tag is present and inspectable on the VM using sudo. It does **not** establish that the container has been recreated or that the candidate is live on port 8001.
+
+**Promotion status remains pending.** No fresh immediate pre-promotion SQLite snapshot has yet been evidenced, and no shared-dev container recreation/soak result has been reported. Next, run the existing snapshot service using sudo, verify the resulting backup's integrity and freshness, then follow the shared-dev-only promotion procedure. Keep Naukri as the only enabled collector, Telegram/notifications and Gemini disabled, preserve the external dev volume and rollback image, and do not touch production port 8000.
