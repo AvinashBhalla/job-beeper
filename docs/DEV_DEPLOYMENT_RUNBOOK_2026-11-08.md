@@ -82,3 +82,16 @@ Promotion invariants:
 The Termalin connection can reach the VM and read the disposable snapshot, but its `docker` command returns `permission denied` on `/var/run/docker.sock`. No `sudo`, Docker group change or permission workaround was attempted. Therefore I cannot build/recreate the shared-dev container through the current Termalin session. An authorized Docker operator/session is required for the promotion. The live shared-dev health endpoint returned HTTP 200; protected unauthenticated API calls returned 401. No live app, volume, database, config or runtime changes were made.
 
 Workday/SmartRecruiters remain legacy-only and Darwinbox is generic discovery only; they are not part of the six-source V2 release scope.
+
+
+## 2026-11-08 — Owner-approved promotion execution attempt
+
+Owner explicitly approved shared-dev promotion. Candidate PR head before this record was `e299efdb228b4a05fdc106a0e5e70b9344adf607`; V2 CI run `42471400933` passed against that exact head. The candidate real-data Naukri dry run is recorded in `docs/QA/real-data-pipeline-dry-run-2026-11-08.md`.
+
+**Execution is blocked, not completed.** The only available Termalin shell runs as `ubuntu` (uid 1001), is not in the Docker group, and cannot access the `root:docker` mode-0660 socket. `docker ps` returns permission denied. No sudo, Docker group change or socket permission modification was used. The repository has no self-hosted deploy runner/workflow. The configured Termalin backup is an unconfirmed DRAFT; the previous 09:44 UTC snapshot is too old to serve as immediate pre-promotion backup.
+
+Live health reads returned HTTP 200 on shared dev port 8001 and production port 8000. No new backup, candidate image build/load, container restart, config/volume/DB mutation, collector-flag change, merge or deployment occurred. Production is untouched.
+
+Full execution record: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`.
+
+**Handoff:** resume only from an existing Docker-authorized operator session. Take a fresh SQLite online backup from the live shared-dev volume immediately before promotion, preserve the current volume/compose/env/config/rollback image, keep Naukri-only ingestion and Telegram/Gemini off, recreate only shared dev, then verify and observe at least two Naukri cycles. Do not ask the user to paste credentials into chat.
