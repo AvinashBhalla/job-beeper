@@ -55,3 +55,8 @@ Consequently, this session cannot safely inspect/recreate `job-radar-dev`, build
 An owner/operator must provide a Termalin or SSH execution session already authorized for Docker management. No password, private key or token should be pasted into chat. Once that authorized session is available, resume from the fresh-backup step; do not reuse the old 09:44 UTC snapshot as the immediate rollback backup.
 
 **Disposition:** Owner approval received; promotion is **not executed** because this connected session lacks Docker authorization and cannot take the required immediate pre-promotion backup. Shared dev and production remain healthy and unchanged.
+## Additional backup-service check
+
+The existing root-owned `job-radar-sqlite-snapshot.service` was inspected read-only. Its last successful run was 2026-11-08 02:45:43 UTC; systemd logs show the development snapshot had 8,333 jobs and 45,117,440 bytes at that time, with `integrity=ok`. This predates the current promotion window by several hours and is not an immediate pre-promotion backup.
+
+A normal `systemctl start --no-block job-radar-sqlite-snapshot.service` request as `ubuntu` was denied with `Interactive authentication required`. The service did not run; there was no fresh snapshot. No sudo or permission workaround was used.
