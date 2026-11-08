@@ -77,3 +77,10 @@ Do not use destructive payloads, external hosts, credential guessing, brute forc
 
 Attach jobbeeper-security-regression-2026-11-08.md with test IDs, setup, exact route/action, expected/actual, evidence, severity, reproducibility, data impact and remediation. Untested means UNKNOWN, not PASS. Do not alter the app.
 ```
+## Additional Prompt 3 check — canonical baseline notification suppression
+
+During engineering review, a cross-source edge case was found: the Lever initial-inventory marker is canonical-opportunity-level, while the member notification queue also uses a per-job baseline flag. The code has now been patched and has four regression tests.
+
+On the isolated candidate QA environment only, verify by read-only UI/telemetry inspection where exposed that no first-inventory/baseline records are queued for member Telegram notifications. Do not configure Telegram or trigger a real send. If internal queue visibility is not available in the UI, mark this check BLOCKED and rely on automated tests; do not probe undocumented destructive endpoints.
+
+Automated coverage now includes: canonical marker exclusion at enqueue; cancellation of an already queued row at claim time; final send-time revalidation; and per-job baseline exclusion. Full V2 suite currently passes 336 tests.
