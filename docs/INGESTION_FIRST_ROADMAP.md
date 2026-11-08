@@ -65,3 +65,12 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - Confirmed the relay workflow on its default branch is manual-dispatch only; the VM systemd timer dispatches every five minutes. The latest 15 successful runs took 138–164 seconds end-to-end. Run #7599 completed all 18 query/location targets and produced 325 unique jobs. Keep the 15-minute staleness ceiling provisional but evidence-based (three five-minute cycles).
 - The existing relay feed has a snapshot-level updated_at, count and full jobs list. A separate relay feature branch now adds fail-closed last-good retention on any failed target and per-job relay_first_observed_at / relay_last_observed_at. The V2 consumer is being updated to use these optional fields without losing compatibility with older feed records.
 - Product readiness: public JobBeeper homepage promises 11 sources, role/location/experience/company preferences, Telegram/browser/app notifications, free job browsing and application tracking. The current repository is sufficient to build further; broad private-backend reverse engineering is not a blocker. Use targeted black-box acceptance checks only for signup, preferences validation/save, job search/details/save/application tracking, notification channels and plan gating. See docs/REVERSE_ENGINEERING_SCOPE.md.
+
+## 2026-11-08 — Current PR/release gate status
+
+- Source observability and Naukri consumer freshness are merged into v2-live-radar (PR #47, merge `dd4d21e`), with GitHub CI run `42442324585` passing the full 207-test suite and dashboard syntax. This is not a deployment.
+- Matcher benchmark methodology note is merged (PR #41, merge `4e48836`); its deterministic runner and two tests were already in the V2 branch. 4/4 scored cases pass; one remains review-only.
+- Keep user preferences PR #46 draft while the preferences-save frontend/backend validation issue and per-user Telegram live E2E remain open. OAuth sign-in and resume parser were confirmed by owner UAT.
+- Relay publisher PR #4 is CI-green but remains draft because merging it changes the public feed on the VM's five-minute timer. Do not merge/dispatch without explicit owner approval.
+- PR #35 is the WIP V2-to-main promotion gate; main/V2 divergence and production migration still need deliberate reconciliation.
+- PR #37 and relay PR #3 were closed as superseded/deferred. See `docs/PR_BRANCH_AUDIT_2026-11-08.md` for exact branch cleanup.
