@@ -1,9 +1,9 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-11-06 — Multi-user auth foundation implemented on isolated feature branch; not deployed
+**Snapshot:** 2026-11-08 — Candidate V2 integration branch; final browser regression completed, acceptance still blocked by evidence-only gates; not deployed
 **Release integration branch:** `v2-live-radar`
 
-**Active feature branch:** `feat/multi-user-foundation-20261106`
+**Active candidate branch:** `integration/pr46-v2-rebase-20261108`
 **Production host:** Oracle Cloud Ubuntu VM `job-radar`
 
 This is the current operating summary for an engineer taking over. `docs/JOB_RADAR_HANDOVER.md` is the detailed chronological record; `docs/JOBBEEPER_REFERENCE.md` describes the product architecture. **Mandatory rule: update both this file and the detailed handover after every user prompt before ending the turn/session, including decisions or evidence-only turns (record “no code change” when applicable).** After every code/config change, document what changed, tests/CI, commit SHA, deployment evidence, remaining work, exact commands/output expected from the user, and the next-chat continuation prompt. Newest handoff supersedes older instructions; explicitly label older checklists historical. Never rely on the current chat alone.
