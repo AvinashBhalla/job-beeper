@@ -17,7 +17,7 @@ import uuid
 import warnings
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
@@ -3435,13 +3435,18 @@ def _lever_public_url(value: Any, *, site: str, instance: str, posting_id: str) 
     if isinstance(value, str) and value.strip():
         parsed = urlsplit(value.strip())
         expected_prefix = f"/{site}/"
+        relative_path = unquote(parsed.path[len(expected_prefix):]) if parsed.path.startswith(expected_prefix) else ""
+        path_segments = relative_path.split("/")
         if (
             parsed.scheme.lower() == "https"
             and parsed.hostname
             and parsed.hostname.lower() == allowed_host
+            and parsed.port in (None, 443)
             and parsed.username is None
             and parsed.password is None
-            and parsed.path.startswith(expected_prefix)
+            and bool(relative_path)
+            and all(segment not in {"", ".", ".."} for segment in path_segments)
+            and "\\" not in relative_path
             and parsed.query == ""
             and parsed.fragment == ""
         ):
@@ -3462,6 +3467,8 @@ def _normalize_lever_posting(
         return None
 
     posting_id = str(raw_id).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", posting_id):
+        return None
     source_id = f"lever-{instance}-{site}-{posting_id}"
     hosted_url = _lever_public_url(
         item.get("hostedUrl"),

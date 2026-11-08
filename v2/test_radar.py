@@ -4227,6 +4227,40 @@ class LeverCollectorTests(unittest.TestCase):
         )
         self.assertEqual(jobs[0]["url"], "https://jobs.lever.co/example/posting-123")
 
+    def test_pagination_is_bounded_to_five_full_pages_per_board(self):
+        def get(url, **kwargs):
+            page_start = kwargs["params"]["skip"]
+            full_page = [
+                self._job(id=f"posting-{page_start + index}")
+                for index in range(radar.LEVER_PAGE_SIZE)
+            ]
+            return self._response(full_page)
+
+        jobs, metrics, request = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            get,
+        )
+        self.assertEqual(request.call_count, radar.LEVER_MAX_PAGES_PER_BOARD)
+        self.assertEqual(len(jobs), radar.LEVER_PAGE_SIZE * radar.LEVER_MAX_PAGES_PER_BOARD)
+        self.assertEqual(metrics["pages_attempted"], radar.LEVER_MAX_PAGES_PER_BOARD)
+        self.assertEqual(metrics["pages_succeeded"], radar.LEVER_MAX_PAGES_PER_BOARD)
+
+    def test_unsafe_posting_id_is_skipped_without_url_construction(self):
+        item = self._job(id="../other-company/secret")
+        jobs, _, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(jobs, [])
+
+    def test_hosted_url_path_traversal_falls_back_to_safe_canonical_url(self):
+        item = self._job(hostedUrl="https://jobs.lever.co/example/../other-company/posting-123")
+        jobs, _, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(jobs[0]["url"], "https://jobs.lever.co/example/posting-123")
+
     def test_no_public_boards_configured_is_a_clear_source_error(self):
         with self.assertRaisesRegex(RuntimeError, "no public lever_boards"):
             radar.lever_collect({"lever_boards": []})
