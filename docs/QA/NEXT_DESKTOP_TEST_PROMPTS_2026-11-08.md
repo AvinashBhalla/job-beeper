@@ -84,3 +84,10 @@ During engineering review, a cross-source edge case was found: the Lever initial
 On the isolated candidate QA environment only, verify by read-only UI/telemetry inspection where exposed that no first-inventory/baseline records are queued for member Telegram notifications. Do not configure Telegram or trigger a real send. If internal queue visibility is not available in the UI, mark this check BLOCKED and rely on automated tests; do not probe undocumented destructive endpoints.
 
 Automated coverage now includes: canonical marker exclusion at enqueue; cancellation of an already queued row at claim time; final send-time revalidation; and per-job baseline exclusion. Full V2 suite currently passes 336 tests.
+
+
+## Prompt 2 addendum — public browse/job detail checks
+
+- On a public `/browse/role/{slug}` page, test the location filter and text search for title/company/location. Record how filtering interacts with the displayed 200-result cap and whether pagination or only client-side filtering exists.
+- Open one public job detail. Record whether employer application instructions, external application link, source, remote/work mode, posted/discovered times and employer privacy/EEO text are displayed, and whether the apply route is sign-in gated.
+- Treat any landing-page statements about six-hour subscriber head start, paid Telegram/browser/app alerts, application tracking and company preferences as claims until the actual UI flow corroborates them. Do not sign up, pay, or submit an application.
