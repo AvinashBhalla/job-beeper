@@ -6201,3 +6201,104 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - `systemctl start --no-block job-radar-sqlite-snapshot.service` from the connected `ubuntu` Termalin session was denied with `Interactive authentication required`. No new backup was created.
 - Combined with the `root:docker` 0660 socket denying `docker ps`, this confirms the connected session lacks authority both to snapshot the live protected volume and to recreate the candidate container. No `sudo`, chmod, group membership change, or other workaround was used.
 - Deployment approval remains valid, but promotion is not executed. Obtain an already authorized operator session for both the root-owned snapshot unit and Docker operations; then continue with fresh backup, image build, isolated dev recreate, smoke checks and two Naukri cycles.
+
+# 2026-11-08 CONTINUATION CHECKPOINT — shared dev deployed, six sources exercised, 36-source requirement
+
+This is an appended continuation checkpoint. Preserve all preceding handover history.
+
+## Current live state
+- Shared-dev container: job-radar-dev
+- Shared-dev image: job-radar-dev-multitenant:b16fb83
+- Image ID: sha256:75f8855338f150a79794d388c32733305e548165f71dd417cfa04e6443c8c917
+- Shared-dev binding: 127.0.0.1:8001 -> container 8000
+- Last verified shared-dev health: HTTP 200, version 2.0.0; dashboard HTTP 200.
+- Production container: v2-radar-1, image v2-radar, public port 8000; health HTTP 200. It was not changed, recreated or promoted.
+- Existing VM connection user ubuntu is allowed full passwordless sudo; always prefix privileged commands with sudo. No password or second SSH account needed.
+- Current V2 PR #51 is open/draft; branch integration/pr46-v2-rebase-20261108. Latest docs commit when this note was appended is recorded by the PR head, so re-fetch PR state/head before work.
+- Shared-dev application/test code used for image b16fb83 is 754809fe406e8c5cb09f8e36140ac5cf3e4f7238; later changes to PR branch at this checkpoint are docs-only.
+
+## Shared-dev live-source evidence
+All six registered V2 source adapters were exercised with real source data:
+- Naukri: recurring scheduler success, multiple five-minute cycles, including 307 jobs / 3 inserts, 308 / 2 inserts and later 306 / 0. Current saved scheduler config still enables Naukri only.
+- Instahyre: fixed current response parser (objects list, employer.company_name, public_url, locations; city aliases and bounded pagination). Three regression tests pass. Live one-off run: 140 jobs, 4 HTTP 200 pages, 140 new.
+- Greenhouse: one-off end-to-end run, 369 jobs, 3/3 configured boards, 3 HTTP 200, 369 new.
+- Ashby: one-off end-to-end run, 828 jobs, 2/2 boards, 34 new (remaining already existed/deduped); all 828 timestamped.
+- Lever: one-off end-to-end run on test board paytmpayments, 500 jobs inserted, five HTTP 200 pages; bounded five-page cap reached. This board was NOT added to saved config.
+- LinkedIn: after respecting the recorded cooldown, controlled one-query live probe returned 10 unique jobs / one HTTP 200. Those exact fetched jobs were passed through run_source with no second network request and 10 were ingested. LinkedIn remains disabled in saved scheduler config.
+- Source code registry in V2 still has six sources only: linkedin, naukri, instahyre, greenhouse, ashby, lever. Only Naukri is enabled in shared-dev scheduler. The one-off pipeline passes do not mean the other adapters are automatically polled.
+
+Latest verified shared-dev DB state at 2026-11-08 11:39:59 UTC:
+- integrity_check = ok
+- jobs = 9,444
+- canonical_opportunities = 9,444
+- job_evaluations = 9,444
+- user_job_evaluations = 9,444
+- notification_ledger = 9,444
+- users = 1 (admin only); user_preferences = 1; user_notification_ledger = 0; source_runs = 7,858
+- all global notification rows suppressed; sent_at non-null = 0
+- notifications_enabled=false; Telegram bot token/chat blank; Gemini and LLM router flags false.
+- A sqlite3 OperationalError: database is locked was seen in notification_worker -> recover_stale_claims during concurrent ingestion; it recurred once after LinkedIn run_source. This must be investigated with a concurrency test and fixed before production.
+
+## Owner's expanded mandatory source requirement
+Owner explicitly asked that jobs be fetched from ALL 36 platforms below and notified via Telegram according to each user's saved filters/preferences, as soon as they become publicly available:
+1 Ashby
+2 Avature
+3 BambooHR
+4 Breezy HR
+5 Cutshort
+6 Darwinbox
+7 Eightfold AI
+8 Freshteam
+9 Greenhouse
+10 Hireology
+11 Hirist
+12 HRsmart
+13 iCIMS
+14 Instahyre
+15 Jibe (iCIMS)
+16 Jobvite
+17 Keka
+18 Lever
+19 LinkedIn
+20 Naukri
+21 Oracle Cloud Recruiting
+22 Paycom
+23 PeopleStrong
+24 Phenom People
+25 Recruitee
+26 Rippling ATS
+27 SmartRecruiters
+28 SAP SuccessFactors
+29 Oracle Taleo
+30 Teamtailor
+31 UKG Pro / UltiPro
+32 Wellfound
+33 Workable
+34 Workday
+35 Y Combinator
+36 Zoho Recruit
+
+Read docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md. It contains the complete 36-row matrix, verified-vs-research statuses, connector discovery plan, scheduler, normalization, per-user Telegram requirements, implementation priorities and production checklist. Workday and Darwinbox are the owner's highest-priority missing integrations.
+
+Important: many names in this list are ATS products with per-employer tenant/career-board endpoints; Cutshort, Hirist, LinkedIn, Naukri, Instahyre, Wellfound and YC are marketplaces/aggregators. There is no universal endpoint that lists every company using all 36 ATSs. Add company/career-site discovery and board registry, and validate real employer boards. Never claim the 36 are implemented yet.
+
+Near-real-time definition: webhook when an employer/vendor authorizes one; otherwise a default 2-minute target poll interval for high-priority public boards, staggered/jittered and bounded by rate limits. This is a target after the listing is publicly visible, not a guarantee of instant visibility at employer-internal publish time.
+
+## Production readiness / blockers
+- Production port 8000 is healthy and untouched.
+- Production current config is version 10, LinkedIn and Naukri enabled, notifications enabled, Telegram global token/chat configured.
+- Production DB read-only state on 2026-11-08: about 20,971 jobs, 20,660 canonical opportunities, 20,971 global evaluations, 20,660 global notification rows, 22,255 source runs; ledger 1,482 sent, 10 failed, 19,168 suppressed. Production users/user_preferences/user_notification tables were absent/empty at read time.
+- A disposable production snapshot was copied to /tmp/job-radar-production-preflight-20261108T112121Z. Candidate init_db and evaluation/notification refresh on its copy migrated runtime config 10 -> 12, preserved job/canonical/evaluation/notification counts and sent count, integrity ok, matching refresh took ~73 seconds. No production DB was written.
+- Production has live Telegram credentials. Do not launch candidate notification workers against it before the per-user delivery plan, queue safety and exact container startup behaviour are reviewed.
+- Latest production health (11:39 UTC) reported LinkedIn cooldown to 12:01:13.950862 UTC. This may change; always recheck live health and honour Retry-After/cooldown. No more LinkedIn probes are needed now; dev probe passed.
+- Earlier production screenshot showed a work process interrupted at final verification. This continuation completed the final dev integrity/source logs; the final values above supersede the interrupted screen.
+- No production build/recreate/merge occurred. Earlier explicit approval was shared dev only; production needs separate explicit approval.
+
+## Next agent — do not ask owner to repeat requirements
+1. Read docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md and this appended section first.
+2. Fix the SQLite notification-worker contention (recover_stale_claims) and add tests under concurrent source-ingestion load.
+3. Prove per-user signup/login, preferences, Telegram linking, queued delivery, idempotency and no cross-user leakage with at least two synthetic/test users and a dedicated safe Telegram test chat or fake transport. Never ask for tokens in chat.
+4. Implement Workday and Darwinbox first, then remaining public ATS connectors in the roadmap's priority order. Build company/career URL discovery and tenant/board registry; connector support without board discovery is incomplete.
+5. Add each source only after a real public board two-poll test (or webhook), correct pagination/dedup/first-seen handling, DB ingestion/matching, and notification decisions. Record status per platform.
+6. Keep UI 320px overlap deferred unless user changes priority.
+7. Shared dev remains on b16fb83; production remains on old image. Do not promote production until P0 gates and at least Workday/Darwinbox priorities plus user-specific Telegram have been verified, a fresh formal prod backup is taken, and separate explicit owner approval is recorded.
