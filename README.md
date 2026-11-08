@@ -1,6 +1,6 @@
 # Job Radar
 
-Job Radar is a personal, always-on job discovery and matching service. Its pipeline is source-specific ingestion → normalization and canonical deduplication → deterministic preference matching → a persisted notification ledger → dashboard and Telegram.
+JobBeeper is evolving into an end-to-end job-search product: discover relevant jobs, evaluate fit and freshness, prepare truthful applications, track progress, and support referrals and follow-ups. Its shared ingestion engine feeds user-scoped matching and notifications; resume assets, applications and outreach remain private to each user.
 
 ## Branch and VM model
 
@@ -59,6 +59,8 @@ Runtime candidate preferences remain global and are admin-only until the in-prog
 - **Current status, next task and release checklist:** [Job Radar V2 Knowledge Transfer](docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md)
 - **Chronological engineering history:** [Job Radar Handover](docs/JOB_RADAR_HANDOVER.md)
 - **V2 implementation notes:** [V2 README](v2/README.md)
+- **Product vision, architecture decisions and delivery priorities:** [Product Vision and Delivery Roadmap](docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md)
+- **Reference repository research:** [Career-Ops and Apply Factory findings](docs/REFERENCE_REPOSITORIES_RESEARCH_2026-11-08.md)
 - **Product behavior and source roadmap:** [JobBeeper Reference](docs/JOBBEEPER_REFERENCE.md)
 
 Mandatory process: update both handover files after every user prompt, directly on `v2-live-radar` for working-state documentation. Do not create a separate branch solely for docs. Code and config changes require tests; promote to `main` only when verified.

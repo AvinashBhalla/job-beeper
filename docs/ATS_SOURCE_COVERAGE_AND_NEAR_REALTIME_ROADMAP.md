@@ -1,3 +1,5 @@
+> **Current source of truth:** [Product Vision and Delivery Roadmap](PRODUCT_VISION_AND_DELIVERY_ROADMAP.md). This file remains detailed design/history; when priorities conflict, the product vision roadmap is authoritative.
+
 # Job Radar — 36-platform source coverage and near-real-time delivery roadmap
 
 **Owner requirement recorded:** 2026-11-08  

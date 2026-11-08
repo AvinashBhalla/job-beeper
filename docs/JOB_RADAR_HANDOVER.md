@@ -6471,3 +6471,13 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Production already has three Greenhouse and two Ashby board definitions, while `ats_board_registry` is empty. The discovery activation helper previously matched only on `registry_id`, which would append a second config entry for a preconfigured but not-yet-registered board. It now matches provider-specific board identity, attaches the registry ID to the existing entry, and rejects a conflicting registry link rather than duplicating the board.
 - Added regression coverage for activation of an already configured Greenhouse board; focused Greenhouse/Keka activation tests pass. This is required for per-board initial-baseline suppression on the existing production allowlists.
 - Candidate needs a fresh exact-SHA full suite/CI after this activation dedup fix. Production remains unchanged.
+
+
+## 2026-11-08 — Product direction consolidation
+
+- Added docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md as the source of truth for the end-to-end product vision, architecture decisions, implementation gaps and priorities. Older roadmap docs now point to it; their technical history remains useful but no longer overrides its current sequence.
+- Career-Ops findings adopted: posting legitimacy/repost revalidation, explainable evidence-weighted fit, fact-grounded resume tailoring, application preparation, contact provenance, draft-first outreach and privacy minimization.
+- Apply Factory findings adopted: per-user reusable application answer bank, correction/learning events, review of uncertain answers and optional browser-assisted form filling. Do not copy the Kimi Webbridge/LinkedIn DOM-scraping dependency; implement a first-party companion after APIs stabilize.
+- Confirmed current product gaps: Applied tracker is browser localStorage, not server-synced; current resume parser only returns preference suggestions and does not store a resume or generate tailored versions; referral/contact discovery and follow-up workflow remain design-only; no auto-submit capability exists.
+- Product priority: production ingestion/notification release first; server-owned application tracking next (P0.5, before wider multi-user beta); then resume vault/tailoring and answer bank; then referrals/follow-ups; assisted form filling; unattended submission last and only after a separate permission/safety review.
+- No code behavior changed by this product documentation update.

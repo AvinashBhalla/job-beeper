@@ -1,3 +1,5 @@
+> **Current source of truth:** [Product Vision and Delivery Roadmap](PRODUCT_VISION_AND_DELIVERY_ROADMAP.md). This file remains detailed design/history; when priorities conflict, the product vision roadmap is authoritative.
+
 # Ingestion-First Roadmap
 
 **Updated:** 2026-11-07  

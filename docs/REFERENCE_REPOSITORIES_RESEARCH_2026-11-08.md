@@ -10,8 +10,8 @@ Live verification against employer public boards on 2026-11-08:
 
 Isolated database run_source rehearsal for each provider:
 
-- First run: Keka 109 / Darwinbox 18 ingested and tagged as first-board baseline.
-- Second run: Keka 0 new / Darwinbox 0 new; no duplicate rows.
+- First run: Keka 109 / Darwinbox Arvind 36 ingested and tagged as first-board baseline. The earlier JG Summit `.com` 18-job result is superseded by the repeat HTTP 403 finding; see the correction below.
+- Second run: Keka 0 new / Darwinbox Arvind 0 new; no duplicate rows.
 - Notification sending was disabled and the notification ledger had no sent items.
 - SQLite integrity was `ok` after both runs.
 
@@ -32,3 +32,24 @@ The live re-verification invalidated the earlier `jgsummit.darwinbox.com` exampl
 ### Live verifier contract improvement — 2026-11-08
 
 The JobBeeper Workable verifier originally used a different, obsolete endpoint than the collector. It now calls the collector's public widget route `https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true`; the regression test pins that route and the live Hugging Face probe returns six postings. This is an implementation lesson from the reference provider architecture: probes should test the exact transport and envelope used by the production adapter, or the verifier can falsely reject a healthy collector.
+
+
+## Product-level adoption decision — 2026-11-08
+
+The two projects complement each other rather than replace JobBeeper:
+
+| Reference capability | JobBeeper decision |
+|---|---|
+| Career-Ops job legitimacy/repost observations | Adopt as a pre-application revalidation step; source-specific implementation, not copied code |
+| Evidence-weighted fit and explainable blockers | Adopt in the matcher as hard constraints + weighted evidence with provenance |
+| Tailored ATS CV, cover letter and application answers | Plan as a user-owned resume-versioning and application-preparation feature; never fabricate facts |
+| Contact discovery and tailored referral messages | Adopt with source provenance, confidence, editable drafts and user approval |
+| Career-Ops local-first runtime | Adopt its privacy/data-minimization principle; preserve JobBeeper hosted multi-user architecture with tenant isolation and secure storage |
+| Apply Factory answer bank | Adopt a per-user reusable answer bank with confidence, source, correction events and review queue |
+| Apply Factory browser-assisted filling | Build as an optional first-party companion after application and answer-bank APIs stabilize |
+| Apply Factory Kimi Webbridge/LinkedIn DOM scraping | Do not make this a core dependency; it is a brittle, provider-specific prototype |
+| User presses Submit in both references | Preserve the human checkpoint. Assisted fill first; unattended auto-submit is a separate future risk/permission review |
+
+Combined workflow: shared JobBeeper discovery → verified/current job → user-specific explanation → truthful tailored CV and answer preparation → optional browser-assisted form fill → user review/submit → application timeline → contact/referral research → approved outreach and follow-up.
+
+See docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md for the implementation sequence, architecture decisions and acceptance criteria.

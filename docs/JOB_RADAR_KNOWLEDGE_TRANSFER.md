@@ -3453,3 +3453,12 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 ### Activation dedup guard
 
 Production already contains Greenhouse and Ashby allowlist entries but no ATS board registry rows. The activation flow now links a verified registry row to an existing matching provider entry by its source-specific key and attaches `registry_id`, rather than appending a duplicate. A pre-existing entry linked to a different registry ID is rejected. A regression test covers Greenhouse; this protects per-employer silent-baseline suppression when the preconfigured boards are activated.
+
+
+## 2026-11-08 — Product strategy and reference adoption
+
+- New source-of-truth product plan: docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md. Read this before reprioritizing features. It supersedes earlier conflicting priority orders in older roadmaps without discarding their technical history.
+- Career-Ops should inform job legitimacy checks, explainable evidence weighting, factual resume tailoring, application preparation, contact provenance and draft-first human-approved outreach. Its local CLI architecture should not replace JobBeeper hosted shared-ingestion/multi-user architecture.
+- Apply Factory contributes a reusable answer-bank concept with learning/correction events and optional browser-assisted form filling. The current reference's Kimi Webbridge/DOM scraping approach is not a stable dependency to copy. Build the first-party companion after answer-bank APIs.
+- Current truth: Applied tracker uses browser localStorage and is not cross-device/server-owned. Resume parser is an onboarding-suggestion extractor only; no resume vault/tailored CV generation yet. Referral/contact discovery, follow-up workflow and browser fill are not implemented. Auto-submit is not implemented and must remain off until a distinct permissions/risk gate.
+- Reprioritized: P0 release reliable source ingestion + production-safe notifications; P0.5 server-side user-owned application tracking before wider beta; P1 resume vault/factual tailoring + answer bank; P2 contact/referral/follow-up; P3 interview/search coach; P4 carefully gated automation with user confirmation.

@@ -1,3 +1,5 @@
+> **Current source of truth:** [Product Vision and Delivery Roadmap](PRODUCT_VISION_AND_DELIVERY_ROADMAP.md). This file remains detailed design/history; when priorities conflict, the product vision roadmap is authoritative.
+
 # JobBeeper Multi-User and Referral Intelligence Roadmap
 
 **Status:** Authentication foundation PR #45 merged into `v2-live-radar` as `dd7aeb1`; user preferences, onboarding and user-scoped job evaluations/feed are implemented on `feat/user-preferences-evaluations-20261106` but not yet merged or deployed. Opportunity list/detail tenant scoping and final PR review remain. Telegram fan-out and server-side applications remain later milestones.
