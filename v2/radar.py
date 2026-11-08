@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications
+from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -1268,11 +1268,13 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_canonical_url ON canonical_opportunities(canonical_url)")
         conn.commit()
     backfill_canonical_opportunities()
+    user_applications.reconcile_canonical_ids(DB_PATH)
     backfill_notification_ledger()
     auth.init_auth_schema(DB_PATH)
     user_preferences.init_preferences_schema(DB_PATH)
     telegram_linking.init_schema(DB_PATH)
     user_notifications.init_schema(DB_PATH)
+    user_applications.init_schema(DB_PATH)
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
@@ -7161,6 +7163,89 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     return {
         "opportunities": [dict(row) for row in rows]
     }
+
+
+class ApplicationCreateRequest(BaseModel):
+    job_id: int = Field(gt=0)
+    applied_at: str | None = Field(default=None, max_length=64)
+    status: str = "Applied"
+    notes: str = Field(default="", max_length=user_applications.MAX_NOTES_LENGTH)
+
+
+class ApplicationUpdateRequest(BaseModel):
+    status: str | None = None
+    notes: str | None = Field(default=None, max_length=user_applications.MAX_NOTES_LENGTH)
+
+
+class ApplicationImportRequest(BaseModel):
+    applications: list[dict[str, Any]] = Field(max_length=user_applications.MAX_IMPORT_RECORDS)
+
+
+@app.get("/api/applications")
+def list_user_applications(user: dict[str, Any] = Depends(require_authenticated)):
+    return {"applications": user_applications.list_for_user(DB_PATH, user["id"])}
+
+
+@app.post("/api/applications")
+def create_user_application(
+    payload: ApplicationCreateRequest,
+    response: Response,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    try:
+        application, created = user_applications.create(
+            DB_PATH, user["id"], payload.job_id,
+            applied_at=payload.applied_at, status=payload.status, notes=payload.notes,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.status_code = 201 if created else 200
+    return {"application": application, "created": created}
+
+
+@app.patch("/api/applications/{application_id}")
+def update_user_application(
+    application_id: int,
+    payload: ApplicationUpdateRequest,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    fields = payload.model_fields_set
+    if not fields or not fields.issubset({"status", "notes"}):
+        raise HTTPException(status_code=422, detail="Provide application status or notes to update.")
+    try:
+        application = user_applications.update(
+            DB_PATH, user["id"], application_id,
+            status=payload.status if "status" in fields else None,
+            notes=payload.notes if "notes" in fields else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application record not found.")
+    return {"application": application}
+
+
+@app.delete("/api/applications/{application_id}", status_code=204)
+def delete_user_application(
+    application_id: int,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    if not user_applications.delete(DB_PATH, user["id"], application_id):
+        raise HTTPException(status_code=404, detail="Application record not found.")
+    return Response(status_code=204)
+
+
+@app.post("/api/applications/import")
+def import_user_applications(
+    payload: ApplicationImportRequest,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    try:
+        return user_applications.import_legacy(DB_PATH, user["id"], payload.applications)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/jobs")

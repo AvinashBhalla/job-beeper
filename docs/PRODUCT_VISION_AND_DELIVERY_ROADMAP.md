@@ -205,7 +205,7 @@ Never bypass CAPTCHA, login walls, rate limits, employer controls or terms. Neve
 - Existing shared layer: jobs, canonical opportunities, source runs/board registry.
 - Existing identity/profile layer: users, sessions, user_preferences, user_job_evaluations.
 - Existing alerts: user_notification_settings, user_notification_ledger, Telegram link tables.
-- Next: user_applications(user_id, canonical_opportunity_id, job_id, applied_at, status, notes, created_at, updated_at).
+- P0.5 implementation branch: `user_applications(user_id, canonical_opportunity_id, job_id, applied_at, status, notes, created_at, updated_at)`. It is in active implementation/testing, not yet merged/deployed. Canonical ID is reconciled through retained job_id after a dedupe rebuild; unique user+canonical key prevents duplicate app rows.
 - Later: user_resumes, resume_facts, resume_versions, application_answer_bank, answer_learning_events.
 - Later: followup_tasks, contacts, application_contacts, outreach_drafts, outreach_events, email_integrations.
 
@@ -236,8 +236,8 @@ Report sample size and timestamp precision. A source returning 1,000 old jobs is
 2. Provision the first production admin interactively using `python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com` inside the live container. This copies the existing global candidate preferences exactly once. Do not store the password in shell history or docs.
 3. Confirm the actual HTTPS public origin. Google OAuth remains disabled until the owner supplies a Google client ID/secret and registered callback. OAuth must create member accounts only.
 4. Configure per-user Telegram bot username, webhook secret and public webhook URL; link the owner's private chat and test only after explicit user opt-in. Legacy global Telegram credentials do not prove per-user delivery.
-5. Complete board-level disable UI/endpoint PR, exact-SHA CI, full suite, QA and a separate deploy. Current production already supports discovery/verify/activate; the disable action is pending merge/deploy.
-6. Implement server-backed application tracking before a wider beta (P0.5).
+5. Board-level disable UI is deployed (PR #54, image `00820f0`). Use it from admin Source Health; no board was disabled during rollout.
+6. Finish the server-owned Application Tracker P0.5 branch before a wider beta. It replaces browser-only Applied state, imports legacy localStorage idempotently, and is awaiting full-suite/exact-SHA CI and production-data canary; not yet deployed.
 7. Design resume vault/tailoring using fact provenance and human review, then the answer bank before the browser companion. Keep auto-submit gated and off.
 
 **Reminder:** a source adapter in code is not a verified active production connector. A roadmap feature is not implemented until API, UI, tenant tests and release evidence exist.
@@ -247,3 +247,7 @@ Report sample size and timestamp precision. A source returning 1,000 old jobs is
 - Production release `00820f0` is deployed. The admin workspace now supports per-board disable, preserving other boards under the same ATS. All 10 verified production boards remain active; no board configuration was changed during deployment.
 - The first-admin account is not yet created; use the secure interactive bootstrap recorded in `JOB_RADAR_HANDOVER.md`. Google OAuth and member Telegram are not configured until owner-supplied credentials/public HTTPS routing are available.
 - Continue measured source soak and prioritize P0.5 server-owned application tracking next.
+
+### P0.5 implementation checkpoint — 2026-11-09
+
+The current feature branch adds per-user server-owned application records and the dashboard API migration. It is not in production until exact full V2 tests, GitHub CI, data-copy canary and a separate backup-backed deploy have passed. The local full V2 suite has passed 400 tests in 307.495s; exact-head GitHub CI and production-data canary are still pending. The feature is not deployed. Detailed implementation/release notes are in `JOB_RADAR_HANDOVER.md`.

@@ -6552,3 +6552,49 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - The first admin is still **not** provisioned. Production users/admins remain 0. Secure interactive command: `sudo docker exec -it v2-radar-1 python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com`. It prompts for hidden password twice and copies the current candidate preferences into the first admin once. Agent account creation was blocked by execution safety; no account/password was created.
 - Google OAuth and per-user Telegram remain disabled until owner-controlled credentials/public HTTPS origin/webhook configuration are provided. See “Current admin account blocker and safe first login” above.
 - Private dashboard link created in Termalin: `https://termal.in/account#open-site=54768be5-95ea-4d86-9360-96d0c38c2843` (owner-only). Open the link, then sign in to JobBeeper with the first admin credentials after manual bootstrap.
+
+
+## 2026-11-09 — P0.5 server-owned Application Tracker implementation (branch, not deployed)
+
+### Why this moved ahead of resume/referrals
+
+- The Applied view was entirely `localStorage` (`job_beeper_applied_jobs_v1_user_<user_id>`). It did not sync across browsers/devices and would disappear when browser data was cleared. This is a core job-search workflow, so fix ownership now before widening the beta.
+- Keep source job records shared. An application is a user-owned relationship to one canonical opportunity/job; do not duplicate job descriptions per user.
+
+### Implemented in working branch `feat/server-application-tracker-20261109`
+
+- New `v2/user_applications.py` with a minimal `user_applications` table: owner user ID, canonical opportunity ID, source job ID, applied time, status, notes and timestamps. Unique `(user_id, canonical_opportunity_id)` prevents duplicate applications per user; separate users can independently apply to the same opportunity.
+- Canonical ID is deliberately **not** a foreign key to `canonical_opportunities`: the existing dedupe identity migration rebuilds that table. The service reconnects through the retained source `job_id` after `backfill_canonical_opportunities`, and reconciles application canonical IDs. Dedupe merges multiple application records for the same user/opportunity by keeping the earliest application record, preserving latest status, joining notes, and deleting the duplicate.
+- Routes use authenticated session user IDs only (never client user ID): GET/POST `/api/applications`, PATCH/DELETE `/api/applications/{application_id}`, POST `/api/applications/import`. Mutations inherit `require_authenticated` CSRF verification. Other users see 404 on record mutation; there is no cross-user lookup.
+- Allowed statuses: Applied, Interviewing, Offer, Rejected. Notes capped at 2,000 characters. Legacy import limited to 500 records per request and idempotent by canonical opportunity.
+- Dashboard no longer uses localStorage as the active store. It loads from the server, adds/updates/deletes via API and imports the old user-specific local key once. Old browser records that cannot be matched to a retained job are skipped **but the local copy is kept**; fully successful imports clear the old key. Mutations show errors instead of silently updating stale browser-only state.
+- Export now includes both the application record ID and source job ID.
+- The existing CI full-suite discovery imports the new service and test module; the explicit py_compile file list was left unchanged (no workflow-scope permission is needed for this feature). Route-audit test in `test_auth.py` now classifies the new application APIs as member-authenticated, not admin-only.
+
+### Tests added
+
+`v2/test_user_applications.py` currently has seven focused API tests, covering owner isolation/same opportunity by two users, dedupe rebuild preservation, merging duplicate records after canonical merge, idempotent create, legacy import idempotency/skip handling, owner-scoped status/notes/delete, and auth/CSRF/invalid status. Full local V2 suite passed **400 tests in 307.495s** after the route-audit allowance was updated to classify these member routes correctly. Exact-head GitHub CI is still required. Do not report this as released or production-tested until CI and the production-data canary also pass.
+
+### Release safety
+
+- This work is not committed/pushed/merged/deployed yet. Production remains on `job-radar-prod-canary:00820f0`; live job radar, board registry, candidate preferences and notifications have not been changed by this feature branch.
+- Before PR: pass the exact full V2 suite and modern Node syntax in CI. Review the database schema against canonical identity rebuild and application merge behavior. Run diff-check/compile/JS check. Use a production DB copy in isolated canary with all sources and notifications off; verify health, auth isolation, schema, job counts and integrity.
+- After merge only: online SQLite backup/config/compose snapshot, build the merged tree, migration canary, deploy image only, then smoke-test `/api/applications` with two independent test users. Do not create/test a user's production application data without their consent.
+- First admin login still requires the secure interactive bootstrap in the earlier section; this tracker is member-authenticated and owner-scoped.
+
+### Next feature order after P0.5
+
+1. Finish/merge/deploy this application tracker.
+2. Add status-history / follow-up tasks once there is a real user application record to anchor them.
+3. Build the resume vault and fact provenance before generating tailored versions; parser currently only extracts onboarding preference suggestions.
+4. Build the Application Answer Bank and correction/review queue before a browser companion.
+5. Add contact/referral discovery with public evidence, editable outreach drafts, user approval and follow-up. Email sending later.
+6. Assisted browser filling later; preserve a manual Submit checkpoint. Auto-submit last after separate permission/reliability review.
+
+
+### 2026-11-09 — P0.5 full suite result
+
+- Fresh full V2 unittest run completed: **400 tests passed in 307.495s**. The earlier run had one stale route-audit failure because it loaded the old test file before the allowlist edit; the new run started after the route-audit correction and passed all 400 tests.
+- `python -m py_compile` for the changed Python modules passes; `git diff --check` passes. Host Node is v12.22.9 and cannot parse existing optional/nullish syntax in the dashboard; the GitHub Actions runner uses modern Node and performs the actual `node --check` validation.
+- Ponytail review: the new service is a single responsibility module with explicit methods; no new dependencies, generic repositories, background queues or infrastructure were introduced. The no-FK canonical ID choice is documented at the schema field because canonical dedupe groups are rebuilt; startup reconciliation uses the retained source job ID.
+- Branch remains `feat/server-application-tracker-20261109`; current production remains image `job-radar-prod-canary:00820f0`. No application-tracker schema has been applied to production yet.
