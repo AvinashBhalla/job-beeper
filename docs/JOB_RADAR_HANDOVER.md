@@ -6143,3 +6143,12 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - HTTP smoke verification: /health, /dashboard/, dashboard JS and CSS returned 200. Member login/feed/daily-summary returned 200; member /api/source-status/summary, /api/source-status and /api/latency-summary returned 403. Admin login and all three source-health GETs returned 200. No outbound source requests or Telegram sends were made.
 - The original port-8004 feature process still uses /tmp/job-radar-user-preferences and remains unchanged. Do not use it for post-fix verification. Ports 8000/8001 remain untouched.
 - Next: run Prompt 1 in docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md against port 18005. It must verify real 390×844/375×812/320×740 rendering and direct #sources member navigation, then admin access.
+
+## 2026-11-08 — Final integration review: canonical Lever baseline guard on member notifications
+
+- A second code review found the member queue still lacked a canonical-opportunity baseline filter despite an earlier handover statement claiming complete protection. `user_notifications._queue_new_matches` checked `jobs.source_initial_baseline` only. This could miss a Lever baseline opportunity whose canonical ID originated from an older job in another source.
+- Fixed member queue creation, claim selection and pre-send revalidation to exclude `notification_ledger.baseline_suppressed=1`; stale queued/failed/sending member rows are cancelled with `initial_source_baseline`. This remains source-agnostic and safe for all members.
+- Added three new canonical-level regressions: suppress at enqueue for a cross-source canonical; cancel an already queued item before claim; prevent final send if canonical suppression appears after claim. Existing per-job baseline test remains.
+- Member notification suite: **17 passed**. Full integration suite: **336 passed** in 194.322 seconds. Python compilation and `git diff --check` passed.
+- No Telegram HTTP calls or messages occurred. Lever remains disabled and the candidate preview collector flags remain off. No shared-dev or production deployment.
+- Updated QA prompt with this additional safety invariant. Current candidate still awaits browser Prompt 1 and security Prompt 3.
