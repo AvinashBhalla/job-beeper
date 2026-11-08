@@ -188,18 +188,18 @@ class BoardDiscoveryApiTests(unittest.TestCase):
         self.assertEqual(board["review_status"], "verified")
         self.assertFalse(radar.get_config()["source_enabled"]["greenhouse"])
 
-    def _insert_verified_greenhouse_board(self):
+    def _insert_verified_greenhouse_board(self, company="Acme", token="acme", domain="acme.example"):
         timestamp = radar.iso(radar.now())
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""INSERT INTO employer_companies
                 (company_name,domain,website_url,careers_url,discovery_status,created_at,updated_at)
                 VALUES(?,?,?,?,?,?,?)""",
-                ("Acme", "acme.example", "https://acme.example/", "https://acme.example/careers", "boards_found", timestamp, timestamp))
-            company_id = conn.execute("SELECT id FROM employer_companies WHERE domain='acme.example'").fetchone()[0]
+                (company, domain, f"https://{domain}/", f"https://{domain}/careers", "boards_found", timestamp, timestamp))
+            company_id = conn.execute("SELECT id FROM employer_companies WHERE domain=?", (domain,)).fetchone()[0]
             conn.execute("""INSERT INTO ats_board_registry
                 (company_id,provider,board_key,board_url,discovered_from,confidence,collector_source,collector_available,review_status,last_verified_at,last_seen_at,created_at,updated_at)
                 VALUES(?,?,?,?,?,?,?,1,'verified',?,?,?,?)""",
-                (company_id, "greenhouse", "acme", "https://boards.greenhouse.io/acme", "https://acme.example/careers", "high", "greenhouse", timestamp, timestamp, timestamp, timestamp))
+                (company_id, "greenhouse", token, f"https://boards.greenhouse.io/{token}", f"https://{domain}/careers", "high", "greenhouse", timestamp, timestamp, timestamp, timestamp))
             board_id = conn.execute("SELECT id FROM ats_board_registry WHERE company_id=?", (company_id,)).fetchone()[0]
             conn.commit()
         return board_id
@@ -267,6 +267,63 @@ class BoardDiscoveryApiTests(unittest.TestCase):
         config = radar.get_config()
         self.assertTrue(config["source_enabled"]["keka"])
         self.assertIn({"careers_url": careers_url, "company": "Bridgestone", "registry_id": board_id}, config["keka_boards"])
+
+    def test_admin_can_disable_one_board_without_disabling_provider_peers(self):
+        config = radar.get_config()
+        config["greenhouse_boards"] = []
+        radar.save_config(config)
+        first_id = self._insert_verified_greenhouse_board()
+        second_id = self._insert_verified_greenhouse_board("Beta", "beta", "beta.example")
+        with patch.object(radar, "refresh_job_evaluations"), patch.object(radar, "refresh_notification_decisions"), patch.object(radar, "refresh_configured_user_evaluations"):
+            for board_id in (first_id, second_id):
+                activated = self.client.post(
+                    f"/api/discovery/boards/{board_id}/activate",
+                    headers={"X-CSRF-Token": self.csrf},
+                )
+                self.assertEqual(activated.status_code, 200, activated.text)
+        response = self.client.post(
+            f"/api/discovery/boards/{first_id}/deactivate",
+            headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["remaining_boards"], 1)
+        self.assertTrue(response.json()["source_enabled"])
+        config = radar.get_config()
+        self.assertEqual([item["registry_id"] for item in config["greenhouse_boards"]], [second_id])
+        with sqlite3.connect(self.db_path) as conn:
+            first = conn.execute("SELECT review_status,baseline_pending FROM ats_board_registry WHERE id=?", (first_id,)).fetchone()
+            second = conn.execute("SELECT review_status,baseline_pending FROM ats_board_registry WHERE id=?", (second_id,)).fetchone()
+        self.assertEqual(first, ("verified", 0))
+        self.assertEqual(second, ("active", 1))
+
+    def test_disabling_last_board_turns_off_only_its_provider(self):
+        config = radar.get_config()
+        config["greenhouse_boards"] = []
+        radar.save_config(config)
+        board_id = self._insert_verified_greenhouse_board()
+        with patch.object(radar, "refresh_job_evaluations"), patch.object(radar, "refresh_notification_decisions"), patch.object(radar, "refresh_configured_user_evaluations"):
+            activated = self.client.post(
+                f"/api/discovery/boards/{board_id}/activate",
+                headers={"X-CSRF-Token": self.csrf},
+            )
+        self.assertEqual(activated.status_code, 200, activated.text)
+        response = self.client.post(
+            f"/api/discovery/boards/{board_id}/deactivate",
+            headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        config = radar.get_config()
+        self.assertEqual(config["greenhouse_boards"], [])
+        self.assertFalse(config["source_enabled"]["greenhouse"])
+        self.assertTrue(config["source_enabled"]["naukri"])
+
+    def test_board_deactivation_requires_admin_and_csrf(self):
+        board_id = self._insert_verified_greenhouse_board()
+        denied_csrf = self.client.post(f"/api/discovery/boards/{board_id}/deactivate")
+        self.assertEqual(denied_csrf.status_code, 403)
+        self.client.post("/api/auth/logout", headers={"X-CSRF-Token": self.csrf})
+        anonymous = self.client.post(f"/api/discovery/boards/{board_id}/deactivate")
+        self.assertEqual(anonymous.status_code, 401)
 
     def test_unverified_board_cannot_be_activated(self):
         board_id = self._insert_verified_greenhouse_board()
