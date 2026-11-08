@@ -91,3 +91,46 @@ Host-reported result:
 This verifies the image tag is present and inspectable on the VM using sudo. It does **not** establish that the container has been recreated or that the candidate is live on port 8001.
 
 **Promotion status remains pending.** No fresh immediate pre-promotion SQLite snapshot has yet been evidenced, and no shared-dev container recreation/soak result has been reported. Next, run the existing snapshot service using sudo, verify the resulting backup's integrity and freshness, then follow the shared-dev-only promotion procedure. Keep Naukri as the only enabled collector, Telegram/notifications and Gemini disabled, preserve the external dev volume and rollback image, and do not touch production port 8000.
+
+
+## 2026-11-08 — Shared-dev rollout succeeded; live adapter canary results
+
+This section supersedes the earlier access-blocker status. The existing Oracle VM SSH-key account `ubuntu` has passwordless full sudo (confirmed by `sudo -n -l`); Docker/systemd operations were run with `sudo`.
+
+### Deployment
+
+- PR #51 branch head deployed: `754809fe406e8c5cb09f8e36140ac5cf3e4f7238`.
+- CI run `42474145630` completed successfully.
+- Candidate image: `job-radar-dev-multitenant:b16fb83`, ID `sha256:75f8855338f150a79794d388c32733305e548165f71dd417cfa04e6443c8c917`.
+- `job-radar-dev` recreated at `2026-11-08T11:07:58.298331082Z`; HTTP 200 on port 8001.
+- The deployment changed only the service image in the validated candidate Compose file. It preserved the external volume `job-radar-dev_radar-dev-data`, config bind, env file and 8001 binding.
+- Production port 8000 remained on its pre-existing container and returned HTTP 200; no production change occurred.
+
+### Verified backups
+
+- `/var/backups/job-radar-daily/development-pre-candidate-20261108T105233Z.sqlite3`: 8,383 jobs, 45,342,720 bytes, integrity `ok`; SHA-256 `412a9232f60f1e25703061f95b370e34d31136170d5eac05ff78533830d9b85a`.
+- `/var/backups/job-radar-daily/development-pre-instahyme-fix-20261108T110723Z.sqlite3`: 8,386 jobs, 45,588,480 bytes, integrity `ok`; SHA-256 `295f839e9954ae6ed0edaf928ee91f00f0ab74f6aba2b0b36f92e59326a38216`.
+
+### Live application pipelines
+
+The owner-facing adapter tests were run via one-off `radar.run_source` calls with the live dev DB. The scheduler source flags were not changed. All listed runs finished with `outcome=success` and no HTTP 4xx/5xx/429 errors:
+
+- Naukri: periodic scheduler polls succeeded; one poll inserted 3 jobs.
+- Instahyre: 140 seen / 140 inserted, 4 HTTP 200 pages.
+- Greenhouse: 369 seen / 369 inserted, 3 of 3 public boards successful.
+- Ashby: 828 seen / 34 new, 2 of 2 boards successful; all 828 carried timestamps.
+- Lever: 500 seen / 500 inserted from one-off board `paytmpayments`; 5 of 5 pages HTTP 200, bounded five-page cap reached. The board was not added to persisted config.
+
+Instahyre live incompatibility was fixed in the candidate: API response `objects` shape, current nested employer/public URL/location fields, Bengaluru/Gurugram/Delhi/remote aliases, and bounded pagination. Three new tests passed and V2 CI run `42474145630` succeeded on the deployed head.
+
+After those tests the live DB reported 9,429 jobs, canonical opportunities, global evaluations, per-user evaluations and notification-ledger rows, SQLite integrity `ok`. Source-run count was 7,851.
+
+### Delivery and integration gates
+
+- Naukri only remains enabled in the recurring scheduler. LinkedIn, Instahyre, Greenhouse, Ashby and Lever remain disabled in the saved config.
+- Notifications false; Telegram token/chat blank; Gemini and LLM router flags false.
+- 56 global ledger rows pending and 9,373 suppressed; zero non-null `sent_at`. No Telegram messages sent.
+- LinkedIn live polling deliberately withheld while production health reported a rate-limit cooldown through `2026-11-08T11:25:12.064175+00:00`. CI/unit coverage passed; live check is outstanding.
+- Protected endpoints return 401 without login; a real browser admin/member login was not tested in this pass.
+- 320px toolbar overlap remains a known, deliberately deferred UI defect.
+- Shared-dev deployment is complete; production remains untouched. PR #51 remains open/draft. Production promotion requires a separate explicit approval after the remaining LinkedIn/auth checks are reviewed.
