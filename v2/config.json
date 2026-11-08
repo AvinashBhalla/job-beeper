@@ -5,7 +5,8 @@
     "instahyre": 600,
     "greenhouse": 900,
     "ashby": 1800,
-    "lever": 1800
+    "lever": 1800,
+    "workday": 120
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -77,7 +78,7 @@
     "workflow",
     "orchestration"
   ],
-  "candidate_experience_years": 2,
+  "candidate_experience_years": 2.0,
   "match_threshold": 55,
   "title_exclude": [
     "senior",
@@ -95,7 +96,7 @@
     "vp",
     "vice president"
   ],
-  "max_experience_years": 3,
+  "max_experience_years": 3.0,
   "remote_only": false,
   "min_experience_years": null,
   "max_age_hours": 72,
@@ -108,9 +109,11 @@
     "instahyre": false,
     "greenhouse": false,
     "ashby": false,
-    "lever": false
+    "lever": false,
+    "workday": false
   },
-  "config_version": 12,
+  "config_version": 13,
+  "workday_boards": [],
   "greenhouse_boards": [
     {
       "token": "coinbase",

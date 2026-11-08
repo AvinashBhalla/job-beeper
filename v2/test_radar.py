@@ -4810,5 +4810,281 @@ class LeverConfigTests(unittest.TestCase):
             radar.validate_config({**BASE_CONFIG, "lever_boards": [
                 {"site": "../unsafe", "company": "Bad"},
             ]})
+class WorkdayCollectorTests(unittest.TestCase):
+    def test_board_url_parser_derives_tenant_cluster_and_site(self):
+        parsed = radar._parse_workday_board_url(
+            "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/"
+        )
+        self.assertEqual(parsed["tenant"], "nvidia")
+        self.assertEqual(parsed["cluster"], "5")
+        self.assertEqual(parsed["site"], "NVIDIAExternalCareerSite")
+        self.assertEqual(
+            parsed["url"],
+            "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+        )
+
+    def test_board_url_parser_rejects_non_workday_or_unsafe_urls(self):
+        for value in (
+            "http://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+            "https://nvidia.example.com/NVIDIAExternalCareerSite",
+            "https://nvidia.wd5.myworkdayjobs.com/site/job/123",
+            "https://user@nvidia.wd5.myworkdayjobs.com/site",
+            "https://nvidia.wd5.myworkdayjobs.com/site?search=secret",
+        ):
+            with self.subTest(value=value):
+                self.assertIsNone(radar._parse_workday_board_url(value))
+
+    def test_config_keeps_workday_opt_in_and_validates_employer_boards(self):
+        validated = radar.validate_config({
+            **BASE_CONFIG,
+            "workday_boards": [{
+                "url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite",
+                "company": "NVIDIA",
+            }],
+        })
+        self.assertEqual(validated["workday_boards"], [{
+            "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+            "company": "NVIDIA",
+        }])
+        self.assertFalse(validated["source_enabled"]["workday"])
+        self.assertEqual(validated["poll_seconds"]["workday"], 120)
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config({
+                **BASE_CONFIG,
+                "workday_boards": [{"url": "https://evil.example/jobs", "company": "Evil"}],
+            })
+
+    def test_config_v13_migrates_workday_to_disabled(self):
+        defaults = {
+            "config_version": 13,
+            "source_enabled": {"workday": False, "linkedin": True},
+            "poll_seconds": {"workday": 120, "linkedin": 180},
+            "workday_boards": [],
+        }
+        prior = {
+            "config_version": 12,
+            "source_enabled": {"workday": True, "linkedin": True},
+            "poll_seconds": {"linkedin": 180},
+        }
+        merged = radar._merge_config(defaults, prior)
+        self.assertFalse(merged["source_enabled"]["workday"])
+        self.assertEqual(merged["poll_seconds"]["workday"], 120)
+        self.assertEqual(merged["workday_boards"], [])
+
+    def test_collector_pages_board_bounds_details_and_preserves_unknown_post_time(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        first_page = [{
+            "title": "Software Engineer",
+            "externalPath": "/job/US-California/Software-Engineer_JR12345",
+            "locationsText": "2 Locations",
+            "postedOn": "Posted Today",
+            "bulletFields": ["JR12345"],
+        }] + [{
+            "title": f"Sales Consultant {index}",
+            "externalPath": f"/job/US-California/Sales-Consultant_{index}",
+            "locationsText": "California",
+            "postedOn": "Posted 2 Days Ago",
+            "bulletFields": [f"REQ-{index}"],
+        } for index in range(19)]
+        post_calls = []
+        get_calls = []
+
+        class Response:
+            status_code = 200
+            def __init__(self, payload): self.payload = payload
+            def raise_for_status(self): return None
+            def json(self): return self.payload
+
+        def fake_post(url, *, json, headers, timeout):
+            post_calls.append((url, dict(json)))
+            if json["offset"] == 0:
+                return Response({"jobPostings": first_page, "total": 2000})
+            return Response({"jobPostings": [], "total": 2000})
+
+        def fake_get(url, *, params=None, headers=None, timeout=20):
+            get_calls.append(url)
+            slug = url.rsplit("/", 1)[-1]
+            requisition = slug.rsplit("_", 1)[-1]
+            title = "Software Engineer" if requisition == "JR12345" else f"Sales Consultant {requisition}"
+            return Response({"jobPostingInfo": {
+                "title": title,
+                "jobReqId": requisition,
+                "jobPostingId": slug,
+                "externalUrl": "https://attacker.example/replace-me",
+                "location": "California, United States",
+                "additionalLocations": ["Remote, United States"],
+                "jobDescription": "<p>Build software using Python and React.</p>",
+                "postedOn": "Posted Today",
+                "startDate": "2026-11-08",
+                "timeType": "Full time",
+            }})
+
+        config = {
+            "workday_boards": [{"url": board_url, "company": "NVIDIA"}],
+            "target_roles": ["software engineer"],
+            "title_exclude": ["senior"],
+            "locations": ["California, United States"],
+            "remote_only": False,
+        }
+        with patch.object(radar, "WORKDAY_MAX_PAGES_PER_BOARD", 2), patch.object(
+            radar.requests, "post", side_effect=fake_post
+        ), patch.object(radar.requests, "get", side_effect=fake_get), patch.object(
+            radar.time, "sleep", return_value=None
+        ):
+            jobs = radar.workday_collect(config)
+
+        self.assertEqual([call[1]["offset"] for call in post_calls], [0, 20])
+        self.assertEqual(len(get_calls), 20)
+        self.assertEqual(len(jobs), 20)
+        software_job = next(job for job in jobs if job["title"] == "Software Engineer")
+        self.assertEqual(software_job["source_job_id"], "workday-nvidia-NVIDIAExternalCareerSite-JR12345")
+        self.assertEqual(software_job["url"], board_url + first_page[0]["externalPath"])
+        self.assertNotIn("attacker.example", software_job["url"])
+        self.assertEqual(software_job["location"], "California, United States, Remote, United States")
+        self.assertIn("Python and React", software_job["description"])
+        self.assertIsNone(software_job["source_posted_at"])
+        self.assertEqual(software_job["posted_precision"], "unknown")
+        self.assertEqual(software_job["source_details"]["posted_on_label"], "Posted Today")
+        self.assertEqual(software_job["source_details"]["start_date"], "2026-11-08")
+        self.assertTrue(software_job["source_details"]["details_fetched"])
+        self.assertTrue(jobs[10]["source_details"]["details_fetched"])
+
+    def test_detail_failures_do_not_exceed_the_attempt_budget(self):
+        class Response:
+            status_code = 200
+            def raise_for_status(self): return None
+            def json(self):
+                return {"jobPostings": [{
+                    "title": f"Software Engineer {n}",
+                    "externalPath": f"/job/US-California/Software-Engineer_{n}",
+                    "bulletFields": [f"JR{n}"],
+                } for n in range(20)], "total": 20}
+
+        def fail_detail(*args, **kwargs):
+            raise RuntimeError("transient detail error")
+
+        with patch.object(radar.requests, "post", return_value=Response()), patch.object(
+            radar.requests, "get", side_effect=fail_detail
+        ) as get_call, patch.object(radar, "WORKDAY_MAX_DETAILS_PER_BOARD", 3), patch.object(
+            radar.time, "sleep", return_value=None
+        ):
+            jobs = radar.workday_collect({
+                "workday_boards": [{
+                    "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                    "company": "NVIDIA",
+                }],
+            })
+        self.assertEqual(get_call.call_count, 3)
+        self.assertEqual(len(jobs), 20)
+        self.assertEqual(
+            sum(bool(job["source_details"]["details_fetched"]) for job in jobs), 0
+        )
+
+    def test_detail_rate_limit_stops_remaining_requests(self):
+        class Response:
+            status_code = 200
+            def raise_for_status(self): return None
+            def json(self):
+                return {"jobPostings": [{
+                    "title": f"Software Engineer {n}",
+                    "externalPath": f"/job/US-California/Software-Engineer_{n}",
+                    "bulletFields": [f"JR{n}"],
+                } for n in range(20)], "total": 20}
+
+        class RateLimited(Exception):
+            response = type("HttpResponse", (), {"status_code": 429})()
+
+        with patch.object(radar.requests, "post", return_value=Response()), patch.object(
+            radar.requests, "get", side_effect=RateLimited("429")
+        ) as get_call:
+            jobs = radar.workday_collect({
+                "workday_boards": [{
+                    "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                    "company": "NVIDIA",
+                }],
+            })
+        self.assertEqual(get_call.call_count, 1)
+        self.assertEqual(len(jobs), 0)
+
+    def test_collector_rejects_malformed_external_paths(self):
+        class Response:
+            status_code = 200
+            def raise_for_status(self): return None
+            def json(self):
+                return {"jobPostings": [{
+                    "title": "Software Engineer",
+                    "externalPath": "https://evil.example/job/123",
+                    "bulletFields": ["JR123"],
+                }], "total": 1}
+
+        with patch.object(radar.requests, "post", return_value=Response()):
+            jobs = radar.workday_collect({
+                "workday_boards": [{
+                    "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                    "company": "NVIDIA",
+                }],
+                "target_roles": ["software engineer"],
+            })
+        self.assertEqual(jobs, [])
+
+    def test_collector_requires_an_explicit_board_allowlist(self):
+        with self.assertRaisesRegex(RuntimeError, "no public workday_boards"):
+            radar.workday_collect({"workday_boards": []})
+
+    def test_config_rejects_enabling_workday_without_a_verified_board(self):
+        with self.assertRaisesRegex(radar.HTTPException, "Add at least one verified Workday"):
+            radar.validate_config({**BASE_CONFIG, "source_enabled": {"workday": True}})
+
+    def test_list_429_honours_retry_after_and_stops_workday_requests(self):
+        class RateLimitedResponse:
+            status_code = 429
+            headers = {"Retry-After": "120"}
+            def raise_for_status(self):
+                raise radar.requests.HTTPError("429 rate limited", response=self)
+            def json(self):
+                return {}
+
+        calls = []
+        with patch.object(radar, "source_state", {}), patch.object(
+            radar.requests, "post", side_effect=lambda *args, **kwargs: calls.append(args[0]) or RateLimitedResponse()
+        ):
+            with self.assertRaisesRegex(RuntimeError, "All configured Workday boards failed"):
+                radar.workday_collect({
+                    "workday_boards": [{
+                        "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                        "company": "NVIDIA",
+                    }],
+                })
+            runtime = radar.source_state["workday"]
+            self.assertEqual(runtime["rate_limit_retry_after_seconds"], 120.0)
+            self.assertEqual(runtime["rate_limit_cooldown_seconds"], 120)
+            self.assertGreater(radar._workday_cooldown_remaining(), 100)
+        self.assertEqual(len(calls), 1)
+
+    def test_workday_cooldown_is_restored_from_latest_source_run(self):
+        from datetime import timedelta
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmp:
+            database = Path(tmp) / "jobs.db"
+            detected_at = radar.iso(radar.now() - timedelta(seconds=60))
+            with sqlite3.connect(database) as conn:
+                conn.execute("""CREATE TABLE source_runs (
+                    id INTEGER PRIMARY KEY, source TEXT, http_status INTEGER,
+                    rate_limit_detected_at TEXT, finished_at TEXT,
+                    cooldown_seconds INTEGER, retry_after_seconds REAL
+                )""")
+                conn.execute(
+                    "INSERT INTO source_runs(source,http_status,rate_limit_detected_at,finished_at,cooldown_seconds,retry_after_seconds) VALUES(?,?,?,?,?,?)",
+                    ("workday", 429, detected_at, detected_at, 300, 240.0),
+                )
+            with patch.object(radar, "DB_PATH", database), patch.object(radar, "source_state", {}):
+                radar.restore_workday_rate_limit_state()
+                remaining = radar._workday_cooldown_remaining()
+                self.assertGreater(remaining, 200)
+                self.assertLessEqual(remaining, 300)
+                self.assertEqual(radar.source_state["workday"]["rate_limit_retry_after_seconds"], 240.0)
+
+
 if __name__ == "__main__":
     unittest.main()

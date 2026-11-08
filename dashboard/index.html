@@ -567,6 +567,14 @@
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="naukri" checked> Naukri</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="greenhouse"> Greenhouse</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="instahyre"> Instahyre</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="ashby"> Ashby</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="lever"> Lever</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workday"> Workday</label>
+                </div>
+                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
+                  <label class="form-field-label" for="cfgWorkdayBoards">Workday public career boards (JSON)</label>
+                  <textarea id="cfgWorkdayBoards" rows="4" spellcheck="false" placeholder='[{"url":"https://company.wd5.myworkdayjobs.com/CareerSite","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <span style="font-size:11px;color:var(--text-muted);">Add only verified public myworkdayjobs.com URLs. Use the employer's real careers URL; tenant and site identifiers are derived from it. Workday remains off until a board is added and the source is enabled.</span>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">

@@ -217,3 +217,40 @@ For any candidate that has WAL enabled:
 - After deployment, confirm the actual `PRAGMA journal_mode` from the running container, plus `PRAGMA integrity_check`, table counts, health and zero-send safety flags.
 
 The contention fix is on `fix/sqlite-notification-contention-20261108` and passed 347 full-suite tests (188.827s). It remains isolated until exact-SHA GitHub CI and the approved shared-dev-only deployment are complete. Production still requires separate owner approval.
+
+
+## 2026-11-08 — Workday candidate adapter and SQLite contention fix status
+
+The SQLite contention fix and Workday adapter are candidate-only changes on `fix/sqlite-notification-contention-20261108`. The V2 full suite currently passes 354 tests, but the latest Workday changes still require commit/push and GitHub CI on the exact final SHA. No container has been rebuilt for this commit. Shared dev remains `job-radar-dev-multitenant:b16fb83` on port 8001, Naukri-only; production port 8000 remains unchanged.
+
+Workday has been exercised against NVIDIA's public board and through a two-poll disposable DB pipeline; no Workday board is enabled in shared-dev config. Do not switch Workday on during the SQLite fix deployment. First promote and soak the SQLite fix only if the deployment plan can isolate source flags; then Workday needs a separate controlled enablement after a verified board URL is added.
+
+
+## 2026-11-08 — P0 SQLite fix promoted to shared dev (Workday not deployed)
+
+- Code SHA: `c441737ca6c19f17002d9a43923a4a64353f0977`; GitHub V2 CI run `42480365749` completed successfully. This build contains the SQLite contention fix only; Workday candidate edits are later local working-tree changes and are not in this image.
+- Image: `job-radar-dev-multitenant:c441737`, built from that exact SHA. Only container `job-radar-dev` on `127.0.0.1:8001` was recreated. Production `v2-radar-1` was not recreated or changed. The external volume `job-radar-dev_radar-dev-data` and read-only config bind `/home/ubuntu/job-beeper-dev/v2/config.dev.json` were preserved. Compose diff was limited to image tag plus explicit feature-flag overrides described below.
+- Fresh pre-deploy online backup: `/var/backups/job-radar-daily/development-jobs.sqlite3`, SHA-256 `aa78251196c7c2925cf09e5e6b9cbb7878884681bd9920407e32f4e2ff0b49e0`, size 51,535,872 bytes, 9,459 jobs, source_runs 7,869, integrity `ok`. Production snapshot `/var/backups/job-radar-daily/production-jobs.sqlite3` was also taken and verified, but is not a production deployment or a write to the prod DB.
+- Post-deploy checks: health HTTP 200; `PRAGMA journal_mode=wal`; app-managed connection `busy_timeout=15000`; integrity `ok`; 9,461 jobs/canonical/evaluation/notification rows; Naukri remains the only enabled recurring source; `notifications_enabled=false`; Telegram variables absent; both global and per-user sent counts zero. Three Naukri scheduler runs since deployment succeeded; the last inspected logs contained no SQLite-lock error or traceback. Continue the soak; this is not a production load test.
+- Environment issue discovered and corrected: Compose interpolated Gemini and LLM feature flags from `.env` as `true`, despite intended shared-dev-off settings. The effective candidate Compose now sets `GEMINI_EXTRACTION_ENABLED`, `GEMINI_MATCHER_ENABLED`, `LLM_ROUTER_ENABLED`, and `LLM_ROUTER_MATCHER_ENABLED` explicitly to the literal string `false`. The `.env` file was not changed. A first short-lived container using interpolated flags attempted three Gemini calls; it was then recreated with all four explicit false overrides. Current container verifies all four false.
+- Active Compose file: `/tmp/job-radar-dev-candidate-c441737.yml`. It differs from `/tmp/job-radar-dev-candidate-b16fb83.yml` by the image tag and the four explicit false feature-flag values. Use this file for future shared-dev recreates unless the Compose source is intentionally updated and reviewed.
+- Workday remains disabled and not present in the deployed image. Do not enable it as part of SQLite rollback/recreate. The Workday adapter must receive its own exact-SHA CI, code review and separate controlled board pilot. Production still requires separate explicit owner approval.
+
+
+## 2026-11-08 — Current verified state after SQLite P0 rollout
+
+The SQLite P0 candidate is now deployed to shared dev, superseding earlier notes that said deployment was pending. Container `job-radar-dev` runs `job-radar-dev-multitenant:c441737` on `127.0.0.1:8001`; health HTTP 200. Production `v2-radar-1` on port 8000 remains the original image and was not changed.
+
+Read-only verification at 2026-11-08 12:58 UTC: shared-dev SQLite `journal_mode=wal`; app-managed `v2.sqlite_store.connect()` reports `busy_timeout=15000` (a separate diagnostic opened with `timeout=5` naturally reports 5000 and should not be mistaken for the app setting); integrity `ok`; jobs=9,462; source_runs=7,874; source flags Naukri only; notifications false; Telegram token absent; Gemini/LLM false. Last eight source runs were successful Naukri cycles. No `database is locked` line appeared in the last 90 minutes of logs. Continue the soak.
+
+The local Workday candidate is not in image `c441737`; keep it disabled. Current intended code budget is one listing page (20 jobs) plus up to 20 paced detail calls per board; the adapter's 429 cooldown is persisted/restored. Workday needs exact-SHA CI and a separate controlled board pilot before any deployment. Do not deploy or enable it as part of the SQLite P0 rollout.
+
+
+## 2026-11-08 — Workday final candidate suite result
+
+The current local Workday candidate passed the full V2 suite: **359 tests, 266.690 seconds, zero failures**. Twelve focused Workday tests cover public board URL safety, config allowlisting, one-page listing/detail parsing, baseline suppression, detail request caps, list/detail 429 handling and cooldown restoration. A separate controlled `run_source` test confirmed a list-endpoint 429 writes a `rate_limited` source run with HTTP 429 and the 120-second Retry-After cooldown. The exact Workday candidate is not yet committed/pushed at this note; do not infer GitHub CI status from this local test result.
+
+
+## Current verification addendum — Workday candidate is separate from deployed P0
+
+The working tree on `fix/sqlite-notification-contention-20261108` now additionally contains a Workday public CXS collector, persisted 429/Retry-After cooldown, config version 13 and admin UI allowlist editor. It passes 12 focused Workday tests and the full V2 suite (359 tests, 266.690s), and one real NVIDIA public-board run produced 20/20 full-detail job records. **These Workday changes are not committed, are not in image `c441737`, and are not deployed to shared dev or production.** The shared-dev config must remain `workday=false` and `workday_boards=[]` until a separately approved board pilot and exact-SHA CI.

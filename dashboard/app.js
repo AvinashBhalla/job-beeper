@@ -1616,8 +1616,10 @@
     const enabled = c.source_enabled || {};
     document.querySelectorAll('#cfgSourcesWrap input[data-source]').forEach(input => {
       const src = input.dataset.source;
-      input.checked = enabled[src] !== false;
+      input.checked = enabled[src] === true;
     });
+    const workdayBoards = $('cfgWorkdayBoards');
+    if (workdayBoards) workdayBoards.value = JSON.stringify(c.workday_boards || [], null, 2);
 
   }
 
@@ -1647,6 +1649,15 @@
     document.querySelectorAll('#cfgSourcesWrap input[data-source]').forEach(input => {
       next.source_enabled[input.dataset.source] = input.checked;
     });
+    const workdayBoardsText = $('cfgWorkdayBoards')?.value.trim() || '[]';
+    try {
+      next.workday_boards = JSON.parse(workdayBoardsText);
+    } catch {
+      throw new Error('Workday board configuration must be valid JSON.');
+    }
+    if (!Array.isArray(next.workday_boards)) {
+      throw new Error('Workday board configuration must be a JSON array.');
+    }
 
     return next;
   }
@@ -1812,7 +1823,15 @@
   }
 
   async function savePreferences() {
-    const payload = state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload();
+    let payload;
+    try {
+      payload = state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload();
+    } catch (error) {
+      const message = error.message || 'Please check the configuration fields.';
+      if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;
+      showToast(message, 'error', 7000);
+      return;
+    }
     if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saving preferences…';
 
     if (!state.isAdmin) {

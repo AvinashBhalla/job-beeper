@@ -66,7 +66,14 @@ LINKEDIN_DEEP_TPR = "r21600"
 LEVER_PAGE_SIZE = 100
 LEVER_MAX_PAGES_PER_BOARD = 5
 LEVER_MAX_BOARDS = 20
-INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever"})
+WORKDAY_PAGE_SIZE = 20
+WORKDAY_MAX_PAGES_PER_BOARD = 1
+WORKDAY_MAX_DETAILS_PER_BOARD = 20
+WORKDAY_MAX_BOARDS = 20
+WORKDAY_DETAIL_DELAY_SECONDS = 0.1
+WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
+WORKDAY_MAX_429_COOLDOWN_SECONDS = 3600
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -187,6 +194,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     # Existing runtimes must never start polling new employer boards implicitly.
     if current_version < 12 <= default_version:
         merged.setdefault("source_enabled", {})["lever"] = False
+    # Version 13 adds Workday CXS as an opt-in public career-site source.
+    if current_version < 13 <= default_version:
+        merged.setdefault("source_enabled", {})["workday"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -203,7 +213,48 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             merged["source_enabled"]["ashby"] = False
         if current_version < 12 <= default_version:
             merged["source_enabled"]["lever"] = False
+        if current_version < 13 <= default_version:
+            merged["source_enabled"]["workday"] = False
     return merged
+
+
+def _parse_workday_board_url(value: Any) -> dict[str, str] | None:
+    """Resolve a public Workday career-board URL into its CXS identifiers."""
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 500:
+        return None
+    try:
+        parsed = urlsplit(value.strip())
+        host = (parsed.hostname or "").lower()
+        match = re.fullmatch(
+            r"(?P<tenant>[a-z0-9-]{1,80})\.wd(?P<cluster>[0-9]{1,3})\.myworkdayjobs\.com",
+            host,
+        )
+        if (
+            parsed.scheme.lower() != "https"
+            or not match
+            or parsed.port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            return None
+        segments = [segment for segment in parsed.path.split("/") if segment]
+        if segments and re.fullmatch(r"[a-z]{2}-[A-Z]{2}", segments[0]):
+            segments = segments[1:]
+        if len(segments) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", segments[0]):
+            return None
+        tenant = match.group("tenant")
+        site = segments[0]
+        return {
+            "url": f"https://{host}/{site}",
+            "host": host,
+            "tenant": tenant,
+            "cluster": match.group("cluster"),
+            "site": site,
+        }
+    except ValueError:
+        return None
 
 
 def validate_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -342,6 +393,29 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         })
     config["lever_boards"] = normalized_lever_boards
 
+    workday_boards = config.get("workday_boards", [])
+    if not isinstance(workday_boards, list):
+        raise HTTPException(status_code=422, detail="workday_boards must be a list.")
+    if len(workday_boards) > WORKDAY_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"workday_boards cannot contain more than {WORKDAY_MAX_BOARDS} boards.")
+    normalized_workday_boards: list[dict[str, str]] = []
+    seen_workday_boards: set[tuple[str, str]] = set()
+    for board in workday_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Workday board must be an object.")
+        parsed_board = _parse_workday_board_url(board.get("url"))
+        company = board.get("company")
+        if not parsed_board:
+            raise HTTPException(status_code=422, detail="Each Workday board requires an HTTPS public myworkdayjobs.com career URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Workday board requires a company label of at most 120 characters.")
+        identity = (parsed_board["host"], parsed_board["site"].lower())
+        if identity in seen_workday_boards:
+            raise HTTPException(status_code=422, detail="Duplicate Workday career board URL.")
+        seen_workday_boards.add(identity)
+        normalized_workday_boards.append({"url": parsed_board["url"], "company": company.strip()})
+    config["workday_boards"] = normalized_workday_boards
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -352,7 +426,13 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "greenhouse": bool(source_enabled.get("greenhouse", False)),
         "ashby": bool(source_enabled.get("ashby", False)),
         "lever": bool(source_enabled.get("lever", False)),
+        "workday": bool(source_enabled.get("workday", False)),
     }
+    if config["source_enabled"]["workday"] and not normalized_workday_boards:
+        raise HTTPException(
+            status_code=422,
+            detail="Add at least one verified Workday public career board before enabling Workday.",
+        )
 
     poll_seconds = config.get("poll_seconds", {})
     if not isinstance(poll_seconds, dict):
@@ -366,6 +446,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "greenhouse": 900,
             "ashby": 1800,
             "lever": 1800,
+            "workday": 120,
         }.items()
     }
 
@@ -2034,6 +2115,34 @@ def _tracked_source_get(
     return response
 
 
+def _tracked_source_post(
+    source: str,
+    endpoint: str,
+    *,
+    json_body: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    timeout: int = 20,
+) -> requests.Response:
+    """Record safe request metadata for a JSON POST; never persist payloads or URLs."""
+    started_monotonic = time.monotonic()
+    try:
+        response = requests.post(
+            endpoint, json=json_body, headers=headers, timeout=timeout
+        )
+    except Exception:
+        _record_source_request(
+            source, status_code=None,
+            duration_ms=(time.monotonic() - started_monotonic) * 1000,
+            exception=True,
+        )
+        raise
+    _record_source_request(
+        source, status_code=getattr(response, "status_code", None),
+        duration_ms=(time.monotonic() - started_monotonic) * 1000,
+    )
+    return response
+
+
 def _record_source_page(source: str, succeeded: bool) -> None:
     def update(metrics: dict[str, Any]) -> None:
         metrics["pages_attempted"] += 1
@@ -2188,6 +2297,50 @@ def restore_linkedin_rate_limit_state() -> None:
             "linkedin: restored 429 streak from recent history; streak=%s",
             linkedin_rate_limit_streak,
         )
+
+
+def restore_workday_rate_limit_state() -> None:
+    """Restore the latest Workday Retry-After cooldown after an application restart."""
+    runtime = source_state.setdefault("workday", {})
+    try:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT http_status,rate_limit_detected_at,finished_at,cooldown_seconds,retry_after_seconds "
+                "FROM source_runs WHERE source='workday' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+    except sqlite3.Error:
+        log.exception("workday: unable to restore persisted 429 cooldown")
+        return
+
+    if not row or int(row[0] or 0) != 429:
+        for key in (
+            "rate_limited_until", "rate_limited_until_monotonic",
+            "rate_limit_cooldown_seconds", "rate_limit_retry_after_seconds",
+            "rate_limit_detected_at",
+        ):
+            runtime.pop(key, None)
+        return
+
+    detected_at = parse_relative(row[1] or row[2])
+    if detected_at is None:
+        log.warning("workday: skipped invalid persisted rate-limit timestamp")
+        return
+    cooldown_seconds = max(60, min(
+        WORKDAY_MAX_429_COOLDOWN_SECONDS,
+        int(row[3] or WORKDAY_DEFAULT_429_COOLDOWN_SECONDS),
+    ))
+    elapsed_seconds = max(0.0, (now() - detected_at).total_seconds())
+    remaining_seconds = max(0.0, cooldown_seconds - elapsed_seconds)
+    runtime["rate_limit_detected_at"] = iso(detected_at)
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_retry_after_seconds"] = row[4]
+    if remaining_seconds > 0:
+        runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=remaining_seconds))
+        runtime["rate_limited_until_monotonic"] = time.monotonic() + remaining_seconds
+        log.warning("workday: restored persisted 429 cooldown; remaining=%ss", int(remaining_seconds))
+    else:
+        runtime.pop("rate_limited_until", None)
+        runtime.pop("rate_limited_until_monotonic", None)
 
 
 def normalize_phrase(value: str) -> str:
@@ -2919,6 +3072,29 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
         except (TypeError, ValueError, OverflowError):
             return None
 
+
+
+def _set_workday_rate_limit(response: requests.Response) -> int:
+    """Record a conservative source-wide Workday cooldown from a 429 response."""
+    retry_after = _retry_after_seconds(response)
+    requested = WORKDAY_DEFAULT_429_COOLDOWN_SECONDS if retry_after is None else max(60, retry_after)
+    cooldown_seconds = int(min(WORKDAY_MAX_429_COOLDOWN_SECONDS, requested))
+    runtime = source_state.setdefault("workday", {})
+    runtime["rate_limit_retry_after_seconds"] = retry_after
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_detected_at"] = iso(now())
+    runtime["rate_limited_until_monotonic"] = time.monotonic() + cooldown_seconds
+    runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=cooldown_seconds))
+    log.warning("workday: HTTP 429; pausing all Workday board requests for %ss", cooldown_seconds)
+    return cooldown_seconds
+
+
+def _workday_cooldown_remaining() -> float:
+    return max(
+        0.0,
+        float(source_state.get("workday", {}).get("rate_limited_until_monotonic", 0.0))
+        - time.monotonic(),
+    )
 
 
 def _source_run_error_metadata(exc: Exception) -> dict[str, Any]:
@@ -4175,6 +4351,251 @@ def lever_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect a bounded set of public Workday career-site postings.
+
+    This uses the public candidate career-site CXS interface, not the authenticated
+    Workday REST API. Boards must be explicitly allowlisted by real career URL.
+    The first page is polled frequently; pagination and detail calls are bounded.
+    """
+    boards = config.get("workday_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Workday is enabled but no public workday_boards are configured")
+    if len(boards) > WORKDAY_MAX_BOARDS:
+        raise RuntimeError("Workday board allowlist exceeds the configured safety limit")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    headers = {**UA, "Accept": "application/json", "Content-Type": "application/json"}
+
+    for board in boards:
+        parsed_board = _parse_workday_board_url(
+            board.get("url") if isinstance(board, dict) else None
+        )
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not parsed_board or not company:
+            _record_source_board("workday", False)
+            failures.append("invalid Workday public board configuration")
+            continue
+
+        host = parsed_board["host"]
+        tenant = parsed_board["tenant"]
+        site = parsed_board["site"]
+        board_url = parsed_board["url"]
+        list_endpoint = f"https://{host}/wday/cxs/{tenant}/{site}/jobs"
+        successful_pages = 0
+        details_attempted = 0
+        details_fetched = 0
+        board_jobs: list[dict[str, Any]] = []
+        rate_limited = False
+
+        for page_number in range(WORKDAY_MAX_PAGES_PER_BOARD):
+            offset = page_number * WORKDAY_PAGE_SIZE
+            payload = {
+                "appliedFacets": {},
+                "limit": WORKDAY_PAGE_SIZE,
+                "offset": offset,
+                "searchText": "",
+            }
+            try:
+                response = _tracked_source_post(
+                    "workday", list_endpoint, json_body=payload, headers=headers, timeout=20
+                )
+                response.raise_for_status()
+                data = response.json()
+                postings = data.get("jobPostings") if isinstance(data, dict) else None
+                if not isinstance(postings, list):
+                    raise ValueError("Workday response did not contain jobPostings")
+                successful_pages += 1
+                _record_source_page("workday", True)
+            except Exception as exc:
+                _record_source_page("workday", False)
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_workday_rate_limit(failed_response)
+                    rate_limited = True
+                    failures.append(f"{tenant}/{site} list rate limited")
+                else:
+                    failures.append(
+                        f"{tenant}/{site} page {page_number + 1}: {type(exc).__name__}"
+                    )
+                log.warning(
+                    "workday: tenant=%s site=%s page=%s failed error_type=%s",
+                    tenant, site, page_number + 1, type(exc).__name__,
+                )
+                break
+
+            for item in postings:
+                if not isinstance(item, dict):
+                    continue
+                title = item.get("title")
+                external_path = item.get("externalPath")
+                if not isinstance(title, str) or not title.strip():
+                    continue
+                if not isinstance(external_path, str) or not external_path.startswith("/job/"):
+                    continue
+                try:
+                    parsed_path = urlsplit(external_path)
+                except ValueError:
+                    continue
+                if (
+                    parsed_path.scheme or parsed_path.netloc or parsed_path.query
+                    or parsed_path.fragment or parsed_path.path != external_path
+                    or external_path.startswith("//") or "\\" in external_path
+                    or any(part in {".", ".."} for part in external_path.split("/"))
+                ):
+                    continue
+
+                bullet_fields = item.get("bulletFields")
+                safe_bullet_fields = (
+                    [str(value).strip() for value in bullet_fields
+                     if isinstance(value, (str, int)) and str(value).strip()][:10]
+                    if isinstance(bullet_fields, list) else []
+                )
+
+                detail_info: dict[str, Any] = {}
+                # Detail retrieval does not depend on the administrator's role or
+                # location filters; per-user evaluation happens after ingestion.
+                if details_attempted < WORKDAY_MAX_DETAILS_PER_BOARD:
+                    try:
+                        if details_attempted:
+                            time.sleep(WORKDAY_DETAIL_DELAY_SECONDS)
+                        details_attempted += 1
+                        detail_response = _tracked_source_get(
+                            "workday",
+                            f"https://{host}/wday/cxs/{tenant}/{site}{external_path}",
+                            headers={**UA, "Accept": "application/json"},
+                            timeout=20,
+                        )
+                        detail_response.raise_for_status()
+                        detail_payload = detail_response.json()
+                        candidate_info = (
+                            detail_payload.get("jobPostingInfo")
+                            if isinstance(detail_payload, dict) else None
+                        )
+                        if isinstance(candidate_info, dict):
+                            detail_info = candidate_info
+                        details_fetched += 1
+                    except Exception as exc:
+                        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                        log.warning(
+                            "workday: tenant=%s site=%s detail failed status=%s error_type=%s",
+                            tenant, site, status_code, type(exc).__name__,
+                        )
+                        if status_code == 429:
+                            _set_workday_rate_limit(exc.response)
+                            rate_limited = True
+                            failures.append(f"{tenant}/{site} detail rate limited")
+                            break
+
+                raw_requisition_id = (
+                    detail_info.get("jobReqId")
+                    or (safe_bullet_fields[0] if safe_bullet_fields else None)
+                    or detail_info.get("jobPostingId")
+                    or detail_info.get("id")
+                    or external_path.rsplit("/", 1)[-1]
+                )
+                requisition_id = re.sub(
+                    r"[^A-Za-z0-9_-]+", "-", str(raw_requisition_id)
+                ).strip("-_")
+                if not requisition_id:
+                    continue
+                source_id = f"workday-{tenant}-{site}-{requisition_id}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+
+                locations: list[str] = []
+                primary_location = (
+                    detail_info.get("location")
+                    or detail_info.get("jobRequisitionLocation")
+                )
+                if isinstance(primary_location, dict):
+                    primary_location = (
+                        primary_location.get("descriptor")
+                        or primary_location.get("name")
+                    )
+                if isinstance(primary_location, str) and primary_location.strip():
+                    locations.append(primary_location.strip())
+                extra_locations = detail_info.get("additionalLocations")
+                if isinstance(extra_locations, list):
+                    locations.extend(
+                        value.strip() for value in extra_locations
+                        if isinstance(value, str) and value.strip()
+                    )
+                location = ", ".join(dict.fromkeys(locations))
+
+                raw_description = detail_info.get("jobDescription")
+                description = (
+                    BeautifulSoup(
+                        html_lib.unescape(raw_description), "html.parser"
+                    ).get_text(" ", strip=True)
+                    if isinstance(raw_description, str) else ""
+                )
+                details = {
+                    "workday_tenant": tenant,
+                    "workday_cluster": parsed_board["cluster"],
+                    "workday_site": site,
+                    "requisition_id": requisition_id,
+                    "job_posting_id": detail_info.get("jobPostingId"),
+                    "posted_on_label": item.get("postedOn") or detail_info.get("postedOn"),
+                    "locations_text": item.get("locationsText"),
+                    "employment_type": detail_info.get("timeType"),
+                    "start_date": detail_info.get("startDate"),
+                    "additional_locations": (
+                        extra_locations if isinstance(extra_locations, list) else []
+                    ),
+                    "details_fetched": bool(detail_info),
+                    "listing_bullet_fields": safe_bullet_fields,
+                }
+                board_jobs.append(normalize_job(
+                    "workday",
+                    source_id,
+                    company,
+                    str(detail_info.get("title") or title).strip(),
+                    location,
+                    board_url + external_path,
+                    None,
+                    "unknown",
+                    description,
+                    source_details=details,
+                ))
+
+            if rate_limited or len(postings) < WORKDAY_PAGE_SIZE:
+                break
+            if page_number == WORKDAY_MAX_PAGES_PER_BOARD - 1:
+                log.warning(
+                    "workday: tenant=%s site=%s reached bounded pagination cap pages=%s page_size=%s",
+                    tenant, site, WORKDAY_MAX_PAGES_PER_BOARD, WORKDAY_PAGE_SIZE,
+                )
+
+        if successful_pages:
+            successful_boards += 1
+            _record_source_board("workday", True)
+            jobs.extend(board_jobs)
+        else:
+            _record_source_board("workday", False)
+        if rate_limited:
+            break
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Workday boards failed: {details}")
+    if failures:
+        log.warning(
+            "workday: partial board/page failures=%s successful_boards=%s",
+            len(failures), successful_boards,
+        )
+    log.info(
+        "workday: boards=%s successful=%s failed=%s jobs=%s detail_attempt_cap_per_board=%s",
+        len(boards), successful_boards, len(failures), len(jobs),
+        WORKDAY_MAX_DETAILS_PER_BOARD,
+    )
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -4182,6 +4603,7 @@ COLLECTORS = {
     "greenhouse": greenhouse_collect,
     "ashby": ashby_collect,
     "lever": lever_collect,
+    "workday": workday_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -4279,13 +4701,15 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         finished = now()
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         cooldown_remaining = (
-            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
-        )
-        rate_limit_seen = (
-            source == "linkedin"
-            and linkedin_rate_limit_generation != rate_limit_generation_at_start
+            _linkedin_cooldown_remaining() if source == "linkedin"
+            else _workday_cooldown_remaining() if source == "workday"
+            else 0.0
         )
         metrics = request_metrics or {}
+        rate_limit_seen = (
+            (source == "linkedin" and linkedin_rate_limit_generation != rate_limit_generation_at_start)
+            or (source == "workday" and bool(metrics.get("http_429", 0)))
+        )
         partial_page_failure = (
             metrics.get("pages_failed", 0) > 0
             and metrics.get("pages_succeeded", 0) > 0
@@ -4380,6 +4804,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             )
         elif not rate_limit_seen:
             runtime.pop("rate_limited_until", None)
+            runtime.pop("rate_limited_until_monotonic", None)
             runtime.pop("rate_limit_cooldown_seconds", None)
             runtime.pop("rate_limit_retry_after_seconds", None)
             runtime.pop("rate_limit_detected_at", None)
@@ -4395,10 +4820,22 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         metadata = _source_run_error_metadata(exc)
         cooldown_remaining = (
-            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
+            _linkedin_cooldown_remaining() if source == "linkedin"
+            else _workday_cooldown_remaining() if source == "workday"
+            else 0.0
         )
         if source == "linkedin" and cooldown_remaining > 0:
             metadata["rate_limited"] = True
+        if source == "workday" and cooldown_remaining > 0:
+            metadata.update({
+                "rate_limited": True,
+                "http_status": 429,
+                "error": "HTTP 429",
+                "error_type": "HTTPError",
+                "retry_after_seconds": source_state.get(source, {}).get(
+                    "rate_limit_retry_after_seconds"
+                ),
+            })
         if metadata["rate_limited"]:
             outcome = "rate_limited"
         else:
@@ -4425,7 +4862,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             cooldown_seconds=cooldown_seconds,
             rate_limit_detected_at=(
                 source_state.get(source, {}).get("rate_limit_detected_at")
-                if source == "linkedin" and metadata["rate_limited"] else None
+                if source in {"linkedin", "workday"} and metadata["rate_limited"] else None
             ),
             request_metrics=request_metrics,
         )
@@ -4505,6 +4942,8 @@ async def scheduler() -> None:
                 continue
             if name == "linkedin" and _linkedin_cooldown_remaining() > 0:
                 continue
+            if name == "workday" and _workday_cooldown_remaining() > 0:
+                continue
             if source_state.get(name, {}).get("running"):
                 continue
             interval = max(60, int(intervals.get(name, 600)))
@@ -4524,6 +4963,7 @@ async def scheduler() -> None:
 async def startup() -> None:
     init_db()
     restore_linkedin_rate_limit_state()
+    restore_workday_rate_limit_state()
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
