@@ -61,3 +61,7 @@ A follow-up isolated QA check showed the earlier JG Summit example at `jgsummit.
 - QA probes returned Greenhouse Coinbase 283, Graviton Research Capital 21, Zocdoc 64; Ashby OpenAI 816, PostHog 10; Workday NVIDIA first page 20; SmartRecruiters Bosch Group page 10; Workable Hugging Face 6; Keka Bridgestone 109; Darwinbox Arvind 36.
 - Arvind Darwinbox isolated two-poll run: 36 jobs inserted and baseline-marked on first poll, 0 new on second, both successful, no sent Telegram rows, SQLite integrity `ok`.
 - These results are one-shot public endpoint verification and do not authorize broad enabling without registry IDs and safe baseline handling. Airtel, LeadSquared, Sterling and the previous JG Summit `.com` Darwinbox routes returned 403 and should remain inactive.
+
+### Preconfigured board activation safety
+
+The admin activation path now reuses an existing matching provider entry (Greenhouse token, Ashby board slug, Workday tenant/site, SmartRecruiters identifier, Workable account, Lever site/instance, Keka tenant or Darwinbox tenant/company ID) and adds its registry ID in place. It will not duplicate the configured board. A board linked to a different registry row is rejected. This lets existing Greenhouse/Ashby allowlists receive per-board baseline markers when activated.

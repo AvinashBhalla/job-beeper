@@ -6465,3 +6465,9 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Verification failures were also observed for Airtel, LeadSquared and Sterling Darwinbox tenant URLs (HTTP 403). Do not enable them. JG Summit `.com` gave 403; its former 18-job result is superseded. The detector now rejects `.darwinbox.com` and accepts only `.darwinbox.in`.
 - Isolated QA API checks: port 8010; health 200, dashboard static route 200, anonymous `/api/discovery/boards` returns 401, notifications disabled, every collector off, no Telegram/LLM credentials, QA DB integrity `ok`. Chromium/Playwright browser binary is not installed on the VM, so full interactive visual browser QA remains outstanding; dashboard JS syntax passed GitHub CI. Admin API and endpoint behavior are covered by unit/integration tests.
 - The current candidate code plus docs/tests still needs a final commit/push to `integration/pr46-v2-rebase-20261108`, followed by exact-SHA GitHub CI. No production config, image, volume or notifier changed during these QA checks.
+
+### 2026-11-08 — activation now reuses configured board entries
+
+- Production already has three Greenhouse and two Ashby board definitions, while `ats_board_registry` is empty. The discovery activation helper previously matched only on `registry_id`, which would append a second config entry for a preconfigured but not-yet-registered board. It now matches provider-specific board identity, attaches the registry ID to the existing entry, and rejects a conflicting registry link rather than duplicating the board.
+- Added regression coverage for activation of an already configured Greenhouse board; focused Greenhouse/Keka activation tests pass. This is required for per-board initial-baseline suppression on the existing production allowlists.
+- Candidate needs a fresh exact-SHA full suite/CI after this activation dedup fix. Production remains unchanged.

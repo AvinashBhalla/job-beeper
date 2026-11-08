@@ -223,6 +223,24 @@ class BoardDiscoveryApiTests(unittest.TestCase):
             row = conn.execute("SELECT review_status,baseline_pending FROM ats_board_registry WHERE id=?", (board_id,)).fetchone()
         self.assertEqual(row, ("active", 1))
 
+    def test_activation_links_preconfigured_greenhouse_board_without_duplicate(self):
+        board_id = self._insert_verified_greenhouse_board()
+        config = radar._default_config()
+        config["greenhouse_boards"] = [{"token": "acme", "company": "Acme"}]
+        with patch.object(radar, "get_config", return_value=config), patch.object(
+            radar, "save_config", side_effect=lambda value: value
+        ), patch.object(radar, "refresh_job_evaluations"), patch.object(
+            radar, "refresh_notification_decisions"
+        ), patch.object(radar, "refresh_configured_user_evaluations"):
+            response = self.client.post(
+                f"/api/discovery/boards/{board_id}/activate",
+                headers={"X-CSRF-Token": self.csrf},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(len(config["greenhouse_boards"]), 1)
+        self.assertEqual(config["greenhouse_boards"][0]["registry_id"], board_id)
+        self.assertTrue(config["source_enabled"]["greenhouse"])
+
     def test_verified_keka_board_activation_maps_registry_to_public_careers_url(self):
         timestamp = radar.iso(radar.now())
         careers_url = "https://bridgestone1.keka.com/careers"

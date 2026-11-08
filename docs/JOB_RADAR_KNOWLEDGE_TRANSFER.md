@@ -3449,3 +3449,7 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Corrected local V2 full suite on Darwinbox host restriction passed 387 in 291.998s. After Workable probe change, 10 focused tests (Workable verification + Keka/Darwinbox class) pass; a complete exact-final-SHA CI run must cover all changes.
 - QA app is isolated on 127.0.0.1:8010 with volume `job-radar-connectors-qa_qa-data`, config v15, all sources off and notifications off. Health/dashboard 200; anonymous admin endpoint 401; DB integrity ok. No Chromium browser is installed on the VM, so full visual login/discovery UI testing is still pending.
 - No production changes. Production v14 source configuration remains unchanged. Do not enable empty/unverified boards; see detailed handover for exact prod config and per-source verification summary.
+
+### Activation dedup guard
+
+Production already contains Greenhouse and Ashby allowlist entries but no ATS board registry rows. The activation flow now links a verified registry row to an existing matching provider entry by its source-specific key and attaches `registry_id`, rather than appending a duplicate. A pre-existing entry linked to a different registry ID is rejected. A regression test covers Greenhouse; this protects per-employer silent-baseline suppression when the preconfigured boards are activated.

@@ -6654,7 +6654,44 @@ def activate_discovered_board(board_id: int):
 
     config = get_config()
     current_entries = list(config.get(config_key) or [])
-    existing = next((item for item in current_entries if int(item.get("registry_id") or 0) == board_id), None)
+
+    def same_configured_board(item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        if provider == "greenhouse":
+            return str(item.get("token") or "").strip().lower() == key.lower()
+        if provider == "ashby":
+            return str(item.get("board") or "").strip().lower() == key.lower()
+        if provider == "lever":
+            item_instance = str(item.get("instance") or "global").strip().lower()
+            expected_instance = "eu" if ".eu." in (urlsplit(board["board_url"]).hostname or "") else "global"
+            return str(item.get("site") or "").strip().lower() == key.lower() and item_instance == expected_instance
+        if provider == "smartrecruiters":
+            value = item.get("company_identifier") or item.get("identifier")
+            return isinstance(value, str) and value.strip().lower() == key.lower()
+        if provider == "workable":
+            value = item.get("account") or item.get("subdomain")
+            return isinstance(value, str) and value.strip().lower() == key.lower()
+        if provider == "workday":
+            parsed = _parse_workday_board_url(item.get("url"))
+            return bool(parsed and f"{parsed['tenant']}:{parsed['site']}".lower() == key.lower())
+        if provider in {"keka", "darwinbox"}:
+            value = item.get("careers_url") or item.get("url")
+            detected = board_discovery.detect_ats_board(value) if isinstance(value, str) else None
+            return bool(detected and detected.get("provider") == provider and str(detected.get("board_key", "")).lower() == key.lower())
+        return False
+
+    existing = next((
+        item for item in current_entries
+        if isinstance(item, dict) and str(item.get("registry_id") or "") == str(board_id)
+    ), None)
+    if existing is None:
+        existing = next((item for item in current_entries if same_configured_board(item)), None)
+        if existing is not None:
+            linked_id = existing.get("registry_id")
+            if linked_id not in (None, "", board_id, str(board_id)):
+                raise HTTPException(status_code=409, detail="This board is already linked to a different registry entry.")
+            existing["registry_id"] = board_id
     if existing is None:
         registry_entry["registry_id"] = board_id
         current_entries.append(registry_entry)
