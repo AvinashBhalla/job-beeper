@@ -109,3 +109,5 @@ During a code-level integration review, a remaining cross-source notification ga
 - All member notification tests: **17 passed**. Full integration V2 suite: **336 passed** in **194.322 seconds**. Python compile and `git diff --check` passed.
 - This is a verified source-level fix; no real Telegram message or outbound Telegram request occurred. Lever remains disabled, all candidate QA collector switches remain off, and production/shared-dev are untouched.
 - This correction supersedes the earlier wording that the member queue was fully protected before this change. The newly inspected code path was not covered by the prior test.
+
+- Integration follow-up: per-user notification queue now checks canonical `notification_ledger.baseline_suppressed=1` at enqueue, claim and final send validation, not just `jobs.source_initial_baseline`. Cross-source canonical cases and stale queued items are covered by regression tests. Verified in integration candidate head `9ac6fab`; 17 notification tests and 336 full-suite tests pass.
