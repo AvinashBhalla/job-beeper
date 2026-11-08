@@ -3235,3 +3235,15 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - Current live shared-dev `/health` returned HTTP 200 and protected unauthenticated APIs returned 401. Termalin Docker access fails with permission denied; no live DB/config/volume/container was changed, no `sudo`/permission workaround used, and production remains untouched.
 - Next action is a controlled shared-dev-only candidate push on port 8001, after explicit owner approval and a fresh SQLite online backup, preserving volume/rollback/config and keeping Naukri-only, notifications/Telegram off, LinkedIn and other new sources off, Gemini off. Verify at least two actual Naukri polling cycles plus job/canonical/evaluation/feed/ledger deltas; keep production port 8000 unchanged. A Docker-authorized operator/session is needed to execute the image build and container recreation.
 - PR #51 remains open/draft. The candidate is **not yet pushed to shared dev**. Do not call this a production release.
+
+
+## Latest state — 2026-11-08 (shared-dev promotion approved; awaiting Docker-authorized operator)
+
+- Owner approved shared-dev promotion. Approval scope is port 8001 only, not production port 8000.
+- Candidate PR #51 head before latest deployment note: `e299efdb228b4a05fdc106a0e5e70b9344adf607`; V2 CI run `42471400933` passed on that exact head. Candidate application code SHA `cf778c1f1da33c773f820cafea991fb084c58da8` passed the disposable real-data dry run.
+- Core Naukri pipeline was demonstrated with a real shared-dev snapshot and fresh public relay, but no candidate container has been promoted to the live shared-dev database/scheduler.
+- Termalin's only connected shell runs as `ubuntu`, not in the `docker` group; Docker socket is root:docker 0660 and Docker CLI returns permission denied. No sudo, group change or socket chmod workaround was attempted. No self-hosted deployment workflow/runner exists in repo.
+- Fresh pre-promotion backup not available. Existing 09:44 UTC snapshot is older than the immediate deployment window; configured Termalin full-server backup is an unconfirmed DRAFT with no archives.
+- Live `/health`: shared dev 8001 HTTP 200; production 8000 HTTP 200. Neither was changed. No fresh backup, image build/recreate, DB/config/volume mutation, source flag change, PR merge or production deployment occurred.
+- Detailed execution report: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`. Next step: provide an already Docker-authorized operator session, take a fresh SQLite online backup, deploy only shared dev with Naukri enabled and all other sources/notifications/Gemini disabled, verify health, then observe at least two Naukri scheduler cycles. Do not post credentials in chat.
+- Promotion is approved but **not yet pushed**.
