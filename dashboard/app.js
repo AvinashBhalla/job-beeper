@@ -33,6 +33,7 @@
     isAdmin: false,
     userPreferences: null,
     sourceStatus: [],
+    discoveredBoards: [],
     activeSection: 'jobsSection',
     filters: {
       search: '',
@@ -1555,6 +1556,10 @@
         instahyre: 'Instahyre',
         greenhouse: 'Greenhouse',
         ashby: 'Ashby',
+        lever: 'Lever',
+        workday: 'Workday',
+        smartrecruiters: 'SmartRecruiters',
+        workable: 'Workable',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
@@ -1620,6 +1625,10 @@
     });
     const workdayBoards = $('cfgWorkdayBoards');
     if (workdayBoards) workdayBoards.value = JSON.stringify(c.workday_boards || [], null, 2);
+    const smartRecruitersBoards = $('cfgSmartRecruitersBoards');
+    if (smartRecruitersBoards) smartRecruitersBoards.value = JSON.stringify(c.smartrecruiters_boards || [], null, 2);
+    const workableBoards = $('cfgWorkableBoards');
+    if (workableBoards) workableBoards.value = JSON.stringify(c.workable_boards || [], null, 2);
 
   }
 
@@ -1649,14 +1658,21 @@
     document.querySelectorAll('#cfgSourcesWrap input[data-source]').forEach(input => {
       next.source_enabled[input.dataset.source] = input.checked;
     });
-    const workdayBoardsText = $('cfgWorkdayBoards')?.value.trim() || '[]';
-    try {
-      next.workday_boards = JSON.parse(workdayBoardsText);
-    } catch {
-      throw new Error('Workday board configuration must be valid JSON.');
-    }
-    if (!Array.isArray(next.workday_boards)) {
-      throw new Error('Workday board configuration must be a JSON array.');
+    const boardArrays = [
+      ['cfgWorkdayBoards', 'workday_boards', 'Workday'],
+      ['cfgSmartRecruitersBoards', 'smartrecruiters_boards', 'SmartRecruiters'],
+      ['cfgWorkableBoards', 'workable_boards', 'Workable'],
+    ];
+    for (const [elementId, configKey, label] of boardArrays) {
+      const raw = $(elementId)?.value.trim() || '[]';
+      try {
+        next[configKey] = JSON.parse(raw);
+      } catch {
+        throw new Error(`${label} board configuration must be valid JSON.`);
+      }
+      if (!Array.isArray(next[configKey])) {
+        throw new Error(`${label} board configuration must be a JSON array.`);
+      }
     }
 
     return next;
@@ -1999,6 +2015,7 @@
       state.sourceStatus = data.sources || [];
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
+        void loadDiscoveredBoards();
       }
     } catch (e) {
       state.sourceStatus = [
@@ -2010,6 +2027,148 @@
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
       }
+    }
+  }
+
+  function renderDiscoveredBoards() {
+    const tbody = $('discoveredBoardsTableBody');
+    if (!tbody) return;
+    const boards = state.discoveredBoards || [];
+    if (!boards.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No discovered boards yet. Add a company website above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = boards.map(board => {
+      const collector = board.collector_available
+        ? `<span style="color:var(--status-success);">${esc(board.collector_source)} available</span>`
+        : '<span style="color:var(--text-muted);">Discovery only</span>';
+      const review = esc(board.review_status || 'discovered');
+      const verifyButton = board.collector_available && board.review_status !== 'verified' && board.review_status !== 'active'
+        ? `<button type="button" class="btn-pill btn-pill-secondary board-verify-btn" data-board-id="${esc(board.id)}">Verify endpoint</button>`
+        : '';
+      const activateButton = board.review_status === 'verified'
+        ? `<button type="button" class="btn-pill btn-pill-primary board-activate-btn" data-board-id="${esc(board.id)}">Activate source</button>`
+        : '';
+      const actions = board.review_status === 'active'
+        ? '<span style="color:var(--status-success);">Active</span>'
+        : `${verifyButton}${activateButton}<button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="reviewed">Mark reviewed</button><button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="rejected">Reject</button>`;
+      return `<tr>
+        <td><b>${esc(board.company_name)}</b><div style="font-size:11px;color:var(--text-muted);">${esc(board.domain)}</div></td>
+        <td>${esc(board.provider)}</td>
+        <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a></td>
+        <td>${collector}</td>
+        <td>${review}</td>
+        <td><a href="${esc(board.discovered_from)}" target="_blank" rel="noopener noreferrer">Open page</a></td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap;">${actions}</td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.board-review-btn').forEach(button => {
+      button.addEventListener('click', () => reviewDiscoveredBoard(
+        Number(button.dataset.boardId), button.dataset.status
+      ));
+    });
+    tbody.querySelectorAll('.board-verify-btn').forEach(button => {
+      button.addEventListener('click', () => verifyDiscoveredBoard(Number(button.dataset.boardId), button));
+    });
+    tbody.querySelectorAll('.board-activate-btn').forEach(button => {
+      button.addEventListener('click', () => activateDiscoveredBoard(Number(button.dataset.boardId), button));
+    });
+  }
+
+  async function loadDiscoveredBoards() {
+    if (!state.isAdmin) return;
+    const tbody = $('discoveredBoardsTableBody');
+    if (tbody && !state.discoveredBoards?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading discovered boards…</td></tr>';
+    }
+    try {
+      const response = await authClient.request('/discovery/boards?limit=500', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Could not load boards (HTTP ${response.status}).`);
+      const data = await response.json();
+      state.discoveredBoards = data.boards || [];
+      renderDiscoveredBoards();
+    } catch (error) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:var(--status-error);padding:var(--space-12);">${esc(error.message || 'Board registry unavailable.')}</td></tr>`;
+    }
+  }
+
+  async function discoverCompanyBoards(event) {
+    event.preventDefault();
+    const button = $('discoverCompanyBtn');
+    const status = $('boardDiscoveryStatus');
+    const companyName = $('discoveryCompanyName')?.value.trim();
+    const websiteUrl = $('discoveryWebsiteUrl')?.value.trim();
+    const careersUrl = $('discoveryCareersUrl')?.value.trim();
+    const country = $('discoveryCountry')?.value.trim();
+    if (!companyName || !websiteUrl) return;
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Scanning public company and careers pages…';
+    try {
+      const response = await authClient.request('/discovery/companies/scan', {
+        method: 'POST',
+        body: { company_name: companyName, website_url: websiteUrl, careers_url: careersUrl || null, country: country || null },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Discovery failed (HTTP ${response.status}).`);
+      const found = Number(data.boards_discovered || 0);
+      if (status) status.textContent = `${data.company_name}: checked ${data.pages_checked} public page(s), found ${found} board candidate(s). No source was enabled.`;
+      if ($('discoveryCompanyName')) $('discoveryCompanyName').value = '';
+      if ($('discoveryWebsiteUrl')) $('discoveryWebsiteUrl').value = '';
+      if ($('discoveryCareersUrl')) $('discoveryCareersUrl').value = '';
+      await loadDiscoveredBoards();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Company discovery failed.';
+      showToast(error.message || 'Company discovery failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function verifyDiscoveredBoard(boardId, button) {
+    if (button) button.disabled = true;
+    if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `Checking public ATS endpoint for board ${boardId}…`;
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/verify`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Board verification failed (HTTP ${response.status}).`);
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `${data.provider}: endpoint verified, ${data.jobs_observed} public listing(s) visible. Scheduler is still disabled.`;
+      await loadDiscoveredBoards();
+    } catch (error) {
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = error.message || 'Board verification failed.';
+      showToast(error.message || 'Board verification failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function activateDiscoveredBoard(boardId, button) {
+    if (button) button.disabled = true;
+    if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `Activating verified board ${boardId}…`;
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/activate`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Activation failed (HTTP ${response.status}).`);
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `${data.provider}: source enabled at ${data.poll_interval_seconds}s. First poll is silent baseline inventory.`;
+      await Promise.all([loadDiscoveredBoards(), loadSourceStatusTelemetry()]);
+    } catch (error) {
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = error.message || 'Board activation failed.';
+      showToast(error.message || 'Board activation failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function reviewDiscoveredBoard(boardId, reviewStatus) {
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/review`, {
+        method: 'POST', body: { status: reviewStatus },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Review failed (HTTP ${response.status}).`);
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `Board ${boardId} marked ${reviewStatus}. This does not enable polling.`;
+      await loadDiscoveredBoards();
+    } catch (error) {
+      showToast(error.message || 'Could not update board review status.', 'error', 7000);
     }
   }
 
@@ -2033,6 +2192,10 @@
       { value: 'greenhouse', label: 'Greenhouse' },
       { value: 'ashby', label: 'Ashby' },
       { value: 'instahyre', label: 'Instahyre' },
+      { value: 'lever', label: 'Lever' },
+      { value: 'workday', label: 'Workday' },
+      { value: 'smartrecruiters', label: 'SmartRecruiters' },
+      { value: 'workable', label: 'Workable' },
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';
@@ -2116,6 +2279,7 @@
     // Refresh buttons
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
     if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
+    if ($('boardDiscoveryForm')) $('boardDiscoveryForm').addEventListener('submit', discoverCompanyBoards);
 
     // Server-side job feed pagination.
     if ($('previousJobsPageBtn')) $('previousJobsPageBtn').addEventListener('click', () => {

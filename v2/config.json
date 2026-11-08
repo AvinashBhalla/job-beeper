@@ -6,7 +6,9 @@
     "greenhouse": 900,
     "ashby": 1800,
     "lever": 1800,
-    "workday": 120
+    "workday": 120,
+    "smartrecruiters": 120,
+    "workable": 120
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -110,9 +112,11 @@
     "greenhouse": false,
     "ashby": false,
     "lever": false,
-    "workday": false
+    "workday": false,
+    "smartrecruiters": false,
+    "workable": false
   },
-  "config_version": 13,
+  "config_version": 14,
   "workday_boards": [],
   "greenhouse_boards": [
     {
@@ -138,5 +142,7 @@
       "company": "PostHog"
     }
   ],
-  "lever_boards": []
+  "lever_boards": [],
+  "smartrecruiters_boards": [],
+  "workable_boards": []
 }

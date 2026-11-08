@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications
+from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -73,6 +73,14 @@ WORKDAY_MAX_BOARDS = 20
 WORKDAY_DETAIL_DELAY_SECONDS = 0.1
 WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
 WORKDAY_MAX_429_COOLDOWN_SECONDS = 3600
+SMARTRECRUITERS_PAGE_SIZE = 100
+SMARTRECRUITERS_MAX_PAGES_PER_BOARD = 3
+SMARTRECRUITERS_MAX_DETAILS_PER_BOARD = 20
+SMARTRECRUITERS_MAX_BOARDS = 50
+SMARTRECRUITERS_DETAIL_DELAY_SECONDS = 0.1
+WORKABLE_MAX_JOBS_PER_BOARD = 500
+WORKABLE_MAX_BOARDS = 50
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable"})
 INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
@@ -197,6 +205,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     # Version 13 adds Workday CXS as an opt-in public career-site source.
     if current_version < 13 <= default_version:
         merged.setdefault("source_enabled", {})["workday"] = False
+    if current_version < 14 <= default_version:
+        merged.setdefault("source_enabled", {})["smartrecruiters"] = False
+        merged.setdefault("source_enabled", {})["workable"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -215,6 +226,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             merged["source_enabled"]["lever"] = False
         if current_version < 13 <= default_version:
             merged["source_enabled"]["workday"] = False
+        if current_version < 14 <= default_version:
+            merged["source_enabled"]["smartrecruiters"] = False
+            merged["source_enabled"]["workable"] = False
     return merged
 
 
@@ -255,6 +269,19 @@ def _parse_workday_board_url(value: Any) -> dict[str, str] | None:
         }
     except ValueError:
         return None
+
+
+def _optional_registry_id(board: dict[str, Any], provider: str) -> int | None:
+    value = board.get("registry_id")
+    if value is None:
+        return None
+    try:
+        identifier = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"{provider} registry_id must be an integer.") from exc
+    if identifier < 1:
+        raise HTTPException(status_code=422, detail=f"{provider} registry_id must be positive.")
+    return identifier
 
 
 def validate_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -333,7 +360,11 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if token.lower() in seen_board_tokens:
             raise HTTPException(status_code=422, detail=f"Duplicate Greenhouse board token: {token}.")
         seen_board_tokens.add(token.lower())
-        normalized_boards.append({"token": token, "company": company.strip()})
+        normalized_entry = {"token": token, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Greenhouse")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_boards.append(normalized_entry)
     config["greenhouse_boards"] = normalized_boards
 
     ashby_boards = config.get("ashby_boards", [])
@@ -356,7 +387,11 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if name.lower() in seen_ashby_board_names:
             raise HTTPException(status_code=422, detail=f"Duplicate Ashby board name: {name}.")
         seen_ashby_board_names.add(name.lower())
-        normalized_ashby_boards.append({"board": name, "company": company.strip()})
+        normalized_entry = {"board": name, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Ashby")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_ashby_boards.append(normalized_entry)
     config["ashby_boards"] = normalized_ashby_boards
 
     lever_boards = config.get("lever_boards", [])
@@ -386,11 +421,11 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if identity in seen_lever_sites:
             raise HTTPException(status_code=422, detail=f"Duplicate Lever board site: {site} ({instance}).")
         seen_lever_sites.add(identity)
-        normalized_lever_boards.append({
-            "site": site,
-            "company": company.strip(),
-            "instance": instance,
-        })
+        normalized_entry = {"site": site, "company": company.strip(), "instance": instance}
+        registry_id = _optional_registry_id(board, "Lever")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_lever_boards.append(normalized_entry)
     config["lever_boards"] = normalized_lever_boards
 
     workday_boards = config.get("workday_boards", [])
@@ -413,8 +448,62 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if identity in seen_workday_boards:
             raise HTTPException(status_code=422, detail="Duplicate Workday career board URL.")
         seen_workday_boards.add(identity)
-        normalized_workday_boards.append({"url": parsed_board["url"], "company": company.strip()})
+        normalized_entry = {"url": parsed_board["url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Workday")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_workday_boards.append(normalized_entry)
     config["workday_boards"] = normalized_workday_boards
+
+    smartrecruiters_boards = config.get("smartrecruiters_boards", [])
+    if not isinstance(smartrecruiters_boards, list) or len(smartrecruiters_boards) > SMARTRECRUITERS_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"smartrecruiters_boards must be a list with at most {SMARTRECRUITERS_MAX_BOARDS} entries.")
+    normalized_smartrecruiters: list[dict[str, str]] = []
+    seen_smartrecruiters: set[str] = set()
+    for board in smartrecruiters_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each SmartRecruiters board must be an object.")
+        identifier = board.get("company_identifier") or board.get("identifier")
+        company = board.get("company")
+        if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", identifier.strip()):
+            raise HTTPException(status_code=422, detail="Each SmartRecruiters board requires a valid company identifier.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each SmartRecruiters board requires a company label of at most 120 characters.")
+        identifier = identifier.strip()
+        if identifier.lower() in seen_smartrecruiters:
+            raise HTTPException(status_code=422, detail=f"Duplicate SmartRecruiters company identifier: {identifier}.")
+        seen_smartrecruiters.add(identifier.lower())
+        normalized_entry = {"company_identifier": identifier, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "SmartRecruiters")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_smartrecruiters.append(normalized_entry)
+    config["smartrecruiters_boards"] = normalized_smartrecruiters
+
+    workable_boards = config.get("workable_boards", [])
+    if not isinstance(workable_boards, list) or len(workable_boards) > WORKABLE_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"workable_boards must be a list with at most {WORKABLE_MAX_BOARDS} entries.")
+    normalized_workable: list[dict[str, str]] = []
+    seen_workable: set[str] = set()
+    for board in workable_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Workable board must be an object.")
+        account = board.get("account") or board.get("subdomain")
+        company = board.get("company")
+        if not isinstance(account, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,100}", account.strip()):
+            raise HTTPException(status_code=422, detail="Each Workable board requires a valid public account slug.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Workable board requires a company label of at most 120 characters.")
+        account = account.strip()
+        if account.lower() in seen_workable:
+            raise HTTPException(status_code=422, detail=f"Duplicate Workable account: {account}.")
+        seen_workable.add(account.lower())
+        normalized_entry = {"account": account, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Workable")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_workable.append(normalized_entry)
+    config["workable_boards"] = normalized_workable
 
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
@@ -427,12 +516,17 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "ashby": bool(source_enabled.get("ashby", False)),
         "lever": bool(source_enabled.get("lever", False)),
         "workday": bool(source_enabled.get("workday", False)),
+        "smartrecruiters": bool(source_enabled.get("smartrecruiters", False)),
+        "workable": bool(source_enabled.get("workable", False)),
     }
     if config["source_enabled"]["workday"] and not normalized_workday_boards:
         raise HTTPException(
             status_code=422,
             detail="Add at least one verified Workday public career board before enabling Workday.",
         )
+    for source, configured_boards in (("smartrecruiters", normalized_smartrecruiters), ("workable", normalized_workable)):
+        if config["source_enabled"][source] and not configured_boards:
+            raise HTTPException(status_code=422, detail=f"Add at least one verified {source.title()} public career board before enabling {source.title()}.")
 
     poll_seconds = config.get("poll_seconds", {})
     if not isinstance(poll_seconds, dict):
@@ -447,6 +541,8 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "ashby": 1800,
             "lever": 1800,
             "workday": 120,
+            "smartrecruiters": 120,
+            "workable": 120,
         }.items()
     }
 
@@ -983,6 +1079,47 @@ def init_db() -> None:
             snapshot_unchanged INTEGER NOT NULL DEFAULT 0
         )
         """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS employer_companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT NOT NULL,
+            domain TEXT NOT NULL UNIQUE,
+            website_url TEXT NOT NULL,
+            careers_url TEXT NOT NULL,
+            country TEXT,
+            discovery_status TEXT NOT NULL DEFAULT 'not_scanned',
+            pages_checked INTEGER NOT NULL DEFAULT 0,
+            last_discovered_at TEXT,
+            error_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ats_board_registry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            provider TEXT NOT NULL,
+            board_key TEXT NOT NULL,
+            board_url TEXT NOT NULL,
+            discovered_from TEXT NOT NULL,
+            confidence TEXT NOT NULL DEFAULT 'medium',
+            collector_source TEXT,
+            collector_available INTEGER NOT NULL DEFAULT 0,
+            review_status TEXT NOT NULL DEFAULT 'discovered',
+            last_verified_at TEXT,
+            last_seen_at TEXT NOT NULL,
+            last_error_type TEXT,
+            baseline_pending INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(company_id) REFERENCES employer_companies(id),
+            UNIQUE(company_id, provider, board_key)
+        )
+        """)
+        _ensure_column(conn, "ats_board_registry", "baseline_pending", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_provider ON ats_board_registry(provider, review_status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_company ON ats_board_registry(company_id, provider)")
         conn.execute("""
         CREATE TABLE IF NOT EXISTS canonical_opportunities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1690,6 +1827,86 @@ def suppress_initial_source_snapshot_alerts(
             suppressed += max(0, cursor.rowcount)
         conn.commit()
     return suppressed
+
+
+def suppress_activated_board_inventory(source: str) -> int:
+    """Silence the first snapshot of each newly activated employer board.
+
+    Board discovery can identify an existing vacancy archive. These rows are
+    useful in the dashboard, but should not be mistaken for freshly published
+    jobs when an administrator first connects a company. The first successful
+    source poll marks those board rows as baseline and cancels any unattempted
+    legacy/member queue records for the same jobs.
+    """
+    suppressed_jobs = 0
+    timestamp = iso(now())
+    reasons = json.dumps([
+        "initial employer-board inventory baseline",
+        "board was explicitly activated after discovery and endpoint verification",
+        "historical inventory is visible in the dashboard but is not a new-job alert",
+    ], ensure_ascii=False)
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        registry_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ats_board_registry'"
+        ).fetchone()
+        if not registry_exists:
+            return 0
+        pending_rows = conn.execute(
+            "SELECT id FROM ats_board_registry WHERE collector_source=? AND baseline_pending=1 AND review_status='active'",
+            (source,),
+        ).fetchall()
+        pending_ids = {int(row["id"]) for row in pending_rows}
+        if not pending_ids:
+            return 0
+        rows = conn.execute(
+            "SELECT id,canonical_opportunity_id,source_details_json FROM jobs WHERE source=?",
+            (source,),
+        ).fetchall()
+        seen_registry_ids: set[int] = set()
+        for row in rows:
+            try:
+                details = json.loads(row["source_details_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                details = {}
+            raw_registry_id = details.get("board_registry_id") if isinstance(details, dict) else None
+            try:
+                registry_id = int(raw_registry_id) if raw_registry_id is not None else None
+            except (TypeError, ValueError):
+                registry_id = None
+            if registry_id not in pending_ids:
+                continue
+            seen_registry_ids.add(registry_id)
+            job_id = int(row["id"])
+            conn.execute("UPDATE jobs SET source_initial_baseline=1 WHERE id=?", (job_id,))
+            canonical_id = row["canonical_opportunity_id"]
+            if canonical_id is not None:
+                conn.execute(
+                    """UPDATE notification_ledger
+                       SET status='suppressed',candidate_job_id=NULL,baseline_suppressed=1,
+                           next_attempt_at=NULL,claimed_at=NULL,updated_at=?,decision_reason_json=?
+                       WHERE canonical_opportunity_id=? AND candidate_job_id=?
+                         AND baseline_suppressed=0
+                         AND status IN ('pending','queued','suppressed')
+                         AND attempt_count=0 AND sent_at IS NULL""",
+                    (timestamp, reasons, int(canonical_id), job_id),
+                )
+            conn.execute(
+                """UPDATE user_notification_ledger
+                   SET status='cancelled',claimed_at=NULL,next_attempt_at=NULL,
+                       last_error='initial_employer_board_baseline',updated_at=?
+                   WHERE candidate_job_id=? AND status IN ('queued','failed','sending')
+                     AND attempt_count=0 AND sent_at IS NULL""",
+                (timestamp, job_id),
+            )
+            suppressed_jobs += 1
+        for registry_id in seen_registry_ids:
+            conn.execute(
+                "UPDATE ats_board_registry SET baseline_pending=0,updated_at=? WHERE id=?",
+                (timestamp, registry_id),
+            )
+        conn.commit()
+    return suppressed_jobs
 
 
 def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
@@ -3076,25 +3293,78 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
 
 def _set_workday_rate_limit(response: requests.Response) -> int:
     """Record a conservative source-wide Workday cooldown from a 429 response."""
+    return _set_source_rate_limit(
+        "workday", response,
+        default_seconds=WORKDAY_DEFAULT_429_COOLDOWN_SECONDS,
+        maximum_seconds=WORKDAY_MAX_429_COOLDOWN_SECONDS,
+    )
+
+
+def _workday_cooldown_remaining() -> float:
+    return _source_cooldown_remaining("workday")
+
+
+def _set_source_rate_limit(
+    source: str,
+    response: requests.Response,
+    *,
+    default_seconds: int = 300,
+    maximum_seconds: int = 3600,
+) -> int:
+    """Persist a conservative source-wide Retry-After cooldown in runtime state."""
     retry_after = _retry_after_seconds(response)
-    requested = WORKDAY_DEFAULT_429_COOLDOWN_SECONDS if retry_after is None else max(60, retry_after)
-    cooldown_seconds = int(min(WORKDAY_MAX_429_COOLDOWN_SECONDS, requested))
-    runtime = source_state.setdefault("workday", {})
+    requested = default_seconds if retry_after is None else max(60, retry_after)
+    cooldown_seconds = int(min(maximum_seconds, requested))
+    runtime = source_state.setdefault(source, {})
     runtime["rate_limit_retry_after_seconds"] = retry_after
     runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
     runtime["rate_limit_detected_at"] = iso(now())
     runtime["rate_limited_until_monotonic"] = time.monotonic() + cooldown_seconds
     runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=cooldown_seconds))
-    log.warning("workday: HTTP 429; pausing all Workday board requests for %ss", cooldown_seconds)
+    log.warning("%s: HTTP 429; pausing source requests for %ss", source, cooldown_seconds)
     return cooldown_seconds
 
 
-def _workday_cooldown_remaining() -> float:
+def _source_cooldown_remaining(source: str) -> float:
     return max(
         0.0,
-        float(source_state.get("workday", {}).get("rate_limited_until_monotonic", 0.0))
+        float(source_state.get(source, {}).get("rate_limited_until_monotonic", 0.0))
         - time.monotonic(),
     )
+
+
+def restore_source_rate_limit_state(source: str) -> None:
+    """Restore one source's last persisted HTTP 429 cooldown after restart."""
+    runtime = source_state.setdefault(source, {})
+    try:
+        with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT http_status,rate_limit_detected_at,finished_at,cooldown_seconds,retry_after_seconds "
+                "FROM source_runs WHERE source=? ORDER BY id DESC LIMIT 1", (source,)
+            ).fetchone()
+    except sqlite3.Error:
+        log.exception("%s: unable to restore persisted 429 cooldown", source)
+        return
+    if not row or int(row[0] or 0) != 429:
+        for key in ("rate_limited_until", "rate_limited_until_monotonic", "rate_limit_cooldown_seconds", "rate_limit_retry_after_seconds", "rate_limit_detected_at"):
+            runtime.pop(key, None)
+        return
+    detected_at = parse_relative(row[1] or row[2])
+    if detected_at is None:
+        log.warning("%s: skipped invalid persisted rate-limit timestamp", source)
+        return
+    cooldown_seconds = max(60, min(3600, int(row[3] or 300)))
+    remaining = max(0.0, cooldown_seconds - max(0.0, (now() - detected_at).total_seconds()))
+    runtime["rate_limit_detected_at"] = iso(detected_at)
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_retry_after_seconds"] = row[4]
+    if remaining > 0:
+        runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=remaining))
+        runtime["rate_limited_until_monotonic"] = time.monotonic() + remaining
+        log.warning("%s: restored persisted 429 cooldown; remaining=%ss", source, int(remaining))
+    else:
+        runtime.pop("rate_limited_until", None)
+        runtime.pop("rate_limited_until_monotonic", None)
 
 
 def _source_run_error_metadata(exc: Exception) -> dict[str, Any]:
@@ -3961,6 +4231,7 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 published_at,
                 posted_precision,
                 description,
+                source_details={"board_registry_id": board.get("registry_id")},
             ))
 
     if successful_boards == 0:
@@ -4078,6 +4349,7 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 jobs.append(normalize_job(
                     "ashby", source_id, company, title.strip(), location,
                     direct_url, published_at, posted_precision, description,
+                    source_details={"board_registry_id": board.get("registry_id")},
                 ))
             except (TypeError, ValueError) as exc:
                 log.warning("ashby: board=%s skipped malformed job error_type=%s", name, type(exc).__name__)
@@ -4126,6 +4398,7 @@ def _normalize_lever_posting(
     site: str,
     company: str,
     instance: str,
+    registry_id: int | None = None,
 ) -> dict[str, Any] | None:
     raw_id = item.get("id")
     title = item.get("text")
@@ -4213,6 +4486,7 @@ def _normalize_lever_posting(
     source_details = {
         "lever_instance": instance,
         "lever_site": site,
+        "board_registry_id": registry_id,
         "team": categories.get("team"),
         "department": categories.get("department"),
         "commitment": categories.get("commitment"),
@@ -4310,6 +4584,7 @@ def lever_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     site=site,
                     company=company,
                     instance=instance,
+                    registry_id=board.get("registry_id"),
                 )
                 if job and job["source_job_id"] not in seen_ids:
                     seen_ids.add(job["source_job_id"])
@@ -4538,6 +4813,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     "workday_tenant": tenant,
                     "workday_cluster": parsed_board["cluster"],
                     "workday_site": site,
+                    "board_registry_id": board.get("registry_id"),
                     "requisition_id": requisition_id,
                     "job_posting_id": detail_info.get("jobPostingId"),
                     "posted_on_label": item.get("postedOn") or detail_info.get("postedOn"),
@@ -4596,6 +4872,266 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect active PUBLIC SmartRecruiters postings with bounded detail lookups."""
+    boards = config.get("smartrecruiters_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("SmartRecruiters is enabled but no smartrecruiters_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    headers = {**UA, "Accept": "application/json"}
+    for board in boards:
+        identifier = str(board.get("company_identifier") or board.get("identifier") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", identifier) or not company:
+            _record_source_board("smartrecruiters", False)
+            failures.append("invalid SmartRecruiters board configuration")
+            continue
+        endpoint = f"https://api.smartrecruiters.com/v1/companies/{identifier}/postings"
+        board_jobs: list[dict[str, Any]] = []
+        pages_succeeded = 0
+        detail_attempts = 0
+        total_found = None
+        rate_limited = False
+        for page_number in range(SMARTRECRUITERS_MAX_PAGES_PER_BOARD):
+            offset = page_number * SMARTRECRUITERS_PAGE_SIZE
+            try:
+                response = _tracked_source_get(
+                    "smartrecruiters", endpoint,
+                    params={"limit": SMARTRECRUITERS_PAGE_SIZE, "offset": offset, "destination": "PUBLIC"},
+                    headers=headers, timeout=20,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                content = payload.get("content") if isinstance(payload, dict) else None
+                if not isinstance(content, list):
+                    raise ValueError("SmartRecruiters response did not contain a content list")
+                total_found = payload.get("totalFound")
+                pages_succeeded += 1
+                _record_source_page("smartrecruiters", True)
+            except Exception as exc:
+                _record_source_page("smartrecruiters", False)
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_source_rate_limit("smartrecruiters", failed_response)
+                    rate_limited = True
+                failures.append(f"{identifier} page {page_number + 1}: {type(exc).__name__}")
+                log.warning("smartrecruiters: identifier=%s page=%s failed error_type=%s", identifier, page_number + 1, type(exc).__name__)
+                break
+
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                raw_id = item.get("id")
+                title = str(item.get("name") or "").strip()
+                if raw_id in (None, "") or not title:
+                    continue
+                source_id = f"smartrecruiters-{identifier}-{raw_id}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+
+                raw_location = item.get("location") if isinstance(item.get("location"), dict) else {}
+                location_parts = [
+                    str(raw_location.get(field) or "").strip()
+                    for field in ("city", "region", "country")
+                    if str(raw_location.get(field) or "").strip()
+                ]
+                location = str(raw_location.get("fullLocation") or ", ".join(location_parts)).strip()
+                if raw_location.get("remote"):
+                    location = f"{location} (Remote)".strip()
+                elif raw_location.get("hybrid"):
+                    location = f"{location} (Hybrid)".strip()
+                published_raw = item.get("releasedDate")
+                published_at = parse_relative(published_raw) if isinstance(published_raw, str) else None
+                precision = "minute" if published_at and re.search(r"\d{2}:\d{2}", str(published_raw)) else "date" if published_at else "unknown"
+
+                detail: dict[str, Any] = {}
+                if detail_attempts < SMARTRECRUITERS_MAX_DETAILS_PER_BOARD:
+                    try:
+                        if detail_attempts:
+                            time.sleep(SMARTRECRUITERS_DETAIL_DELAY_SECONDS)
+                        detail_attempts += 1
+                        detail_response = _tracked_source_get(
+                            "smartrecruiters", f"{endpoint}/{raw_id}",
+                            headers=headers, timeout=20,
+                        )
+                        detail_response.raise_for_status()
+                        detail_payload = detail_response.json()
+                        if isinstance(detail_payload, dict):
+                            detail = detail_payload
+                    except Exception as exc:
+                        failed_response = getattr(exc, "response", None)
+                        if getattr(failed_response, "status_code", None) == 429:
+                            _set_source_rate_limit("smartrecruiters", failed_response)
+                            rate_limited = True
+                            failures.append(f"{identifier} detail rate limited")
+                        log.warning("smartrecruiters: identifier=%s detail failed error_type=%s", identifier, type(exc).__name__)
+
+                sections = (((detail.get("jobAd") or {}).get("sections")) if isinstance(detail.get("jobAd"), dict) else {})
+                description_parts = []
+                if isinstance(sections, dict):
+                    for key in ("jobDescription", "qualifications", "additionalInformation", "companyDescription"):
+                        value = sections.get(key)
+                        text_value = value.get("text") if isinstance(value, dict) else None
+                        if isinstance(text_value, str) and text_value.strip():
+                            description_parts.append(BeautifulSoup(html_lib.unescape(text_value), "html.parser").get_text(" ", strip=True))
+                description = " ".join(part for part in description_parts if part)
+                department = (item.get("department") or {}).get("label") if isinstance(item.get("department"), dict) else None
+                function = (item.get("function") or {}).get("label") if isinstance(item.get("function"), dict) else None
+                employment_type = (item.get("typeOfEmployment") or {}).get("label") if isinstance(item.get("typeOfEmployment"), dict) else None
+                experience_level = (item.get("experienceLevel") or {}).get("label") if isinstance(item.get("experienceLevel"), dict) else None
+                posting_url = detail.get("postingUrl") or item.get("postingUrl") or detail.get("applyUrl") or item.get("applyUrl")
+                if not isinstance(posting_url, str) or not posting_url.startswith("https://"):
+                    posting_url = f"https://jobs.smartrecruiters.com/{identifier}/{raw_id}"
+                details = {
+                    "company_identifier": identifier, "posting_id": str(raw_id),
+                    "board_registry_id": board.get("registry_id"),
+                    "job_ad_id": item.get("jobAdId"), "ref_number": item.get("refNumber"),
+                    "department": department, "function": function,
+                    "employment_type": employment_type, "experience_level": experience_level,
+                    "details_fetched": bool(detail),
+                }
+                board_jobs.append(normalize_job(
+                    "smartrecruiters", source_id,
+                    str((item.get("company") or {}).get("name") if isinstance(item.get("company"), dict) else "") or company,
+                    title, location, posting_url, published_at, precision, description,
+                    source_details=details,
+                ))
+                if rate_limited:
+                    break
+
+            if rate_limited or len(content) < SMARTRECRUITERS_PAGE_SIZE:
+                break
+            if total_found is not None and offset + len(content) >= int(total_found):
+                break
+        if pages_succeeded:
+            successful_boards += 1
+            _record_source_board("smartrecruiters", True)
+            jobs.extend(board_jobs)
+        else:
+            _record_source_board("smartrecruiters", False)
+        if rate_limited:
+            break
+    if successful_boards == 0:
+        raise RuntimeError("All configured SmartRecruiters boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("smartrecruiters: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("smartrecruiters: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
+def workable_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect a public Workable account's published job widget (details included)."""
+    boards = config.get("workable_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Workable is enabled but no workable_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    for board in boards:
+        account = str(board.get("account") or board.get("subdomain") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,100}", account) or not company:
+            _record_source_board("workable", False)
+            failures.append("invalid Workable board configuration")
+            continue
+        endpoint = f"https://apply.workable.com/api/v1/widget/accounts/{account}"
+        try:
+            response = _tracked_source_get(
+                "workable", endpoint, params={"details": "true"},
+                headers={**UA, "Accept": "application/json"}, timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            postings = payload.get("jobs") if isinstance(payload, dict) else None
+            if not isinstance(postings, list):
+                raise ValueError("Workable response did not contain a jobs list")
+            _record_source_page("workable", True)
+            _record_source_board("workable", True)
+            successful_boards += 1
+        except Exception as exc:
+            _record_source_page("workable", False)
+            _record_source_board("workable", False)
+            failed_response = getattr(exc, "response", None)
+            if getattr(failed_response, "status_code", None) == 429:
+                _set_source_rate_limit("workable", failed_response)
+            failures.append(f"{account}: {type(exc).__name__}")
+            log.warning("workable: account=%s failed error_type=%s", account, type(exc).__name__)
+            if _source_cooldown_remaining("workable") > 0:
+                break
+            continue
+        if len(postings) > WORKABLE_MAX_JOBS_PER_BOARD:
+            log.warning("workable: account=%s returned %s jobs; processing first %s under the request budget", account, len(postings), WORKABLE_MAX_JOBS_PER_BOARD)
+        for item in postings[:WORKABLE_MAX_JOBS_PER_BOARD]:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            shortcode = str(item.get("shortcode") or item.get("code") or "").strip()
+            if not title or not shortcode:
+                continue
+            source_id = f"workable-{account}-{shortcode}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+            locations: list[str] = []
+            raw_locations = item.get("locations")
+            if isinstance(raw_locations, list):
+                for value in raw_locations:
+                    if not isinstance(value, dict):
+                        continue
+                    parts = [str(value.get(k) or "").strip() for k in ("city", "region", "country") if str(value.get(k) or "").strip()]
+                    label = ", ".join(parts)
+                    if label and label not in locations:
+                        locations.append(label)
+            if not locations:
+                parts = [str(item.get(k) or "").strip() for k in ("city", "state", "country") if str(item.get(k) or "").strip()]
+                if parts:
+                    locations.append(", ".join(parts))
+            workplace = str(item.get("workplace_type") or "").strip().lower()
+            if not workplace and item.get("telecommuting"):
+                workplace = "remote"
+            location = ", ".join(locations)
+            if workplace in {"remote", "hybrid", "on_site"}:
+                location = f"{location} ({'On-site' if workplace == 'on_site' else workplace.title()})".strip()
+            published_raw = item.get("published_on")
+            published_at = parse_relative(published_raw) if isinstance(published_raw, str) else None
+            precision = "date" if published_at else "unknown"
+            description_html = item.get("description")
+            description = (
+                BeautifulSoup(html_lib.unescape(description_html), "html.parser").get_text(" ", strip=True)
+                if isinstance(description_html, str) else ""
+            )
+            posting_url = item.get("url") or item.get("application_url") or f"https://apply.workable.com/{account}/"
+            if not isinstance(posting_url, str) or not posting_url.startswith("https://"):
+                posting_url = f"https://apply.workable.com/{account}/"
+            details = {
+                "account": account, "shortcode": shortcode,
+                "board_registry_id": board.get("registry_id"),
+                "employment_type": item.get("employment_type"),
+                "department": item.get("department"), "function": item.get("function"),
+                "industry": item.get("industry"), "experience": item.get("experience"),
+                "education": item.get("education"), "telecommuting": bool(item.get("telecommuting")),
+                "workplace_type": item.get("workplace_type"),
+                "created_at": item.get("created_at"),
+                "details_fetched": bool(description),
+            }
+            jobs.append(normalize_job(
+                "workable", source_id, company or str(payload.get("name") or account),
+                title, location, posting_url, published_at, precision, description,
+                source_details=details,
+            ))
+    if successful_boards == 0:
+        raise RuntimeError("All configured Workable boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("workable: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("workable: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -4604,6 +5140,8 @@ COLLECTORS = {
     "ashby": ashby_collect,
     "lever": lever_collect,
     "workday": workday_collect,
+    "smartrecruiters": smartrecruiters_collect,
+    "workable": workable_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -4673,6 +5211,12 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             config,
             source_run_started_at=started_at,
         )
+        board_baseline_suppressed = suppress_activated_board_inventory(source)
+        if board_baseline_suppressed:
+            log.info(
+                "source=%s newly activated board baseline suppressed jobs=%s",
+                source, board_baseline_suppressed,
+            )
         baseline_suppressed = suppress_initial_source_snapshot_alerts(
             source,
             started_at,
@@ -4702,13 +5246,13 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         cooldown_remaining = (
             _linkedin_cooldown_remaining() if source == "linkedin"
-            else _workday_cooldown_remaining() if source == "workday"
+            else _source_cooldown_remaining(source) if source in PUBLIC_ATS_RATE_LIMIT_SOURCES
             else 0.0
         )
         metrics = request_metrics or {}
         rate_limit_seen = (
             (source == "linkedin" and linkedin_rate_limit_generation != rate_limit_generation_at_start)
-            or (source == "workday" and bool(metrics.get("http_429", 0)))
+            or (source in PUBLIC_ATS_RATE_LIMIT_SOURCES and bool(metrics.get("http_429", 0)))
         )
         partial_page_failure = (
             metrics.get("pages_failed", 0) > 0
@@ -4821,12 +5365,12 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         metadata = _source_run_error_metadata(exc)
         cooldown_remaining = (
             _linkedin_cooldown_remaining() if source == "linkedin"
-            else _workday_cooldown_remaining() if source == "workday"
+            else _source_cooldown_remaining(source) if source in PUBLIC_ATS_RATE_LIMIT_SOURCES
             else 0.0
         )
         if source == "linkedin" and cooldown_remaining > 0:
             metadata["rate_limited"] = True
-        if source == "workday" and cooldown_remaining > 0:
+        if source in PUBLIC_ATS_RATE_LIMIT_SOURCES and cooldown_remaining > 0:
             metadata.update({
                 "rate_limited": True,
                 "http_status": 429,
@@ -4862,7 +5406,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             cooldown_seconds=cooldown_seconds,
             rate_limit_detected_at=(
                 source_state.get(source, {}).get("rate_limit_detected_at")
-                if source in {"linkedin", "workday"} and metadata["rate_limited"] else None
+                if (source == "linkedin" or source in PUBLIC_ATS_RATE_LIMIT_SOURCES) and metadata["rate_limited"] else None
             ),
             request_metrics=request_metrics,
         )
@@ -4942,7 +5486,7 @@ async def scheduler() -> None:
                 continue
             if name == "linkedin" and _linkedin_cooldown_remaining() > 0:
                 continue
-            if name == "workday" and _workday_cooldown_remaining() > 0:
+            if name in PUBLIC_ATS_RATE_LIMIT_SOURCES and _source_cooldown_remaining(name) > 0:
                 continue
             if source_state.get(name, {}).get("running"):
                 continue
@@ -4964,6 +5508,8 @@ async def startup() -> None:
     init_db()
     restore_linkedin_rate_limit_state()
     restore_workday_rate_limit_state()
+    restore_source_rate_limit_state("smartrecruiters")
+    restore_source_rate_limit_state("workable")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -5433,9 +5979,6 @@ def read_config():
 def update_config(payload: dict[str, Any]):
     saved = save_config(payload)
     user_preferences.sync_first_admin_preferences(DB_PATH, saved)
-    refresh_job_evaluations(saved)
-    refresh_notification_decisions(saved)
-    refresh_configured_user_evaluations()
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
@@ -5483,6 +6026,289 @@ def latency_summary(hours: int = 24):
         }
 
     return {"hours": hours, "sources": summary}
+
+
+@app.post("/api/discovery/companies/scan", dependencies=[Depends(require_admin)])
+def discover_company_boards(payload: dict[str, Any]):
+    """Register one employer and discover public ATS board candidates for review."""
+    company_name = str(payload.get("company_name") or "").strip()
+    website_url = str(payload.get("website_url") or "").strip()
+    careers_url_value = payload.get("careers_url")
+    careers_url = str(careers_url_value).strip() if careers_url_value else None
+    country_value = payload.get("country")
+    country = str(country_value).strip()[:80] if country_value else None
+    if not company_name or not website_url:
+        raise HTTPException(status_code=422, detail="company_name and website_url are required.")
+    try:
+        result = board_discovery.discover_public_careers(
+            company_name, website_url, careers_url
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    domain = board_discovery.domain_key(result["website_url"])
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO employer_companies(
+                   company_name,domain,website_url,careers_url,country,discovery_status,
+                   pages_checked,last_discovered_at,error_count,created_at,updated_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(domain) DO UPDATE SET
+                   company_name=excluded.company_name,
+                   website_url=excluded.website_url,
+                   careers_url=excluded.careers_url,
+                   country=COALESCE(excluded.country,employer_companies.country),
+                   discovery_status=excluded.discovery_status,
+                   pages_checked=excluded.pages_checked,
+                   last_discovered_at=excluded.last_discovered_at,
+                   error_count=excluded.error_count,
+                   updated_at=excluded.updated_at""",
+            (
+                company_name, domain, result["website_url"], result["careers_url"],
+                country, result["discovery_status"], result["pages_checked"],
+                timestamp, len(result["errors"]), timestamp, timestamp,
+            ),
+        )
+        company_row = conn.execute(
+            "SELECT id FROM employer_companies WHERE domain=?", (domain,)
+        ).fetchone()
+        company_id = int(company_row[0])
+        stored_ids: list[int] = []
+        for board in result["boards"]:
+            conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,
+                       created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,'discovered',?,?,?)
+                   ON CONFLICT(company_id,provider,board_key) DO UPDATE SET
+                       board_url=excluded.board_url,
+                       discovered_from=excluded.discovered_from,
+                       confidence=excluded.confidence,
+                       collector_source=excluded.collector_source,
+                       collector_available=excluded.collector_available,
+                       last_seen_at=excluded.last_seen_at,
+                       review_status=CASE
+                           WHEN ats_board_registry.review_status IN ('active','rejected')
+                           THEN ats_board_registry.review_status
+                           ELSE 'discovered' END,
+                       updated_at=excluded.updated_at""",
+                (
+                    company_id, board["provider"], board["board_key"],
+                    board["board_url"], board["discovered_from"],
+                    board.get("confidence", "medium"), board.get("collector_source"),
+                    int(bool(board.get("collector_available"))), timestamp,
+                    timestamp, timestamp,
+                ),
+            )
+            row = conn.execute(
+                "SELECT id FROM ats_board_registry WHERE company_id=? AND provider=? AND board_key=?",
+                (company_id, board["provider"], board["board_key"]),
+            ).fetchone()
+            if row:
+                stored_ids.append(int(row[0]))
+        conn.commit()
+
+    return {
+        "company_id": company_id,
+        "company_name": company_name,
+        "domain": domain,
+        "discovery_status": result["discovery_status"],
+        "pages_checked": result["pages_checked"],
+        "boards_discovered": len(result["boards"]),
+        "board_ids": stored_ids,
+        "boards": result["boards"],
+        "errors": result["errors"],
+        "activation_note": "Discovery never enables a source. Review and verify each board before connecting it to a collector.",
+    }
+
+
+@app.get("/api/discovery/companies", dependencies=[Depends(require_admin)])
+def list_discovered_companies(limit: int = 100):
+    limit = max(1, min(int(limit), 500))
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT c.id,c.company_name,c.domain,c.website_url,c.careers_url,c.country,
+                      c.discovery_status,c.pages_checked,c.last_discovered_at,c.error_count,
+                      COUNT(b.id) AS board_count
+               FROM employer_companies c LEFT JOIN ats_board_registry b ON b.company_id=c.id
+               GROUP BY c.id ORDER BY c.updated_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return {"companies": [dict(row) for row in rows]}
+
+
+@app.get("/api/discovery/boards", dependencies=[Depends(require_admin)])
+def list_discovered_boards(status: str | None = None, limit: int = 250):
+    limit = max(1, min(int(limit), 1000))
+    query = """SELECT b.id,b.company_id,c.company_name,c.domain,b.provider,b.board_key,
+                      b.board_url,b.discovered_from,b.confidence,b.collector_source,
+                      b.collector_available,b.review_status,b.last_verified_at,
+                      b.last_seen_at,b.last_error_type
+               FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id"""
+    values: list[Any] = []
+    if status:
+        if status not in {"discovered", "reviewed", "verified", "rejected", "active"}:
+            raise HTTPException(status_code=422, detail="Unsupported board review status.")
+        query += " WHERE b.review_status=?"
+        values.append(status)
+    query += " ORDER BY b.last_seen_at DESC,b.id DESC LIMIT ?"
+    values.append(limit)
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(query, values).fetchall()
+    return {"boards": [dict(row) for row in rows]}
+
+
+@app.post("/api/discovery/boards/{board_id}/verify", dependencies=[Depends(require_admin)])
+def verify_discovered_board(board_id: int):
+    """Probe a known public ATS endpoint; verification never enables polling."""
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """SELECT id,provider,board_key,board_url,collector_available
+               FROM ats_board_registry WHERE id=?""", (board_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Discovered board was not found.")
+    candidate = dict(row)
+    if not candidate["collector_available"]:
+        raise HTTPException(status_code=409, detail="This ATS has been discovered but its V2 collector is not implemented yet.")
+    try:
+        result = board_discovery.probe_public_board(candidate)
+    except (ValueError, requests.RequestException) as exc:
+        error_type = type(exc).__name__
+        with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+            conn.execute(
+                "UPDATE ats_board_registry SET last_error_type=?,updated_at=? WHERE id=?",
+                (error_type, iso(now()), board_id),
+            )
+            conn.commit()
+        raise HTTPException(
+            status_code=502,
+            detail=f"Public {candidate['provider']} board verification failed ({error_type}).",
+        ) from exc
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """UPDATE ats_board_registry
+               SET review_status='verified',last_verified_at=?,last_seen_at=?,
+                   last_error_type=NULL,updated_at=? WHERE id=?""",
+            (timestamp, timestamp, timestamp, board_id),
+        )
+        conn.commit()
+    return {"board_id": board_id, **result, "scheduler_enabled": False}
+
+
+@app.post("/api/discovery/boards/{board_id}/review", dependencies=[Depends(require_admin)])
+def review_discovered_board(board_id: int, payload: dict[str, Any]):
+    status = str(payload.get("status") or "").strip().lower()
+    if status not in {"reviewed", "rejected"}:
+        raise HTTPException(status_code=422, detail="status must be 'reviewed' or 'rejected'.")
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        cursor = conn.execute(
+            "UPDATE ats_board_registry SET review_status=?,updated_at=? WHERE id=? AND review_status!='active'",
+            (status, iso(now()), board_id),
+        )
+        if cursor.rowcount == 0:
+            existing = conn.execute("SELECT review_status FROM ats_board_registry WHERE id=?", (board_id,)).fetchone()
+            if not existing:
+                raise HTTPException(status_code=404, detail="Discovered board was not found.")
+            if existing[0] == "active":
+                raise HTTPException(status_code=409, detail="Active boards cannot be changed through discovery review.")
+        conn.commit()
+    return {"board_id": board_id, "review_status": status}
+
+
+@app.post("/api/discovery/boards/{board_id}/activate", dependencies=[Depends(require_admin)])
+def activate_discovered_board(board_id: int):
+    """Attach a verified board to its collector and enable that source.
+
+    The first successful poll is marked as historical baseline so an existing
+    vacancy archive does not trigger a backfill alert burst.
+    """
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """SELECT b.id,b.provider,b.board_key,b.board_url,b.collector_source,
+                      b.collector_available,b.review_status,c.company_name
+               FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id
+               WHERE b.id=?""", (board_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Discovered board was not found.")
+    board = dict(row)
+    if board["review_status"] != "verified":
+        raise HTTPException(status_code=409, detail="Verify this public board endpoint before activation.")
+    if not board["collector_available"] or not board["collector_source"]:
+        raise HTTPException(status_code=409, detail="This ATS has been discovered but no supported V2 collector is available.")
+
+    source = str(board["collector_source"])
+    provider = str(board["provider"])
+    key = str(board["board_key"])
+    company = str(board["company_name"])
+    registry_entry: dict[str, Any]
+    config_key: str
+    if provider == "workday":
+        config_key = "workday_boards"
+        registry_entry = {"url": board["board_url"], "company": company}
+    elif provider == "greenhouse":
+        config_key = "greenhouse_boards"
+        registry_entry = {"token": key, "company": company}
+    elif provider == "ashby":
+        config_key = "ashby_boards"
+        registry_entry = {"board": key, "company": company}
+    elif provider == "lever":
+        config_key = "lever_boards"
+        registry_entry = {
+            "site": key, "company": company,
+            "instance": "eu" if ".eu." in (urlsplit(board["board_url"]).hostname or "") else "global",
+        }
+    elif provider == "smartrecruiters":
+        config_key = "smartrecruiters_boards"
+        registry_entry = {"company_identifier": key, "company": company}
+    elif provider == "workable":
+        config_key = "workable_boards"
+        registry_entry = {"account": key, "company": company}
+    else:
+        raise HTTPException(status_code=409, detail="This board provider has no activation mapping.")
+
+    config = get_config()
+    current_entries = list(config.get(config_key) or [])
+    existing = next((item for item in current_entries if int(item.get("registry_id") or 0) == board_id), None)
+    if existing is None:
+        registry_entry["registry_id"] = board_id
+        current_entries.append(registry_entry)
+    config[config_key] = current_entries
+    config.setdefault("source_enabled", {})[source] = True
+    try:
+        saved = save_config(config)
+    except HTTPException:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Board configuration could not be activated: {type(exc).__name__}.") from exc
+
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """UPDATE ats_board_registry
+               SET review_status='active',baseline_pending=1,last_verified_at=COALESCE(last_verified_at,?),
+                   last_seen_at=?,last_error_type=NULL,updated_at=? WHERE id=?""",
+            (timestamp, timestamp, timestamp, board_id),
+        )
+        conn.commit()
+    refresh_job_evaluations(saved)
+    refresh_notification_decisions(saved)
+    refresh_configured_user_evaluations()
+    interval = int(saved.get("poll_seconds", {}).get(source, 120))
+    return {
+        "board_id": board_id, "provider": provider, "collector_source": source,
+        "review_status": "active", "source_enabled": True,
+        "poll_interval_seconds": interval, "baseline_pending": True,
+        "first_poll_note": "Existing board inventory will be ingested silently once before fresh-job alerts are eligible.",
+    }
 
 
 @app.get("/api/source-status/summary", dependencies=[Depends(require_admin)])

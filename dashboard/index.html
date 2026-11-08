@@ -570,6 +570,8 @@
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="ashby"> Ashby</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="lever"> Lever</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workday"> Workday</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="smartrecruiters"> SmartRecruiters</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workable"> Workable</label>
                 </div>
                 <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
                   <label class="form-field-label" for="cfgWorkdayBoards">Workday public career boards (JSON)</label>
@@ -577,6 +579,13 @@
                   <span style="font-size:11px;color:var(--text-muted);">Add only verified public myworkdayjobs.com URLs. Use the employer's real careers URL; tenant and site identifiers are derived from it. Workday remains off until a board is added and the source is enabled.</span>
                 </div>
 
+                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
+                  <label class="form-field-label" for="cfgSmartRecruitersBoards">SmartRecruiters company identifiers (JSON)</label>
+                  <textarea id="cfgSmartRecruitersBoards" rows="3" spellcheck="false" placeholder='[{"company_identifier":"BoschGroup","company":"Bosch Group"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <label class="form-field-label" for="cfgWorkableBoards">Workable public account slugs (JSON)</label>
+                  <textarea id="cfgWorkableBoards" rows="3" spellcheck="false" placeholder='[{"account":"huggingface","company":"Hugging Face"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <span style="font-size:11px;color:var(--text-muted);">Use identifiers discovered and verified from the employer's public careers board. All sources remain off until explicitly enabled.</span>
+                </div>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRemoteOnly"> Remote opportunities only</label>
                 </div>
@@ -606,6 +615,37 @@
                 <p class="view-subtitle-main">Latest source health and measured request, retry, rate-limit and partial-failure totals over the last 24 hours. Historical runs are marked Not measured.</p>
               </div>
               <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
+            </div>
+
+            <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Employer &amp; Career Board Discovery</span>
+              <p class="auth-description">Enter a company's normal website or careers URL. Job Beeper checks public careers links, identifies supported ATS board patterns and adds candidates to this review queue. Discovery does not enable a collector or send Telegram alerts.</p>
+              <form id="boardDiscoveryForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--space-8);align-items:end;">
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryCompanyName">Company name</label>
+                  <input id="discoveryCompanyName" class="number-field-input" type="text" maxlength="160" placeholder="Example: Acme" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryWebsiteUrl">Company website (HTTPS)</label>
+                  <input id="discoveryWebsiteUrl" class="number-field-input" type="url" placeholder="https://company.com" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryCareersUrl">Careers URL (optional)</label>
+                  <input id="discoveryCareersUrl" class="number-field-input" type="url" placeholder="https://company.com/careers">
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryCountry">Country (optional)</label>
+                  <input id="discoveryCountry" class="number-field-input" type="text" maxlength="80" placeholder="India">
+                </div>
+                <button type="submit" class="btn-pill btn-pill-primary" id="discoverCompanyBtn">Discover career boards</button>
+              </form>
+              <p id="boardDiscoveryStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">No company scanned in this session.</p>
+              <div class="data-table-container" style="margin-top:var(--space-6);">
+                <table class="table-dataset">
+                  <thead><tr><th>Company</th><th>ATS provider</th><th>Board identifier</th><th>Collector</th><th>Review status</th><th>Discovered from</th><th>Review</th></tr></thead>
+                  <tbody id="discoveredBoardsTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No discovered boards yet.</td></tr></tbody>
+                </table>
+              </div>
             </div>
 
             <div class="data-table-container">
