@@ -41,3 +41,11 @@ Source documentation: https://github.com/lever/postings-api (Lever's public Post
 - Lever remains disabled in both repository configs and every existing runtime via opt-out migration. No source request, database write, matching run, notification or app service restart occurred as part of this implementation.
 - Next step after CI: select a small explicit board allowlist based on role/location fit, perform a bounded GET-only read-only canary of one or two boards, assess posting count, ID stability across two snapshots, location/India/remote yield, timestamp limitations and useful new-job yield. Do not enable the source or notifications based on structural API success alone.
 - No production/shared-dev deployment, source activation, schedule change or Telegram send is authorized by this PR.
+## 2026-11-08 — Lever URL and pagination hardening
+
+- Added strict Lever posting ID validation (alphanumeric, underscore and hyphen; max 200 chars) before deriving canonical hosted URLs.
+- Hosted URL acceptance now checks HTTPS, exact allowed Lever host and port, configured site path, no userinfo/query/fragment and no dot/backslash traversal segments. Untrusted or malformed URLs fall back to the canonical URL built from the configured site and validated posting ID.
+- Added fixture test proving maximum pagination is exactly five full pages / 500 unique postings and never requests a sixth page. Added unsafe-ID skip and hosted path-traversal fallback tests.
+- Focused Lever suite: 15 tests passed. Full V2 suite: 230 passed in 80.326 seconds. Python compilation and git diff --check passed locally.
+- GitHub CI run 42452809803 passed on the initial implementation (227 tests); a fresh CI run is required after this hardening commit.
+- Lever remains disabled with an empty allowlist in both config presets. No live board probe, source request, matching, notification or deployment.
