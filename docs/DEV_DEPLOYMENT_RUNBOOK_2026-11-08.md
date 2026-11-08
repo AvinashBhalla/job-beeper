@@ -186,3 +186,20 @@ At the final post-run check:
 - Protected APIs returned 401 when queried without a session, as expected. Owner must log in through the SSH-tunnel browser to verify admin/member interactive flows; this run did not establish a real member login.
 - The known 320px hit-test overlap remains deferred by owner priority; do not report the 320px flow as passing.
 - Shared dev is deployed and tested; **production has not been promoted**. PR #51 remains draft/open. Production requires a separate explicit promotion decision after remaining gates are reviewed.
+
+
+## 2026-11-08 — final dev verification and expanded 36-platform owner scope
+
+Latest shared-dev check at 2026-11-08 11:39:59 UTC:
+- Health HTTP 200, dashboard HTTP 200, version 2.0.0; image job-radar-dev-multitenant:b16fb83, ID sha256:75f8855338f150a79794d388c32733305e548165f71dd417cfa04e6443c8c917.
+- Production port 8000 HTTP 200 and unchanged old container/image; no production deployment.
+- Dev SQLite integrity ok; jobs/canonical/global evaluations/per-user evaluations/global notification ledger = 9,444; source_runs=7,858. One admin user, one profile preference row, per-user notification ledger empty. Every global notification ledger row is suppressed; sent_at non-null count zero.
+- Latest result by source: Naukri scheduler success; LinkedIn one-off 10 seen/10 inserted; Instahyre 140/140; Greenhouse 369/369; Ashby 828 seen/34 new; Lever 500/500 from one-off board. Only Naukri remains enabled in the persisted dev scheduler.
+- Delivery remains disabled in shared dev; Telegram token/chat blank; Gemini/LLM flags false.
+- A transient/recurring sqlite3.OperationalError database is locked appeared in notification_worker -> recover_stale_claims under concurrent ingestion. Production gate: fix and stress-test.
+- Production preflight was performed only on disposable /tmp copy; no write to the live prod volume. Prod has global Telegram credentials and notification delivery on; queue currently has 1,482 sent, 10 failed, 19,168 suppressed. Preserve behaviour/queue in any future promotion.
+- Production LinkedIn cooldown must always be re-read; latest seen was through 2026-11-08T12:01:13.950862Z.
+
+Owner's full 36-platform source requirement is recorded in docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md. It distinguishes ATS vendors from marketplace sources, identifies Workday and Darwinbox as first missing connectors, requires company/board discovery and per-user Telegram outbox, and defines a 2-minute high-priority poll target where endpoints/terms permit. The V2 runtime currently has six adapters; five non-Naukri source pipelines have one-off live evidence but are not scheduler-enabled. Do not claim all 36 work.
+
+Next agent order: P0 notification-worker DB-lock fix + member/admin auth and per-user Telegram test; P1 Workday then Darwinbox; implement employer/career-site discovery; continue through the 36-row roadmap. No production promotion until these gates, a formal fresh prod backup and separate explicit approval.
