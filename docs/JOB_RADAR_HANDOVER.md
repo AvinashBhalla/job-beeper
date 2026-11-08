@@ -6194,3 +6194,10 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - Full execution record: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`.
 - Next action: owner/operator must provide an existing Docker-authorized Termalin/SSH execution session. Do not request secrets in chat or alter broad Docker socket permissions. Then take a fresh SQLite online backup, deploy only shared dev with Naukri enabled and other sources/notifications/Gemini disabled, verify, and observe at least two scheduler cycles.
 - Promotion is **approved but not yet deployed**. This is an access blocker, not a failed candidate build or successful push.
+
+## 2026-11-08 — Backup service also requires interactive authorization
+
+- As part of owner-approved shared-dev promotion, the existing `job-radar-sqlite-snapshot.service` was inspected. Last successful run was 2026-11-08 02:45:43 UTC; development snapshot then contained 8,333 jobs and integrity `ok`. It is several hours old and cannot substitute for the immediate pre-promotion backup.
+- `systemctl start --no-block job-radar-sqlite-snapshot.service` from the connected `ubuntu` Termalin session was denied with `Interactive authentication required`. No new backup was created.
+- Combined with the `root:docker` 0660 socket denying `docker ps`, this confirms the connected session lacks authority both to snapshot the live protected volume and to recreate the candidate container. No `sudo`, chmod, group membership change, or other workaround was used.
+- Deployment approval remains valid, but promotion is not executed. Obtain an already authorized operator session for both the root-owned snapshot unit and Docker operations; then continue with fresh backup, image build, isolated dev recreate, smoke checks and two Naukri cycles.

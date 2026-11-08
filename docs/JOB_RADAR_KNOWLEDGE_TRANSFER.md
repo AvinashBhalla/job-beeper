@@ -3247,3 +3247,9 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - Live `/health`: shared dev 8001 HTTP 200; production 8000 HTTP 200. Neither was changed. No fresh backup, image build/recreate, DB/config/volume mutation, source flag change, PR merge or production deployment occurred.
 - Detailed execution report: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`. Next step: provide an already Docker-authorized operator session, take a fresh SQLite online backup, deploy only shared dev with Naukri enabled and all other sources/notifications/Gemini disabled, verify health, then observe at least two Naukri scheduler cycles. Do not post credentials in chat.
 - Promotion is approved but **not yet pushed**.
+
+## 2026-11-08 — Final shared-dev access check
+
+- Owner approval received; candidate is ready in GitHub, but Termalin's connected `ubuntu` account cannot access the `root:docker` mode-0660 socket and cannot trigger the root-owned SQLite snapshot service. The snapshot service last ran at 02:45:43 UTC and is not fresh enough for deployment; a start request returned `Interactive authentication required`.
+- No fresh backup or image/container action occurred. Port 8001 and port 8000 health reads both returned HTTP 200. No state changed.
+- An already authorized Docker/snapshot operator session is the single remaining infrastructure prerequisite. Don't use this session to alter sudoers, Docker groups or socket mode.
