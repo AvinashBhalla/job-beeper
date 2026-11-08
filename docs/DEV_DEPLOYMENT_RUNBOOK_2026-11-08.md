@@ -254,3 +254,10 @@ The current local Workday candidate passed the full V2 suite: **359 tests, 266.6
 ## Current verification addendum — Workday candidate is separate from deployed P0
 
 The working tree on `fix/sqlite-notification-contention-20261108` now additionally contains a Workday public CXS collector, persisted 429/Retry-After cooldown, config version 13 and admin UI allowlist editor. It passes 12 focused Workday tests and the full V2 suite (359 tests, 266.690s), and one real NVIDIA public-board run produced 20/20 full-detail job records. **These Workday changes are not committed, are not in image `c441737`, and are not deployed to shared dev or production.** The shared-dev config must remain `workday=false` and `workday_boards=[]` until a separately approved board pilot and exact-SHA CI.
+
+
+## 2026-11-08 — Correction: Workday candidate remains local; SQLite P0 is live
+
+The prior section titled “Workday candidate adapter and SQLite contention fix status” is superseded on deployment state: SQLite P0 commit `c441737ca6c19f17002d9a43923a4a64353f0977` **is deployed to shared dev** as `job-radar-dev-multitenant:c441737` on port 8001. It is not deployed to production. The live database reports WAL, app-managed busy timeout 15,000ms, `integrity_check=ok`, jobs=9,462 and source_runs=7,874 at 2026-11-08 12:58 UTC. Naukri remains the only enabled source; notifications false, Telegram credentials absent, Gemini/LLM false. No lock errors were found in the last 90 minutes of inspected logs.
+
+The Workday implementation was committed as `c4f9c66cd05419242a761939f4c1ff883b4266d0`, pushed to the feature branch and fast-forwarded to PR #51's integration branch. Its final local V2 suite passed **359 tests in 266.690 seconds, zero failures**. GitHub V2 CI run `42483043107` passed on that exact SHA: Python compilation, dashboard JavaScript syntax, focused router/extractor tests and full V2 suite all succeeded. Keep Workday disabled and do not deploy it without a separate reviewed shared-dev pilot.

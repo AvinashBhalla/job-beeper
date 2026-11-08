@@ -6406,3 +6406,16 @@ Near-real-time definition: webhook when an employer/vendor authorizes one; other
 - `dashboard/app.js`/`dashboard/index.html` provide Ashby, Lever and Workday source toggles plus an admin-only JSON editor for `workday_boards`; JSON parsing/type errors are surfaced before save. GitHub CI's modern Node check is required; VM Node 12 cannot parse existing modern syntax.
 - Current Workday config remains safely off (`source_enabled.workday=false`, `workday_boards=[]`, poll default 120s). Adapter and UI changes are local uncommitted modifications on top of P0 SHA `c441737`; not included in shared-dev image. Four post-deploy Naukri runs succeeded and no lock errors were observed in the shared-dev container logs.
 - The full platform goal remains unfinished: only seven adapters are registered. Workday is sequential across boards; at 24.57s per board the two-minute target is not met at large board counts. Employer-board discovery, bounded multi-board scheduling, Darwinbox and remaining connectors are still required.
+
+
+## 2026-11-08 — Workday candidate committed and pushed; exact-SHA CI running
+
+- The Workday adapter, config version 13, dashboard controls, test coverage, and updated source/deployment handover were committed as `c4f9c66cd05419242a761939f4c1ff883b4266d0` (`feat: add bounded Workday public career-site collector`).
+- The commit is pushed to `fix/sqlite-notification-contention-20261108` and fast-forwarded to `integration/pr46-v2-rebase-20261108` (PR #51). Remote refs have both been verified at `c4f9c66`.
+- GitHub Actions V2 CI run `42483043107` is running against this exact SHA. Python compilation and the dashboard JavaScript syntax step succeeded; focused router/extractor tests succeeded; the full V2 unittest job was still running at this note. Local V2 full suite on this code passed 359 tests in 266.690s.
+- Workday is not deployed or enabled in shared dev. Shared dev remains image c441737 (SQLite P0 only); production remains untouched. PR #51 remains open and draft. Do not merge or deploy Workday until exact-SHA CI passes and a controlled shared-dev board pilot is separately approved.
+
+
+## 2026-11-08 — Exact Workday commit CI completed
+
+GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66cd05419242a761939f4c1ff883b4266d0`. All job steps passed, including Python compile, modern Node dashboard syntax, focused router/extractor tests and full V2 unittest suite. PR #51 remains open/draft and unmerged. Workday is committed but not deployed or enabled in shared dev.
