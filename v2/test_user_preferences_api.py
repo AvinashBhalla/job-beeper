@@ -88,6 +88,23 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.assertIn("target role and location", response.json()["detail"])
 
 
+    def test_preference_save_returns_specific_validation_for_missing_target_role(self):
+        self.assertEqual(
+            self._login("a@example.com", "user-a-password-long").status_code,
+            200,
+        )
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        response = self.client.put(
+            "/api/preferences",
+            json={"locations": ["Bengaluru"]},
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            response.json()["detail"],
+            "At least one target role is required before accessing the job feed.",
+        )
+
     def test_job_feed_numeric_pagination_has_stable_pages_and_total(self):
         config = {**radar.get_config(), "notifications_enabled": False}
         extra_jobs = [

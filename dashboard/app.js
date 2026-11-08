@@ -698,6 +698,16 @@
       });
     }
 
+    function readRenderedTags() {
+      return [...container.querySelectorAll('.tag-chip-item')]
+        .map(chip => {
+          const label = chip.cloneNode(true);
+          label.querySelectorAll('.tag-chip-remove').forEach(remove => remove.remove());
+          return label.textContent.trim();
+        })
+        .filter(Boolean);
+    }
+
     function addTag(value) {
       const clean = value.trim().replace(/^,+|,+$/g, '');
       if (clean && !tags.includes(clean)) {
@@ -738,7 +748,14 @@
     renderTags();
 
     tagInputs[containerId] = {
-      getTags: () => [...tags],
+      getTags: () => {
+        // Commit any text still in the input, then prefer the chips the user
+        // can actually see. This keeps a visual tag and the submitted payload
+        // in sync even if the browser's blur/click ordering differs.
+        if (input.value.trim()) addTag(input.value);
+        const rendered = readRenderedTags();
+        return rendered.length ? rendered : [...tags];
+      },
       setTags: newTags => {
         tags = Array.isArray(newTags) ? [...newTags] : [];
         renderTags();
@@ -1767,6 +1784,18 @@
     const payload = state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload();
     if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saving preferences…';
 
+    if (!state.isAdmin) {
+      const missing = [];
+      if (!payload.target_roles?.length) missing.push('at least one target role');
+      if (!payload.locations?.length) missing.push('at least one target location');
+      if (missing.length) {
+        const message = `Add ${missing.join(' and ')} before saving your preferences.`;
+        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;
+        showToast(message, 'error', 7000);
+        return;
+      }
+    }
+
     try {
       const response = await authClient.request(state.isAdmin ? '/config' : '/preferences', {
         method: 'PUT',
@@ -1779,8 +1808,11 @@
         return;
       }
       if (!response.ok) {
-        showToast('Failed to save configuration', 'error');
-        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Save failed.';
+        const errorData = await response.json().catch(() => ({}));
+        const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : '';
+        const message = (detail || `Save failed (HTTP ${response.status}).`).slice(0, 320);
+        showToast(message, 'error', 7000);
+        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;
         return;
       }
 

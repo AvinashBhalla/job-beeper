@@ -120,6 +120,22 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             self.assertIn(required, source, f"shared dashboard must implement {required}")
         self.assertIn("admin-only-setting", (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
 
+    def test_preferences_save_uses_visible_tags_and_surfaces_backend_validation(self):
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        for required in (
+            "function readRenderedTags()",
+            "chip.cloneNode(true)",
+            "const rendered = readRenderedTags()",
+            "if (input.value.trim()) addTag(input.value)",
+            "if (!payload.target_roles?.length) missing.push('at least one target role')",
+            "if (!payload.locations?.length) missing.push('at least one target location')",
+            "const errorData = await response.json().catch(() => ({}))",
+            "const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : ''",
+            "showToast(message, 'error', 7000)",
+            "saveStatusMessage",
+        ):
+            self.assertIn(required, source, f"preferences save must implement {required}")
+
     def test_dashboard_feed_polling_is_bounded_and_skips_hidden_tabs(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         self.assertIn("setInterval(refreshFeedIfVisible, 60000)", source)
