@@ -4266,6 +4266,182 @@ class LeverCollectorTests(unittest.TestCase):
             radar.lever_collect({"lever_boards": []})
 
 
+class LeverInitialSnapshotBaselineTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.original_db = radar.DB_PATH
+        radar.DB_PATH = Path(self.temp_dir.name) / "jobs.db"
+        self.addCleanup(setattr, radar, "DB_PATH", self.original_db)
+        radar.init_db()
+        self.config = {
+            **BASE_CONFIG,
+            "require_explicit_experience_for_alerts": False,
+            "notifications_enabled": True,
+        }
+
+    def _job(self, source_id):
+        return radar.normalize_job(
+            "lever",
+            source_id,
+            "Example Labs",
+            "Software Engineer",
+            "Bengaluru, India",
+            f"https://jobs.lever.co/example/{source_id}",
+            None,
+            "unknown",
+            "Python backend APIs. Requires 2 years of professional software engineering experience.",
+        )
+
+    def _ledger_rows(self):
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            return conn.execute(
+                "SELECT nl.canonical_opportunity_id, nl.status, nl.baseline_suppressed, "
+                "j.source, j.source_job_id "
+                "FROM notification_ledger nl "
+                "JOIN jobs j ON j.canonical_opportunity_id=nl.canonical_opportunity_id "
+                "ORDER BY j.source_job_id"
+            ).fetchall()
+
+    def _record(self, started_at, outcome):
+        radar.record_run(
+            "lever",
+            started_at,
+            radar.now(),
+            1,
+            1,
+            "partial source scan" if outcome != "success" else None,
+            run_id=f"lever-{outcome}-{started_at.timestamp()}",
+            outcome=outcome,
+            duration_seconds=1.0,
+        )
+
+    def test_first_inventory_and_partial_runs_are_durable_baseline_not_alerts(self):
+        first_started = radar.now() - radar.dt.timedelta(seconds=2)
+        radar.upsert_jobs([self._job("posting-one")], self.config)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", first_started),
+            1,
+        )
+        radar.refresh_job_evaluations(self.config)
+        radar.refresh_notification_decisions(self.config)
+        rows = self._ledger_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1:3], ("suppressed", 1))
+
+        # A partial first run does not complete the source baseline. New rows
+        # from another partial scan are also inventory, not alert candidates.
+        self._record(first_started, "partial_failed")
+        second_started = radar.now() - radar.dt.timedelta(seconds=1)
+        radar.upsert_jobs([self._job("posting-two")], self.config)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", second_started),
+            1,
+        )
+        radar.refresh_job_evaluations(self.config)
+        radar.refresh_notification_decisions(self.config)
+        rows = self._ledger_rows()
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(row[1] == "suppressed" and row[2] == 1 for row in rows))
+
+        # Once a successful source run is persisted, later new jobs must follow
+        # normal matching and notification rules.
+        self._record(second_started, "success")
+        third_started = radar.now() - radar.dt.timedelta(seconds=1)
+        radar.upsert_jobs([self._job("posting-three")], self.config)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", third_started),
+            0,
+        )
+        radar.refresh_job_evaluations(self.config)
+        radar.refresh_notification_decisions(self.config)
+        rows = self._ledger_rows()
+        third = next(row for row in rows if row[4] == "posting-three")
+        self.assertEqual(third[1:3], ("queued", 0))
+
+    def test_initial_baseline_does_not_suppress_existing_canonical_opportunity(self):
+        old_started = radar.now() - radar.dt.timedelta(hours=1)
+        old_job = radar.normalize_job(
+            "greenhouse", "gh-existing", "Example Labs", "Software Engineer",
+            "Bengaluru, India", "https://jobs.lever.co/example/shared-posting",
+            None, "unknown", "Python backend APIs",
+        )
+        old_job["discovered_at"] = radar.iso(old_started)
+        radar.upsert_jobs([old_job], self.config)
+
+        new_started = radar.now() - radar.dt.timedelta(seconds=1)
+        lever_job = self._job("shared-posting")
+        lever_job["url"] = old_job["url"]
+        lever_job["discovered_at"] = radar.iso(new_started)
+        radar.upsert_jobs([lever_job], self.config)
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT COUNT(DISTINCT canonical_opportunity_id), "
+                "MIN(first_seen_at), MAX(first_seen_at) FROM jobs"
+            ).fetchone()
+        self.assertEqual(rows[0], 1)
+        self.assertLess(
+            radar.parse_relative(rows[1]),
+            new_started,
+        )
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", new_started),
+            0,
+        )
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            flag = conn.execute(
+                "SELECT baseline_suppressed FROM notification_ledger"
+            ).fetchone()[0]
+        self.assertEqual(flag, 0)
+
+    def test_other_sources_are_never_baselined_by_lever_policy(self):
+        started = radar.now() - radar.dt.timedelta(seconds=1)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("naukri", started),
+            0,
+        )
+
+    def test_legacy_notification_ledger_migration_adds_baseline_flag(self):
+        with TemporaryDirectory() as tmp:
+            db = Path(tmp) / "legacy.db"
+            with sqlite3.connect(db) as conn:
+                conn.execute("""
+                    CREATE TABLE notification_ledger (
+                        canonical_opportunity_id INTEGER PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        candidate_job_id INTEGER,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        decision_reason_json TEXT NOT NULL DEFAULT '[]',
+                        attempt_count INTEGER NOT NULL DEFAULT 0,
+                        next_attempt_at TEXT,
+                        claimed_at TEXT,
+                        sent_at TEXT,
+                        last_error TEXT
+                    )
+                """)
+                conn.execute(
+                    "INSERT INTO notification_ledger "
+                    "(canonical_opportunity_id,status,created_at,updated_at) "
+                    "VALUES (1,'pending','2026-11-01T00:00:00+00:00','2026-11-01T00:00:00+00:00')"
+                )
+            original = radar.DB_PATH
+            try:
+                radar.DB_PATH = db
+                radar.init_db()
+                with sqlite3.connect(db) as conn:
+                    columns = {row[1] for row in conn.execute("PRAGMA table_info(notification_ledger)")}
+                    value = conn.execute(
+                        "SELECT status, baseline_suppressed FROM notification_ledger "
+                        "WHERE canonical_opportunity_id=1"
+                    ).fetchone()
+                self.assertIn("baseline_suppressed", columns)
+                self.assertEqual(value, ("pending", 0))
+            finally:
+                radar.DB_PATH = original
+
+
 class LeverConfigTests(unittest.TestCase):
     def test_v12_migration_forces_lever_off_even_if_old_config_enabled_it(self):
         defaults = {

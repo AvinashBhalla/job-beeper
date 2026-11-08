@@ -72,3 +72,13 @@ Required behavior for any timestamp-unknown full-snapshot ATS source:
 - Regression tests must cover first complete baseline, repeated unchanged snapshot, partial first run, restart durability, and a new posting after baseline.
 
 Until that gate exists, Lever remains default-off with an empty configured allowlist; the Drivetrain probe above is not an activation.
+
+## 2026-11-08 — Initial-inventory notification guard implemented
+
+- Lever has no reliable publication timestamp in its documented public postings contract. The first full board snapshot must not be treated as newly published jobs.
+- Added additive notification_ledger.baseline_suppressed INTEGER NOT NULL DEFAULT 0. During each Lever source run, after job upsert and before evaluation/notification dispatch, suppress_initial_source_snapshot_alerts() marks newly created canonical opportunities as suppressed while no prior successful Lever source run exists. The marker is durable and excluded from future global notification-decision refreshes.
+- Partial first runs do not establish completion. A later partial run continues baselining newly seen records. Only a successful source run completes the baseline; subsequent genuinely new Lever IDs then use normal matching and notification rules. The code does not falsify or overwrite discovered_at or source_posted_at.
+- Existing canonical opportunities with an older observation from another source are not baseline-suppressed. Only Lever is in INITIAL_SNAPSHOT_BASELINE_SOURCES; Naukri, LinkedIn and Greenhouse behavior is unchanged.
+- Focused tests: 4 passed. Full V2 suite after this addition: 234 passed in 81.248 seconds. Tests cover partial-run baselining, success transition/new-job alerting, existing cross-source canonical preservation, source isolation and legacy SQLite migration.
+- Important integration gate: PR #46 uses a separate user_notification_ledger. That branch's member enqueue query currently does not consult the global notification_ledger.baseline_suppressed flag. Before enabling Lever for member notifications or merging the multi-user notification integration, rebase PR #46 and add the equivalent baseline filter/test to its per-user enqueue/delivery paths. The present guard protects the V2 global/admin notification ledger only.
+- Lever remains disabled with empty lever_boards in both config presets; no Lever source request, notification, DB canary, app deployment or service restart was performed by this code change.

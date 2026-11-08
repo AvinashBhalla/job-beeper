@@ -65,6 +65,7 @@ LINKEDIN_DEEP_TPR = "r21600"
 LEVER_PAGE_SIZE = 100
 LEVER_MAX_PAGES_PER_BOARD = 5
 LEVER_MAX_BOARDS = 20
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -835,6 +836,7 @@ def init_db() -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             decision_reason_json TEXT NOT NULL DEFAULT '[]',
+            baseline_suppressed INTEGER NOT NULL DEFAULT 0,
             attempt_count INTEGER NOT NULL DEFAULT 0,
             next_attempt_at TEXT,
             claimed_at TEXT,
@@ -908,6 +910,7 @@ def init_db() -> None:
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
         _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
+        _ensure_column(conn, "notification_ledger", "baseline_suppressed", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "notification_ledger", "attempt_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "notification_ledger", "next_attempt_at", "TEXT")
         _ensure_column(conn, "notification_ledger", "claimed_at", "TEXT")
@@ -1257,6 +1260,82 @@ def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
     return None
 
 
+def suppress_initial_source_snapshot_alerts(
+    source: str,
+    started_at: dt.datetime,
+) -> int:
+    """Persistently suppress first-inventory alerts for timestamp-unknown ATS sources.
+
+    Partial first runs are also baseline inventory: subsequent partial runs keep
+    suppressing only newly discovered records until one complete successful run
+    is recorded. Existing canonical opportunities seen before this run are not
+    modified, and other sources are never affected.
+    """
+    if source not in INITIAL_SNAPSHOT_BASELINE_SOURCES:
+        return 0
+
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        has_successful_run = conn.execute(
+            """
+            SELECT 1 FROM source_runs
+            WHERE source=? AND outcome='success'
+            LIMIT 1
+            """,
+            (source,),
+        ).fetchone()
+        if has_successful_run:
+            return 0
+
+        cutoff = iso(started_at)
+        timestamp = iso(now())
+        reasons = json.dumps(
+            [
+                "initial source inventory baseline",
+                "source has no reliable publication timestamp",
+                "do not alert on listings already present before first successful source run",
+            ],
+            ensure_ascii=False,
+        )
+        canonical_ids = conn.execute(
+            """
+            SELECT DISTINCT j.canonical_opportunity_id
+            FROM jobs j
+            WHERE j.source=?
+              AND j.canonical_opportunity_id IS NOT NULL
+              AND j.first_seen_at >= ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM jobs earlier
+                  WHERE earlier.canonical_opportunity_id=j.canonical_opportunity_id
+                    AND earlier.first_seen_at < ?
+              )
+            """,
+            (source, cutoff, cutoff),
+        ).fetchall()
+        suppressed = 0
+        for row in canonical_ids:
+            cursor = conn.execute(
+                """
+                UPDATE notification_ledger
+                SET status='suppressed',
+                    candidate_job_id=NULL,
+                    baseline_suppressed=1,
+                    updated_at=?,
+                    decision_reason_json=?
+                WHERE canonical_opportunity_id=?
+                  AND baseline_suppressed=0
+                  AND status IN ('pending', 'queued', 'suppressed')
+                  AND attempt_count=0
+                  AND sent_at IS NULL
+                """,
+                (timestamp, reasons, int(row["canonical_opportunity_id"])),
+            )
+            suppressed += max(0, cursor.rowcount)
+        conn.commit()
+    return suppressed
+
+
 def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     now_value = now()
@@ -1271,7 +1350,9 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
             """
             SELECT canonical_opportunity_id, status
             FROM notification_ledger
-            WHERE status IN ('pending', 'queued')
+            WHERE baseline_suppressed=0
+              AND (
+                status IN ('pending', 'queued')
                OR (
                     status='suppressed'
                     AND EXISTS (
@@ -1282,6 +1363,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                           AND j.discovered_at >= ?
                     )
                )
+              )
             ORDER BY created_at ASC
             """,
             (rediscovery_cutoff,),
@@ -3750,6 +3832,16 @@ def run_source(source: str, config: dict[str, Any]) -> None:
                 type(exc).__name__,
             )
         new_jobs = upsert_jobs(jobs, config)
+        baseline_suppressed = suppress_initial_source_snapshot_alerts(
+            source,
+            started_at,
+        )
+        if baseline_suppressed:
+            log.info(
+                "source=%s initial inventory baseline suppressed canonical_opportunities=%s",
+                source,
+                baseline_suppressed,
+            )
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
 
