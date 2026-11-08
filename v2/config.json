@@ -4,7 +4,13 @@
     "naukri": 300,
     "instahyre": 600,
     "greenhouse": 900,
-    "ashby": 1800
+    "ashby": 1800,
+    "lever": 1800,
+    "workday": 120,
+    "smartrecruiters": 120,
+    "workable": 120,
+    "keka": 120,
+    "darwinbox": 120
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -76,7 +82,7 @@
     "workflow",
     "orchestration"
   ],
-  "candidate_experience_years": 2,
+  "candidate_experience_years": 2.0,
   "match_threshold": 55,
   "title_exclude": [
     "senior",
@@ -94,7 +100,7 @@
     "vp",
     "vice president"
   ],
-  "max_experience_years": 3,
+  "max_experience_years": 3.0,
   "remote_only": false,
   "min_experience_years": null,
   "max_age_hours": 72,
@@ -106,9 +112,16 @@
     "naukri": true,
     "instahyre": false,
     "greenhouse": false,
-    "ashby": false
+    "ashby": false,
+    "lever": false,
+    "workday": false,
+    "smartrecruiters": false,
+    "workable": false,
+    "keka": false,
+    "darwinbox": false
   },
-  "config_version": 11,
+  "config_version": 15,
+  "workday_boards": [],
   "greenhouse_boards": [
     {
       "token": "coinbase",
@@ -132,5 +145,10 @@
       "board": "posthog",
       "company": "PostHog"
     }
-  ]
+  ],
+  "lever_boards": [],
+  "smartrecruiters_boards": [],
+  "workable_boards": [],
+  "keka_boards": [],
+  "darwinbox_boards": []
 }

@@ -7,6 +7,11 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
+/* Author display rules must never override the semantic HTML hidden state. */
+[hidden] {
+  display: none !important;
+}
+
 /* ==========================================================================
    1. Theme Foundations: Obsidian Dark (Default) & Editorial Light
    ========================================================================== */
@@ -1947,6 +1952,30 @@ body.auth-ready .auth-gate {
   box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
+.auth-password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-password-field input {
+  padding-right: 64px;
+}
+
+.auth-password-field .auth-password-toggle {
+  position: absolute;
+  right: 8px;
+  min-height: 30px;
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .auth-form button {
   min-height: 42px;
   margin-top: 12px;
@@ -1980,4 +2009,239 @@ body.auth-ready .auth-gate {
 
 @media (max-width: 560px) {
   .auth-card { padding: 24px; }
+}
+
+
+/* Minimal tenant workspace; operational/admin navigation remains unavailable to users. */
+.user-workspace {
+  display: none;
+  min-height: 100vh;
+  padding: clamp(20px, 4vw, 48px);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+}
+body.user-ready #authGate,
+body.user-ready .app-shell,
+body.user-ready .mobile-bottom-navigation,
+body.user-ready .toast-notifications-host {
+  display: none !important;
+}
+body.user-ready #userWorkspace {
+  display: block;
+}
+.user-workspace-header {
+  width: min(100%, 1100px);
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.user-workspace-brand {
+  margin-bottom: 8px;
+}
+.user-panel-card {
+  width: min(100%, 1100px);
+  margin: 0 auto 24px;
+  padding: clamp(22px, 3vw, 36px);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm, 0 8px 28px rgba(0,0,0,.08));
+}
+.user-panel-card h1 {
+  margin: 0 0 8px;
+  font-size: clamp(20px, 2.4vw, 28px);
+  color: var(--text-primary);
+}
+.user-panel-card .auth-form {
+  max-width: 680px;
+}
+.user-panel-card .auth-form textarea {
+  width: 100%;
+  min-height: 58px;
+  padding: 11px 12px;
+  resize: vertical;
+  color: var(--text-primary);
+  background: var(--bg-canvas);
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.user-panel-card .auth-form textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+.user-panel-card .auth-form small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.user-feed-heading,
+.user-feed-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.user-jobs-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.user-job-card {
+  padding: 18px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-canvas);
+}
+.user-job-card h2 {
+  margin: 0 0 7px;
+  font-size: 16px;
+}
+.user-job-card h2 a {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.user-job-card h2 a:hover {
+  color: var(--accent-primary);
+}
+.user-job-meta {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.user-job-score {
+  display: inline-flex;
+  margin: 4px 0 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+.user-job-reasons {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 560px) {
+  .user-workspace-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+
+/* Server-side job-feed pagination */
+.feed-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--divider);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.feed-pagination[hidden] { display: none; }
+.feed-pagination button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+
+.experience-provenance-label {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  vertical-align: 1px;
+}
+
+
+/* Keep the operational header readable on narrow phones without clipping metrics. */
+@media (max-width: 560px) {
+  .top-header-bar {
+    height: auto;
+    min-height: var(--header-height);
+    padding: 10px 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-title-wrap {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .header-telemetry-ribbon {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .telemetry-capsule {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 7px 6px;
+    font-size: 11px;
+  }
+
+  .telemetry-divider {
+    display: none;
+  }
+
+  .telemetry-item {
+    min-width: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2px 4px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .telemetry-item span,
+  .telemetry-item b {
+    overflow-wrap: anywhere;
+  }
+
+  .telemetry-item b {
+    font-size: 12px;
+  }
+
+  .header-telemetry-ribbon > .theme-dropdown-wrap {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .top-header-bar {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .telemetry-capsule {
+    font-size: 10px;
+  }
+
+  .header-action-btn {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
 }

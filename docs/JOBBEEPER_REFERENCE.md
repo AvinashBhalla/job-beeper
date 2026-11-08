@@ -233,3 +233,58 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - [CI #40651562286](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651562286): focused tests 32 passed in 0.061 seconds; full V2 suite 134 passed in 17.009 seconds. This is CI evidence only, not VM or live-provider validation.
 - Keep LLM_ROUTER_ENABLED=false and LLM_ROUTER_MATCHER_ENABLED=false until a separate rollout is approved. Keep Telegram credentials blank and notifications disabled; no VM, DB, named volume or production-like service was changed.
 - Next: read-only inspect/fetch of /home/ubuntu/job-beeper-dev and explicit ahead/behind/path assessment before any fast-forward. Preserve local v2/config.json, .venv/, .env, and job-radar-dev_radar-dev-data.
+
+
+## 2026-11-07 — Current-system comparison and browser evidence required
+
+The public product claims remain reference points, not verified implementation details. The latest read-only audit is in `docs/INGESTION_FIRST_ROADMAP.md`. In brief: our current code has five collectors, production enables two, shared dev enables one; LinkedIn is receiving repeated HTTP 429 responses; Naukri is a five-minute external relay with date-only posting dates. We cannot currently claim parity with JobBeeper's breadth or freshness.
+
+Next reverse-engineering pass should use the user's authorized logged-in browser session to capture sanitized Network metadata for initial load, background refresh, filters, pagination, job detail loading, timestamps and source labels. Record observed facts separately from inferences. Do not extract private backend code, replay authenticated endpoints, expose session tokens, bypass access controls or evade rate limits. The evidence report belongs in `docs/JOBBEEPER_NETWORK_EVIDENCE_YYYY-MM-DD.md`.
+
+The product priority remains ingestion reliability and source expansion. However, on 2026-11-07 the owner explicitly asked to continue existing authentication, resume-parser and Telegram feature work in parallel on isolated PR #46 while the JobBeeper browser/network investigation proceeds. Keep that branch draft and isolated; do not merge or promote it until explicit approval and release gates. The ingestion-first strategy still governs production priorities.
+
+
+## 2026-11-07 — Parallel feature work confirmation
+
+- The owner's Codex `@Chrome`/CDP JobBeeper network investigation is a separate workstream. Await its sanitized report/HAR; do not claim private backend behavior from frontend network evidence.
+- Continue auth/Google signup, resume parser and per-user Telegram feature development on `feat/user-preferences-evaluations-20261106` in parallel. PR #46 stays draft.
+- Current checkpoint: commit `51db2f9`, CI run `42370884022` green; isolated full suite **272 passed, 1 skipped**. Dedicated Telegram dev bot and public HTTPS webhook E2E remain pending.
+- Keep shared dev (8001) and production (8000) untouched absent explicit approval.
+
+
+## Authenticated browser evidence — 2026-11-07
+
+See JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md for the full sanitized request inventory and observation windows. This section supplements the public product reference above; it does not reveal or establish JobBeeper's private backend design.
+
+Observed in the owner's authenticated browser: browser-fetched list API with numeric page and page size 20; server-requested keyword search; separate metadata and tracker requests on detail open; a view-marking POST; source labels LinkedIn, Ashby, Naukri, Lever and Hirist; and experience provenance labels for employer-stated vs description-derived values. Ten minutes of idle observation in an expired-subscription account produced no feed-related Fetch/XHR, WebSocket or SSE events. Active-account refresh behavior remains unknown.
+
+Implications for this repository: implement stable server-side pagination; preserve experience provenance; keep source-posted and discovered timestamps distinct; measure each source's unique-job yield; and avoid adding detail-tracker endpoints without a user-facing requirement. Current local code already has server-side keyword search, newest-first ordering and separate source-posted/discovered timestamps, but still loads up to 500 jobs in one request and does not expose numeric page metadata. The dashboard feed refresh cadence has been reduced from 10 seconds to 60 seconds while visible.
+
+## Lever adapter implementation status — 2026-11-08
+
+- The current V2 branch now has a default-off Lever public Postings API adapter on feature branch `feat/lever-source-adapter-20261108`. Official public API contract: https://github.com/lever/postings-api; GET global/EU site endpoints; `skip`/`limit` pagination; published jobs only; stable ID/title/categories/plain/HTML descriptions/hostedUrl/workplaceType/optional salary.
+- Adapter supports explicit `lever_boards` allowlist, global/EU selection, max 20 boards, 5 pages × 100 items max per board/run, 20s timeout, metrics and partial-failure retention. It never submits applications. It only accepts valid Lever hosted URLs or constructs the canonical site URL. No documented publish timestamp; posted time remains unknown.
+- Config v12 keeps Lever disabled in both configs and forces old persisted configs off. 12 focused tests and full suite 227 passed locally; CI pending. No employer board configured, no live request or deployment.
+
+## GitHub CI result — 2026-11-08
+
+- Draft PR #50: https://github.com/AvinashBhalla/job-beeper/pull/50
+- GitHub V2 CI run #42452809803 passed on commit `c8967ac140647409e735b7ea5be18ea7c92f133d`: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32 passed), full V2 suite (227 passed in 27.508 seconds).
+- PR #50 remains draft and mergeable. No Lever board has been configured or polled; Lever remains off in both config presets.
+
+
+## Next ATS candidate research — Recruitee vs SmartRecruiters — 2026-11-08
+
+- SmartRecruiters official docs describe a public company postings endpoint `GET /v1/companies/{companyIdentifier}/postings` with `destination=PUBLIC`, `limit` (max 100) and `offset`; its authentication guide lists the public Posting API among no-auth APIs. The separate `/feed/publications` endpoint requires `X-SmartToken`; do not confuse the two contracts. See https://developers.smartrecruiters.com/reference/v1listpostings and https://developers.smartrecruiters.com/docs/authentication.
+- Recruitee's public company feed has two XML URLs per subdomain: formatted `/api/feeds/offers.xml` and raw `/api/offers.xml`. The raw feed contains currently published offers only, disappears when offers are unpublished, and updates immediately. Documented fields include stable reference, title/company, full description, multiple locations, remote/hybrid/on-site flags, hosted/apply URLs, `posted` (feed-added timestamp) and `updated` (last update). See https://support.recruitee.com/en/articles/8213076-faq-api and https://docs.recruitee.com/docs/feed.
+- Recruitee's new Careers Site JSON API `/api/offers` will require `X-Careers-Sites-Token` starting 2027-02-10; official docs say XML feed and jobs widget are not covered by that token requirement. Prefer the raw XML feed if/when implementing. See https://docs.recruitee.com/reference/authentication-1.
+- Critical parser rule: the XML feed may contain a `<credentials>` subtree with third-party job-board secrets. Parse only an allowlist of job fields; never persist/log raw XML or the credentials subtree. Use strict fixed Recruitee host construction from a validated subdomain, bounded response size, one GET/site, no retries, and keep default-off.
+- Recommendation: Recruitee is the next adapter to evaluate after Lever; its feed has stronger location/timestamp signals and remains separate from the upcoming Careers API token cutover. SmartRecruiters is also viable but company-scoped; public endpoints are distinct from its authenticated `feed/publications` API. No Recruitee or SmartRecruiters live request/adapter was implemented in this research step.
+
+## 2026-11-08 — Recruitee live feed canary and next adapter
+
+- A bounded direct read-only canary of `https://tether.recruitee.com/api/offers.xml` returned HTTP 200 twice; each XML response was 8,785,676 bytes with 228 offers and 228 unique IDs. All offers had `published-at` and `updated-at`; 20 offers listed India locations and a broad title filter found 18 technical candidates; 226 remote / 2 hybrid. The two snapshots 2s apart had identical ID sets and metadata fingerprints. This is only short-interval consistency, not a source SLA.
+- The live Tether raw XML shape differs from the older official example. Observed shape `<hash><offers><offer>` uses `id`, `guid`, `slug`, `published-at`, `updated-at`, `description`, `requirements`, `locations`, `remote`, `hybrid`, `on-site`, `careers-url`, `careers-apply-url`; the older docs sample uses `<jobs><job>` with `reference`, `posted`, `updated`, `description_requirements`. A future adapter must support both.
+- The canary currently had no `<credentials>` node, but official Recruitee docs explicitly state credentials for partner job boards may appear in XML. Any parser must explicitly skip `<credentials>`, reject DTD/entities, cap response size, only parse allowlisted fields, and never log/persist raw XML.
+- Official feed URLs: raw `/api/offers.xml`, formatted `/api/feeds/offers.xml`, JSON `/api/offers`. Careers Site JSON API token is required from 2027-02-10; official docs exclude XML feed and widget from that token change. Use official docs in `docs/RECRUITEE_SOURCE_RESEARCH_2026-11-08.md`.
+- No Recruitee adapter or app source request was made. Recommendation: Recruitee is next candidate after Lever review; use Tether as test fixture with both schemas and credentials-skip coverage. Keep source off until code review and a no-notification first-snapshot policy is validated.

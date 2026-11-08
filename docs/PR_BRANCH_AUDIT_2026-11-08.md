@@ -59,3 +59,58 @@ Deleted: `feat/structured-naukri-details-20261106` (after #3 closure), `fix/rela
 - Current planned app branches after cleanup: `main`, `v2-live-radar`, and `feat/user-preferences-evaluations-20261106` (open draft PR #46). PR #35 remains the V2-to-main release gate and is not merge-ready.
 - The isolated 8003 preview is restored: health/dashboard/assets return HTTP 200, source-status remains admin-only (401 anonymously), and all five collector switches and notifications remain disabled with synthetic source-run examples only.
 - Next prioritized feature task: diagnose the PR #46 preferences-save validation/UI error before considering the multi-user branch merge. Do not merge PR #46 or promote to shared dev/production until preference save and per-user Telegram E2E are verified.
+
+## 2026-11-08 — PR #46 local V2 integration candidate
+
+- Integration candidate `integration/pr46-v2-rebase-20261108` is pushed to origin at `676dfaf`, not deployed and not yet opened as a PR. PR #46 and PR #50 remain separate open draft PRs; running 8002/8004 services are unchanged.
+- Shared conflict in `v2/radar.py` was resolved by combining both implementations: preserve monotonic `last_seen_at`, safe source-posted timestamp handling and description-change-only global reevaluation; retain experience provenance/confidence ranking, min/max persistence and per-user evaluation refresh for only touched/new jobs.
+- `dashboard/app.js` and `dashboard/index.html` auto-merged. Six conflict files were originally detected; the docs conflicts are being resolved by keeping the newer V2 handover/roadmap/audit and appending current PR #46/browser QA status. Feature-only docs and tests (OAuth, resume parser, Telegram, local browser QA) remain included from PR #46.
+- Important next integration: ensure `user_notification_ledger` enqueue/delivery excludes global `notification_ledger.baseline_suppressed=1` opportunities before Lever or other first-snapshot ATS inventory is enabled for member Telegram. The user notification path must not bypass the initial-inventory baseline.
+- This local candidate must pass the full V2 suite and user-preferences/OAuth/resume/Telegram focused suites. Keep PR #46 remote draft unchanged until owner desktop Browser report is returned and this candidate has full green CI.
+- No push/deploy/runtime changes.
+
+## 2026-11-08 — Desktop QA findings, local fixes and remaining verification
+
+- User supplied a complete Desktop browser report: overall **Failed**, with QA-001 medium authorization exposure (member opens Source Health and sees source names/status/counts/last-success/diagnostics) and QA-002 low mobile header clipping at 390×844. All other tested scenarios are recorded in `docs/QA/desktop-browser-findings-2026-11-08.md`.
+- Desktop could not save its report because its workspace lacked `.git`; a canonical copy and next prompts are now in this repository. The Desktop connection interruption occurred while its answer was being generated; local Git worktrees and QA server remained intact.
+- Local integration candidate `/tmp/job-radar-pr46-integration`, branch `integration/pr46-v2-rebase-20261108`, already contained UI-only source-health hiding/route guard and mobile responsive CSS changes. We tightened the server boundary: `/api/source-status/summary` now uses `require_admin`, matching `/api/source-status` and `/api/latency-summary`.
+- Candidate UI changes: admin-only desktop/mobile navigation and section; direct member `#sources` routes redirect to Jobs; `loadSourceStatusTelemetry()` returns immediately for members and never calls source-status APIs; mobile telemetry row wraps into 3 columns under 560px with `minmax(0,1fr)` and `overflow-wrap:anywhere`.
+- Per-user first-inventory safety was checked during the merge: `user_notifications` excludes `jobs.source_initial_baseline` in enqueue and final send validation. We additionally exclude it from claim selection and explicitly cancel stale queued/failed member notification rows after a job becomes initial baseline.
+- Regression tests updated: member `/api/source-status/summary`, `/api/source-status`, `/api/latency-summary` return 403; admin source summary and full status return 200; route dependency contract now classifies source summary as admin-only; dashboard markup/route/telemetry guards and mobile grid have contract tests.
+- Focused auth/API/dashboard tests: **13 passed**. User notification tests: **14 passed**. Full V2 unittest discovery: **333 passed** in **174.474 seconds**. Python py_compile/compileall and `git diff --check` passed.
+- Local VM Node is v12.22.9 and cannot parse the dashboard's optional-chaining/nullish syntax. The local `node --check` attempt is not a project failure; use GitHub CI's modern Node runtime for the JS syntax check.
+- IMPORTANT: integration branch `integration/pr46-v2-rebase-20261108` at `676dfaf` is pushed but not deployed. Post-fix browser verification must use synthetic QA port 8005 / tunnel 18005, never old pre-fix port 8004.
+- Public reference research is summarized in `docs/PRODUCT_REVERSE_ENGINEERING_2026-11-08.md`; detailed Desktop tasks are in `docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md`. The public JobBeeper site mentions role/location/experience/company preferences, remote jobs, blocked companies, pause alerts, free browsing/application tracking, paid Telegram/browser/app alerts, and subscriber-first/public sharing. These are research leads, not verified account features; Prompt 2 should verify them without signing up or paying.
+- Remaining gates: browser-verify QA-001/QA-002 on the candidate; run security/tenant-isolation Prompt 3 (CSRF, IDOR, expiry, exact preference payload, keyboard/pagination/filter matrix); update docs with each Desktop artifact; then run candidate GitHub CI. Keep PR #46 and #50 open/draft until integration/review decisions are made. No merge, port 8004 restart, shared-dev or production deploy is authorized.
+
+
+## Candidate QA preview — 2026-11-08
+
+- An isolated candidate server is running at remote loopback 127.0.0.1:8005 (Termalin job 3o9e1mx8d2). Browser tunnel: ssh -N -L 18005:127.0.0.1:8005 ubuntu@130.210.27.197; URL: http://localhost:18005/dashboard/.
+- This preview uses a fresh synthetic database /tmp/job-radar-pr46-fixed-qa/jobs.db, not a copy of production, shared dev or the old port-8004 database. It has one admin, one member, two synthetic jobs and one clearly synthetic Naukri source-run row.
+- All six collector flags (LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever) are false; notifications are false; Telegram, Google OAuth, Gemini and other LLM credentials are blank. The environment binds only to remote loopback.
+- Temporary test accounts shared in chat: qa-member@local.test and qa-admin@local.test. Passwords are not written in repository files.
+- HTTP smoke verification: /health, /dashboard/, dashboard JS and CSS returned 200. Member login/feed/daily-summary returned 200; member /api/source-status/summary, /api/source-status and /api/latency-summary returned 403. Admin login and all three source-health GETs returned 200. No outbound source requests or Telegram sends were made.
+- The original port-8004 feature process still uses /tmp/job-radar-user-preferences and remains unchanged. Do not use it for post-fix verification. Ports 8000/8001 remain untouched.
+- Next: run Prompt 1 in docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md against port 18005. It must verify real 390×844/375×812/320×740 rendering and direct #sources member navigation, then admin access.
+
+## Follow-up integration review — per-user Lever baseline suppression
+
+During a code-level integration review, a remaining cross-source notification gap was found despite an earlier handover note claiming the member path was protected.
+
+- Lever initial-inventory suppression marks `notification_ledger.baseline_suppressed=1` at the canonical-opportunity level.
+- `user_notifications._queue_new_matches()` previously excluded only `jobs.source_initial_baseline=1`. A Lever row can be part of initial baseline while its canonical opportunity was first created by a different source; the job-row flag may therefore be 0 while the canonical flag is 1.
+- Fixed member queue creation, claim selection and final pre-send revalidation to also exclude any canonical opportunity with `notification_ledger.baseline_suppressed=1`.
+- Stale `queued`, `failed` or `sending` member rows for either job-level or canonical-level baseline items are cancelled as `initial_source_baseline`.
+- Added four tests around this: cross-source canonical suppression at enqueue, cancellation of a queued item at claim, final send revalidation if the canonical marker appears after claim, and the existing own-source baseline behavior.
+- All member notification tests: **17 passed**. Full integration V2 suite: **336 passed** in **194.322 seconds**. Python compile and `git diff --check` passed.
+- This is a verified source-level fix; no real Telegram message or outbound Telegram request occurred. Lever remains disabled, all candidate QA collector switches remain off, and production/shared-dev are untouched.
+- This correction supersedes the earlier wording that the member queue was fully protected before this change. The newly inspected code path was not covered by the prior test.
+
+
+## Correction to per-user Lever baseline review — candidate head 9ac6fab
+
+- Earlier text in this audit/handover stated the per-user member notification path already checked the global canonical baseline suppression marker. Code inspection showed that statement was incorrect: it checked only `jobs.source_initial_baseline`.
+- Fixed member notification enqueue, claim/cancel and final send revalidation to also check `notification_ledger.baseline_suppressed=1`. This closes cross-source canonical cases where a Lever baseline item shares a canonical opportunity with an earlier row from another source.
+- Added three regression tests for canonical marker exclusion at enqueue, cancellation of a previously queued item, and final pre-send rejection. `test_user_notifications`: 17 passed. Full integration suite: 336 passed in 194.322s. No Telegram HTTP request occurred.
+- Code fix commit `08c256f` was replayed after the GitHub documentation commits and pushed at candidate head `9ac6fab`. No production/shared-dev deployment; Lever remains off.

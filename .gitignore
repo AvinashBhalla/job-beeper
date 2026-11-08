@@ -6,3 +6,6 @@ __pycache__/
 *.pyo
 v2/jobs.db
 v2/config_token
+
+# Private isolated feature environment (dev bot credentials)
+.env.feature

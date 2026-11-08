@@ -1,27 +1,31 @@
+> **Current source of truth:** [Product Vision and Delivery Roadmap](PRODUCT_VISION_AND_DELIVERY_ROADMAP.md). This file remains detailed design/history; when priorities conflict, the product vision roadmap is authoritative.
+
 # JobBeeper Multi-User and Referral Intelligence Roadmap
 
-**Status:** Authentication and admin/user roles implemented on an isolated feature branch; not deployed. Per-user preferences/evaluations, Telegram fan-out and applications remain pending.
-**Date:** 2026-11-06
-**Priority:** Per-user preferences and matching are the next product milestone
+**Status:** Authentication foundation PR #45 merged into `v2-live-radar` as `dd7aeb1`; user preferences, onboarding and user-scoped job evaluations/feed are implemented on `feat/user-preferences-evaluations-20261106` but not yet merged or deployed. Opportunity list/detail tenant scoping and final PR review remain. Telegram fan-out and server-side applications remain later milestones.
+**Date:** 2026-11-06 (updated after PR #45 merge)
+**Priority:** PAUSED behind ingestion reliability and broad source coverage (priority reset 2026-11-07)
 **Repository:** AvinashBhalla/job-beeper
-**Development branch/worktree:** `feat/multi-user-foundation-20261106`, `/tmp/job-radar-naukri-location-v3`
+**Integration branch:** `v2-live-radar`
+**Current feature branch/worktree:** `feat/user-preferences-evaluations-20261106`, `/tmp/job-radar-user-preferences`
 
 ## 1. Product direction
 
 JobBeeper is moving from a personal job radar to a multi-user job discovery and job-search workflow product.
 
-The immediate product objective is to let multiple real users create accounts, define independent job-search preferences, receive their own relevant matches, and connect their own Telegram destination. This enables a small beta and real user feedback before expanding the product.
+The long-term product objective remains multi-user accounts, independent preferences and per-user alerts. However, the immediate objective is now to make the shared ingestion engine reliably discover fresh jobs from a broad set of permitted sources. Multi-user onboarding and Telegram are paused until the ingestion acceptance gates in `docs/INGESTION_FIRST_ROADMAP.md` pass.
 
 The long-term direction includes a HAPPPY-like referral-intelligence workflow inspired by Uplers HAPPPY: after a user applies to a job, help identify relevant people at that employer, prepare referral/follow-up outreach, and track the follow-up process using authorized LinkedIn research and a user-authorized email integration.
 
-**Priority order is explicit:**
-1. Finish and safely promote the current search/description work.
-2. Build secure multi-user identity, roles, per-user preferences and per-user Telegram delivery.
-3. Run a small user beta and use feedback to improve matching, coverage and product UX.
-4. Build application tracking and referral intelligence as a separate, permissioned workflow.
-5. Consider hiring-post discovery and other broader features later.
+**Priority order (updated 2026-11-07; supersedes the earlier multi-user-first plan):**
+1. Audit and improve shared job ingestion: coverage, freshness, request budgets, 429 behavior, timestamp precision, deduplication and source health.
+2. Reverse-engineer observable JobBeeper UI/network behavior with a sanitized HAR from the user's authorized session; do not infer or extract private backend implementation.
+3. Build a measured source catalog and add permitted public/authorized adapters incrementally toward 100 useful sources.
+4. Validate real freshness and unique-job yield over canary windows; do not claim 100-source or instant coverage before evidence.
+5. Resume this multi-user roadmap (including PR #46, resume onboarding and Telegram) after ingestion gates pass.
+6. Build application tracking and referral intelligence later; hiring-post discovery remains later still.
 
-Do not start referral automation before the multi-user foundation and application tracking are reliable.
+Do not expand signup, resume parser or Telegram now. Keep PR #46 draft and isolated; no dev bot setup is needed during the ingestion phase.
 
 ## 2. Existing architecture: shared ingestion, personal evaluation
 
@@ -248,13 +252,18 @@ The future hiring-post stream (recruiter/employee posts announcing openings) rem
 - All existing legacy `/api/*` endpoints require an admin session; unsafe admin requests require CSRF; every API response is `Cache-Control: no-store`. `/health` is a minimal public liveness endpoint. Login validates browser Origin and supports `JOB_BEEPER_PUBLIC_ORIGIN` behind TLS termination.
 - Replaced the dashboard config-token flow with cookie-session login/account UI. Ordinary users see a holding screen and do not load the legacy global job feed.
 - Final V2 suite passed 189 tests in 79.321 seconds in a throwaway `--network none` container (one Node-only dashboard contract test is skipped inside that Python image); the Node-enabled dashboard contract suite passed 4/4 separately in 0.655 seconds.
-- The feature branch is pushed to GitHub and PR #45 is open against `v2-live-radar`; current head is `ea463cb`. Automated review findings P1/P2 were fixed in `ea463cb`; CI and re-review are pending on the latest head. The live dev and production containers remain untouched.
+- PR #45 was merged on 2026-11-06 into `v2-live-radar` as squash commit `dd7aeb1eea4790564a73367df90f7d4a07e012ea`. The remote feature branch has been removed. This is a code merge only: no live dev or production container/database/config was changed. CI passed on the final PR head; the Codex re-review remained stuck in running, so the final merge relied on manual review, resolved inline threads and green CI.
 
-### Gate 3 — per-user preferences and matching
-- Move candidate preferences to user scope.
-- Introduce user evaluations and preference fingerprints.
-- Update feed, search, job detail and application tracker APIs to use the authenticated user's evaluations.
-- Verify preference changes reevaluate that user's jobs only.
+### Gate 3 — per-user preferences and matching (implemented on draft PR #46; smoke test pending)
+- **Onboarding gate:** a user must configure at least one target role and at least one location before the personalized feed unlocks. Do not show an empty/global feed to incomplete users; show a focused setup screen with the missing fields and save action.
+- New users start with empty candidate preferences. Never copy the admin's profile into a new user's account. The first admin's existing global candidate profile is migrated into that admin's preference row only.
+- Keep ingestion, normalized jobs, canonical opportunities, source health, polling and provider credentials shared/system-level. Keep source/runtime controls admin-only.
+- Introduce `user_preferences` and `user_job_evaluations` keyed by authenticated `user_id`; matcher receives explicit preference data and never falls back to a global candidate profile for a normal user.
+- Implemented: preferences, job feed, job detail and daily summary are scoped to the authenticated user. Ordinary users do not receive global notification-ledger details. Opportunity list/detail endpoints remain admin-only and must be tenant-scoped before those views are exposed to users.
+- Preference saves re-evaluate the user's stored jobs without triggering another scrape. New shared ingestions evaluate for each active, configured user.
+- Implemented: normal users use a separate minimal workspace and never load the admin app shell or its browser-local applied/saved state. Server-side applications remain a later milestone.
+- Synthetic migration/tenant tests pass. A read-only copy of the live dev DB was not needed or used; do not run migrations against the live dev or production database in this implementation milestone.
+- PR #46 is draft and CI run #1222 passed on code head c5201ce. Manual browser smoke test and final security review remain before marking the PR ready.
 
 ### Gate 4 — Telegram fan-out and beta
 - Implement one-time Telegram linking.
@@ -371,3 +380,19 @@ The read-only audit above records the live single-user runtime before the auth f
 
 ### Next implementation milestone
 Implement `user_preferences` and `user_job_evaluations`, migrate the current global candidate profile to the initial admin on a copied DB, and make job feed/search/detail responses explicitly use the authenticated user's evaluation. Keep source ingestion shared. Do not add per-user Telegram delivery until user-scoped evaluation and notification-ledger tests pass.
+
+
+## 2026-11-07 — Priority status
+
+The product roadmap continues to prioritize ingestion for production readiness, but the owner requested on 2026-11-07 that ongoing authentication/signup, resume parser and per-user Telegram work continue in parallel on isolated PR #46. Keep it on `feat/user-preferences-evaluations-20261106`, draft and not promoted to shared dev or production. The owner is creating a dedicated dev bot; live Telegram E2E waits for private credentials and an approved public HTTPS webhook endpoint. The JobBeeper network investigation proceeds independently. Ingestion acceptance gates still govern any production release and source expansion.
+
+
+## 2026-11-07 — Parallel execution checkpoint (supersedes pause above)
+
+The owner explicitly requested parallel execution rather than waiting for the ingestion milestones to finish before continuing the existing feature branch. Continue this roadmap's auth, preferences, resume and Telegram implementation work in parallel with the ingestion-first roadmap. Do not change production priority or deployment boundaries.
+
+- Branch/PR: `feat/user-preferences-evaluations-20261106`, PR #46 draft.
+- Latest commit: `51db2f9`; GitHub V2 CI run `42370884022` passed.
+- Isolated suite: **272 passed, 1 skipped**; notification tests 12/12; resume parser tests 15/15; Google OAuth tests 15/15.
+- Isolated feature runtime healthy on 8002. Shared dev 8001 and production 8000 unchanged.
+- Pending: dedicated Telegram bot configuration, public HTTPS webhook and full link/opt-in/new-match/delivery/opt-out smoke test. Production bot remains untouched.

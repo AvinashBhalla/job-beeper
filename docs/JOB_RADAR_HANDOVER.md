@@ -4,10 +4,10 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-11-06 (multi-user authentication foundation implemented on an isolated feature branch; not deployed)**
+**Last updated: 2026-11-08 (candidate integration branch; final read-only browser regression recorded; acceptance remains blocked by evidence-only gates; not deployed)**
 **Release integration branch:** `v2-live-radar`
 
-**Active feature branch:** `feat/multi-user-foundation-20261106`
+**Active candidate branch:** `integration/pr46-v2-rebase-20261108`
 **Repository:** `AvinashBhalla/job-beeper`
 
 > ## Mandatory agent handover rule — every prompt
@@ -6034,3 +6034,450 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Redundant parser branch `fix/linkedin-experience-parser` was inspected; current V2 already includes `extract_linkedin_labeled_experience` plus its two regression tests, and the full 215-test CI covers them. Remove the stale branch, not the code.
 - PR/branch audit: `docs/PR_BRANCH_AUDIT_2026-11-08.md`. Cooldown evidence: `docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md`. Persistent design/migration: `docs/LINKEDIN_COOLDOWN_PERSISTENCE_2026-11-08.md`.
 - Next task: investigate PR #46 preference-save error and surface useful server validation feedback. Keep PR #46 draft until preference persistence and per-user Telegram E2E are proven.
+
+## 2026-11-08 — PR #46 local V2 integration candidate
+
+- Integration candidate `integration/pr46-v2-rebase-20261108` is now pushed to origin at `676dfaf`, merging PR #46 work with the Lever baseline branch and the QA fixes. It remains a standalone branch, not a PR or deployment; it does not alter the 8002 or 8004 running services.
+- Shared conflict in `v2/radar.py` was resolved by combining both implementations: preserve monotonic `last_seen_at`, safe source-posted timestamp handling and description-change-only global reevaluation; retain experience provenance/confidence ranking, min/max persistence and per-user evaluation refresh for only touched/new jobs.
+- `dashboard/app.js` and `dashboard/index.html` auto-merged. Six conflict files were originally detected; the docs conflicts are being resolved by keeping the newer V2 handover/roadmap/audit and appending current PR #46/browser QA status. Feature-only docs and tests (OAuth, resume parser, Telegram, local browser QA) remain included from PR #46.
+- Important next integration: ensure `user_notification_ledger` enqueue/delivery excludes global `notification_ledger.baseline_suppressed=1` opportunities before Lever or other first-snapshot ATS inventory is enabled for member Telegram. The user notification path must not bypass the initial-inventory baseline.
+- This local candidate must pass the full V2 suite and user-preferences/OAuth/resume/Telegram focused suites. Keep PR #46 remote draft unchanged until owner desktop Browser report is returned and this candidate has full green CI.
+- No push/deploy/runtime changes.
+
+## 2026-11-08 — Lever public ATS adapter implemented (default-off)
+
+- Created clean worktree `/tmp/job-radar-lever-adapter` from current `v2-live-radar` and branch `feat/lever-source-adapter-20261108`. The current roadmap already lists Lever as the next structured ATS adapter; no prior Lever adapter or live board probe was found.
+- Reviewed official Lever public Postings API docs: GET `/v0/postings/{SITE}?mode=json&skip=N&limit=Y`, with global and EU hosts; public published postings need no API key; documented fields include stable ID, title, categories, descriptions, hosted URL, workplace type and optional salary. It documents skip/limit pagination, but does not promise an accurate publish timestamp. Do not map undocumented `createdAt` to posted time.
+- Implemented `lever_collect` using an explicit site/company/instance allowlist, HTTPS global/EU APIs, pages of 100, max 5 pages per board (max 500 postings per configured board/run), 20-second timeout, no auth, no retry and no application POST. Uses source-level page/board/request metrics, stable instance/site-scoped IDs, allowed Lever hosted URLs/canonical URL fallback, normalized location/description/categories/workplace/salary. Unknown publication timestamp remains unknown.
+- Added config v12, `lever` source flag default false, `lever_boards=[]`, 1800-second poll target, validation for safe site slugs/instance/duplicates/20-board max, and migration which forces Lever off in pre-v12 persisted runtimes. Both `v2/config.json` and `v2/config.dev.json` keep all existing source flags unchanged and add Lever disabled/empty.
+- Focused Lever collector/config tests: 12 passed. Full V2 suite: **227 passed** in 80.051 seconds. Python compileall/py_compile passed. GitHub CI required after push.
+- No live Lever board was configured or polled. No source activation, matching, database write, notification, service restart or production/shared-dev deployment occurred.
+- Next: push/open draft PR, check GitHub CI, then curate one or two role-relevant Lever public site slugs and run a controlled GET-only two-snapshot read-only canary. Compare fresh postings, duplicate/stable IDs, location/India/remote relevance and useful new-job yield. Keep Lever off until separate review. Full specification: `docs/LEVER_SOURCE_ADAPTER.md`.
+
+## GitHub CI result — 2026-11-08
+
+- Draft PR #50: https://github.com/AvinashBhalla/job-beeper/pull/50
+- GitHub V2 CI run #42452809803 passed on commit `c8967ac140647409e735b7ea5be18ea7c92f133d`: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32 passed), full V2 suite (227 passed in 27.508 seconds).
+- PR #50 remains draft and mergeable. No Lever board has been configured or polled; Lever remains off in both config presets.
+
+
+## Next ATS candidate research — Recruitee vs SmartRecruiters — 2026-11-08
+
+- SmartRecruiters official docs describe a public company postings endpoint `GET /v1/companies/{companyIdentifier}/postings` with `destination=PUBLIC`, `limit` (max 100) and `offset`; its authentication guide lists the public Posting API among no-auth APIs. The separate `/feed/publications` endpoint requires `X-SmartToken`; do not confuse the two contracts. See https://developers.smartrecruiters.com/reference/v1listpostings and https://developers.smartrecruiters.com/docs/authentication.
+- Recruitee's public company feed has two XML URLs per subdomain: formatted `/api/feeds/offers.xml` and raw `/api/offers.xml`. The raw feed contains currently published offers only, disappears when offers are unpublished, and updates immediately. Documented fields include stable reference, title/company, full description, multiple locations, remote/hybrid/on-site flags, hosted/apply URLs, `posted` (feed-added timestamp) and `updated` (last update). See https://support.recruitee.com/en/articles/8213076-faq-api and https://docs.recruitee.com/docs/feed.
+- Recruitee's new Careers Site JSON API `/api/offers` will require `X-Careers-Sites-Token` starting 2027-02-10; official docs say XML feed and jobs widget are not covered by that token requirement. Prefer the raw XML feed if/when implementing. See https://docs.recruitee.com/reference/authentication-1.
+- Critical parser rule: the XML feed may contain a `<credentials>` subtree with third-party job-board secrets. Parse only an allowlist of job fields; never persist/log raw XML or the credentials subtree. Use strict fixed Recruitee host construction from a validated subdomain, bounded response size, one GET/site, no retries, and keep default-off.
+- Recommendation: Recruitee is the next adapter to evaluate after Lever; its feed has stronger location/timestamp signals and remains separate from the upcoming Careers API token cutover. SmartRecruiters is also viable but company-scoped; public endpoints are distinct from its authenticated `feed/publications` API. No Recruitee or SmartRecruiters live request/adapter was implemented in this research step.
+
+## 2026-11-08 — Lever URL and pagination hardening
+
+- Added strict Lever posting ID validation (alphanumeric, underscore and hyphen; max 200 chars) before deriving canonical hosted URLs.
+- Hosted URL acceptance now checks HTTPS, exact allowed Lever host and port, configured site path, no userinfo/query/fragment and no dot/backslash traversal segments. Untrusted or malformed URLs fall back to the canonical URL built from the configured site and validated posting ID.
+- Added fixture test proving maximum pagination is exactly five full pages / 500 unique postings and never requests a sixth page. Added unsafe-ID skip and hosted path-traversal fallback tests.
+- Focused Lever suite: 15 tests passed. Full V2 suite: 230 passed in 80.326 seconds. Python compilation and git diff --check passed locally.
+- GitHub CI run 42452809803 passed on the initial implementation (227 tests); a fresh CI run is required after this hardening commit.
+- Lever remains disabled with an empty allowlist in both config presets. No live board probe, source request, matching, notification or deployment.
+## Read-only Drivetrain board canary — 2026-11-08
+
+- Public Lever board slug: `drivetrain` (discovered from its public careers page; no credentials required). Public page search showed India/remote engineering and automation roles.
+- A bounded, unauthenticated GET was sent twice to `https://api.lever.co/v0/postings/drivetrain?mode=json&limit=100&skip=0`, two seconds apart. Both requests returned HTTP 200.
+- Both snapshots contained 35 postings and 35 unique IDs. 35/35 IDs overlapped between the two snapshots; union size was 35 and churn was zero over this two-second interval.
+- Both snapshots contained 22 records with India location metadata. A deliberately broad title-keyword filter found 9 India-based technical postings (software/backend/frontend/engineer/developer/QA/SDET/automation). This is a smoke-test estimate, not the JobBeeper matcher result.
+- Sample relevant roles included Backend Engineer, Frontend Engineer, SDET/QA Manager, SDE Automation & Quality, SRE and Software Engineer (Data Engineering). The official board page also exposes roles that may not match our target experience/role filters.
+- The two-second interval only verifies response schema and short-term ID consistency; it is not a long-term ID-stability, publication-freshness or source-yield SLA.
+- This was a read-only direct public API probe outside JobBeeper. It did not add a board to either config, enable Lever, run the collector, write to SQLite, evaluate matches or trigger notifications.
+- Suggested canary site for future explicit opt-in: `drivetrain`. Keep the runtime source disabled until the first-snapshot notification baseline gate below is implemented and reviewed.
+## First-snapshot notification baseline gate — required before enabling Lever
+
+Lever's documented public list API does not guarantee a reliable source publication timestamp. Its first full import could contain many old-but-still-open postings, each with `discovered_at=now`; the current freshness logic can consequently regard them as new and queue eligible alerts. Do not activate the source or notifications until an initial-inventory baseline is handled explicitly.
+
+Required behavior for any timestamp-unknown full-snapshot ATS source:
+- The first successful complete snapshot must ingest and evaluate listings but mark those existing canonical opportunities as baseline inventory, not newly discovered alerts.
+- The baseline marker must be durable across restarts and later scheduled refreshes, and must not falsify `discovered_at`, `source_posted_at` or `posted_precision`.
+- Subsequent genuinely new source IDs on later successful snapshots must remain eligible for the normal matching/notification path.
+- A partial or failed first scan must not mark an incomplete inventory as a complete baseline. The source must retry its baseline establishment after a successful complete run.
+- The baseline logic must be source-scoped and must not suppress notifications for LinkedIn, Naukri or other already-operational sources.
+- Regression tests must cover first complete baseline, repeated unchanged snapshot, partial first run, restart durability, and a new posting after baseline.
+
+Until that gate exists, Lever remains default-off with an empty configured allowlist; the Drivetrain probe above is not an activation.
+
+## 2026-11-08 — Initial-inventory notification guard implemented
+
+- Lever has no reliable publication timestamp in its documented public postings contract. The first full board snapshot must not be treated as newly published jobs.
+- Added additive notification_ledger.baseline_suppressed INTEGER NOT NULL DEFAULT 0. During each Lever source run, after job upsert and before evaluation/notification dispatch, suppress_initial_source_snapshot_alerts() marks newly created canonical opportunities as suppressed while no prior successful Lever source run exists. The marker is durable and excluded from future global notification-decision refreshes.
+- Partial first runs do not establish completion. A later partial run continues baselining newly seen records. Only a successful source run completes the baseline; subsequent genuinely new Lever IDs then use normal matching and notification rules. The code does not falsify or overwrite discovered_at or source_posted_at.
+- Existing canonical opportunities with an older observation from another source are not baseline-suppressed. Only Lever is in INITIAL_SNAPSHOT_BASELINE_SOURCES; Naukri, LinkedIn and Greenhouse behavior is unchanged.
+- Focused tests: 4 passed. Full V2 suite after this addition: 234 passed in 81.248 seconds. Tests cover partial-run baselining, success transition/new-job alerting, existing cross-source canonical preservation, source isolation and legacy SQLite migration.
+- Important integration gate: PR #46 uses a separate user_notification_ledger. That branch's member enqueue query currently does not consult the global notification_ledger.baseline_suppressed flag. Before enabling Lever for member notifications or merging the multi-user notification integration, rebase PR #46 and add the equivalent baseline filter/test to its per-user enqueue/delivery paths. The present guard protects the V2 global/admin notification ledger only.
+- Lever remains disabled with empty lever_boards in both config presets; no Lever source request, notification, DB canary, app deployment or service restart was performed by this code change.
+
+## 2026-11-08 — Recruitee live feed canary and next adapter
+
+- A bounded direct read-only canary of `https://tether.recruitee.com/api/offers.xml` returned HTTP 200 twice; each XML response was 8,785,676 bytes with 228 offers and 228 unique IDs. All offers had `published-at` and `updated-at`; 20 offers listed India locations and a broad title filter found 18 technical candidates; 226 remote / 2 hybrid. The two snapshots 2s apart had identical ID sets and metadata fingerprints. This is only short-interval consistency, not a source SLA.
+- The live Tether raw XML shape differs from the older official example. Observed shape `<hash><offers><offer>` uses `id`, `guid`, `slug`, `published-at`, `updated-at`, `description`, `requirements`, `locations`, `remote`, `hybrid`, `on-site`, `careers-url`, `careers-apply-url`; the older docs sample uses `<jobs><job>` with `reference`, `posted`, `updated`, `description_requirements`. A future adapter must support both.
+- The canary currently had no `<credentials>` node, but official Recruitee docs explicitly state credentials for partner job boards may appear in XML. Any parser must explicitly skip `<credentials>`, reject DTD/entities, cap response size, only parse allowlisted fields, and never log/persist raw XML.
+- Official feed URLs: raw `/api/offers.xml`, formatted `/api/feeds/offers.xml`, JSON `/api/offers`. Careers Site JSON API token is required from 2027-02-10; official docs exclude XML feed and widget from that token change. Use official docs in `docs/RECRUITEE_SOURCE_RESEARCH_2026-11-08.md`.
+- No Recruitee adapter or app source request was made. Recommendation: Recruitee is next candidate after Lever review; use Tether as test fixture with both schemas and credentials-skip coverage. Keep source off until code review and a no-notification first-snapshot policy is validated.
+
+## 2026-11-08 — Desktop QA findings, local fixes and remaining verification
+
+- User supplied a complete Desktop browser report: overall **Failed**, with QA-001 medium authorization exposure (member opens Source Health and sees source names/status/counts/last-success/diagnostics) and QA-002 low mobile header clipping at 390×844. All other tested scenarios are recorded in `docs/QA/desktop-browser-findings-2026-11-08.md`.
+- Desktop could not save its report because its workspace lacked `.git`; a canonical copy and next prompts are now in this repository. The Desktop connection interruption occurred while its answer was being generated; local Git worktrees and QA server remained intact.
+- Local integration candidate `/tmp/job-radar-pr46-integration`, branch `integration/pr46-v2-rebase-20261108`, already contained UI-only source-health hiding/route guard and mobile responsive CSS changes. We tightened the server boundary: `/api/source-status/summary` now uses `require_admin`, matching `/api/source-status` and `/api/latency-summary`.
+- Candidate UI changes: admin-only desktop/mobile navigation and section; direct member `#sources` routes redirect to Jobs; `loadSourceStatusTelemetry()` returns immediately for members and never calls source-status APIs; mobile telemetry row wraps into 3 columns under 560px with `minmax(0,1fr)` and `overflow-wrap:anywhere`.
+- Per-user first-inventory safety was checked during the merge: `user_notifications` excludes `jobs.source_initial_baseline` in enqueue and final send validation. We additionally exclude it from claim selection and explicitly cancel stale queued/failed member notification rows after a job becomes initial baseline.
+- Regression tests updated: member `/api/source-status/summary`, `/api/source-status`, `/api/latency-summary` return 403; admin source summary and full status return 200; route dependency contract now classifies source summary as admin-only; dashboard markup/route/telemetry guards and mobile grid have contract tests.
+- Focused auth/API/dashboard tests: **13 passed**. User notification tests: **14 passed**. Full V2 unittest discovery: **333 passed** in **174.474 seconds**. Python py_compile/compileall and `git diff --check` passed.
+- Local VM Node is v12.22.9 and cannot parse the dashboard's optional-chaining/nullish syntax. The local `node --check` attempt is not a project failure; use GitHub CI's modern Node runtime for the JS syntax check.
+- IMPORTANT: branch `integration/pr46-v2-rebase-20261108` at `676dfaf` is pushed but NOT deployed. Port 8005 now runs its isolated synthetic QA preview; tunnel 18005. Port 8004 still runs the pre-fix PR #46 tree and must not be used for post-fix verification. Run Prompt 1 in the QA prompts file against 18005.
+- Public reference research is summarized in `docs/PRODUCT_REVERSE_ENGINEERING_2026-11-08.md`; detailed Desktop tasks are in `docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md`. The public JobBeeper site mentions role/location/experience/company preferences, remote jobs, blocked companies, pause alerts, free browsing/application tracking, paid Telegram/browser/app alerts, and subscriber-first/public sharing. These are research leads, not verified account features; Prompt 2 should verify them without signing up or paying.
+- Remaining gates: browser-verify QA-001/QA-002 on the candidate; run security/tenant-isolation Prompt 3 (CSRF, IDOR, expiry, exact preference payload, keyboard/pagination/filter matrix); update docs with each Desktop artifact; then run candidate GitHub CI. Keep PR #46 and #50 open/draft until integration/review decisions are made. No merge, port 8004 restart, shared-dev or production deploy is authorized.
+
+
+## Candidate QA preview — 2026-11-08
+
+- An isolated candidate server is running at remote loopback 127.0.0.1:8005 (Termalin job 3o9e1mx8d2). Browser tunnel: ssh -N -L 18005:127.0.0.1:8005 ubuntu@130.210.27.197; URL: http://localhost:18005/dashboard/.
+- This preview uses a fresh synthetic database /tmp/job-radar-pr46-fixed-qa/jobs.db, not a copy of production, shared dev or the old port-8004 database. It has one admin, one member, two synthetic jobs and one clearly synthetic Naukri source-run row.
+- All six collector flags (LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever) are false; notifications are false; Telegram, Google OAuth, Gemini and other LLM credentials are blank. The environment binds only to remote loopback.
+- Temporary test accounts shared in chat: qa-member@local.test and qa-admin@local.test. Passwords are not written in repository files.
+- HTTP smoke verification: /health, /dashboard/, dashboard JS and CSS returned 200. Member login/feed/daily-summary returned 200; member /api/source-status/summary, /api/source-status and /api/latency-summary returned 403. Admin login and all three source-health GETs returned 200. No outbound source requests or Telegram sends were made.
+- The original port-8004 feature process still uses /tmp/job-radar-user-preferences and remains unchanged. Do not use it for post-fix verification. Ports 8000/8001 remain untouched.
+- Next: run Prompt 1 in docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md against port 18005. It must verify real 390×844/375×812/320×740 rendering and direct #sources member navigation, then admin access.
+
+## 2026-11-08 — Final integration review: canonical Lever baseline guard on member notifications
+
+- A second code review found the member queue still lacked a canonical-opportunity baseline filter despite an earlier handover statement claiming complete protection. `user_notifications._queue_new_matches` checked `jobs.source_initial_baseline` only. This could miss a Lever baseline opportunity whose canonical ID originated from an older job in another source.
+- Fixed member queue creation, claim selection and pre-send revalidation to exclude `notification_ledger.baseline_suppressed=1`; stale queued/failed/sending member rows are cancelled with `initial_source_baseline`. This remains source-agnostic and safe for all members.
+- Added three new canonical-level regressions: suppress at enqueue for a cross-source canonical; cancel an already queued item before claim; prevent final send if canonical suppression appears after claim. Existing per-job baseline test remains.
+- Member notification suite: **17 passed**. Full integration suite: **336 passed** in 194.322 seconds. Python compilation and `git diff --check` passed.
+- No Telegram HTTP calls or messages occurred. Lever remains disabled and the candidate preview collector flags remain off. No shared-dev or production deployment.
+- Updated QA prompt with this additional safety invariant. Current candidate still awaits browser Prompt 1 and security Prompt 3.
+
+- The prior note that member enqueue/claim/send already checked the global canonical `notification_ledger.baseline_suppressed` marker was inaccurate. A subsequent line-by-line review found only the per-job `source_initial_baseline` filter.
+- Corrected in commit `08c256f` (candidate head after documentation replay `9ac6fab`): member enqueue query, queue claim/cancellation and final send-time validation now also check canonical baseline suppression. Added three cross-source/canonical regression tests.
+- Current validation: **17** `test_user_notifications` tests pass; full V2 suite **336 passed** in **194.322 seconds**; Python compilation and `git diff --check` pass.
+
+## 2026-11-08 — Final candidate browser regression and release-gate update
+
+- Final Desktop browser report: `docs/QA/desktop-final-candidate-verification-2026-11-08.md`. Target was only `http://localhost:18005/dashboard/`; candidate branch `integration/pr46-v2-rebase-20261108`; tested SHA `cf778c1f1da33c773f820cafea991fb084c58da8`.
+- Two independent synthetic browser contexts were used (member id 2 and admin id 1). Only GET/navigation, DOM inspection, screenshot capture attempts, Network and console reads were performed. No app/config/DB mutation, collectors, OAuth, Telegram, applications, other ports, shared dev or production were touched.
+- **QA-001 PASS:** member desktop and mobile Source Health links have `display:none`, `hidden:true`, zero-size geometry. Member direct `#sources` route settles at `#jobs` without a flash. No source-health telemetry request occurred during a 35-second observation. Member GETs to `/api/source-status`, `/api/source-status/summary`, `/api/latency-summary` returned 403. Admin nav/section visible at desktop and mobile widths; matching GETs returned 200.
+- **QA-002 responsive layout PASS:** tested 1536×900, 1280×800, 768×1024, 390×844, 375×812 and 320×740 for member and admin. Body scroll width equaled viewport width at each size; metrics did not overlap or clip. At 320px, “discovered” wraps below “Today” but stays visible.
+- **QA-002 BLOCKED:** mobile bottom-nav occlusion could not be archived with a reliable obstruction rectangle/hit-test; screenshot export is also blocked. Inline captures were taken, but no screenshot files were written. No files should be fabricated or treated as existing.
+- **QA-003 PASS:** member/admin console errors and warnings were empty.
+- **UNKNOWN:** manual CSRF negative mutation tests and session/logout/expiry mutation checks were deliberately not run due to read-only scope. Previous automated CSRF/logout-protection test coverage passed in the 337-test CI run; do not conflate automated coverage with manual browser verification.
+- GitHub Actions V2 CI run `42468551208` completed successfully on exact SHA `cf778c1f1da33c773f820cafea991fb084c58da8`: 337 tests passed. The docs-only commits that follow this report are not source-code changes; check latest branch/CI status before asserting exact-head validation.
+- No application code change was made in this report-only work unit. PR #51 remains open/draft against `v2-live-radar`; not merged. No shared-dev or production deployment/restart, DB migration, config edit or feature flag change occurred.
+- **Next actions:** (1) screenshot-capable local browser pass to export redacted desktop/member/admin-mobile/bottom-scroll PNGs; (2) stable bottom-nav geometry and hit-testing at 390×844/375×812/320×740; (3) separately scoped synthetic-only CSRF/session mutation pass or explicit owner-reviewed acceptance of UNKNOWNs; (4) verify CI at final code head; (5) ask for explicit shared-dev promotion approval and take a fresh online DB backup immediately before promotion. Do not merge or promote while evidence gates remain open.
+
+
+## 2026-11-08 — Core real-data pipeline validation and shared-dev push decision
+
+- Owner priority changed explicitly: stop spending the current work phase on UI polish; focus on core ingestion, real stored jobs, normalization/canonicalization, matching, feed API and notification decisions. The 320px mobile overlay remains a confirmed known defect, now documented in `docs/QA/desktop-320px-hit-test-diagnostics-2026-11-08.md`, but is deferred and is not a blocker for a desktop/shared-dev data canary. Do not implement a speculative CSS fix.
+- Candidate code used: `cf778c1f1da33c773f820cafea991fb084c58da8` on `integration/pr46-v2-rebase-20261108`. The current PR head is documentation-only commits newer than that code SHA. GitHub V2 CI run `42470425337` passed on the prior documentation head `a5b1e88`; recheck the latest run after the newest documentation-only commits.
+- A 44 MB shared-dev SQLite snapshot (created around 2026-11-08 09:44 UTC) was copied to `/tmp/job-radar-real-data-validation/jobs.db`. The live DB was not opened for writes. Initial snapshot contained 8,368 jobs, 1 user, 1 preferences record, 8,368 canonical opportunities, 8,368 global evaluations, 8,368 per-user evaluations, 8,368 notification-ledger rows and 7,829 source runs; integrity `ok`. Sources: 7,547 Naukri and 821 Ashby.
+- Candidate `radar.init_db()` on the disposable copy preserved all existing counts and integrity. Candidate matching recomputed all 8,368 global and all 8,368 per-user evaluations using the stored profile (23 role terms, 4 locations, 18 skills; values intentionally not copied here). It returned 130 per-user matches and 130 global matches. The 7-day user-role feed function returned 40 matched records; admin all-jobs feed returned 2,193. The test database had one admin identity only; the user-role feed function was called with member-role semantics for that stored profile id and is not a real member-authentication/browser test.
+- One actual candidate Naukri collector run (`run_source('naukri', config)`) fetched the public relay once: HTTP 200, 318 jobs, feed age 351.46s within the 900s freshness guard, one page success, zero 4xx/5xx/429, outcome `success`, 7 new jobs. On the disposable copy this yielded 8,375 jobs (7,554 Naukri, 821 Ashby), 8,375 canonical opportunities, 8,375 global and user evaluations, still 130 matches, 24 pending global ledger rows and 8,351 suppressed. All 24 pending rows state Telegram is disabled. User notification settings/chat/ledger remain 0; no Telegram or Gemini credential was configured, and no notification was sent.
+- Full evidence: `docs/QA/real-data-pipeline-dry-run-2026-11-08.md`. This demonstrates the core Naukri-to-normalization/upsert-to-canonical-to-match-to-feed/decision-ledger path on a real stored DB snapshot plus fresh public relay data. It does not prove all six adapters or a live scheduler soak against the live shared-dev volume. Ashby is historical/stale and disabled in dev; other source adapters remain disabled.
+- Shared dev port 8001 `/health` returned HTTP 200; unauthenticated protected API GETs returned 401. The Termalin SSH shell could not access Docker (`permission denied` on `/var/run/docker.sock`). No `sudo`, group permission change or workaround was used. No candidate container build/recreation, live DB/config/volume change, service restart, or production action occurred.
+- **Next push:** controlled promotion of the candidate to shared dev port 8001 only, after explicit owner approval and a fresh online SQLite backup. Preserve the existing `job-radar-dev_radar-dev-data` volume, image rollback tag `f43cd4a`, live compose/env/config mounts; keep Naukri on, LinkedIn/Instahyre/Greenhouse/Ashby/Lever off, Telegram blank/notifications off, Gemini off. After promotion, observe at least two real Naukri scheduler cycles, validate source run/job deltas/canonical/evaluation/feed state, and confirm zero sends. Production port 8000 remains unchanged.
+- The deployment is ready as a plan but **not yet pushed**. An authorized Docker operator/session is needed because the current Termalin connection lacks Docker socket permission. Obtain explicit approval before the shared-dev promotion; no production deployment is authorized.
+
+
+## 2026-11-08 — Owner-approved shared-dev promotion could not execute
+
+- Owner explicitly approved shared-dev deployment only; no production permission was granted.
+- Candidate PR #51 head before the latest operational note was `e299efdb228b4a05fdc106a0e5e70b9344adf607`; exact-head V2 CI run `42471400933` succeeded. Candidate app code SHA `cf778c1f1da33c773f820cafea991fb084c58da8` passed the real-data dry run: 8,368 real snapshot rows rematched, 130 matches, one public Naukri relay fetch (318 listings, 7 new jobs in the disposable copy), canonical/evaluation/feed/notification-decision path and DB integrity `ok`.
+- The available Termalin session runs as `ubuntu`, not in the `docker` group; Docker socket is `root:docker` mode 0660; `docker ps` denied. No sudo, group membership change or socket permission workaround was used. The repo has no self-hosted deployment workflow/runner.
+- Backup prerequisites are not satisfied: Termalin's configured full-server backup remains an unconfirmed DRAFT with no archives; the previous 09:44 UTC snapshot is too old for immediate pre-promotion backup.
+- Read-only live checks: shared dev 8001 returned HTTP 200; production 8000 returned HTTP 200. Neither was changed. No fresh backup, image build/load, container restart, DB/config/volume mutation, feature-flag change, PR merge or prod deployment occurred.
+- Full execution record: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`.
+- Next action: owner/operator must provide an existing Docker-authorized Termalin/SSH execution session. Do not request secrets in chat or alter broad Docker socket permissions. Then take a fresh SQLite online backup, deploy only shared dev with Naukri enabled and other sources/notifications/Gemini disabled, verify, and observe at least two scheduler cycles.
+- Promotion is **approved but not yet deployed**. This is an access blocker, not a failed candidate build or successful push.
+
+## 2026-11-08 — Backup service also requires interactive authorization
+
+- As part of owner-approved shared-dev promotion, the existing `job-radar-sqlite-snapshot.service` was inspected. Last successful run was 2026-11-08 02:45:43 UTC; development snapshot then contained 8,333 jobs and integrity `ok`. It is several hours old and cannot substitute for the immediate pre-promotion backup.
+- `systemctl start --no-block job-radar-sqlite-snapshot.service` from the connected `ubuntu` Termalin session was denied with `Interactive authentication required`. No new backup was created.
+- Combined with the `root:docker` 0660 socket denying `docker ps`, this confirms the connected session lacks authority both to snapshot the live protected volume and to recreate the candidate container. No `sudo`, chmod, group membership change, or other workaround was used.
+- Deployment approval remains valid, but promotion is not executed. Obtain an already authorized operator session for both the root-owned snapshot unit and Docker operations; then continue with fresh backup, image build, isolated dev recreate, smoke checks and two Naukri cycles.
+
+# 2026-11-08 CONTINUATION CHECKPOINT — shared dev deployed, six sources exercised, 36-source requirement
+
+This is an appended continuation checkpoint. Preserve all preceding handover history.
+
+## Current live state
+- Shared-dev container: job-radar-dev
+- Shared-dev image: job-radar-dev-multitenant:b16fb83
+- Image ID: sha256:75f8855338f150a79794d388c32733305e548165f71dd417cfa04e6443c8c917
+- Shared-dev binding: 127.0.0.1:8001 -> container 8000
+- Last verified shared-dev health: HTTP 200, version 2.0.0; dashboard HTTP 200.
+- Production container: v2-radar-1, image v2-radar, public port 8000; health HTTP 200. It was not changed, recreated or promoted.
+- Existing VM connection user ubuntu is allowed full passwordless sudo; always prefix privileged commands with sudo. No password or second SSH account needed.
+- Current V2 PR #51 is open/draft; branch integration/pr46-v2-rebase-20261108. Latest docs commit when this note was appended is recorded by the PR head, so re-fetch PR state/head before work.
+- Shared-dev application/test code used for image b16fb83 is 754809fe406e8c5cb09f8e36140ac5cf3e4f7238; later changes to PR branch at this checkpoint are docs-only.
+
+## Shared-dev live-source evidence
+All six registered V2 source adapters were exercised with real source data:
+- Naukri: recurring scheduler success, multiple five-minute cycles, including 307 jobs / 3 inserts, 308 / 2 inserts and later 306 / 0. Current saved scheduler config still enables Naukri only.
+- Instahyre: fixed current response parser (objects list, employer.company_name, public_url, locations; city aliases and bounded pagination). Three regression tests pass. Live one-off run: 140 jobs, 4 HTTP 200 pages, 140 new.
+- Greenhouse: one-off end-to-end run, 369 jobs, 3/3 configured boards, 3 HTTP 200, 369 new.
+- Ashby: one-off end-to-end run, 828 jobs, 2/2 boards, 34 new (remaining already existed/deduped); all 828 timestamped.
+- Lever: one-off end-to-end run on test board paytmpayments, 500 jobs inserted, five HTTP 200 pages; bounded five-page cap reached. This board was NOT added to saved config.
+- LinkedIn: after respecting the recorded cooldown, controlled one-query live probe returned 10 unique jobs / one HTTP 200. Those exact fetched jobs were passed through run_source with no second network request and 10 were ingested. LinkedIn remains disabled in saved scheduler config.
+- Source code registry in V2 still has six sources only: linkedin, naukri, instahyre, greenhouse, ashby, lever. Only Naukri is enabled in shared-dev scheduler. The one-off pipeline passes do not mean the other adapters are automatically polled.
+
+Latest verified shared-dev DB state at 2026-11-08 11:39:59 UTC:
+- integrity_check = ok
+- jobs = 9,444
+- canonical_opportunities = 9,444
+- job_evaluations = 9,444
+- user_job_evaluations = 9,444
+- notification_ledger = 9,444
+- users = 1 (admin only); user_preferences = 1; user_notification_ledger = 0; source_runs = 7,858
+- all global notification rows suppressed; sent_at non-null = 0
+- notifications_enabled=false; Telegram bot token/chat blank; Gemini and LLM router flags false.
+- A sqlite3 OperationalError: database is locked was seen in notification_worker -> recover_stale_claims during concurrent ingestion; it recurred once after LinkedIn run_source. This must be investigated with a concurrency test and fixed before production.
+
+## Owner's expanded mandatory source requirement
+Owner explicitly asked that jobs be fetched from ALL 36 platforms below and notified via Telegram according to each user's saved filters/preferences, as soon as they become publicly available:
+1 Ashby
+2 Avature
+3 BambooHR
+4 Breezy HR
+5 Cutshort
+6 Darwinbox
+7 Eightfold AI
+8 Freshteam
+9 Greenhouse
+10 Hireology
+11 Hirist
+12 HRsmart
+13 iCIMS
+14 Instahyre
+15 Jibe (iCIMS)
+16 Jobvite
+17 Keka
+18 Lever
+19 LinkedIn
+20 Naukri
+21 Oracle Cloud Recruiting
+22 Paycom
+23 PeopleStrong
+24 Phenom People
+25 Recruitee
+26 Rippling ATS
+27 SmartRecruiters
+28 SAP SuccessFactors
+29 Oracle Taleo
+30 Teamtailor
+31 UKG Pro / UltiPro
+32 Wellfound
+33 Workable
+34 Workday
+35 Y Combinator
+36 Zoho Recruit
+
+Read docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md. It contains the complete 36-row matrix, verified-vs-research statuses, connector discovery plan, scheduler, normalization, per-user Telegram requirements, implementation priorities and production checklist. Workday and Darwinbox are the owner's highest-priority missing integrations.
+
+Important: many names in this list are ATS products with per-employer tenant/career-board endpoints; Cutshort, Hirist, LinkedIn, Naukri, Instahyre, Wellfound and YC are marketplaces/aggregators. There is no universal endpoint that lists every company using all 36 ATSs. Add company/career-site discovery and board registry, and validate real employer boards. Never claim the 36 are implemented yet.
+
+Near-real-time definition: webhook when an employer/vendor authorizes one; otherwise a default 2-minute target poll interval for high-priority public boards, staggered/jittered and bounded by rate limits. This is a target after the listing is publicly visible, not a guarantee of instant visibility at employer-internal publish time.
+
+## Production readiness / blockers
+- Production port 8000 is healthy and untouched.
+- Production current config is version 10, LinkedIn and Naukri enabled, notifications enabled, Telegram global token/chat configured.
+- Production DB read-only state on 2026-11-08: about 20,971 jobs, 20,660 canonical opportunities, 20,971 global evaluations, 20,660 global notification rows, 22,255 source runs; ledger 1,482 sent, 10 failed, 19,168 suppressed. Production users/user_preferences/user_notification tables were absent/empty at read time.
+- A disposable production snapshot was copied to /tmp/job-radar-production-preflight-20261108T112121Z. Candidate init_db and evaluation/notification refresh on its copy migrated runtime config 10 -> 12, preserved job/canonical/evaluation/notification counts and sent count, integrity ok, matching refresh took ~73 seconds. No production DB was written.
+- Production has live Telegram credentials. Do not launch candidate notification workers against it before the per-user delivery plan, queue safety and exact container startup behaviour are reviewed.
+- Latest production health (11:39 UTC) reported LinkedIn cooldown to 12:01:13.950862 UTC. This may change; always recheck live health and honour Retry-After/cooldown. No more LinkedIn probes are needed now; dev probe passed.
+- Earlier production screenshot showed a work process interrupted at final verification. This continuation completed the final dev integrity/source logs; the final values above supersede the interrupted screen.
+- No production build/recreate/merge occurred. Earlier explicit approval was shared dev only; production needs separate explicit approval.
+
+## Next agent — do not ask owner to repeat requirements
+1. Read docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md and this appended section first.
+2. Fix the SQLite notification-worker contention (recover_stale_claims) and add tests under concurrent source-ingestion load.
+3. Prove per-user signup/login, preferences, Telegram linking, queued delivery, idempotency and no cross-user leakage with at least two synthetic/test users and a dedicated safe Telegram test chat or fake transport. Never ask for tokens in chat.
+4. Implement Workday and Darwinbox first, then remaining public ATS connectors in the roadmap's priority order. Build company/career URL discovery and tenant/board registry; connector support without board discovery is incomplete.
+5. Add each source only after a real public board two-poll test (or webhook), correct pagination/dedup/first-seen handling, DB ingestion/matching, and notification decisions. Record status per platform.
+6. Keep UI 320px overlap deferred unless user changes priority.
+7. Shared dev remains on b16fb83; production remains on old image. Do not promote production until P0 gates and at least Workday/Darwinbox priorities plus user-specific Telegram have been verified, a fresh formal prod backup is taken, and separate explicit owner approval is recorded.
+
+
+## 2026-11-08 — SQLite notification contention fix implemented and fully tested (not deployed)
+
+**Branch:** `fix/sqlite-notification-contention-20261108` (based on integration head `ce502e1f8be51d5f2123c3bc0a1cb916245ec260`).
+
+### Root cause found
+
+- Shared dev logs showed `sqlite3.OperationalError: database is locked` in `notification_worker -> recover_stale_claims()` while collectors were ingesting. The DB uses a local Docker volume and was in SQLite `DELETE` journal mode.
+- The legacy collector/notification paths used `radar.db_lock`; the independent multi-user notification service opened its own connections and used `BEGIN IMMEDIATE` without that lock for claim/queue/status writes. Both worker families could therefore compete for the same SQLite writer lock.
+- `user_notifications.dispatch()` also repeated the full active-user queue scan once per attempted message. With no opted-in users it could still open claim/write transactions.
+- A global Telegram credential by itself was not a sufficient send gate; the legacy send path did not consistently enforce `notifications_enabled`. The active shared-dev runtime was confirmed safe (credentials absent, feature disabled), but the code now enforces that state.
+
+### Fix on the isolated branch
+
+- Added `v2/sqlite_store.py` as the shared SQLite policy: process-wide re-entrant `DB_LOCK`, a 15,000 ms busy timeout on app-managed connections, and a checked WAL enable helper. WAL is enabled during `radar.init_db()`.
+- Unified the radar and legacy Telegram connection helpers on that timeout and the same process-wide lock. Member notification schema/settings/queue/claim/final-state writes now use that same lock; no lock is held while making the outbound Telegram HTTP request.
+- Changed the member dispatcher to queue new eligible jobs once per dispatch cycle using a single `INSERT ... SELECT`, return immediately when the bot token is missing or there are no opted-in users, and preserve `limit=0` as a true no-op.
+- Gated both the legacy immediate-send and background-worker paths on credentials **and** the persisted `notifications_enabled` switch. Per-user notification delivery continues to use each user's own opt-in and private linked chat.
+- Extended `.github/workflows/v2-ci.yml` syntax compilation coverage to all new/changed SQLite and notification modules/tests.
+
+### Verification
+
+- Focused final tests: **24 passed** (`test_sqlite_store`, `test_user_notifications`, `LegacyNotificationGateTests`). Includes separate-connection SQLite busy waiting, WAL persistence, concurrent member-claim vs legacy-recovery, no-opt-in/no-op behavior, batching and two-user chat isolation.
+- Full final V2 suite on this exact code: **347 tests passed in 188.827 seconds; zero failures** (`python -m unittest discover -s v2 -p 'test_*.py' -v`).
+- `py_compile`/`compileall` and `git diff --check` passed. No Telegram HTTP message was sent by these tests (delivery uses mocks).
+
+### Deployment status and exact next steps
+
+- **Not committed or pushed at this checkpoint; not deployed.** The running shared-dev container remains `job-radar-dev-multitenant:b16fb83`, built from app SHA `754809fe406e8c5cb09f8e36140ac5cf3e4f7238`. Its live DB still reports `journal_mode=delete`. Production remains untouched.
+- A read-only shared-dev config check confirmed `notifications_enabled=false`, Telegram bot token/chat values absent, and `user_notification_settings` count 0. Existing dev scheduler remains Naukri-only.
+- Next: inspect final diff, commit on `fix/sqlite-notification-contention-20261108`, push it, then update the existing open/draft PR #51 integration branch from its current `ce502e1` base (do not merge PR #51 or close PR #46). Wait for GitHub V2 CI on the exact new SHA and inspect its job results.
+- The owner previously approved a **shared-dev port 8001** promotion only. After CI passes, use `docs/DEV_DEPLOYMENT_RUNBOOK_2026-11-08.md`: take a fresh SQLite online backup from the live container (integrity, size, SHA-256 recorded), build an immutable image, recreate only `job-radar-dev`, preserve volume/config/env/Telegram blanking and Naukri-only flags, and verify integrity/row counts/WAL/health/zero-send state. Do not touch production ports 8000/8002/8004/8005.
+- After shared-dev deployment, observe at least two Naukri scheduler cycles and inspect logs for any further lock errors. WAL and timeout are not a substitute for observing the actual live system. Production still needs a separate explicit approval and a reviewed migration/delivery plan.
+- WAL backup caution: while WAL is active, create snapshots with SQLite's online backup API. Do not copy only `jobs.db` from a live WAL database and omit `jobs.db-wal`; do not delete sidecar files manually.
+
+### Workday discovery evidence (research only; adapter not implemented)
+
+- A one-request probe against NVIDIA's public Workday career site succeeded: `POST https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs`, JSON `{"appliedFacets":{},"limit":20,"offset":0,"searchText":""}` returned HTTP 200, JSON keys `facets`, `jobPostings`, `total`, `userAuthenticated`, 20 postings and `total=2000`. Sample public fields included title, `externalPath`, `postedOn`, `locationsText` and a requisition ID in `bulletFields`. This is a real endpoint probe only, not recurring ingestion or a vendor-supported API guarantee.
+- A Workday adapter needs an employer registry of real careers URLs and must derive each employer's cluster/host, tenant and career-site name. Never guess tenant/site IDs from the company name. CXS is a public career-site interface and should be treated as undocumented/changeable; distinguish it from authenticated Workday REST APIs.
+- Darwinbox official recruitment API research indicates employer-issued API-key authentication. Validate a public candidate careers feed only against an actual employer URL and access terms; do not assume a universal unauthenticated API.
+- The 36-platform matrix remains authoritative. Workday then Darwinbox remain the next connector priorities, paired with company-board discovery; no new source was enabled.
+
+
+## 2026-11-08 — SQLite contention fix + first Workday connector completed (candidate branch; not deployed)
+
+- Current branch: `fix/sqlite-notification-contention-20261108`, based on integration head `ce502e1f8be51d5f2123c3bc0a1cb916245ec260`. Earlier SQLite fix pushed on this branch/integration PR as `c441737ca6c19f17002d9a43923a4a64353f0977`; the Workday adapter/UI/docs changes in the current worktree must be committed and pushed before final CI.
+- SQLite notification contention fix: shared `DB_LOCK` for the legacy and per-user queues, 15s busy timeout, WAL on init, queue-once batching, no-opt-in early return and global notifications switch gate. The full suite with Workday now passes **354 tests in 236.278s**; SQLite-only/notification focused suite 24 pass.
+- Workday V2 adapter added to `COLLECTORS`; config version 13; `source_enabled.workday=false` by default, `poll_seconds.workday=120`, and `workday_boards` must contain a verified public HTTPS myworkdayjobs URL. Tenant, cluster and site are parsed from the actual board URL. Workday included in initial source baseline because `postedOn` is only a human label and `source_posted_at` remains unknown.
+- Workday adapter limits each board to 5 list pages × 20 postings (100 listing records) and 5 detail fetches per cycle; public board URLs and paths are allowlisted, HTML description is stripped, requisition-based stable IDs are used, no arbitrary `externalUrl` is trusted. This is a public CXS candidate-site interface, not the authenticated Workday REST API and not a vendor guarantee.
+- Live NVIDIA public board check: 100 unique listing IDs from 5 pages; 5 detail calls under current cap. Two-poll `run_source` application pipeline on a disposable SQLite DB (1 page per poll for controlled smoke): poll 1 inserted 20, 20 canonical opportunities and all 20 initial inventory rows were baseline-suppressed; poll 2 inserted 0; 2 successful source runs; integrity `ok`; no sent Telegram rows. This is one real board, not wide Workday support.
+- Dashboard added Ashby/Lever/Workday admin source toggles and a Workday JSON allowlist editor. The admin still needs a manually verified board URL. Automated company/ATS detection and board discovery remain unimplemented.
+- Workday adapter is not deployed to shared dev/production; shared dev remains image `b16fb83`, Naukri-only, notifications false, `journal_mode=delete`; production unchanged. Workday must stay disabled until exact-SHA CI and approved shared-dev promotion.
+- Existing CI run `42480365749` passed on earlier SQLite-only commit `c441737`; it does not cover the current Workday changes. Push the final Workday commit and verify the next V2 CI run against its exact SHA. The VM system Node is v12 and cannot parse existing `??` syntax; use GitHub CI's modern Node check as the authoritative dashboard syntax verification.
+- Darwinbox remains unimplemented; the official Recruitment API is employer-keyed. Next after Workday CI/shared-dev check: employer board registry/discovery, then validate Darwinbox per real employer board. Keep per-user interactive Telegram test and shared-dev SQLite lock-error soak as production gates.
+
+
+## 2026-11-08 — P0 shared-dev rollout complete; Workday adapter refined and tested (candidate only)
+
+### SQLite/notifications P0 status
+
+- P0 implementation commit `c441737ca6c19f17002d9a43923a4a64353f0977` passed GitHub V2 CI run `42480365749` (all steps success) and the exact-commit V2 suite (347 passed, 188.827s).
+- Shared dev is now running `job-radar-dev-multitenant:c441737` on port 8001. It uses the preserved external data volume and config bind. DB checks: WAL, `busy_timeout=15000`, integrity `ok`, current key tables 9,461 rows, source_runs 7,872. Three post-deploy Naukri polls completed successfully; no `database is locked` or traceback was found in logs since rollout. Continue soak and do not call this production-scale proof.
+- Delivery safety: `notifications_enabled=false`, Telegram token/chat absent, both sent counts zero, per-user settings/outbox remain empty. Naukri is the only scheduler-enabled source. Gemini and LLM feature flags are explicitly false in effective container env. An initial interpolation issue set them true; this was corrected in the candidate Compose file and the service was recreated. The dev `.env` was not modified.
+- Fresh online backup before deployment: `/var/backups/job-radar-daily/development-jobs.sqlite3`, SHA-256 `aa78251196c7c2925cf09e5e6b9cbb7878884681bd9920407e32f4e2ff0b49e0`, 9,459 jobs, integrity `ok`. Production snapshot was also taken for backup checks, but production container `v2-radar-1` and DB were not changed.
+
+### Workday candidate status
+
+- Local branch `fix/sqlite-notification-contention-20261108`, based on the CI/deployed P0 SHA above, now includes `workday_collect`, version-13 config, validated public-board allowlist, source toggle and admin JSON board editor. These Workday files are not yet committed/pushed; the deployed image does not include them.
+- Nine focused Workday tests pass, including employer URL parsing, host/path rejection, config opt-in migration, 20-item pagination/detail parsing, detail failure attempt cap, and stop on HTTP 429. A full-suite run on this code exited 0 but its redirected output file was removed; rerun without redirection and retain the test summary before publish.
+- Latest live public NVIDIA poll: 1 listing request + 20 detail requests, 20 unique stable requisition IDs, 20 descriptions, 20 locations, employment types included, 24.57 seconds. Human `postedOn` labels are retained but source timestamp precision remains unknown. The source remains a public undocumented CXS candidate-site interface, not an authenticated Workday REST integration or vendor guarantee.
+- Current candidate limits: one page of 20 per board per cycle; at most 20 detail attempts; 100ms delay between details; max20 allowlisted boards. Boards run sequentially. At measured 24.57 seconds per board, four boards approach the 120-second poll interval; larger board sets cannot claim two-minute end-to-end capture until bounded concurrency/per-board scheduling exists. First run is baseline-suppressed to avoid historic alerts.
+- Workday is disabled in repository defaults and shared-dev config; `workday_boards=[]` in both. Do not enable or deploy before fresh CI and a separately approved real employer-board pilot.
+
+### Immediate next tasks
+
+1. Finish/inspect full V2 suite output on the current Workday code, run modern GitHub CI on exact final SHA, and commit/push the Workday branch + fast-forward integration PR #51 without merging it. PR #51 remains draft/open; PR #46 remains untouched.
+2. Continue shared-dev SQLite soak over additional Naukri cycles and watch for lock regressions. No production promotion.
+3. Complete real member login + dedicated test-chat Telegram delivery with at least two users; tests cover isolation, but live member flow is not complete.
+4. Build an employer/career-site discovery registry before scaling Workday board coverage. Then start Darwinbox; official Recruitment API uses employer-provided auth, so validate each public candidate board independently.
+5. Continue the original 36-platform matrix. Do not claim full coverage; only seven sources are presently registered in candidate V2 and only Naukri is enabled on shared dev.
+
+
+## 2026-11-08 — Current operational state: SQLite P0 deployed; Workday candidate pending CI
+
+- Shared dev was promoted to `job-radar-dev-multitenant:c441737` on port 8001. Exact code SHA `c441737ca6c19f17002d9a43923a4a64353f0977`; GitHub V2 CI run `42480365749` passed. The SQLite contention fix is deployed; production container `v2-radar-1` remains unchanged and healthy.
+- Live shared-dev checks: health HTTP 200, SQLite `journal_mode=wal`, `connect_sqlite()` busy timeout 15,000ms, integrity `ok`, 9,462 jobs and 7,874 source runs at 2026-11-08 12:58 UTC. Last eight source runs were successful Naukri cycles. No `database is locked` message was found in the last 90 minutes of dev logs. Keep observing; this is not a production-load proof.
+- Shared-dev guardrails: Naukri only enabled; `notifications_enabled=false`; Telegram bot token/chat absent; Gemini and LLM router false; zero delivery activity. Existing external volume and config bind remain attached. Fresh pre-deploy online backup is documented in the deployment runbook. Production was not touched.
+- Current local Workday candidate adds the Workday CXS collector, validated board URL allowlist/config version 13, admin checkbox + JSON board editor, source baseline suppression, bounded list/detail requests and persisted `Retry-After` cooldown. Workday is disabled by default and absent from the deployed `c441737` image.
+- Current Workday request budget: one page of 20 listings per board per cycle; up to 20 detail calls, 100ms delay, 20-board allowlist cap; default 120-second interval when deliberately enabled. 429 halts the board scan, persists a cooldown, is restored on startup and suppresses scheduler polls until expiry. Workday CXS remains an undocumented public candidate-site interface; this is not authenticated Workday REST and not a universal employer discovery mechanism.
+- Real NVIDIA public-board test against the final collector settings via disposable SQLite `run_source`: first poll 20 jobs inserted, all 20 with full descriptions, 20 canonical opportunities, 20 first-inventory baseline suppressions; second poll 0 new; 2 successful source runs; integrity `ok`; sent count zero. A controlled 429 run persisted a 120-second cooldown and `rate_limited` source run. Only one employer has been exercised. No Workday scheduler enablement, shared-dev deploy or recurring soak.
+- Workday-focused tests: 12 pass (including list/detail 429 cooldown and startup restoration). Full V2 suite on current cooldown changes: **359 tests passed in 266.690s, zero failures**. Dashboard code uses modern JS syntax already present in project; VM Node v12 cannot parse the repo, so the next GitHub CI Node check is the authoritative JS syntax test.
+- Current worktree `/tmp/job-radar-sqlite-contention` branch `fix/sqlite-notification-contention-20261108` has uncommitted Workday changes. Integration branch / PR #51 still points to `c441737`. After full tests pass: inspect diff, commit all intended Workday+docs changes, push feature branch and fast-forward `integration/pr46-v2-rebase-20261108`; confirm CI for exact new SHA. Leave PR #51 draft/open; do not merge or deploy Workday.
+- Next after CI: build employer-board discovery/registry; Darwinbox follows Workday, noting its official Recruiting API is customer-keyed. Verify member/admin flows and real two-user dedicated-chat Telegram dispatch before production. Production promotion needs its own fresh formal backup, reviewed migration/delivery plan and separate owner approval.
+
+
+## 2026-11-08 — final Workday candidate verification (after persisted cooldown hardening)
+
+- Full V2 suite on current working tree: **359 tests passed in 266.690s, zero failures**. Workday-focused `WorkdayCollectorTests`: **12 passed**. `compileall`, JSON validation, and `git diff --check` passed. The separate existing GitHub CI run `42480365749` validates P0 SHA `c441737`; new Workday changes still require their own exact-SHA CI after push.
+- NVIDIA current public board validation: 20 listings from one CXS POST + 20 full-detail requests, 20 unique requisition IDs, 20 descriptions, 20 actual detail locations and employment type, 24.57s elapsed. No exact posting timestamp is exposed; retain `postedOn` label and use unknown precision. No Workday recurring board is enabled in dev.
+- Workday now also has source-wide 429 handling: respects `Retry-After`, clamps cooldown between 60s and 3600s, defaults to 300s when missing, stops the remaining board requests, persists status/cooldown into `source_runs`, and restores the remaining cooldown on app startup.
+- `dashboard/app.js`/`dashboard/index.html` provide Ashby, Lever and Workday source toggles plus an admin-only JSON editor for `workday_boards`; JSON parsing/type errors are surfaced before save. GitHub CI's modern Node check is required; VM Node 12 cannot parse existing modern syntax.
+- Current Workday config remains safely off (`source_enabled.workday=false`, `workday_boards=[]`, poll default 120s). Adapter and UI changes are local uncommitted modifications on top of P0 SHA `c441737`; not included in shared-dev image. Four post-deploy Naukri runs succeeded and no lock errors were observed in the shared-dev container logs.
+- The full platform goal remains unfinished: only seven adapters are registered. Workday is sequential across boards; at 24.57s per board the two-minute target is not met at large board counts. Employer-board discovery, bounded multi-board scheduling, Darwinbox and remaining connectors are still required.
+
+
+## 2026-11-08 — Workday candidate committed and pushed; exact-SHA CI running
+
+- The Workday adapter, config version 13, dashboard controls, test coverage, and updated source/deployment handover were committed as `c4f9c66cd05419242a761939f4c1ff883b4266d0` (`feat: add bounded Workday public career-site collector`).
+- The commit is pushed to `fix/sqlite-notification-contention-20261108` and fast-forwarded to `integration/pr46-v2-rebase-20261108` (PR #51). Remote refs have both been verified at `c4f9c66`.
+- GitHub Actions V2 CI run `42483043107` is running against this exact SHA. Python compilation and the dashboard JavaScript syntax step succeeded; focused router/extractor tests succeeded; the full V2 unittest job was still running at this note. Local V2 full suite on this code passed 359 tests in 266.690s.
+- Workday is not deployed or enabled in shared dev. Shared dev remains image c441737 (SQLite P0 only); production remains untouched. PR #51 remains open and draft. Do not merge or deploy Workday until exact-SHA CI passes and a controlled shared-dev board pilot is separately approved.
+
+
+## 2026-11-08 — Exact Workday commit CI completed
+
+GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66cd05419242a761939f4c1ff883b4266d0`. All job steps passed, including Python compile, modern Node dashboard syntax, focused router/extractor tests and full V2 unittest suite. PR #51 remains open/draft and unmerged. Workday is committed but not deployed or enabled in shared dev.
+
+
+## 2026-11-08 — External repository research and Keka/Darwinbox candidate update
+
+- Studied `career-ops-hq/career-ops` and `itshoax/career-ops-extension`. Research is documented in `docs/REFERENCE_REPOSITORIES_RESEARCH_2026-11-08.md`; doc-only draft PR #52 is `https://github.com/AvinashBhalla/job-beeper/pull/52`, head `763285efa55542f439bbc9303ec2b9b13ff56c9c`. Main reusable input is Career-Ops' small provider contract, strict parsing, bounded pagination, SSRF/redirect protections, transient-only retry and provider tests. The extension is a human-reviewed application-assistance/answer-learning tool, not an ATS collector; keep it as a separate possible future product milestone.
+- On isolated VM worktree `/tmp/job-radar-next`, branch `feat/darwinbox-keka-20261108` (based on `7b1a80d9062be2515e6d34b8838d1ccaf7a68459`), Keka and Darwinbox candidate collectors are implemented with board discovery/probes, admin activation mapping, opt-in config v15, dashboard controls and tests. Files: `v2/radar.py`, `v2/board_discovery.py`, `v2/config.json`, `v2/test_board_discovery.py`, `v2/test_radar.py`, `dashboard/index.html`, `dashboard/app.js`; capability audit and ATS roadmap updated.
+- Historical live board validation: Keka Bridgestone returned 109 postings and passed two-poll baseline/dedup. The prior JG Summit Darwinbox `.com` 18-posting result is superseded because repeat verification returned 403. See the later 2026-11-08 Darwinbox restriction correction; Arvind Group `.in` is the verified replacement, but its two-poll integration still needs to be run.
+- Full local V2 suite: **387 passed, 215.671s, zero failures**. The existing Workday test was corrected to patch the tracked request wrapper rather than raw `requests.post/get`; the focused Workday test and full suite pass. `compileall`, JSON validation and `git diff --check` pass. Exact-SHA GitHub CI has not yet been run on the feature branch.
+- **Deployment state:** production stays on `job-radar-prod-canary:7b1a80d` and `/health` remains HTTP 200. Keka/Darwinbox code has not been pushed/merged/deployed; config source flags default false. Existing global Telegram env/config and DB are unchanged. Research PR #52 is doc-only and draft/open.
+- Next: review the full feature diff; run exact-SHA CI after pushing a feature branch; perform admin browser QA on the isolated feature environment; measure request/poll latency; update handover after CI and QA. Do not enable sources or deploy to production until those gates and a controlled canary are satisfied. Admin user bootstrap is still a separate prerequisite before production dashboard login; Google OAuth is disabled.
+
+
+## 2026-11-08 — Knowledge-transfer update for external research and connector work
+
+- Current production remains build `job-radar-prod-canary:7b1a80d`, `/health` HTTP 200. No Keka/Darwinbox code or config has been deployed; do not mistake the local feature branch for production capability.
+- External repo findings: see `docs/REFERENCE_REPOSITORIES_RESEARCH_2026-11-08.md` and doc-only draft PR #52. Reuse the Career-Ops provider engineering patterns; do not copy its CLI/file-first runtime. The `career-ops-extension` is form-fill/answer-learning with a human submit checkpoint, not an ATS scraper.
+- Keka/Darwinbox candidate code is isolated at `/tmp/job-radar-next`, branch `feat/darwinbox-keka-20261108`, based on `7b1a80d`. Two-poll evidence: Keka 109 then zero new; Darwinbox 18 then zero new; silent baselines, no sends, SQLite integrity `ok`.
+- Full suite: 387/387 tests pass in 215.671s. Compileall/config JSON/diff checks pass. No exact-commit GitHub Actions CI yet, no browser QA yet, no connector production rollout.
+- Next actions: inspect candidate diff; push feature branch only after final review; check CI on exact SHA; run isolated admin discovery→verify→activate browser QA with notifications disabled; review latency metrics and per-tenant failure behavior. Keep Keka/Darwinbox off in prod until explicit controlled promotion. No immediate user secret is required for this code stage; a preferred admin email is required only when provisioning the first production admin account.
+
+
+## 2026-11-08 — Darwinbox verification mismatch found before rollout
+
+- New candidate commit `07544e835212892a63e3f7e05d0f9ee0b6db3ab0` was pushed to PR #51. Exact-SHA GitHub V2 CI run `42505820970` passed, including dashboard syntax and full test suite. A second manual `workflow_dispatch` run `42505931091` was also queued; check its final state before promotion.
+- Isolated QA service runs on loopback port 8010, its own named volume `job-radar-connectors-qa_qa-data`, config v15, every collector disabled, no Telegram credentials, no LLM providers and notifications false. Health HTTP 200, dashboard GET HTTP 200, unauthenticated admin discovery API correctly returns 401, database integrity `ok`. It does not share ports or volumes with production/dev.
+- Keka live discovery probe still succeeds: Bridgestone `bridgestone1.keka.com` exposes 109 jobs.
+- Darwinbox first verification run found a mismatch: `jgsummit.darwinbox.com` returned HTTP 403; the earlier 18-job evidence is superseded. The current Career-Ops provider pattern only recognizes `*.darwinbox.in`. A fresh `arvind.darwinbox.in` board probe returned 36 jobs; Airtel, LeadSquared and Sterling `.in` examples returned 403. The candidate detector and fixtures are being tightened to `.in` only and Arvind replaces JG Summit in the test fixture. No Darwinbox tenant should be added to production until the exact new commit passes tests/CI and the production activation has a baseline marker.
+- Current production remains image `job-radar-prod-canary:7b1a80d` with preserved `v2_radar-data` volume. Current prod config v14 has LinkedIn/Naukri enabled; GH 3 and Ashby 2 board entries configured but off; Workday/SmartRecruiters/Workable/Lever/Keka/Darwinbox production board lists empty. Never enable an empty provider allowlist.
+- Production still has zero user rows and no admin account. The supplied admin email is `bawejaavichal01@gmail.com`; first-admin CLI requires password entry. Do not create a production account or expose/generated password without a deliberate secure bootstrap path. User needs to set a password during provisioning before account-based dashboard and per-user Telegram setup can be verified.
+
+
+## 2026-11-08 — Darwinbox domain restriction and Arvind verification
+
+- `v2/board_discovery.py` now accepts Darwinbox only on `*.darwinbox.in`, matching the external reference provider; `.com` host detection was removed. `v2/test_board_discovery.py` rejects the previous JG Summit `.com` URL and uses Arvind's `.in` board pattern.
+- This correction follows actual network evidence: Arvind public candidate API returned 36 jobs; Airtel, LeadSquared and Sterling boards returned 403. Keka's 109-job public feed remains live. Never generalize these results to every tenant.
+- Re-run focused and full V2 suites, push the exact correction SHA to PR #51 and verify exact-SHA CI before any production promotion. Production remains untouched.
+
+### 2026-11-08 — Corrected Darwinbox/Workable verification + QA evidence
+
+- The corrected V2 full suite on the Darwinbox `.in` detector passed **387 tests in 291.998s** (exit 0). It ran before the small Workable verification endpoint correction; after that correction, the focused Workable verification test plus all nine Keka/Darwinbox tests passed (10 focused tests total). `compileall`, config JSON validation and `git diff --check` pass. The exact full CI run for the final pushed correction SHA is still required.
+- Workable verification was calling a legacy endpoint `www.workable.com/api/accounts/{slug}`, while the collector uses the public widget endpoint `apply.workable.com/api/v1/widget/accounts/{slug}`. The probe now calls the same public widget API and has a test asserting that path. Isolated live Hugging Face probe now returns 6 jobs.
+- Isolated QA board probes on the corrected build: Greenhouse Coinbase 283, Graviton Research Capital 21, Zocdoc 64; Ashby OpenAI 816, PostHog 10; NVIDIA Workday first page 20; Bosch Group SmartRecruiters verification page 10; Hugging Face Workable 6; Bridgestone Keka 109; Arvind Darwinbox 36. These are bounded live endpoint samples, not whole-board counts for every source (notably Workday is one 20-job page). Every employer still requires its own check and source limits apply.
+- Arvind Darwinbox collector two-poll integration in isolated DB `/data/arvind-darwinbox-canary.sqlite3`: poll 1 saw/inserted 36 jobs, all 36 tagged as initial baseline, `baseline_pending` cleared; poll 2 saw 36 and inserted 0; both runs `success`; sent notification rows 0; SQLite integrity `ok`. Keka's previously completed Bridgestone two-poll test remains 109 on poll 1 and 0 new on poll 2.
+- Verification failures were also observed for Airtel, LeadSquared and Sterling Darwinbox tenant URLs (HTTP 403). Do not enable them. JG Summit `.com` gave 403; its former 18-job result is superseded. The detector now rejects `.darwinbox.com` and accepts only `.darwinbox.in`.
+- Isolated QA API checks: port 8010; health 200, dashboard static route 200, anonymous `/api/discovery/boards` returns 401, notifications disabled, every collector off, no Telegram/LLM credentials, QA DB integrity `ok`. Chromium/Playwright browser binary is not installed on the VM, so full interactive visual browser QA remains outstanding; dashboard JS syntax passed GitHub CI. Admin API and endpoint behavior are covered by unit/integration tests.
+- The current candidate code plus docs/tests still needs a final commit/push to `integration/pr46-v2-rebase-20261108`, followed by exact-SHA GitHub CI. No production config, image, volume or notifier changed during these QA checks.
+
+### 2026-11-08 — activation now reuses configured board entries
+
+- Production already has three Greenhouse and two Ashby board definitions, while `ats_board_registry` is empty. The discovery activation helper previously matched only on `registry_id`, which would append a second config entry for a preconfigured but not-yet-registered board. It now matches provider-specific board identity, attaches the registry ID to the existing entry, and rejects a conflicting registry link rather than duplicating the board.
+- Added regression coverage for activation of an already configured Greenhouse board; focused Greenhouse/Keka activation tests pass. This is required for per-board initial-baseline suppression on the existing production allowlists.
+- Candidate needs a fresh exact-SHA full suite/CI after this activation dedup fix. Production remains unchanged.
+
+
+## 2026-11-08 — Product direction consolidation
+
+- Added docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md as the source of truth for the end-to-end product vision, architecture decisions, implementation gaps and priorities. Older roadmap docs now point to it; their technical history remains useful but no longer overrides its current sequence.
+- Career-Ops findings adopted: posting legitimacy/repost revalidation, explainable evidence-weighted fit, fact-grounded resume tailoring, application preparation, contact provenance, draft-first outreach and privacy minimization.
+- Apply Factory findings adopted: per-user reusable application answer bank, correction/learning events, review of uncertain answers and optional browser-assisted form filling. Do not copy the Kimi Webbridge/LinkedIn DOM-scraping dependency; implement a first-party companion after APIs stabilize.
+- Confirmed current product gaps: Applied tracker is browser localStorage, not server-synced; current resume parser only returns preference suggestions and does not store a resume or generate tailored versions; referral/contact discovery and follow-up workflow remain design-only; no auto-submit capability exists.
+- Product priority: production ingestion/notification release first; server-owned application tracking next (P0.5, before wider multi-user beta); then resume vault/tailoring and answer bank; then referrals/follow-ups; assisted form filling; unattended submission last and only after a separate permission/safety review.
+- No code behavior changed by this product documentation update.

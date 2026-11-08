@@ -17,15 +17,23 @@
   const authClient = window.JobBeeperAuth.createClient({ apiBase: API, locationRef: window.location });
 
   const LOCAL_STORAGE_APPLIED_KEY = 'job_beeper_applied_jobs_v1';
+  const appliedStorageKey = () => state.currentUser && state.currentUser.id ? `${LOCAL_STORAGE_APPLIED_KEY}_user_${state.currentUser.id}` : LOCAL_STORAGE_APPLIED_KEY;
   const THEME_STORAGE_KEY = 'job_beeper_theme';
 
   const state = {
     jobs: [],
+    feedPage: 1,
+    feedPageSize: 20,
+    pagination: null,
     selectedJobId: null,
     appliedJobs: [],
     config: null,
     summary: null,
+    currentUser: null,
+    isAdmin: false,
+    userPreferences: null,
     sourceStatus: [],
+    discoveredBoards: [],
     activeSection: 'jobsSection',
     filters: {
       search: '',
@@ -483,6 +491,8 @@
       notification_candidate_job_id: raw.notification_candidate_job_id ?? null,
       experience_min_years: minExp,
       experience_max_years: maxExp,
+      experience_provenance: raw.experience_provenance || 'unknown',
+      experience_confidence: raw.experience_confidence || 'unknown',
       experience_label: expLabel,
       work_mode: workMode,
       skills_detected: skillsDetected,
@@ -586,7 +596,7 @@
   // =========================================================================
   function loadAppliedJobs() {
     try {
-      const raw = localStorage.getItem(LOCAL_STORAGE_APPLIED_KEY);
+      const raw = localStorage.getItem(appliedStorageKey());
       state.appliedJobs = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(state.appliedJobs)) state.appliedJobs = [];
     } catch (e) {
@@ -598,7 +608,7 @@
 
   function saveAppliedJobs() {
     try {
-      localStorage.setItem(LOCAL_STORAGE_APPLIED_KEY, JSON.stringify(state.appliedJobs));
+      localStorage.setItem(appliedStorageKey(), JSON.stringify(state.appliedJobs));
     } catch (e) {
       console.error('Failed to save applied jobs to localStorage', e);
     }
@@ -689,6 +699,16 @@
       });
     }
 
+    function readRenderedTags() {
+      return [...container.querySelectorAll('.tag-chip-item')]
+        .map(chip => {
+          const label = chip.cloneNode(true);
+          label.querySelectorAll('.tag-chip-remove').forEach(remove => remove.remove());
+          return label.textContent.trim();
+        })
+        .filter(Boolean);
+    }
+
     function addTag(value) {
       const clean = value.trim().replace(/^,+|,+$/g, '');
       if (clean && !tags.includes(clean)) {
@@ -729,7 +749,14 @@
     renderTags();
 
     tagInputs[containerId] = {
-      getTags: () => [...tags],
+      getTags: () => {
+        // Commit any text still in the input, then prefer the chips the user
+        // can actually see. This keeps a visual tag and the submitted payload
+        // in sync even if the browser's blur/click ordering differs.
+        if (input.value.trim()) addTag(input.value);
+        const rendered = readRenderedTags();
+        return rendered.length ? rendered : [...tags];
+      },
       setTags: newTags => {
         tags = Array.isArray(newTags) ? [...newTags] : [];
         renderTags();
@@ -769,7 +796,11 @@
     const pageViews = [...document.querySelectorAll('.workspace-page')];
 
     function showSection(sectionId, pushHash = true) {
-      const target = $(sectionId) || $('jobsSection');
+      let target = $(sectionId) || $('jobsSection');
+      if (!state.isAdmin && target.id === 'sourcesSection') {
+        target = $('jobsSection');
+        history.replaceState(null, '', '#jobs');
+      }
       state.activeSection = target.id;
 
       pageViews.forEach(view => {
@@ -873,7 +904,7 @@
         && (minScore < configuredThreshold || job.likely_match);
       const matchesAge = ageHours(ts) <= maxAge;
       const matchesAlertable = !alertableOnly || job.alertable;
-      const matchesRemote = !remoteOnly || job.work_mode.toLowerCase().includes('remote') || job.location.toLowerCase().includes('remote');
+      const matchesRemote = !remoteOnly || job.work_mode.toLowerCase().includes('remote') || job.location.toLowerCase().includes('remote') || job.description.toLowerCase().includes('remote');
 
       return matchesQuery && matchesSource && matchesScore && matchesAge && matchesAlertable && matchesRemote;
     });
@@ -887,13 +918,23 @@
       filtered.sort((a, b) => String(jobTimestamp(b) || '').localeCompare(String(jobTimestamp(a) || '')) || b.match_score - a.match_score);
     }
 
-    // Update Counter & Active Filter Pills
+    // Update Counter & Active Filter Pills.
+    const pagination = state.pagination || {
+      page: state.feedPage, per_page: state.feedPageSize,
+      total: state.jobs.length, total_pages: 1,
+      has_previous: state.feedPage > 1, has_next: false,
+    };
+    const firstItem = pagination.total ? ((pagination.page - 1) * pagination.per_page) + 1 : 0;
+    const lastItem = firstItem ? firstItem + filtered.length - 1 : 0;
     const countText = $('feedCountText');
     if (countText) {
-      countText.innerHTML = `Showing <b>${filtered.length}</b> of <b>${state.jobs.length}</b> opportunities`;
+      countText.innerHTML = 'Showing <b>' + firstItem +
+        (lastItem > firstItem ? '–' + lastItem : '') +
+        '</b> of <b>' + pagination.total + '</b> opportunities';
     }
     const navBadge = $('jobsNavCount');
-    if (navBadge) navBadge.textContent = state.jobs.length;
+    if (navBadge) navBadge.textContent = pagination.total;
+    updateFeedPagination(pagination);
 
     renderActiveFiltersBar();
 
@@ -916,8 +957,17 @@
       const isSelected = String(state.selectedJobId) === String(job.id);
       const applied = isJobApplied(job.id);
       const scoreTier = getScoreTierClass(job.match_score);
+      const experienceProvenanceLabel = ({
+        employer_stated: 'Employer-stated',
+        description: 'From description',
+        inferred: 'Text inference',
+      })[job.experience_provenance] || '';
+      const experienceEvidenceTitle = experienceProvenanceLabel
+        ? 'Experience source: ' + experienceProvenanceLabel
+          + '; rule-based evidence strength: ' + job.experience_confidence
+        : 'Experience source or confidence unavailable';
 
-      const alertableBadge = job.alertable
+      const alertableBadge = state.isAdmin && job.alertable
         ? `<span class="tag-alertable-compact" title="${esc((job.alertability_reasons || []).join('; '))}">ALERTABLE</span>`
         : '';
       const notificationStatus = String(job.notification_status || 'not_eligible').toLowerCase();
@@ -928,7 +978,7 @@
         ...(job.notification_last_error ? [`Delivery error: ${job.notification_last_error}`] : []),
       ].join('; ') || (job.alertability_reasons || []).join('; ');
       let notificationBadge = '';
-      if (qualifiesForAlertPolicy) {
+      if (state.isAdmin && qualifiesForAlertPolicy) {
         if (notificationStatus === 'sent') {
           notificationBadge = `<span class="tag-alertable-compact" title="Telegram sent${job.notification_sent_at ? ` at ${esc(fmtTimestamp(job.notification_sent_at))}` : ''}">TELEGRAM SENT</span>`;
         } else if (notificationStatus === 'queued' || notificationStatus === 'sending') {
@@ -988,7 +1038,7 @@
             <div class="opportunity-meta-row">
               <span class="meta-item">${SVG_ICONS.mapPin} ${esc(job.location)}</span>
               <span class="meta-dot">·</span>
-              <span class="meta-item">${SVG_ICONS.graduationCap} ${esc(job.experience_label)}</span>
+              <span class="meta-item" title="${esc(experienceEvidenceTitle)}">${SVG_ICONS.graduationCap} ${esc(job.experience_label)}${experienceProvenanceLabel ? '<span class="experience-provenance-label">' + esc(experienceProvenanceLabel) + '</span>' : ''}</span>
               <span class="meta-dot">·</span>
               <span class="meta-item">${SVG_ICONS.clock} ${esc(fmtAge(ts))}</span>
             </div>
@@ -1007,6 +1057,19 @@
         </article>
       `;
     }).join('');
+  }
+
+  function updateFeedPagination(pagination) {
+    const nav = $('feedPagination');
+    const label = $('feedPageLabel');
+    const previous = $('previousJobsPageBtn');
+    const next = $('nextJobsPageBtn');
+    if (!nav || !label || !previous || !next) return;
+    const totalPages = Math.max(1, Number(pagination.total_pages || 0));
+    nav.hidden = Number(pagination.total || 0) <= Number(pagination.per_page || state.feedPageSize);
+    label.textContent = 'Page ' + pagination.page + ' of ' + totalPages;
+    previous.disabled = !pagination.has_previous;
+    next.disabled = !pagination.has_next;
   }
 
   function renderActiveFiltersBar() {
@@ -1046,7 +1109,6 @@
   }
 
   function clearAllFilters() {
-    const hadSearch = Boolean(String(state.filters.search || '').trim());
     state.filters.search = '';
     state.filters.source = '';
     state.filters.minScore = 0;
@@ -1068,11 +1130,8 @@
     $('toggleRemote').classList.remove('active');
     $('toggleRemote').setAttribute('aria-pressed', 'false');
 
-    if (hadSearch) {
-      loadJobsFeed();
-    } else {
-      renderFeed();
-    }
+    state.feedPage = 1;
+    loadJobsFeed();
   }
 
   // =========================================================================
@@ -1099,7 +1158,15 @@
     $('inspTitle').textContent = job.title;
     $('inspCompany').textContent = job.company;
     $('inspScore').textContent = `${job.match_score}%`;
-    $('inspExperience').textContent = job.experience_label;
+    const inspectorExperienceSource = ({
+      employer_stated: 'Employer-stated',
+      description: 'From description',
+      inferred: 'Text inference',
+    })[job.experience_provenance] || 'Source unknown';
+    const inspectorExperienceConfidence = job.experience_confidence !== 'unknown'
+      ? ' · ' + job.experience_confidence + ' evidence'
+      : '';
+    $('inspExperience').textContent = job.experience_label + ' · ' + inspectorExperienceSource + inspectorExperienceConfidence;
     $('inspLocation').textContent = job.location;
     $('inspWorkMode').textContent = job.work_mode;
     $('inspSourcePosted').textContent = fmtTimestamp(job.source_posted_at, job.posted_precision);
@@ -1489,6 +1556,12 @@
         instahyre: 'Instahyre',
         greenhouse: 'Greenhouse',
         ashby: 'Ashby',
+        lever: 'Lever',
+        workday: 'Workday',
+        smartrecruiters: 'SmartRecruiters',
+        workable: 'Workable',
+        keka: 'Keka',
+        darwinbox: 'Darwinbox',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
@@ -1550,8 +1623,18 @@
     const enabled = c.source_enabled || {};
     document.querySelectorAll('#cfgSourcesWrap input[data-source]').forEach(input => {
       const src = input.dataset.source;
-      input.checked = enabled[src] !== false;
+      input.checked = enabled[src] === true;
     });
+    const workdayBoards = $('cfgWorkdayBoards');
+    if (workdayBoards) workdayBoards.value = JSON.stringify(c.workday_boards || [], null, 2);
+    const smartRecruitersBoards = $('cfgSmartRecruitersBoards');
+    if (smartRecruitersBoards) smartRecruitersBoards.value = JSON.stringify(c.smartrecruiters_boards || [], null, 2);
+    const workableBoards = $('cfgWorkableBoards');
+    if (workableBoards) workableBoards.value = JSON.stringify(c.workable_boards || [], null, 2);
+    const kekaBoards = $('cfgKekaBoards');
+    if (kekaBoards) kekaBoards.value = JSON.stringify(c.keka_boards || [], null, 2);
+    const darwinboxBoards = $('cfgDarwinboxBoards');
+    if (darwinboxBoards) darwinboxBoards.value = JSON.stringify(c.darwinbox_boards || [], null, 2);
 
   }
 
@@ -1569,7 +1652,7 @@
 
     next.candidate_experience_years = cand === '' ? null : Number(cand);
     next.min_experience_years = min === '' ? null : Number(min);
-    next.max_experience_years = Number($('cfgMaxExp')?.value || 3);
+    next.max_experience_years = Number($('cfgMaxExp')?.value || (state.isAdmin ? 3 : 30));
     next.match_threshold = Number($('cfgMatchThreshold')?.value || 55);
     next.max_age_hours = Number($('cfgMaxAge')?.value || 72);
 
@@ -1581,16 +1664,214 @@
     document.querySelectorAll('#cfgSourcesWrap input[data-source]').forEach(input => {
       next.source_enabled[input.dataset.source] = input.checked;
     });
+    const boardArrays = [
+      ['cfgWorkdayBoards', 'workday_boards', 'Workday'],
+      ['cfgSmartRecruitersBoards', 'smartrecruiters_boards', 'SmartRecruiters'],
+      ['cfgWorkableBoards', 'workable_boards', 'Workable'],
+      ['cfgKekaBoards', 'keka_boards', 'Keka'],
+      ['cfgDarwinboxBoards', 'darwinbox_boards', 'Darwinbox'],
+    ];
+    for (const [elementId, configKey, label] of boardArrays) {
+      const raw = $(elementId)?.value.trim() || '[]';
+      try {
+        next[configKey] = JSON.parse(raw);
+      } catch {
+        throw new Error(`${label} board configuration must be valid JSON.`);
+      }
+      if (!Array.isArray(next[configKey])) {
+        throw new Error(`${label} board configuration must be a JSON array.`);
+      }
+    }
 
     return next;
   }
 
-  async function savePreferences() {
+  function collectUserPreferencesPayload() {
     const payload = collectPreferencesPayload();
+    return {
+      target_roles: payload.target_roles, locations: payload.locations, skills: payload.skills,
+      title_exclude: payload.title_exclude, excluded_role_terms: payload.excluded_role_terms,
+      candidate_experience_years: payload.candidate_experience_years,
+      min_experience_years: payload.min_experience_years, max_experience_years: payload.max_experience_years,
+      match_threshold: payload.match_threshold, max_age_hours: payload.max_age_hours, remote_only: payload.remote_only,
+    };
+  }
+
+  async function loadTelegramStatus() {
+    const panel = $('telegramConnectPanel');
+    if (panel) panel.hidden = Boolean(state.isAdmin);
+    if (state.isAdmin) return;
+    const status = $('telegramConnectionStatus');
+    try {
+      const response = await authClient.request('/telegram/status', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not load Telegram status.');
+      const connected = Boolean(data.connection?.connected);
+      if (status) status.textContent = connected
+        ? 'Telegram is connected to your Job Beeper account. Notifications are not enabled by this link.'
+        : data.configured
+          ? 'Telegram is not connected yet.'
+          : 'Telegram linking is not configured by the administrator yet.';
+      const createButton = $('createTelegramLinkBtn');
+      if (createButton) createButton.hidden = !data.configured;
+      const disconnectButton = $('disconnectTelegramBtn');
+      if (disconnectButton) disconnectButton.hidden = !connected;
+      const notificationToggle = $('telegramNotificationsEnabled');
+      const notificationStatus = $('telegramNotificationSettingsStatus');
+      try {
+        const settingsResponse = await authClient.request('/notifications/settings', { cache: 'no-store' });
+        const settingsData = await settingsResponse.json().catch(() => ({}));
+        if (!settingsResponse.ok) throw new Error(settingsData.detail || 'Could not load notification settings.');
+        if (notificationToggle) {
+          notificationToggle.checked = Boolean(settingsData.settings?.enabled);
+          notificationToggle.disabled = !connected;
+        }
+        if (notificationStatus) notificationStatus.textContent = settingsData.settings?.enabled
+          ? `Job alerts are on. Only jobs discovered after ${new Date(settingsData.settings.enabled_at).toLocaleString()} are eligible.`
+          : connected ? 'Job alerts are off. Turn them on to receive matching jobs discovered from that point forward.' : 'Connect Telegram before enabling alerts. Alerts are off by default.';
+      } catch (settingsError) {
+        if (notificationStatus) notificationStatus.textContent = settingsError.message || 'Could not load notification settings.';
+      }
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not load Telegram status.';
+    }
+  }
+
+  async function updateTelegramNotificationSetting() {
+    const toggle = $('telegramNotificationsEnabled');
+    const status = $('telegramNotificationSettingsStatus');
+    if (!toggle) return;
+    toggle.disabled = true;
+    try {
+      const response = await authClient.request('/notifications/settings', {
+        method: 'PUT', body: { enabled: Boolean(toggle.checked) },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not update notification settings.');
+      if (status) status.textContent = data.settings.enabled
+        ? 'Job alerts are on. Only jobs discovered after now are eligible; older jobs will not be sent.'
+        : 'Job alerts are off. No further member alerts will be sent.';
+    } catch (error) {
+      toggle.checked = !toggle.checked;
+      if (status) status.textContent = error.message || 'Could not update notification settings.';
+    } finally {
+      await loadTelegramStatus();
+    }
+  }
+
+  async function createTelegramLink() {
+    const status = $('telegramConnectionStatus');
+    const button = $('createTelegramLinkBtn');
+    const anchor = $('openTelegramLink');
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Generating a secure, one-time link…';
+    try {
+      const response = await authClient.request('/telegram/link', { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not create Telegram link.');
+      if (anchor) {
+        anchor.href = data.url;
+        anchor.hidden = false;
+        anchor.textContent = `Open Job Beeper in Telegram (link expires in ${Math.ceil(data.expires_in_seconds / 60)} minutes)`;
+      }
+      if (status) status.textContent = 'Link created. Open it in Telegram and press Start. Return here and refresh the connection status. Generate a new link if this one expires.';
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not create Telegram link.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function disconnectTelegram() {
+    const status = $('telegramConnectionStatus');
+    const button = $('disconnectTelegramBtn');
+    if (button) button.disabled = true;
+    try {
+      const response = await authClient.request('/telegram/link', { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not disconnect Telegram.');
+      const anchor = $('openTelegramLink');
+      if (anchor) { anchor.hidden = true; anchor.removeAttribute('href'); }
+      if (status) status.textContent = 'Telegram has been disconnected from this account.';
+      await loadTelegramStatus();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not disconnect Telegram.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function parseResumeForSuggestions() {
+    const input = $('resumeUploadInput');
+    const status = $('resumeParseStatus');
+    const file = input?.files?.[0];
+    if (!file) {
+      if (status) status.textContent = 'Choose a PDF or DOCX resume first.';
+      return;
+    }
+    if (status) status.textContent = 'Reading resume and extracting suggestions…';
+    const body = new FormData();
+    body.append('file', file);
+    try {
+      const response = await authClient.request('/preferences/resume', { method: 'POST', body });
+      if (response.status === 401) { window.location.reload(); return; }
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || 'Could not parse this resume.');
+      const suggestions = result.suggestions || {};
+      const mergeTags = (containerId, values) => {
+        const existing = tagInputs[containerId]?.getTags() || [];
+        const merged = [...existing];
+        for (const value of (values || [])) {
+          if (!merged.some(item => item.toLowerCase() === value.toLowerCase())) merged.push(value);
+        }
+        tagInputs[containerId]?.setTags(merged);
+      };
+      // Existing user edits take precedence; resume suggestions only fill empty controls.
+      mergeTags('rolesTagContainer', suggestions.target_roles);
+      mergeTags('locationsTagContainer', suggestions.locations);
+      mergeTags('skillsTagContainer', suggestions.skills);
+      const exp = $('cfgCandidateExp');
+      if (exp && !exp.value && suggestions.candidate_experience_years != null) {
+        exp.value = suggestions.candidate_experience_years;
+      }
+      const remote = $('cfgRemoteOnly');
+      if (remote && suggestions.remote_only === true) remote.checked = true;
+      const missing = result.missing_required_fields || [];
+      if (status) {
+        status.textContent = `Suggestions added for review. ${missing.length ? 'Still add: ' + missing.join(' and ') + '. ' : ''}Nothing has been saved yet. Review the fields, edit as needed, then choose Save Preferences.`;
+      }
+      input.value = '';
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Resume parsing failed. You can still enter preferences manually.';
+    }
+  }
+
+  async function savePreferences() {
+    let payload;
+    try {
+      payload = state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload();
+    } catch (error) {
+      const message = error.message || 'Please check the configuration fields.';
+      if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;
+      showToast(message, 'error', 7000);
+      return;
+    }
     if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saving preferences…';
 
+    if (!state.isAdmin) {
+      const missing = [];
+      if (!payload.target_roles?.length) missing.push('at least one target role');
+      if (!payload.locations?.length) missing.push('at least one target location');
+      if (missing.length) {
+        const message = `Add ${missing.join(' and ')} before saving your preferences.`;
+        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;
+        showToast(message, 'error', 7000);
+        return;
+      }
+    }
+
     try {
-      const response = await authClient.request('/config', {
+      const response = await authClient.request(state.isAdmin ? '/config' : '/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1601,15 +1882,26 @@
         return;
       }
       if (!response.ok) {
-        showToast('Failed to save configuration', 'error');
-        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Save failed.';
+        const errorData = await response.json().catch(() => ({}));
+        const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : '';
+        const message = (detail || `Save failed (HTTP ${response.status}).`).slice(0, 320);
+        showToast(message, 'error', 7000);
+        if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;
         return;
       }
 
       const data = await response.json();
-      state.config = data.config;
+      state.config = data.config || data.preferences;
+      state.userPreferences = state.isAdmin ? state.userPreferences : data.preferences;
       populatePreferencesForm();
-      showToast('Preferences saved successfully. Live matching updated.', 'success');
+      if (!state.isAdmin) {
+        const notice = $('userOnboardingNotice');
+        if (notice) notice.hidden = true;
+        window.showSection?.('jobsSection', true);
+        // Do not make preference persistence wait for the much heavier feed refresh.
+        void loadJobsFeed();
+      }
+      showToast('Preferences saved successfully. Your personalized matching has been updated.', 'success');
       if ($('saveStatusMessage')) $('saveStatusMessage').textContent = 'Saved.';
     } catch (e) {
       showToast('Backend API unreachable', 'error');
@@ -1622,12 +1914,22 @@
   // =========================================================================
   async function loadConfig() {
     try {
-      const res = await authClient.request('/config', { cache: 'no-store' });
+      const res = await authClient.request(state.isAdmin ? '/config' : '/preferences', { cache: 'no-store' });
       if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error('Config endpoint unavailable');
       const data = await res.json();
-      state.config = data.config;
+      state.config = data.config || data.preferences;
+      state.userPreferences = state.isAdmin ? state.userPreferences : data.preferences;
       populatePreferencesForm();
+      const onboardingNotice = $('userOnboardingNotice');
+      if (onboardingNotice) onboardingNotice.hidden = Boolean(data.preferences?.onboarding_complete || state.isAdmin);
+      const resumePanel = $('resumeAssistPanel');
+      if (resumePanel) resumePanel.hidden = Boolean(state.isAdmin || data.preferences?.onboarding_complete);
+      const telegramPanel = $('telegramConnectPanel');
+      if (telegramPanel) telegramPanel.hidden = Boolean(state.isAdmin);
+      if (!state.isAdmin && !data.preferences?.onboarding_complete) {
+        window.showSection?.('preferencesSection', false);
+      }
     } catch (e) {
       state.config = null;
       showToast('Live backend configuration unavailable. Check the dashboard API URL.', 'error', 5000);
@@ -1639,12 +1941,26 @@
     const refreshBtn = $('refreshFeedBtn');
     if (refreshBtn) refreshBtn.classList.add('is-loading');
 
+    const sortParameters = {
+      newest: { sort_by: 'created_at', sort_order: 'desc' },
+      match: { sort_by: 'match_score', sort_order: 'desc' },
+      company: { sort_by: 'company', sort_order: 'asc' },
+    }[state.filters.sort] || { sort_by: 'created_at', sort_order: 'desc' };
     const params = new URLSearchParams({
       minutes: '4320',
-      limit: '500',
+      page: String(state.feedPage),
+      per_page: String(state.feedPageSize),
+      status: state.isAdmin ? 'all' : 'matched',
+      sort_by: sortParameters.sort_by,
+      sort_order: sortParameters.sort_order,
     });
     const searchQuery = String(state.filters.search || '').trim();
-    if (searchQuery) params.set('q', searchQuery);
+    if (searchQuery) params.set('search', searchQuery);
+    if (state.filters.source) params.set('source', state.filters.source);
+    if (state.filters.minScore > 0) params.set('min_score', String(state.filters.minScore));
+    if (state.filters.maxAge < 72) params.set('max_age_hours', String(state.filters.maxAge));
+    if (state.filters.alertableOnly) params.set('alertable_only', 'true');
+    if (state.filters.remoteOnly) params.set('remote_only', 'true');
 
     try {
       const [jobsRes, summaryRes] = await Promise.all([
@@ -1660,6 +1976,12 @@
       if (requestId !== jobsFeedRequestSequence) return;
 
       state.jobs = (jobsData.jobs || []).map(normalizeJob).filter(Boolean);
+      state.pagination = jobsData.pagination || {
+        page: state.feedPage, per_page: state.feedPageSize,
+        total: state.jobs.length, total_pages: 1,
+        has_previous: false, has_next: false,
+      };
+      state.feedPage = state.pagination.page || state.feedPage;
       state.summary = summaryData;
       state.isStaticFallback = false;
 
@@ -1674,6 +1996,7 @@
     } catch (err) {
       if (requestId !== jobsFeedRequestSequence) return;
       state.jobs = [];
+      state.pagination = { page: state.feedPage, per_page: state.feedPageSize, total: 0, total_pages: 0, has_previous: false, has_next: false };
       state.summary = null;
       state.isStaticFallback = false;
       updateTelemetry(0, 0, 0, 'Feed Offline');
@@ -1688,6 +2011,10 @@
   }
 
   async function loadSourceStatusTelemetry() {
+    if (!state.isAdmin) {
+      state.sourceStatus = [];
+      return;
+    }
     try {
       const res = await authClient.request('/source-status', { cache: 'no-store' });
       if (res.status === 401) { window.location.reload(); return; }
@@ -1696,6 +2023,7 @@
       state.sourceStatus = data.sources || [];
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
+        void loadDiscoveredBoards();
       }
     } catch (e) {
       state.sourceStatus = [
@@ -1707,6 +2035,148 @@
       if (state.activeSection === 'sourcesSection') {
         renderSourceHealth();
       }
+    }
+  }
+
+  function renderDiscoveredBoards() {
+    const tbody = $('discoveredBoardsTableBody');
+    if (!tbody) return;
+    const boards = state.discoveredBoards || [];
+    if (!boards.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No discovered boards yet. Add a company website above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = boards.map(board => {
+      const collector = board.collector_available
+        ? `<span style="color:var(--status-success);">${esc(board.collector_source)} available</span>`
+        : '<span style="color:var(--text-muted);">Discovery only</span>';
+      const review = esc(board.review_status || 'discovered');
+      const verifyButton = board.collector_available && board.review_status !== 'verified' && board.review_status !== 'active'
+        ? `<button type="button" class="btn-pill btn-pill-secondary board-verify-btn" data-board-id="${esc(board.id)}">Verify endpoint</button>`
+        : '';
+      const activateButton = board.review_status === 'verified'
+        ? `<button type="button" class="btn-pill btn-pill-primary board-activate-btn" data-board-id="${esc(board.id)}">Activate source</button>`
+        : '';
+      const actions = board.review_status === 'active'
+        ? '<span style="color:var(--status-success);">Active</span>'
+        : `${verifyButton}${activateButton}<button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="reviewed">Mark reviewed</button><button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="rejected">Reject</button>`;
+      return `<tr>
+        <td><b>${esc(board.company_name)}</b><div style="font-size:11px;color:var(--text-muted);">${esc(board.domain)}</div></td>
+        <td>${esc(board.provider)}</td>
+        <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a></td>
+        <td>${collector}</td>
+        <td>${review}</td>
+        <td><a href="${esc(board.discovered_from)}" target="_blank" rel="noopener noreferrer">Open page</a></td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap;">${actions}</td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.board-review-btn').forEach(button => {
+      button.addEventListener('click', () => reviewDiscoveredBoard(
+        Number(button.dataset.boardId), button.dataset.status
+      ));
+    });
+    tbody.querySelectorAll('.board-verify-btn').forEach(button => {
+      button.addEventListener('click', () => verifyDiscoveredBoard(Number(button.dataset.boardId), button));
+    });
+    tbody.querySelectorAll('.board-activate-btn').forEach(button => {
+      button.addEventListener('click', () => activateDiscoveredBoard(Number(button.dataset.boardId), button));
+    });
+  }
+
+  async function loadDiscoveredBoards() {
+    if (!state.isAdmin) return;
+    const tbody = $('discoveredBoardsTableBody');
+    if (tbody && !state.discoveredBoards?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading discovered boards…</td></tr>';
+    }
+    try {
+      const response = await authClient.request('/discovery/boards?limit=500', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Could not load boards (HTTP ${response.status}).`);
+      const data = await response.json();
+      state.discoveredBoards = data.boards || [];
+      renderDiscoveredBoards();
+    } catch (error) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:var(--status-error);padding:var(--space-12);">${esc(error.message || 'Board registry unavailable.')}</td></tr>`;
+    }
+  }
+
+  async function discoverCompanyBoards(event) {
+    event.preventDefault();
+    const button = $('discoverCompanyBtn');
+    const status = $('boardDiscoveryStatus');
+    const companyName = $('discoveryCompanyName')?.value.trim();
+    const websiteUrl = $('discoveryWebsiteUrl')?.value.trim();
+    const careersUrl = $('discoveryCareersUrl')?.value.trim();
+    const country = $('discoveryCountry')?.value.trim();
+    if (!companyName || !websiteUrl) return;
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Scanning public company and careers pages…';
+    try {
+      const response = await authClient.request('/discovery/companies/scan', {
+        method: 'POST',
+        body: { company_name: companyName, website_url: websiteUrl, careers_url: careersUrl || null, country: country || null },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Discovery failed (HTTP ${response.status}).`);
+      const found = Number(data.boards_discovered || 0);
+      if (status) status.textContent = `${data.company_name}: checked ${data.pages_checked} public page(s), found ${found} board candidate(s). No source was enabled.`;
+      if ($('discoveryCompanyName')) $('discoveryCompanyName').value = '';
+      if ($('discoveryWebsiteUrl')) $('discoveryWebsiteUrl').value = '';
+      if ($('discoveryCareersUrl')) $('discoveryCareersUrl').value = '';
+      await loadDiscoveredBoards();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Company discovery failed.';
+      showToast(error.message || 'Company discovery failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function verifyDiscoveredBoard(boardId, button) {
+    if (button) button.disabled = true;
+    if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `Checking public ATS endpoint for board ${boardId}…`;
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/verify`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Board verification failed (HTTP ${response.status}).`);
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `${data.provider}: endpoint verified, ${data.jobs_observed} public listing(s) visible. Scheduler is still disabled.`;
+      await loadDiscoveredBoards();
+    } catch (error) {
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = error.message || 'Board verification failed.';
+      showToast(error.message || 'Board verification failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function activateDiscoveredBoard(boardId, button) {
+    if (button) button.disabled = true;
+    if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `Activating verified board ${boardId}…`;
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/activate`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Activation failed (HTTP ${response.status}).`);
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `${data.provider}: source enabled at ${data.poll_interval_seconds}s. First poll is silent baseline inventory.`;
+      await Promise.all([loadDiscoveredBoards(), loadSourceStatusTelemetry()]);
+    } catch (error) {
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = error.message || 'Board activation failed.';
+      showToast(error.message || 'Board activation failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function reviewDiscoveredBoard(boardId, reviewStatus) {
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/review`, {
+        method: 'POST', body: { status: reviewStatus },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Review failed (HTTP ${response.status}).`);
+      if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = `Board ${boardId} marked ${reviewStatus}. This does not enable polling.`;
+      await loadDiscoveredBoards();
+    } catch (error) {
+      showToast(error.message || 'Could not update board review status.', 'error', 7000);
     }
   }
 
@@ -1728,7 +2198,14 @@
       { value: 'linkedin', label: 'LinkedIn' },
       { value: 'naukri', label: 'Naukri' },
       { value: 'greenhouse', label: 'Greenhouse' },
+      { value: 'ashby', label: 'Ashby' },
       { value: 'instahyre', label: 'Instahyre' },
+      { value: 'lever', label: 'Lever' },
+      { value: 'workday', label: 'Workday' },
+      { value: 'smartrecruiters', label: 'SmartRecruiters' },
+      { value: 'workable', label: 'Workable' },
+      { value: 'keka', label: 'Keka' },
+      { value: 'darwinbox', label: 'Darwinbox' },
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';
@@ -1752,6 +2229,7 @@
         if (searchClear) searchClear.style.display = val ? 'inline-flex' : 'none';
         searchDebounceTimer = setTimeout(() => {
           state.filters.search = val.trim();
+          state.feedPage = 1;
           loadJobsFeed();
         }, 250);
       });
@@ -1762,6 +2240,7 @@
         if (searchInp) searchInp.value = '';
         searchClear.style.display = 'none';
         state.filters.search = '';
+        state.feedPage = 1;
         loadJobsFeed();
       });
     }
@@ -1791,7 +2270,8 @@
         state.filters.alertableOnly = !state.filters.alertableOnly;
         alertableBtn.classList.toggle('active', state.filters.alertableOnly);
         alertableBtn.setAttribute('aria-pressed', String(state.filters.alertableOnly));
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       });
     }
 
@@ -1801,13 +2281,29 @@
         state.filters.remoteOnly = !state.filters.remoteOnly;
         remoteBtn.classList.toggle('active', state.filters.remoteOnly);
         remoteBtn.setAttribute('aria-pressed', String(state.filters.remoteOnly));
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       });
     }
 
     // Refresh buttons
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
     if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
+    if ($('boardDiscoveryForm')) $('boardDiscoveryForm').addEventListener('submit', discoverCompanyBoards);
+
+    // Server-side job feed pagination.
+    if ($('previousJobsPageBtn')) $('previousJobsPageBtn').addEventListener('click', () => {
+      if (state.pagination?.has_previous) {
+        state.feedPage = Math.max(1, state.feedPage - 1);
+        loadJobsFeed();
+      }
+    });
+    if ($('nextJobsPageBtn')) $('nextJobsPageBtn').addEventListener('click', () => {
+      if (state.pagination?.has_next) {
+        state.feedPage += 1;
+        loadJobsFeed();
+      }
+    });
 
     // Inspector close button
     if ($('inspCloseBtn')) $('inspCloseBtn').addEventListener('click', closeJobInspector);
@@ -1839,6 +2335,11 @@
 
     // Preferences save button
     if ($('savePreferencesBtn')) $('savePreferencesBtn').addEventListener('click', savePreferences);
+    if ($('parseResumeBtn')) $('parseResumeBtn').addEventListener('click', parseResumeForSuggestions);
+    if ($('createTelegramLinkBtn')) $('createTelegramLinkBtn').addEventListener('click', createTelegramLink);
+    if ($('telegramNotificationsEnabled')) $('telegramNotificationsEnabled').addEventListener('change', updateTelegramNotificationSetting);
+    if ($('refreshTelegramStatusBtn')) $('refreshTelegramStatusBtn').addEventListener('click', loadTelegramStatus);
+    if ($('disconnectTelegramBtn')) $('disconnectTelegramBtn').addEventListener('click', disconnectTelegram);
 
 
   }
@@ -1855,7 +2356,8 @@
       value: state.filters.source,
       onChange: (val) => {
         state.filters.source = val;
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
 
@@ -1872,7 +2374,8 @@
       value: String(state.filters.minScore),
       onChange: (val) => {
         state.filters.minScore = Number(val);
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
 
@@ -1889,7 +2392,8 @@
       value: String(state.filters.maxAge),
       onChange: (val) => {
         state.filters.maxAge = Number(val);
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
 
@@ -1905,7 +2409,8 @@
       value: state.filters.sort,
       onChange: (val) => {
         state.filters.sort = val;
-        renderFeed();
+        state.feedPage = 1;
+        loadJobsFeed();
       },
     });
   }
@@ -1933,13 +2438,46 @@
     if ($('authUserEmail')) $('authUserEmail').textContent = user.email;
   }
 
+  function splitUserTags(value) {
+    return String(value || '').split(/[\n,;]+/)
+      .map(item => item.trim()).filter(Boolean)
+      .filter((item, index, all) => all.findIndex(other => other.toLowerCase() === item.toLowerCase()) === index);
+  }
+
+  function safeExternalJobUrl(value) {
+    try {
+      const url = new URL(String(value || ''), window.location.origin);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+
+
   function showUnavailablePanel() {
     setAuthPanel('authUnavailablePanel');
   }
 
-  async function initializeWorkspace() {
+  async function initializeWorkspace(user) {
     if (workspaceInitialized) return;
     workspaceInitialized = true;
+    state.currentUser = user;
+    state.isAdmin = user?.role === 'admin';
+    document.body.classList.add('auth-ready');
+    document.body.classList.remove('user-ready');
+    const userWorkspace = $('userWorkspace');
+    if (userWorkspace) userWorkspace.hidden = true;
+    if ($('accountEmail')) $('accountEmail').textContent = user?.email || '—';
+    if ($('accountRole')) $('accountRole').textContent = state.isAdmin ? 'Administrator' : 'Member';
+    document.querySelectorAll(
+      '.admin-only-setting, .admin-only-navigation, .admin-only-section'
+    ).forEach(el => { el.hidden = !state.isAdmin; });
+    if ($('preferencesSubtitle')) $('preferencesSubtitle').textContent = state.isAdmin
+      ? 'Candidate profile and global matching, source, and notification settings.'
+      : 'Your personal target roles, locations, skills, and matching criteria. Changes affect only your feed.';
+    const saveButton = $('savePreferencesBtn');
+    if (saveButton) saveButton.textContent = state.isAdmin ? 'Save Preferences to V2' : 'Save My Preferences';
 
     loadAppliedJobs();
     setupNavigation();
@@ -1955,11 +2493,24 @@
     handleHashRoute();
 
     await loadConfig();
-    await loadJobsFeed();
+    if (!state.isAdmin) await loadTelegramStatus();
+    if (state.isAdmin || state.config?.onboarding_complete) await loadJobsFeed();
+    else { state.jobs = []; renderFeed(); }
     await loadSourceStatusTelemetry();
 
-    setInterval(loadJobsFeed, 10000);
-    setInterval(loadSourceStatusTelemetry, 30000);
+    const refreshFeedIfVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (state.isAdmin || (state.config && state.config.onboarding_complete)) {
+        void loadJobsFeed();
+      }
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') refreshFeedIfVisible();
+    });
+    setInterval(refreshFeedIfVisible, 60000);
+    setInterval(() => {
+      if (document.visibilityState === 'visible') void loadSourceStatusTelemetry();
+    }, 30000);
   }
 
   async function refreshAuthentication() {
@@ -1974,7 +2525,7 @@
       onError: showUnavailablePanel,
     });
 
-    if (result.access === 'admin') await initializeWorkspace();
+    if (result.access === 'admin' || result.access === 'user') await initializeWorkspace(result.user);
     return result;
   }
 
@@ -1997,6 +2548,38 @@
   }
 
   function bindAuthEvents() {
+    const googleButton = $('googleSignInBtn');
+    const googleSignup = $('googleSignupWrap');
+    if (googleButton && googleSignup) {
+      authClient.request('/auth/google/status', { cache: 'no-store' })
+        .then(response => response.ok ? response.json() : { enabled: false })
+        .then(status => {
+          googleSignup.hidden = !status.enabled;
+          googleButton.hidden = !status.enabled;
+        })
+        .catch(() => {
+          googleSignup.hidden = true;
+          googleButton.hidden = true;
+        });
+    }
+    const googleAuthResult = new URLSearchParams(window.location.search).get('google_auth');
+    if (googleAuthResult === 'failed' && $('authStatusMsg')) {
+      $('authStatusMsg').textContent = 'Google sign-in could not be completed. Please try again.';
+    } else if (googleAuthResult === 'cancelled' && $('authStatusMsg')) {
+      $('authStatusMsg').textContent = 'Google sign-in was cancelled.';
+    }
+
+    const passwordInput = $('authPassword');
+    const passwordToggle = $('authPasswordToggle');
+    if (passwordInput && passwordToggle) {
+      passwordToggle.addEventListener('click', () => {
+        const reveal = passwordInput.type === 'password';
+        passwordInput.type = reveal ? 'text' : 'password';
+        passwordToggle.textContent = reveal ? 'Hide' : 'Show';
+        passwordToggle.setAttribute('aria-pressed', String(reveal));
+      });
+    }
+
     const form = $('authLoginForm');
     if (form) {
       form.addEventListener('submit', async event => {

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=obsidian_v2">
+  <link rel="stylesheet" href="styles.css?v=obsidian_v4">
 </head>
 
 <body>
@@ -23,21 +23,30 @@
 
       <div id="authLoginPanel">
         <h1 id="authGateTitle">Sign in to Job Beeper</h1>
-        <p class="auth-description">Use the account credentials provided for your beta access.</p>
+        <p class="auth-description">Sign in with your account or create a beta account using Google.</p>
         <form id="authLoginForm" class="auth-form" method="post">
           <label for="authEmail">Email address</label>
           <input id="authEmail" name="email" type="email" autocomplete="username" maxlength="254" required>
           <label for="authPassword">Password</label>
-          <input id="authPassword" name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+          <div class="auth-password-field">
+            <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="5" maxlength="1024" required>
+            <button type="button" class="auth-password-toggle" id="authPasswordToggle" aria-controls="authPassword" aria-pressed="false">Show</button>
+          </div>
           <button type="submit" class="btn-pill btn-pill-primary" id="authLoginBtn">Sign in</button>
           <p class="auth-status" id="authStatusMsg" role="status" aria-live="polite"></p>
         </form>
+        <div class="auth-google-signup" id="googleSignupWrap" hidden>
+          <p class="auth-description">New to Job Beeper?</p>
+          <a class="btn-pill btn-pill-secondary" id="googleSignInBtn" href="/api/auth/google/start" hidden>
+            Continue with Google
+          </a>
+        </div>
       </div>
 
       <div id="authUserPanel" hidden>
         <h1 id="authUserHeading">Your account is ready</h1>
         <p class="auth-description">You are signed in as <strong id="authUserEmail"></strong>.</p>
-        <p class="auth-description">Personal job feeds and individual preferences are not enabled for beta users yet. Your account is safe, but the workspace will become available after tenant-specific matching is released.</p>
+        <p class="auth-description">Your personalized job workspace is loading. If this takes more than a moment, refresh the page or sign out and back in.</p>
         <button type="button" class="btn-pill btn-pill-secondary" id="authUserLogoutBtn">Sign out</button>
       </div>
 
@@ -87,7 +96,7 @@
         <!-- Group 2: Intelligence -->
         <div class="nav-group">
           <span class="nav-group-title">Intelligence</span>
-          <a class="nav-link-item" href="#sources" data-section="sourcesSection" id="navSources">
+          <a class="nav-link-item admin-only-navigation" href="#sources" data-section="sourcesSection" id="navSources" hidden>
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
             <span>Source Health</span>
             <span class="pulse-dot" id="sidebarSourcePulse"></span>
@@ -194,7 +203,7 @@
             </div>
           </div>
 
-          <button type="button" id="refreshFeedBtn" class="header-action-btn" title="Refresh live feed (auto 10s)">
+          <button type="button" id="refreshFeedBtn" class="header-action-btn" title="Refresh live feed (auto 60s)">
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></svg>
             <span>Sync</span>
           </button>
@@ -249,13 +258,18 @@
               <!-- Feed Status Strip -->
               <div class="feed-status-strip">
                 <span id="feedCountText">Showing <b>0</b> jobs</span>
-                <span style="font-family:var(--font-mono);font-size:11px;" id="feedAutoRefreshText">Auto-refresh: 10s</span>
+                <span style="font-family:var(--font-mono);font-size:11px;" id="feedAutoRefreshText">Auto-refresh: 60s</span>
               </div>
 
               <!-- High-Density Opportunity Feed Scroll List -->
               <div class="feed-scroll-list" id="jobsListContainer" role="feed" aria-busy="false">
                 <!-- Opportunity cards dynamically injected -->
               </div>
+              <nav class="feed-pagination" id="feedPagination" aria-label="Job feed pages" hidden>
+                <button type="button" class="btn-action-secondary" id="previousJobsPageBtn" disabled>Previous</button>
+                <span id="feedPageLabel" aria-live="polite">Page 1 of 1</span>
+                <button type="button" class="btn-action-secondary" id="nextJobsPageBtn" disabled>Next</button>
+              </nav>
             </div>
 
             <!-- Right Inspector Research Pane -->
@@ -436,6 +450,34 @@
               </div>
             </div>
 
+            <div id="userOnboardingNotice" class="auth-description" hidden>Complete at least one target role and one target location, then save your preferences to unlock your personalized job feed.</div>
+            <div id="resumeAssistPanel" class="settings-block" hidden>
+              <span class="settings-block-title">Prefill from your resume (optional)</span>
+              <p class="form-help-text">Upload a PDF or DOCX (up to 5 MB; PDF up to 10 pages). We suggest roles, skills, experience and locations. Review and edit everything before you save. Your file is processed for suggestions and is not retained.</p>
+              <div class="form-field-group">
+                <label class="form-field-label" for="resumeUploadInput">Resume file</label>
+                <input id="resumeUploadInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                <button id="parseResumeBtn" class="btn btn-secondary" type="button">Extract suggestions</button>
+                <p id="resumeParseStatus" class="auth-description" role="status" aria-live="polite"></p>
+              </div>
+            </div>
+            <div id="telegramConnectPanel" class="settings-block" hidden>
+              <span class="settings-block-title">Connect Telegram (optional)</span>
+              <p class="form-help-text">Connect your private Telegram chat to this Job Beeper account. Linking is optional and does not enable job notifications by itself.</p>
+              <p id="telegramConnectionStatus" class="auth-description" role="status" aria-live="polite">Checking Telegram connection…</p>
+              <div class="form-field-group">
+                <label class="form-field-label" for="telegramNotificationsEnabled">Job alerts</label>
+                <label><input id="telegramNotificationsEnabled" type="checkbox" disabled> Send matching new-job alerts to my connected Telegram chat</label>
+                <p id="telegramNotificationSettingsStatus" class="form-help-text">Connect Telegram before enabling alerts. Alerts are off by default.</p>
+              </div>
+              <div class="form-field-group">
+                <button id="createTelegramLinkBtn" class="btn btn-secondary" type="button">Generate Telegram connection link</button>
+                <button id="refreshTelegramStatusBtn" class="btn btn-secondary" type="button">Refresh connection status</button>
+                <a id="openTelegramLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Open Job Beeper in Telegram</a>
+                <button id="disconnectTelegramBtn" class="btn btn-secondary" type="button" hidden>Disconnect Telegram</button>
+              </div>
+            </div>
+
             <!-- Matching Criteria Group -->
             <div class="settings-block">
               <span class="settings-block-title">Matching Criteria</span>
@@ -520,15 +562,40 @@
 
               <!-- Sources & Toggles -->
               <div style="display:flex;flex-direction:column;gap:var(--space-6);margin-top:var(--space-8);">
-                <div style="display:flex;gap:var(--space-12);flex-wrap:wrap;" id="cfgSourcesWrap">
+                <div class="admin-only-setting" style="display:flex;gap:var(--space-12);flex-wrap:wrap;" id="cfgSourcesWrap">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="linkedin" checked> LinkedIn</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="naukri" checked> Naukri</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="greenhouse"> Greenhouse</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="instahyre"> Instahyre</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="ashby"> Ashby</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="lever"> Lever</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workday"> Workday</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="smartrecruiters"> SmartRecruiters</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workable"> Workable</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="keka"> Keka</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="darwinbox"> Darwinbox</label>
+                </div>
+                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
+                  <label class="form-field-label" for="cfgWorkdayBoards">Workday public career boards (JSON)</label>
+                  <textarea id="cfgWorkdayBoards" rows="4" spellcheck="false" placeholder='[{"url":"https://company.wd5.myworkdayjobs.com/CareerSite","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <span style="font-size:11px;color:var(--text-muted);">Add only verified public myworkdayjobs.com URLs. Use the employer's real careers URL; tenant and site identifiers are derived from it. Workday remains off until a board is added and the source is enabled.</span>
                 </div>
 
+                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
+                  <label class="form-field-label" for="cfgSmartRecruitersBoards">SmartRecruiters company identifiers (JSON)</label>
+                  <textarea id="cfgSmartRecruitersBoards" rows="3" spellcheck="false" placeholder='[{"company_identifier":"BoschGroup","company":"Bosch Group"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <label class="form-field-label" for="cfgWorkableBoards">Workable public account slugs (JSON)</label>
+                  <textarea id="cfgWorkableBoards" rows="3" spellcheck="false" placeholder='[{"account":"huggingface","company":"Hugging Face"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <label class="form-field-label" for="cfgKekaBoards">Keka public careers URLs (JSON)</label>
+                  <textarea id="cfgKekaBoards" rows="3" spellcheck="false" placeholder='[{"careers_url":"https://company.keka.com/careers","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <label class="form-field-label" for="cfgDarwinboxBoards">Darwinbox public careers URLs (JSON)</label>
+                  <textarea id="cfgDarwinboxBoards" rows="3" spellcheck="false" placeholder='[{"careers_url":"https://tenant.darwinbox.in/ms/candidatev2/companyId/careers/allJobs","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <span style="font-size:11px;color:var(--text-muted);">Use identifiers discovered and verified from the employer's public careers board. All sources remain off until explicitly enabled.</span>
+                </div>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRemoteOnly"> Remote opportunities only</label>
+                </div>
+                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRequireExp"> Require explicit experience for Telegram alerts</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgTelegramAlerts"> Telegram alerts enabled</label>
                 </div>
@@ -546,7 +613,7 @@
         <!-- ===================================================================
              4. SOURCE HEALTH SECTION
              =================================================================== -->
-        <section id="sourcesSection" class="workspace-page" aria-label="Source Health Workspace">
+        <section id="sourcesSection" class="workspace-page admin-only-section" aria-label="Source Health Workspace" hidden>
           <div class="view-content-wrapper">
             <div class="view-headline-row">
               <div>
@@ -554,6 +621,37 @@
                 <p class="view-subtitle-main">Latest source health and measured request, retry, rate-limit and partial-failure totals over the last 24 hours. Historical runs are marked Not measured.</p>
               </div>
               <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
+            </div>
+
+            <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Employer &amp; Career Board Discovery</span>
+              <p class="auth-description">Enter a company's normal website or careers URL. Job Beeper checks public careers links, identifies supported ATS board patterns and adds candidates to this review queue. Discovery does not enable a collector or send Telegram alerts.</p>
+              <form id="boardDiscoveryForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--space-8);align-items:end;">
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryCompanyName">Company name</label>
+                  <input id="discoveryCompanyName" class="number-field-input" type="text" maxlength="160" placeholder="Example: Acme" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryWebsiteUrl">Company website (HTTPS)</label>
+                  <input id="discoveryWebsiteUrl" class="number-field-input" type="url" placeholder="https://company.com" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryCareersUrl">Careers URL (optional)</label>
+                  <input id="discoveryCareersUrl" class="number-field-input" type="url" placeholder="https://company.com/careers">
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="discoveryCountry">Country (optional)</label>
+                  <input id="discoveryCountry" class="number-field-input" type="text" maxlength="80" placeholder="India">
+                </div>
+                <button type="submit" class="btn-pill btn-pill-primary" id="discoverCompanyBtn">Discover career boards</button>
+              </form>
+              <p id="boardDiscoveryStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">No company scanned in this session.</p>
+              <div class="data-table-container" style="margin-top:var(--space-6);">
+                <table class="table-dataset">
+                  <thead><tr><th>Company</th><th>ATS provider</th><th>Board identifier</th><th>Collector</th><th>Review status</th><th>Discovered from</th><th>Review</th></tr></thead>
+                  <tbody id="discoveredBoardsTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No discovered boards yet.</td></tr></tbody>
+                </table>
+              </div>
             </div>
 
             <div class="data-table-container">
@@ -616,7 +714,7 @@
       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
       <span>Applied</span>
     </a>
-    <a href="#sources" class="mobile-tab-btn" data-section="sourcesSection">
+    <a href="#sources" class="mobile-tab-btn admin-only-navigation" data-section="sourcesSection" hidden>
       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
       <span>Health</span>
     </a>
@@ -629,8 +727,8 @@
   <!-- Toast Notification Mount Host -->
   <div class="toast-notifications-host" id="toastContainer" aria-live="polite"></div>
 
-  <script src="auth.js?v=auth_v1"></script>
-  <script src="app.js?v=auth_v1"></script>
+  <script src="auth.js?v=auth_v3"></script>
+  <script src="app.js?v=shared_workspace_v2"></script>
 </body>
 
 </html>

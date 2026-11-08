@@ -61,7 +61,7 @@ python -m v2.auth_admin create-user --email beta-user@example.com
 
 The first command creates only the first admin; the second creates an ordinary user and requires an admin to exist. Both prompt for the password twice with `getpass`; never put passwords in command-line arguments. `JOB_BEEPER_COOKIE_SECURE` defaults to `true` and requires HTTPS. The loopback-only `docker-compose.dev.yml` defaults it to `false` for SSH-tunnel development; never disable Secure on a public service. When TLS terminates at a reverse proxy and Uvicorn does not see the external scheme/host, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact browser-visible origin (for example, `https://jobs.example.com`) so login-Origin validation uses the public origin.
 
-This is a transitional security foundation, not full tenant isolation. Per-user preferences, evaluations, Telegram destinations/ledger and server-side applications are still future milestones. Do not invite ordinary beta users to use the job feed until those user-scoped features are implemented.
+Per-user preferences and job evaluations are implemented on the current draft feature branch. Per-user Telegram account linking, default-off opt-in, a tenant-scoped delivery ledger, matching, deduplication and retry handling are implemented on the isolated feature branch; a real-bot HTTPS webhook and end-to-end delivery smoke test remain pending. Quiet hours, per-user time zones, configurable frequency controls, delivery history and server-side applications are future milestones. Keep the PR draft and do not treat these features as production-ready until review, CI and browser smoke tests are complete.
 
 ### Running the test suite
 
@@ -92,3 +92,27 @@ uvicorn v2.radar:app --host 0.0.0.0 --port 8000
 ```
 
 For production, run the same process under Docker/systemd on a persistent VM. GitHub Actions is not the persistent monitoring engine; it is used only as the Naukri acquisition relay.
+
+## Multi-user preferences and personalized feed (feature branch)
+
+The user-preferences milestone adds user_preferences and user_job_evaluations. New beta users start with empty preferences; they must save at least one target_roles entry and one locations entry before /api/jobs, /api/jobs/{job_id} or /api/daily-summary returns personalized data. The server derives ownership from the authenticated session and joins evaluations by user_id. The shared jobs, canonical_opportunities, source telemetry, global job_evaluations and notification_ledger remain shared/admin-owned in this milestone.
+
+Authenticated endpoints:
+- GET /api/preferences — current user's preferences and onboarding_complete.
+- PUT /api/preferences — save the current user's preferences (CSRF required).
+- GET /api/jobs — shared jobs with only the current user's match score/reasons; global notification details are withheld from normal users.
+- GET /api/jobs/{job_id} — detail only when an evaluation row exists for the authenticated user.
+- GET /api/daily-summary — shared discovered count and user-scoped match count. Normal users do not see global alert delivery counts.
+
+Admin operational routes such as /api/config, source status, latency, dedupe, notification queue and LLM diagnostics remain admin-only. The first admin's legacy global candidate profile is migrated to that admin's preference row; new ordinary users never inherit it. Members can link one private Telegram chat through the one-time `/api/telegram/link` flow, then explicitly opt in through `/api/notifications/settings`. Per-user messages use a separate ledger and resolve only the current user's linked private chat; the legacy global admin notifier remains separate. Server-side applications remain a later milestone.
+
+For isolated smoke testing, use v2/docker-compose.feature.yml (port 8002, separate radar-feature-data volume, all job source and LLM integrations disabled). Telegram and Google OAuth remain unconfigured by default and can be enabled only through a private, ignored .env.feature file; see docs/TELEGRAM_PER_USER_SETUP.md and docs/GOOGLE_OAUTH_SETUP.md. The feature-only seed command, python -m v2.seed_feature_demo, inserts four synthetic listings and refuses to run unless JOB_BEEPER_FEATURE_DEMO=true is set in the isolated feature container. See the root README's Multi-user feature smoke test section for PowerShell commands. This feature Compose project is separate from the existing dev service and must not be confused with a production rollout.
+
+
+## Feed behavior and authenticated JobBeeper comparison (2026-11-07)
+
+- Current member feed: GET /api/jobs accepts search, page, per_page, status, sort_by and sort_order. Legacy q, limit and sort parameters remain supported. Search, source, score, age, alertability and remote filters are applied in SQLite before LIMIT/OFFSET. GET /api/jobs/{job_id} returns the current user's authorized job detail.
+- The dashboard requests 20 jobs per page and uses numeric Previous/Next navigation. Our API returns its own total/total_pages/has_previous/has_next metadata; JobBeeper's response schema remains unknown.
+- Job records persist experience range, provenance (employer_stated, description, inferred, unknown) and qualitative rule-based evidence strength (high, medium, low, unknown). Evidence strength is not a calibrated probability; exact JobBeeper provenance fields remain unknown.
+- The dashboard refreshes the feed once per minute while visible and refreshes on tab return. Periodic feed/source-status requests are skipped while hidden.
+- The authenticated JobBeeper comparison is in docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. Treat its observed request shapes as product evidence only, not an instruction to replay JobBeeper endpoints or copy private implementation details.

@@ -1,18 +1,37 @@
-"""Out-of-band account provisioning for the invite-only JobBeeper beta."""
+"""Out-of-band administrator bootstrap and password-account provisioning."""
 from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import sqlite3
 import sys
 from pathlib import Path
 
-from v2 import auth
+from v2 import auth, user_preferences
 
 
 def _db_path() -> Path:
     return Path(os.getenv("JOB_RADAR_DB", Path(__file__).resolve().parent / "jobs.db"))
+
+
+def _legacy_candidate_config(db_path: Path) -> dict:
+    configured_path = os.getenv("JOB_RADAR_CONFIG_PATH")
+    candidates = [
+        Path(configured_path) if configured_path else db_path.parent / "config.json",
+        Path(__file__).resolve().parent / "config.json",
+    ]
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
 
 
 def _admin_count(db_path: Path) -> int:
@@ -22,7 +41,7 @@ def _admin_count(db_path: Path) -> int:
 
 
 def _prompt_password() -> str:
-    password = getpass.getpass("Password (minimum 12 characters): ")
+    password = getpass.getpass("Password (minimum 5 characters): ")
     confirmation = getpass.getpass("Confirm password: ")
     if password != confirmation:
         raise ValueError("Passwords do not match.")
@@ -40,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
 
     db_path = _db_path()
     auth.init_auth_schema(db_path)
+    user_preferences.init_preferences_schema(db_path)
     try:
         if args.command == "create-admin":
             if _admin_count(db_path):
@@ -47,12 +67,19 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             password = _prompt_password()
             user = auth.create_first_admin(db_path, args.email, password)
+            # CLI bootstrap can run after the API process has already started;
+            # migrate here as well as at startup so the admin feed is ready
+            # without requiring a restart. Ordinary users never inherit it.
+            user_preferences.migrate_first_admin_preferences(
+                db_path, _legacy_candidate_config(db_path)
+            )
         else:
             if not _admin_count(db_path):
                 print("Create the first administrator before provisioning beta users.", file=sys.stderr)
                 return 1
             password = _prompt_password()
             user = auth.create_user(db_path, args.email, password, role="user")
+            user_preferences.ensure_user_preferences(db_path, user["id"])
     except (ValueError, sqlite3.Error) as exc:
         print(str(exc), file=sys.stderr)
         return 1

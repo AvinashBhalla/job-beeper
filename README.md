@@ -1,6 +1,6 @@
 # Job Radar
 
-Job Radar is a personal, always-on job discovery and matching service. Its pipeline is source-specific ingestion → normalization and canonical deduplication → deterministic preference matching → a persisted notification ledger → dashboard and Telegram.
+JobBeeper is evolving into an end-to-end job-search product: discover relevant jobs, evaluate fit and freshness, prepare truthful applications, track progress, and support referrals and follow-ups. Its shared ingestion engine feeds user-scoped matching and notifications; resume assets, applications and outreach remain private to each user.
 
 ## Branch and VM model
 
@@ -41,7 +41,8 @@ Job Radar is a personal, always-on job discovery and matching service. Its pipel
   docker compose --env-file .env -p job-radar-dev -f v2/docker-compose.dev.yml logs --tail=100 radar
   ```
 - The local `.env` stores a Gemini key only if the user supplies one; never print/commit it. Keep both `GEMINI_EXTRACTION_ENABLED` and `GEMINI_MATCHER_ENABLED` false until the initial controlled checks are complete.
-- On the developer's computer, forward the port with `ssh -L 8001:127.0.0.1:8001 ubuntu@<VM_HOST>`, then open `http://127.0.0.1:8001/dashboard/`.
+- From Windows PowerShell, forward the existing dev port with `ssh -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197`, keep that terminal open, then run `Start-Process "http://127.0.0.1:18001/dashboard/"` in a second PowerShell window. Check health with `Invoke-RestMethod "http://127.0.0.1:18001/health" | ConvertTo-Json -Depth 5`. If SSH needs a key/alias, retain the same options as the user's working SSH command.
+- The currently running dev container is an older build and does **not** yet include merged PR #45. Do not use the existing dev database for the new auth/multi-user migration until a separate feature-test environment and verified DB copy are prepared.
 - Never add production Telegram credentials to the dev Compose file. Enable source collectors in dev only deliberately; do not enable LinkedIn while production is querying it unless conducting a coordinated rate-limit test.
 
 ## Sources and pipeline
@@ -51,13 +52,52 @@ Job Radar is a personal, always-on job discovery and matching service. Its pipel
 - **Greenhouse:** public Job Board API, opt-in and disabled until the single-board canary passes ingestion/dedupe/timestamp tests.
 - **Instahyre:** disabled until interface and freshness are verified.
 
-Runtime candidate preferences remain global and are admin-only. The V2 browser now uses server-side cookie sessions: Argon2id passwords, HttpOnly/Secure/SameSite=Lax session cookies, CSRF validation for writes, no-store API responses, five attempts per email/IP plus twenty account-wide attempts across IPs per 15 minutes, same-origin login routing, and admin-only access to legacy global APIs. The old config-token helper remains in the backend for compatibility but is no longer used by the dashboard. If TLS terminates at a reverse proxy and Uvicorn sees an internal origin, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact public dashboard origin. See [V2 authentication and account provisioning](v2/README.md#authentication-and-beta-account-provisioning) before enabling accounts; ordinary users must not be given feed access until per-user preferences/evaluations are implemented.
+Runtime candidate preferences remain global and are admin-only until the in-progress per-user preferences milestone is merged and tested. The V2 browser now uses server-side cookie sessions: Argon2id passwords, HttpOnly/Secure/SameSite=Lax session cookies, CSRF validation for writes, no-store API responses, five attempts per email/IP plus twenty account-wide attempts across IPs per 15 minutes, same-origin login routing, and admin-only access to legacy global APIs. The old config-token helper remains in the backend for compatibility but is no longer used by the dashboard. If TLS terminates at a reverse proxy and Uvicorn sees an internal origin, set `JOB_BEEPER_PUBLIC_ORIGIN` to the exact public dashboard origin. See [V2 authentication and account provisioning](v2/README.md#authentication-and-beta-account-provisioning) before enabling accounts; ordinary users must not be given feed access in a deployed environment until PR #46 is reviewed, merged, smoke-tested and released.
 
 ## Handover and product reference
 
 - **Current status, next task and release checklist:** [Job Radar V2 Knowledge Transfer](docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md)
 - **Chronological engineering history:** [Job Radar Handover](docs/JOB_RADAR_HANDOVER.md)
 - **V2 implementation notes:** [V2 README](v2/README.md)
+- **Product vision, architecture decisions and delivery priorities:** [Product Vision and Delivery Roadmap](docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md)
+- **Reference repository research:** [Career-Ops and Apply Factory findings](docs/REFERENCE_REPOSITORIES_RESEARCH_2026-11-08.md)
 - **Product behavior and source roadmap:** [JobBeeper Reference](docs/JOBBEEPER_REFERENCE.md)
 
 Mandatory process: update both handover files after every user prompt, directly on `v2-live-radar` for working-state documentation. Do not create a separate branch solely for docs. Code and config changes require tests; promote to `main` only when verified.
+
+## Multi-user feature smoke test (isolated from the existing dev service)
+
+The current multi-user feature branch has its own disposable Compose file, loopback port **8002**, and independent Docker volume. It disables all collectors, Telegram and LLM providers. It does not share the existing job-radar-dev database on port 8001 or production on port 8000.
+
+Run these from Windows PowerShell after the feature branch is pushed to the VM worktree:
+
+~~~powershell
+# Build/start the isolated feature container (does not touch ports 8000 or 8001)
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml up -d --build"
+
+# Bootstrap the first admin; the CLI prompts for a password interactively
+ssh -t ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.auth_admin create-admin --email YOUR_ADMIN_EMAIL"
+
+# Create a separate beta test account; it starts with empty role/location preferences
+ssh -t ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.auth_admin create-user --email YOUR_TEST_USER_EMAIL"
+
+# Seed four clearly synthetic listings so the personalized feed can be tested without scraping
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml exec radar python -m v2.seed_feature_demo"
+
+# Terminal 1: open and keep this tunnel running
+ssh -L 18002:127.0.0.1:8002 ubuntu@130.210.27.197
+
+# Terminal 2: health check and dashboard
+Invoke-RestMethod "http://127.0.0.1:18002/health" | ConvertTo-Json -Depth 5
+Start-Process "http://127.0.0.1:18002/dashboard/"
+~~~
+
+Sign in as the test user. For a predictable demo match, enter Python Developer and Bengaluru (the seed script adds four synthetic jobs). The onboarding form must require both a target role and a target location; after saving, the user sees only their personalized matching feed. Demo listings use example.com URLs and are not real vacancies. The admin account uses the legacy admin dashboard and controls. Do not paste passwords into chat or put them in command arguments.
+
+Stop the isolated feature container without deleting its test database:
+
+~~~powershell
+ssh ubuntu@130.210.27.197 "cd /tmp/job-radar-user-preferences && sudo docker compose -p job-radar-user-preferences -f v2/docker-compose.feature.yml down"
+~~~
+
+The feature image has been built and the Compose file validated, but the feature container has not been started. The feature environment's radar-feature-data volume is intentionally preserved by down; do not add -v unless you explicitly want to erase the isolated test database. This is a user-run smoke-test environment, not a production deployment.

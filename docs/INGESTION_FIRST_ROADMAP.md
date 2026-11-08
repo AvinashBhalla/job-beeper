@@ -1,3 +1,5 @@
+> **Current source of truth:** [Product Vision and Delivery Roadmap](PRODUCT_VISION_AND_DELIVERY_ROADMAP.md). This file remains detailed design/history; when priorities conflict, the product vision roadmap is authoritative.
+
 # Ingestion-First Roadmap
 
 **Updated:** 2026-11-07  
@@ -93,3 +95,110 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - Neither merge was deployed. Production's legacy DB has no structured history for the prior 27 log-only 429s, so the first rollout starts with empty persisted breaker state; newly recorded 429s are durable across restarts.
 - Old parser branch was redundant: labelled-experience helper and regression tests already exist in V2; stale branch removed. Current LinkedIn code remains under conservative cooldown; no request-pressure or access-method change.
 - Next priority: diagnose and fix the preferences-save validation/UI issue on PR #46, then validate per-user Telegram link/opt-in/delivery/opt-out E2E. Keep #46 draft until those release gates pass.
+
+## 2026-11-08 — PR #46 local V2 integration candidate
+
+- Integration candidate `integration/pr46-v2-rebase-20261108` is pushed to origin at `676dfaf`, not deployed. It combines PR #46 with Lever baseline and source-health QA fixes. Ports 8002/8004 remain unchanged.
+- Shared conflict in `v2/radar.py` was resolved by combining both implementations: preserve monotonic `last_seen_at`, safe source-posted timestamp handling and description-change-only global reevaluation; retain experience provenance/confidence ranking, min/max persistence and per-user evaluation refresh for only touched/new jobs.
+- `dashboard/app.js` and `dashboard/index.html` auto-merged. Six conflict files were originally detected; the docs conflicts are being resolved by keeping the newer V2 handover/roadmap/audit and appending current PR #46/browser QA status. Feature-only docs and tests (OAuth, resume parser, Telegram, local browser QA) remain included from PR #46.
+- Important next integration: ensure `user_notification_ledger` enqueue/delivery excludes global `notification_ledger.baseline_suppressed=1` opportunities before Lever or other first-snapshot ATS inventory is enabled for member Telegram. The user notification path must not bypass the initial-inventory baseline.
+- This local candidate must pass the full V2 suite and user-preferences/OAuth/resume/Telegram focused suites. Keep PR #46 remote draft unchanged until owner desktop Browser report is returned and this candidate has full green CI.
+- No push/deploy/runtime changes.
+
+## 2026-11-08 — Lever adapter implementation
+
+- Added Lever as the next structured ATS adapter on `feat/lever-source-adapter-20261108`. Official Lever public Postings API uses unauthenticated HTTPS GET `/v0/postings/{SITE}` with explicit `skip`/`limit`; global and EU API hosts are documented. It only exposes published public postings.
+- Adapter is default-off with a version-12 migration, explicit safe site allowlist, 1800s polling, page size 100, at most 5 pages/500 postings per board per run, per-request/page/board telemetry, partial-failure retention, duplicate suppression, hosted URL validation/fallback and plain-description normalization.
+- No reliable published timestamp is documented, so Lever timestamps stay unknown even if sample payloads include a createdAt field. No application endpoint is called.
+- 12 focused tests passed; full V2 suite **227 passed** locally. GitHub CI pending after push. Both configs Lever off with empty allowlist; no live probe, DB write, notifications or deployment.
+- Next after CI: curated one/two-board GET-only two-snapshot canary, evaluate ID stability, fresh yield and India/remote relevance. Keep source disabled until separate review.
+
+## GitHub CI result — 2026-11-08
+
+- Draft PR #50: https://github.com/AvinashBhalla/job-beeper/pull/50
+- GitHub V2 CI run #42452809803 passed on commit `c8967ac140647409e735b7ea5be18ea7c92f133d`: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32 passed), full V2 suite (227 passed in 27.508 seconds).
+- PR #50 remains draft and mergeable. No Lever board has been configured or polled; Lever remains off in both config presets.
+
+
+## Next ATS candidate research — Recruitee vs SmartRecruiters — 2026-11-08
+
+- SmartRecruiters official docs describe a public company postings endpoint `GET /v1/companies/{companyIdentifier}/postings` with `destination=PUBLIC`, `limit` (max 100) and `offset`; its authentication guide lists the public Posting API among no-auth APIs. The separate `/feed/publications` endpoint requires `X-SmartToken`; do not confuse the two contracts. See https://developers.smartrecruiters.com/reference/v1listpostings and https://developers.smartrecruiters.com/docs/authentication.
+- Recruitee's public company feed has two XML URLs per subdomain: formatted `/api/feeds/offers.xml` and raw `/api/offers.xml`. The raw feed contains currently published offers only, disappears when offers are unpublished, and updates immediately. Documented fields include stable reference, title/company, full description, multiple locations, remote/hybrid/on-site flags, hosted/apply URLs, `posted` (feed-added timestamp) and `updated` (last update). See https://support.recruitee.com/en/articles/8213076-faq-api and https://docs.recruitee.com/docs/feed.
+- Recruitee's new Careers Site JSON API `/api/offers` will require `X-Careers-Sites-Token` starting 2027-02-10; official docs say XML feed and jobs widget are not covered by that token requirement. Prefer the raw XML feed if/when implementing. See https://docs.recruitee.com/reference/authentication-1.
+- Critical parser rule: the XML feed may contain a `<credentials>` subtree with third-party job-board secrets. Parse only an allowlist of job fields; never persist/log raw XML or the credentials subtree. Use strict fixed Recruitee host construction from a validated subdomain, bounded response size, one GET/site, no retries, and keep default-off.
+- Recommendation: Recruitee is the next adapter to evaluate after Lever; its feed has stronger location/timestamp signals and remains separate from the upcoming Careers API token cutover. SmartRecruiters is also viable but company-scoped; public endpoints are distinct from its authenticated `feed/publications` API. No Recruitee or SmartRecruiters live request/adapter was implemented in this research step.
+
+## 2026-11-08 — Lever URL and pagination hardening
+
+- Added strict Lever posting ID validation (alphanumeric, underscore and hyphen; max 200 chars) before deriving canonical hosted URLs.
+- Hosted URL acceptance now checks HTTPS, exact allowed Lever host and port, configured site path, no userinfo/query/fragment and no dot/backslash traversal segments. Untrusted or malformed URLs fall back to the canonical URL built from the configured site and validated posting ID.
+- Added fixture test proving maximum pagination is exactly five full pages / 500 unique postings and never requests a sixth page. Added unsafe-ID skip and hosted path-traversal fallback tests.
+- Focused Lever suite: 15 tests passed. Full V2 suite: 230 passed in 80.326 seconds. Python compilation and git diff --check passed locally.
+- GitHub CI run 42452809803 passed on the initial implementation (227 tests); a fresh CI run is required after this hardening commit.
+- Lever remains disabled with an empty allowlist in both config presets. No live board probe, source request, matching, notification or deployment.
+## Read-only Drivetrain board canary — 2026-11-08
+
+- Public Lever board slug: `drivetrain` (discovered from its public careers page; no credentials required). Public page search showed India/remote engineering and automation roles.
+- A bounded, unauthenticated GET was sent twice to `https://api.lever.co/v0/postings/drivetrain?mode=json&limit=100&skip=0`, two seconds apart. Both requests returned HTTP 200.
+- Both snapshots contained 35 postings and 35 unique IDs. 35/35 IDs overlapped between the two snapshots; union size was 35 and churn was zero over this two-second interval.
+- Both snapshots contained 22 records with India location metadata. A deliberately broad title-keyword filter found 9 India-based technical postings (software/backend/frontend/engineer/developer/QA/SDET/automation). This is a smoke-test estimate, not the JobBeeper matcher result.
+- Sample relevant roles included Backend Engineer, Frontend Engineer, SDET/QA Manager, SDE Automation & Quality, SRE and Software Engineer (Data Engineering). The official board page also exposes roles that may not match our target experience/role filters.
+- The two-second interval only verifies response schema and short-term ID consistency; it is not a long-term ID-stability, publication-freshness or source-yield SLA.
+- This was a read-only direct public API probe outside JobBeeper. It did not add a board to either config, enable Lever, run the collector, write to SQLite, evaluate matches or trigger notifications.
+- Suggested canary site for future explicit opt-in: `drivetrain`. Keep the runtime source disabled until the first-snapshot notification baseline gate below is implemented and reviewed.
+## First-snapshot notification baseline gate — required before enabling Lever
+
+Lever's documented public list API does not guarantee a reliable source publication timestamp. Its first full import could contain many old-but-still-open postings, each with `discovered_at=now`; the current freshness logic can consequently regard them as new and queue eligible alerts. Do not activate the source or notifications until an initial-inventory baseline is handled explicitly.
+
+Required behavior for any timestamp-unknown full-snapshot ATS source:
+- The first successful complete snapshot must ingest and evaluate listings but mark those existing canonical opportunities as baseline inventory, not newly discovered alerts.
+- The baseline marker must be durable across restarts and later scheduled refreshes, and must not falsify `discovered_at`, `source_posted_at` or `posted_precision`.
+- Subsequent genuinely new source IDs on later successful snapshots must remain eligible for the normal matching/notification path.
+- A partial or failed first scan must not mark an incomplete inventory as a complete baseline. The source must retry its baseline establishment after a successful complete run.
+- The baseline logic must be source-scoped and must not suppress notifications for LinkedIn, Naukri or other already-operational sources.
+- Regression tests must cover first complete baseline, repeated unchanged snapshot, partial first run, restart durability, and a new posting after baseline.
+
+Until that gate exists, Lever remains default-off with an empty configured allowlist; the Drivetrain probe above is not an activation.
+
+## 2026-11-08 — Initial-inventory notification guard implemented
+
+- Lever has no reliable publication timestamp in its documented public postings contract. The first full board snapshot must not be treated as newly published jobs.
+- Added additive notification_ledger.baseline_suppressed INTEGER NOT NULL DEFAULT 0. During each Lever source run, after job upsert and before evaluation/notification dispatch, suppress_initial_source_snapshot_alerts() marks newly created canonical opportunities as suppressed while no prior successful Lever source run exists. The marker is durable and excluded from future global notification-decision refreshes.
+- Partial first runs do not establish completion. A later partial run continues baselining newly seen records. Only a successful source run completes the baseline; subsequent genuinely new Lever IDs then use normal matching and notification rules. The code does not falsify or overwrite discovered_at or source_posted_at.
+- Existing canonical opportunities with an older observation from another source are not baseline-suppressed. Only Lever is in INITIAL_SNAPSHOT_BASELINE_SOURCES; Naukri, LinkedIn and Greenhouse behavior is unchanged.
+- Focused tests: 4 passed. Full V2 suite after this addition: 234 passed in 81.248 seconds. Tests cover partial-run baselining, success transition/new-job alerting, existing cross-source canonical preservation, source isolation and legacy SQLite migration.
+- Important integration gate: PR #46 uses a separate user_notification_ledger. That branch's member enqueue query currently does not consult the global notification_ledger.baseline_suppressed flag. Before enabling Lever for member notifications or merging the multi-user notification integration, rebase PR #46 and add the equivalent baseline filter/test to its per-user enqueue/delivery paths. The present guard protects the V2 global/admin notification ledger only.
+- Lever remains disabled with empty lever_boards in both config presets; no Lever source request, notification, DB canary, app deployment or service restart was performed by this code change.
+
+## 2026-11-08 — Recruitee live feed canary and next adapter
+
+- A bounded direct read-only canary of `https://tether.recruitee.com/api/offers.xml` returned HTTP 200 twice; each XML response was 8,785,676 bytes with 228 offers and 228 unique IDs. All offers had `published-at` and `updated-at`; 20 offers listed India locations and a broad title filter found 18 technical candidates; 226 remote / 2 hybrid. The two snapshots 2s apart had identical ID sets and metadata fingerprints. This is only short-interval consistency, not a source SLA.
+- The live Tether raw XML shape differs from the older official example. Observed shape `<hash><offers><offer>` uses `id`, `guid`, `slug`, `published-at`, `updated-at`, `description`, `requirements`, `locations`, `remote`, `hybrid`, `on-site`, `careers-url`, `careers-apply-url`; the older docs sample uses `<jobs><job>` with `reference`, `posted`, `updated`, `description_requirements`. A future adapter must support both.
+- The canary currently had no `<credentials>` node, but official Recruitee docs explicitly state credentials for partner job boards may appear in XML. Any parser must explicitly skip `<credentials>`, reject DTD/entities, cap response size, only parse allowlisted fields, and never log/persist raw XML.
+- Official feed URLs: raw `/api/offers.xml`, formatted `/api/feeds/offers.xml`, JSON `/api/offers`. Careers Site JSON API token is required from 2027-02-10; official docs exclude XML feed and widget from that token change. Use official docs in `docs/RECRUITEE_SOURCE_RESEARCH_2026-11-08.md`.
+- No Recruitee adapter or app source request was made. Recommendation: Recruitee is next candidate after Lever review; use Tether as test fixture with both schemas and credentials-skip coverage. Keep source off until code review and a no-notification first-snapshot policy is validated.
+
+## 2026-11-08 — Desktop QA findings, local fixes and remaining verification
+
+- User supplied a complete Desktop browser report: overall **Failed**, with QA-001 medium authorization exposure (member opens Source Health and sees source names/status/counts/last-success/diagnostics) and QA-002 low mobile header clipping at 390×844. All other tested scenarios are recorded in `docs/QA/desktop-browser-findings-2026-11-08.md`.
+- Desktop could not save its report because its workspace lacked `.git`; a canonical copy and next prompts are now in this repository. The Desktop connection interruption occurred while its answer was being generated; local Git worktrees and QA server remained intact.
+- Local integration candidate `/tmp/job-radar-pr46-integration`, branch `integration/pr46-v2-rebase-20261108`, already contained UI-only source-health hiding/route guard and mobile responsive CSS changes. We tightened the server boundary: `/api/source-status/summary` now uses `require_admin`, matching `/api/source-status` and `/api/latency-summary`.
+- Candidate UI changes: admin-only desktop/mobile navigation and section; direct member `#sources` routes redirect to Jobs; `loadSourceStatusTelemetry()` returns immediately for members and never calls source-status APIs; mobile telemetry row wraps into 3 columns under 560px with `minmax(0,1fr)` and `overflow-wrap:anywhere`.
+- Per-user first-inventory safety was checked during the merge: `user_notifications` excludes `jobs.source_initial_baseline` in enqueue and final send validation. We additionally exclude it from claim selection and explicitly cancel stale queued/failed member notification rows after a job becomes initial baseline.
+- Regression tests updated: member `/api/source-status/summary`, `/api/source-status`, `/api/latency-summary` return 403; admin source summary and full status return 200; route dependency contract now classifies source summary as admin-only; dashboard markup/route/telemetry guards and mobile grid have contract tests.
+- Focused auth/API/dashboard tests: **13 passed**. User notification tests: **14 passed**. Full V2 unittest discovery: **333 passed** in **174.474 seconds**. Python py_compile/compileall and `git diff --check` passed.
+- Local VM Node is v12.22.9 and cannot parse the dashboard's optional-chaining/nullish syntax. The local `node --check` attempt is not a project failure; use GitHub CI's modern Node runtime for the JS syntax check.
+- IMPORTANT: candidate branch `integration/pr46-v2-rebase-20261108` at `676dfaf` is pushed but not deployed. Synthetic-only candidate QA is running on 8005 (tunnel 18005); 8004 remains pre-fix. Run the QA prompts against 18005.
+- Public reference research is summarized in `docs/PRODUCT_REVERSE_ENGINEERING_2026-11-08.md`; detailed Desktop tasks are in `docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md`. The public JobBeeper site mentions role/location/experience/company preferences, remote jobs, blocked companies, pause alerts, free browsing/application tracking, paid Telegram/browser/app alerts, and subscriber-first/public sharing. These are research leads, not verified account features; Prompt 2 should verify them without signing up or paying.
+- Remaining gates: browser-verify QA-001/QA-002 on the candidate; run security/tenant-isolation Prompt 3 (CSRF, IDOR, expiry, exact preference payload, keyboard/pagination/filter matrix); update docs with each Desktop artifact; then run candidate GitHub CI. Keep PR #46 and #50 open/draft until integration/review decisions are made. No merge, port 8004 restart, shared-dev or production deploy is authorized.
+
+
+## Candidate QA preview — 2026-11-08
+
+- An isolated candidate server is running at remote loopback 127.0.0.1:8005 (Termalin job 3o9e1mx8d2). Browser tunnel: ssh -N -L 18005:127.0.0.1:8005 ubuntu@130.210.27.197; URL: http://localhost:18005/dashboard/.
+- This preview uses a fresh synthetic database /tmp/job-radar-pr46-fixed-qa/jobs.db, not a copy of production, shared dev or the old port-8004 database. It has one admin, one member, two synthetic jobs and one clearly synthetic Naukri source-run row.
+- All six collector flags (LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever) are false; notifications are false; Telegram, Google OAuth, Gemini and other LLM credentials are blank. The environment binds only to remote loopback.
+- Temporary test accounts shared in chat: qa-member@local.test and qa-admin@local.test. Passwords are not written in repository files.
+- HTTP smoke verification: /health, /dashboard/, dashboard JS and CSS returned 200. Member login/feed/daily-summary returned 200; member /api/source-status/summary, /api/source-status and /api/latency-summary returned 403. Admin login and all three source-health GETs returned 200. No outbound source requests or Telegram sends were made.
+- The original port-8004 feature process still uses /tmp/job-radar-user-preferences and remains unchanged. Do not use it for post-fix verification. Ports 8000/8001 remain untouched.
+- Next: run Prompt 1 in docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md against port 18005. It must verify real 390×844/375×812/320×740 rendering and direct #sources member navigation, then admin access.

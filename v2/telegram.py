@@ -12,6 +12,7 @@ from typing import Any
 import requests
 
 from v2.radar import DB_PATH, UTC, db_lock, iso, now
+from v2.sqlite_store import connect as connect_sqlite
 
 log = logging.getLogger("job-radar.telegram")
 
@@ -253,7 +254,7 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
 
 def recover_stale_claims(max_age_minutes: int = 10) -> int:
     cutoff = iso(now() - dt.timedelta(minutes=max_age_minutes))
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         cursor = conn.execute("""
             UPDATE notification_ledger
             SET status='queued',
@@ -278,7 +279,7 @@ def deliver_queued_notifications(limit: int = 10) -> int:
     token, chat_id = credentials
 
     for _ in range(max(1, min(limit, 50))):
-        with db_lock, sqlite3.connect(DB_PATH) as conn:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
             conn.execute("BEGIN IMMEDIATE")
             item = _claim_one(conn)
             conn.commit()
@@ -293,7 +294,7 @@ def deliver_queued_notifications(limit: int = 10) -> int:
         except Exception as exc:
             retryable = isinstance(exc, TelegramDeliveryError) and exc.retryable
             error = str(exc)
-            with db_lock, sqlite3.connect(DB_PATH) as conn:
+            with db_lock, connect_sqlite(DB_PATH) as conn:
                 if retryable:
                     conn.execute("""
                         UPDATE notification_ledger
@@ -328,7 +329,7 @@ def deliver_queued_notifications(limit: int = 10) -> int:
             )
             continue
 
-        with db_lock, sqlite3.connect(DB_PATH) as conn:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
             conn.execute("""
                 UPDATE notification_ledger
                 SET status='sent',

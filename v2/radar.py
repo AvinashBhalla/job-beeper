@@ -17,22 +17,23 @@ import uuid
 import warnings
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, quote, unquote, urljoin, urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth
+from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
+from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -62,6 +63,31 @@ LINKEDIN_DEEP_SCAN_SECONDS = 1800
 LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
+LEVER_PAGE_SIZE = 100
+LEVER_MAX_PAGES_PER_BOARD = 5
+LEVER_MAX_BOARDS = 20
+WORKDAY_PAGE_SIZE = 20
+WORKDAY_MAX_PAGES_PER_BOARD = 1
+WORKDAY_MAX_DETAILS_PER_BOARD = 20
+WORKDAY_MAX_BOARDS = 20
+WORKDAY_DETAIL_DELAY_SECONDS = 0.1
+WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
+WORKDAY_MAX_429_COOLDOWN_SECONDS = 3600
+SMARTRECRUITERS_PAGE_SIZE = 100
+SMARTRECRUITERS_MAX_PAGES_PER_BOARD = 3
+SMARTRECRUITERS_MAX_DETAILS_PER_BOARD = 20
+SMARTRECRUITERS_MAX_BOARDS = 50
+SMARTRECRUITERS_DETAIL_DELAY_SECONDS = 0.1
+WORKABLE_MAX_JOBS_PER_BOARD = 500
+WORKABLE_MAX_BOARDS = 50
+KEKA_MAX_BOARDS = 50
+KEKA_MAX_JOBS_PER_BOARD = 1000
+DARWINBOX_MAX_BOARDS = 50
+DARWINBOX_PAGE_SIZE = 50
+DARWINBOX_MAX_PAGES_PER_BOARD = 5
+DARWINBOX_PAGE_DELAY_SECONDS = 0.2
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox"})
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -89,7 +115,7 @@ async def prevent_api_response_caching(request: Request, call_next):
     return response
 
 
-db_lock = threading.Lock()
+db_lock = DB_LOCK
 started = time.monotonic()
 source_state: dict[str, dict[str, Any]] = {}
 linkedin_last_deep_scan_at: str | None = None
@@ -178,6 +204,19 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     # Version 11 introduces Ashby; never enable a new source via migration.
     if current_version < 11 <= default_version:
         merged.setdefault("source_enabled", {})["ashby"] = False
+    # Version 12 introduces Lever's public postings API as an opt-in source.
+    # Existing runtimes must never start polling new employer boards implicitly.
+    if current_version < 12 <= default_version:
+        merged.setdefault("source_enabled", {})["lever"] = False
+    # Version 13 adds Workday CXS as an opt-in public career-site source.
+    if current_version < 13 <= default_version:
+        merged.setdefault("source_enabled", {})["workday"] = False
+    if current_version < 14 <= default_version:
+        merged.setdefault("source_enabled", {})["smartrecruiters"] = False
+        merged.setdefault("source_enabled", {})["workable"] = False
+    if current_version < 15 <= default_version:
+        merged.setdefault("source_enabled", {})["keka"] = False
+        merged.setdefault("source_enabled", {})["darwinbox"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -192,7 +231,69 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             merged["source_enabled"]["greenhouse"] = False
         if current_version < 11 <= default_version:
             merged["source_enabled"]["ashby"] = False
+        if current_version < 12 <= default_version:
+            merged["source_enabled"]["lever"] = False
+        if current_version < 13 <= default_version:
+            merged["source_enabled"]["workday"] = False
+        if current_version < 14 <= default_version:
+            merged["source_enabled"]["smartrecruiters"] = False
+            merged["source_enabled"]["workable"] = False
+        if current_version < 15 <= default_version:
+            merged["source_enabled"]["keka"] = False
+            merged["source_enabled"]["darwinbox"] = False
     return merged
+
+
+def _parse_workday_board_url(value: Any) -> dict[str, str] | None:
+    """Resolve a public Workday career-board URL into its CXS identifiers."""
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 500:
+        return None
+    try:
+        parsed = urlsplit(value.strip())
+        host = (parsed.hostname or "").lower()
+        match = re.fullmatch(
+            r"(?P<tenant>[a-z0-9-]{1,80})\.wd(?P<cluster>[0-9]{1,3})\.myworkdayjobs\.com",
+            host,
+        )
+        if (
+            parsed.scheme.lower() != "https"
+            or not match
+            or parsed.port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            return None
+        segments = [segment for segment in parsed.path.split("/") if segment]
+        if segments and re.fullmatch(r"[a-z]{2}-[A-Z]{2}", segments[0]):
+            segments = segments[1:]
+        if len(segments) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", segments[0]):
+            return None
+        tenant = match.group("tenant")
+        site = segments[0]
+        return {
+            "url": f"https://{host}/{site}",
+            "host": host,
+            "tenant": tenant,
+            "cluster": match.group("cluster"),
+            "site": site,
+        }
+    except ValueError:
+        return None
+
+
+def _optional_registry_id(board: dict[str, Any], provider: str) -> int | None:
+    value = board.get("registry_id")
+    if value is None:
+        return None
+    try:
+        identifier = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"{provider} registry_id must be an integer.") from exc
+    if identifier < 1:
+        raise HTTPException(status_code=422, detail=f"{provider} registry_id must be positive.")
+    return identifier
 
 
 def validate_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -271,7 +372,11 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if token.lower() in seen_board_tokens:
             raise HTTPException(status_code=422, detail=f"Duplicate Greenhouse board token: {token}.")
         seen_board_tokens.add(token.lower())
-        normalized_boards.append({"token": token, "company": company.strip()})
+        normalized_entry = {"token": token, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Greenhouse")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_boards.append(normalized_entry)
     config["greenhouse_boards"] = normalized_boards
 
     ashby_boards = config.get("ashby_boards", [])
@@ -294,8 +399,175 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if name.lower() in seen_ashby_board_names:
             raise HTTPException(status_code=422, detail=f"Duplicate Ashby board name: {name}.")
         seen_ashby_board_names.add(name.lower())
-        normalized_ashby_boards.append({"board": name, "company": company.strip()})
+        normalized_entry = {"board": name, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Ashby")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_ashby_boards.append(normalized_entry)
     config["ashby_boards"] = normalized_ashby_boards
+
+    lever_boards = config.get("lever_boards", [])
+    if not isinstance(lever_boards, list):
+        raise HTTPException(status_code=422, detail="lever_boards must be a list.")
+    if len(lever_boards) > LEVER_MAX_BOARDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"lever_boards cannot contain more than {LEVER_MAX_BOARDS} boards.",
+        )
+    normalized_lever_boards: list[dict[str, str]] = []
+    seen_lever_sites: set[tuple[str, str]] = set()
+    for board in lever_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Lever board must be an object.")
+        site = board.get("site")
+        company = board.get("company")
+        instance = str(board.get("instance") or "global").strip().lower()
+        if not isinstance(site, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", site.strip()):
+            raise HTTPException(status_code=422, detail="Each Lever board requires a valid public site name.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Lever board requires a company label of at most 120 characters.")
+        if instance not in {"global", "eu"}:
+            raise HTTPException(status_code=422, detail="Lever board instance must be 'global' or 'eu'.")
+        site = site.strip()
+        identity = (instance, site.lower())
+        if identity in seen_lever_sites:
+            raise HTTPException(status_code=422, detail=f"Duplicate Lever board site: {site} ({instance}).")
+        seen_lever_sites.add(identity)
+        normalized_entry = {"site": site, "company": company.strip(), "instance": instance}
+        registry_id = _optional_registry_id(board, "Lever")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_lever_boards.append(normalized_entry)
+    config["lever_boards"] = normalized_lever_boards
+
+    workday_boards = config.get("workday_boards", [])
+    if not isinstance(workday_boards, list):
+        raise HTTPException(status_code=422, detail="workday_boards must be a list.")
+    if len(workday_boards) > WORKDAY_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"workday_boards cannot contain more than {WORKDAY_MAX_BOARDS} boards.")
+    normalized_workday_boards: list[dict[str, str]] = []
+    seen_workday_boards: set[tuple[str, str]] = set()
+    for board in workday_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Workday board must be an object.")
+        parsed_board = _parse_workday_board_url(board.get("url"))
+        company = board.get("company")
+        if not parsed_board:
+            raise HTTPException(status_code=422, detail="Each Workday board requires an HTTPS public myworkdayjobs.com career URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Workday board requires a company label of at most 120 characters.")
+        identity = (parsed_board["host"], parsed_board["site"].lower())
+        if identity in seen_workday_boards:
+            raise HTTPException(status_code=422, detail="Duplicate Workday career board URL.")
+        seen_workday_boards.add(identity)
+        normalized_entry = {"url": parsed_board["url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Workday")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_workday_boards.append(normalized_entry)
+    config["workday_boards"] = normalized_workday_boards
+
+    smartrecruiters_boards = config.get("smartrecruiters_boards", [])
+    if not isinstance(smartrecruiters_boards, list) or len(smartrecruiters_boards) > SMARTRECRUITERS_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"smartrecruiters_boards must be a list with at most {SMARTRECRUITERS_MAX_BOARDS} entries.")
+    normalized_smartrecruiters: list[dict[str, str]] = []
+    seen_smartrecruiters: set[str] = set()
+    for board in smartrecruiters_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each SmartRecruiters board must be an object.")
+        identifier = board.get("company_identifier") or board.get("identifier")
+        company = board.get("company")
+        if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", identifier.strip()):
+            raise HTTPException(status_code=422, detail="Each SmartRecruiters board requires a valid company identifier.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each SmartRecruiters board requires a company label of at most 120 characters.")
+        identifier = identifier.strip()
+        if identifier.lower() in seen_smartrecruiters:
+            raise HTTPException(status_code=422, detail=f"Duplicate SmartRecruiters company identifier: {identifier}.")
+        seen_smartrecruiters.add(identifier.lower())
+        normalized_entry = {"company_identifier": identifier, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "SmartRecruiters")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_smartrecruiters.append(normalized_entry)
+    config["smartrecruiters_boards"] = normalized_smartrecruiters
+
+    workable_boards = config.get("workable_boards", [])
+    if not isinstance(workable_boards, list) or len(workable_boards) > WORKABLE_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"workable_boards must be a list with at most {WORKABLE_MAX_BOARDS} entries.")
+    normalized_workable: list[dict[str, str]] = []
+    seen_workable: set[str] = set()
+    for board in workable_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Workable board must be an object.")
+        account = board.get("account") or board.get("subdomain")
+        company = board.get("company")
+        if not isinstance(account, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,100}", account.strip()):
+            raise HTTPException(status_code=422, detail="Each Workable board requires a valid public account slug.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Workable board requires a company label of at most 120 characters.")
+        account = account.strip()
+        if account.lower() in seen_workable:
+            raise HTTPException(status_code=422, detail=f"Duplicate Workable account: {account}.")
+        seen_workable.add(account.lower())
+        normalized_entry = {"account": account, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Workable")
+        if registry_id is not None:
+            normalized_entry["registry_id"] = registry_id
+        normalized_workable.append(normalized_entry)
+    config["workable_boards"] = normalized_workable
+
+    keka_boards = config.get("keka_boards", [])
+    if not isinstance(keka_boards, list) or len(keka_boards) > KEKA_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"keka_boards must be a list with at most {KEKA_MAX_BOARDS} entries.")
+    normalized_keka: list[dict[str, Any]] = []
+    seen_keka: set[str] = set()
+    for board in keka_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Keka board must be an object.")
+        careers_url = board.get("careers_url") or board.get("url")
+        detected = board_discovery.detect_ats_board(careers_url) if isinstance(careers_url, str) else None
+        company = board.get("company")
+        if not detected or detected.get("provider") != "keka":
+            raise HTTPException(status_code=422, detail="Each Keka board requires a public HTTPS https://<tenant>.keka.com/careers URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Keka board requires a company label of at most 120 characters.")
+        tenant = str(detected["board_key"]).lower()
+        if tenant in seen_keka:
+            raise HTTPException(status_code=422, detail=f"Duplicate Keka tenant: {tenant}.")
+        seen_keka.add(tenant)
+        entry = {"careers_url": detected["board_url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Keka")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_keka.append(entry)
+    config["keka_boards"] = normalized_keka
+
+    darwinbox_boards = config.get("darwinbox_boards", [])
+    if not isinstance(darwinbox_boards, list) or len(darwinbox_boards) > DARWINBOX_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"darwinbox_boards must be a list with at most {DARWINBOX_MAX_BOARDS} entries.")
+    normalized_darwinbox: list[dict[str, Any]] = []
+    seen_darwinbox: set[tuple[str, str]] = set()
+    for board in darwinbox_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Darwinbox board must be an object.")
+        careers_url = board.get("careers_url") or board.get("url")
+        detected = board_discovery.detect_ats_board(careers_url) if isinstance(careers_url, str) else None
+        company = board.get("company")
+        if not detected or detected.get("provider") != "darwinbox":
+            raise HTTPException(status_code=422, detail="Each Darwinbox board requires a public HTTPS /ms/candidatev2/<companyId>/careers URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Darwinbox board requires a company label of at most 120 characters.")
+        identity = (str(detected["host"]).lower(), str(detected["board_key"]).lower())
+        if identity in seen_darwinbox:
+            raise HTTPException(status_code=422, detail="Duplicate Darwinbox careers board.")
+        seen_darwinbox.add(identity)
+        entry = {"careers_url": detected["board_url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Darwinbox")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_darwinbox.append(entry)
+    config["darwinbox_boards"] = normalized_darwinbox
 
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
@@ -306,7 +578,26 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "instahyre": bool(source_enabled.get("instahyre", True)),
         "greenhouse": bool(source_enabled.get("greenhouse", False)),
         "ashby": bool(source_enabled.get("ashby", False)),
+        "lever": bool(source_enabled.get("lever", False)),
+        "workday": bool(source_enabled.get("workday", False)),
+        "smartrecruiters": bool(source_enabled.get("smartrecruiters", False)),
+        "workable": bool(source_enabled.get("workable", False)),
+        "keka": bool(source_enabled.get("keka", False)),
+        "darwinbox": bool(source_enabled.get("darwinbox", False)),
     }
+    if config["source_enabled"]["workday"] and not normalized_workday_boards:
+        raise HTTPException(
+            status_code=422,
+            detail="Add at least one verified Workday public career board before enabling Workday.",
+        )
+    for source, configured_boards in (
+        ("smartrecruiters", normalized_smartrecruiters),
+        ("workable", normalized_workable),
+        ("keka", normalized_keka),
+        ("darwinbox", normalized_darwinbox),
+    ):
+        if config["source_enabled"][source] and not configured_boards:
+            raise HTTPException(status_code=422, detail=f"Add at least one verified {source.title()} public career board before enabling {source.title()}.")
 
     poll_seconds = config.get("poll_seconds", {})
     if not isinstance(poll_seconds, dict):
@@ -319,6 +610,12 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "instahyre": 600,
             "greenhouse": 900,
             "ashby": 1800,
+            "lever": 1800,
+            "workday": 120,
+            "smartrecruiters": 120,
+            "workable": 120,
+            "keka": 120,
+            "darwinbox": 120,
         }.items()
     }
 
@@ -343,7 +640,7 @@ def suppress_preexisting_unknown_experience_pending_notifications(
         "not replayed to avoid a historical Telegram alert burst",
         "future fresh source observations will use the updated threshold policy",
     ], ensure_ascii=False)
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         tables = {
             row[0] for row in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
@@ -559,6 +856,9 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
     if not row:
         return None
     job = dict(row)
+    if job.get("experience_min_years") is not None or job.get("experience_max_years") is not None:
+        job["jd_experience_min_years"] = job.get("experience_min_years")
+        job["jd_experience_max_years"] = job.get("experience_max_years")
     # Reuse only a fresh, exact-JD Gemini cache result that has validated
     # verbatim evidence for required total-professional experience. The regex
     # parser remains the fallback whenever Gemini is unavailable or ambiguous.
@@ -711,7 +1011,7 @@ def rebuild_canonical_opportunities(conn: sqlite3.Connection) -> None:
 
 
 def backfill_notification_ledger() -> None:
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.execute("""
             INSERT INTO notification_ledger (
                 canonical_opportunity_id, status, created_at, updated_at
@@ -726,7 +1026,7 @@ def backfill_notification_ledger() -> None:
 
 
 def backfill_canonical_opportunities() -> None:
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         if canonical_schema_needs_rebuild(conn):
             rebuild_canonical_opportunities(conn)
@@ -742,7 +1042,8 @@ def backfill_canonical_opportunities() -> None:
 
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
+        enable_wal(conn)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -758,7 +1059,12 @@ def init_db() -> None:
             discovery_latency_seconds INTEGER,
             description TEXT NOT NULL DEFAULT '',
             description_format TEXT NOT NULL DEFAULT 'plain',
+            experience_min_years REAL,
+            experience_max_years REAL,
+            experience_provenance TEXT NOT NULL DEFAULT 'unknown',
+            experience_confidence TEXT NOT NULL DEFAULT 'unknown',
             source_details_json TEXT NOT NULL DEFAULT '{}',
+            source_initial_baseline INTEGER NOT NULL DEFAULT 0,
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
             canonical_opportunity_id INTEGER,
@@ -790,6 +1096,7 @@ def init_db() -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             decision_reason_json TEXT NOT NULL DEFAULT '[]',
+            baseline_suppressed INTEGER NOT NULL DEFAULT 0,
             attempt_count INTEGER NOT NULL DEFAULT 0,
             next_attempt_at TEXT,
             claimed_at TEXT,
@@ -846,6 +1153,47 @@ def init_db() -> None:
         )
         """)
         conn.execute("""
+        CREATE TABLE IF NOT EXISTS employer_companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT NOT NULL,
+            domain TEXT NOT NULL UNIQUE,
+            website_url TEXT NOT NULL,
+            careers_url TEXT NOT NULL,
+            country TEXT,
+            discovery_status TEXT NOT NULL DEFAULT 'not_scanned',
+            pages_checked INTEGER NOT NULL DEFAULT 0,
+            last_discovered_at TEXT,
+            error_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ats_board_registry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            provider TEXT NOT NULL,
+            board_key TEXT NOT NULL,
+            board_url TEXT NOT NULL,
+            discovered_from TEXT NOT NULL,
+            confidence TEXT NOT NULL DEFAULT 'medium',
+            collector_source TEXT,
+            collector_available INTEGER NOT NULL DEFAULT 0,
+            review_status TEXT NOT NULL DEFAULT 'discovered',
+            last_verified_at TEXT,
+            last_seen_at TEXT NOT NULL,
+            last_error_type TEXT,
+            baseline_pending INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(company_id) REFERENCES employer_companies(id),
+            UNIQUE(company_id, provider, board_key)
+        )
+        """)
+        _ensure_column(conn, "ats_board_registry", "baseline_pending", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_provider ON ats_board_registry(provider, review_status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_company ON ats_board_registry(company_id, provider)")
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS canonical_opportunities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             canonical_url TEXT,
@@ -859,10 +1207,16 @@ def init_db() -> None:
         )
         """)
         _ensure_column(conn, "jobs", "description_format", "TEXT NOT NULL DEFAULT 'plain'")
+        _ensure_column(conn, "jobs", "experience_min_years", "REAL")
+        _ensure_column(conn, "jobs", "experience_max_years", "REAL")
+        _ensure_column(conn, "jobs", "experience_provenance", "TEXT NOT NULL DEFAULT 'unknown'")
+        _ensure_column(conn, "jobs", "experience_confidence", "TEXT NOT NULL DEFAULT 'unknown'")
         _ensure_column(conn, "jobs", "source_details_json", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(conn, "jobs", "source_initial_baseline", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
         _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
+        _ensure_column(conn, "notification_ledger", "baseline_suppressed", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "notification_ledger", "attempt_count", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "notification_ledger", "next_attempt_at", "TEXT")
         _ensure_column(conn, "notification_ledger", "claimed_at", "TEXT")
@@ -916,15 +1270,57 @@ def init_db() -> None:
     backfill_canonical_opportunities()
     backfill_notification_ledger()
     auth.init_auth_schema(DB_PATH)
+    user_preferences.init_preferences_schema(DB_PATH)
+    telegram_linking.init_schema(DB_PATH)
+    user_notifications.init_schema(DB_PATH)
+    user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
-def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
+def upsert_jobs(
+    jobs: list[dict[str, Any]],
+    config: dict[str, Any] | None = None,
+    source_run_started_at: dt.datetime | None = None,
+) -> int:
     new_count = 0
+    affected_job_ids: list[int] = []
     config = config or get_config()
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    baseline_cutoff_text = iso(source_run_started_at or now())
+    baseline_pending_by_source: dict[str, bool] = {}
+
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        def mark_initial_baseline(job_id: int, source: str) -> None:
+            source_key = source.strip().lower()
+            if source_key not in INITIAL_SNAPSHOT_BASELINE_SOURCES:
+                return
+            if source_key not in baseline_pending_by_source:
+                prior_success = conn.execute(
+                    "SELECT 1 FROM source_runs WHERE source=? AND outcome='success' LIMIT 1",
+                    (source_key,),
+                ).fetchone()
+                baseline_pending_by_source[source_key] = prior_success is None
+            if not baseline_pending_by_source[source_key]:
+                return
+
+            first_seen = conn.execute(
+                "SELECT first_seen_at FROM jobs WHERE id=?",
+                (int(job_id),),
+            ).fetchone()
+            first_seen_at = parse_relative(first_seen[0]) if first_seen else None
+            cutoff_at = parse_relative(baseline_cutoff_text)
+            if first_seen_at and cutoff_at and first_seen_at >= cutoff_at:
+                conn.execute(
+                    "UPDATE jobs SET source_initial_baseline=1 WHERE id=?",
+                    (int(job_id),),
+                )
+
         for incoming in jobs:
             j = dict(incoming)
             incoming_description = str(j.get("description") or "")
+            experience_details = _experience_provenance_details(j)
+            j["experience_min_years"] = experience_details["min_years"]
+            j["experience_max_years"] = experience_details["max_years"]
+            j["experience_provenance"] = experience_details["provenance"]
+            j["experience_confidence"] = experience_details["confidence"]
             incoming_description_format = (
                 "markdown"
                 if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -951,10 +1347,43 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 j["discovery_latency_seconds"] = None
 
             existing = conn.execute(
-                "SELECT id, canonical_opportunity_id, discovered_at, source_posted_at, posted_precision, description, description_format FROM jobs WHERE source=? AND source_job_id=?",
-                (j["source"], j["source_job_id"])
+                """SELECT
+                       id, canonical_opportunity_id, discovered_at,
+                       source_posted_at, posted_precision, description,
+                       description_format, experience_min_years,
+                       experience_max_years, experience_provenance,
+                       experience_confidence
+                   FROM jobs
+                   WHERE source=? AND source_job_id=?""",
+                (j["source"], j["source_job_id"]),
             ).fetchone()
             if existing:
+                experience_rank = {
+                    "unknown": 0,
+                    "inferred": 1,
+                    "description": 2,
+                    "employer_stated": 3,
+                }
+                confidence_rank = {
+                    "unknown": 0,
+                    "low": 1,
+                    "medium": 2,
+                    "high": 3,
+                }
+                existing_experience_rank = (
+                    experience_rank.get(str(existing[9] or "unknown"), 0),
+                    confidence_rank.get(str(existing[10] or "unknown"), 0),
+                )
+                incoming_experience_rank = (
+                    experience_rank.get(str(j["experience_provenance"]), 0),
+                    confidence_rank.get(str(j["experience_confidence"]), 0),
+                )
+                if incoming_experience_rank < existing_experience_rank:
+                    j["experience_min_years"] = existing[7]
+                    j["experience_max_years"] = existing[8]
+                    j["experience_provenance"] = existing[9]
+                    j["experience_confidence"] = existing[10]
+
                 posted_at_for_update = j["source_posted_at"]
                 precision_for_update = j["posted_precision"]
                 first_discovered_at = parse_relative(existing[2])
@@ -985,6 +1414,16 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
                         ELSE description_format
                     END,
+                    experience_min_years=COALESCE(?, experience_min_years),
+                    experience_max_years=COALESCE(?, experience_max_years),
+                    experience_provenance=CASE
+                        WHEN ?!='unknown' THEN ?
+                        ELSE experience_provenance
+                    END,
+                    experience_confidence=CASE
+                        WHEN ?!='unknown' THEN ?
+                        ELSE experience_confidence
+                    END,
                     source_details_json=CASE
                         WHEN ? <> '{}' THEN ?
                         ELSE source_details_json
@@ -997,10 +1436,16 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     precision_for_update,
                     incoming_description_format, incoming_description, incoming_description,
                     incoming_description_format, incoming_description, incoming_description_format,
-                    source_details_json, source_details_json, existing[0]
+                    j["experience_min_years"], j["experience_max_years"],
+                    j["experience_provenance"], j["experience_provenance"],
+                    j["experience_confidence"], j["experience_confidence"],
+                    source_details_json, source_details_json, existing[0],
                 ))
-                if not existing[1]:
+
+                newly_canonicalized = not existing[1]
+                if newly_canonicalized:
                     _assign_canonical(conn, int(existing[0]))
+                mark_initial_baseline(int(existing[0]), str(j["source"]))
 
                 existing_description = str(existing[5] or "")
                 existing_format = str(existing[6] or "plain")
@@ -1017,22 +1462,35 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         and len(incoming_description) > len(existing_description)
                     )
                 )
-                next_description = incoming_description if update_description else existing_description
-                next_format = incoming_description_format if update_description else existing_format
+                next_description = (
+                    incoming_description if update_description else existing_description
+                )
+                next_format = (
+                    incoming_description_format if update_description else existing_format
+                )
                 next_posted_at = posted_at_for_update or existing[3]
                 next_precision = (
                     precision_for_update
                     if precision_for_update == "minute"
                     else existing[4]
                 )
+                experience_inputs_changed = (
+                    j["experience_min_years"] != existing[7]
+                    or j["experience_max_years"] != existing[8]
+                    or j["experience_provenance"] != existing[9]
+                    or j["experience_confidence"] != existing[10]
+                )
                 evaluation_inputs_changed = (
                     next_description != existing_description
                     or next_format != existing_format
                     or next_posted_at != existing[3]
                     or next_precision != existing[4]
+                    or experience_inputs_changed
                 )
                 if evaluation_inputs_changed:
                     _persist_job_evaluation(conn, int(existing[0]), config)
+                if evaluation_inputs_changed or newly_canonicalized:
+                    affected_job_ids.append(int(existing[0]))
             else:
                 if j.get("needs_jd_enrichment"):
                     j = enrich_linkedin_job(j)
@@ -1040,6 +1498,11 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 # LinkedIn enrichment may replace the original search snippet
                 # with a full JD; persist the post-enrichment values.
                 incoming_description = str(j.get("description") or "")
+                experience_details = _experience_provenance_details(j)
+                j["experience_min_years"] = experience_details["min_years"]
+                j["experience_max_years"] = experience_details["max_years"]
+                j["experience_provenance"] = experience_details["provenance"]
+                j["experience_confidence"] = experience_details["confidence"]
                 incoming_description_format = (
                     "markdown"
                     if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -1057,20 +1520,29 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         source, source_job_id, company, title, location, url,
                         source_posted_at, posted_precision, discovered_at,
                         discovery_latency_seconds, description, description_format,
-                        source_details_json, first_seen_at, last_seen_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        experience_min_years, experience_max_years, experience_provenance,
+                        experience_confidence, source_details_json, first_seen_at,
+                        last_seen_at, source_initial_baseline
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                 """, (
                     j["source"], j["source_job_id"], j["company"], j["title"],
                     j["location"], j["url"], j["source_posted_at"],
                     j["posted_precision"], j["discovered_at"],
                     j["discovery_latency_seconds"], incoming_description,
-                    incoming_description_format, source_details_json,
+                    incoming_description_format, j["experience_min_years"],
+                    j["experience_max_years"], j["experience_provenance"],
+                    j["experience_confidence"], source_details_json,
                     j["discovered_at"], iso(last_seen_at) or j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
+                mark_initial_baseline(int(cur.lastrowid), str(j["source"]))
                 _persist_job_evaluation(conn, int(cur.lastrowid), config)
+                affected_job_ids.append(int(cur.lastrowid))
                 new_count += 1
         conn.commit()
+    # Shared ingestion evaluates only the touched jobs for every configured user.
+    if affected_job_ids:
+        refresh_configured_user_evaluations(affected_job_ids)
     return new_count
 
 # Increment whenever deterministic matching/alertability rules change so
@@ -1159,7 +1631,7 @@ def _ensure_notification_state(
 def backfill_job_evaluations(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     count = 0
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT j.id
@@ -1179,7 +1651,7 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     fingerprint = _config_fingerprint(config)
     count = 0
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT j.id
@@ -1193,6 +1665,148 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
             count += 1
         conn.commit()
     return count
+
+
+def _persist_user_job_evaluation(
+    conn: sqlite3.Connection,
+    user_id: int,
+    job_id: int,
+    preferences: dict[str, Any],
+) -> dict[str, Any]:
+    job = _job_for_canonical(conn, job_id)
+    if not job:
+        raise ValueError(f"Job {job_id} does not exist")
+    details = match_details(job, preferences)
+    evaluated_at = iso(now())
+    fingerprint = user_preferences.preferences_fingerprint(
+        preferences, MATCHER_RULES_VERSION
+    )
+    # These legacy alertability fields are admin-policy metadata only.
+    # Member delivery uses user_notifications with explicit opt-in, a
+    # user-scoped ledger and a separately linked private Telegram chat.
+    alertability_reasons = ["member alerts use separate per-user opt-in and delivery policy"]
+    conn.execute(
+        """INSERT INTO user_job_evaluations (
+               user_id, job_id, preference_fingerprint, evaluated_at, match, score,
+               reasons_json, experience_min_years, experience_max_years,
+               alertable, alertability_reasons_json
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+           ON CONFLICT(user_id, job_id) DO UPDATE SET
+               preference_fingerprint=excluded.preference_fingerprint,
+               evaluated_at=excluded.evaluated_at,
+               match=excluded.match,
+               score=excluded.score,
+               reasons_json=excluded.reasons_json,
+               experience_min_years=excluded.experience_min_years,
+               experience_max_years=excluded.experience_max_years,
+               alertable=0,
+               alertability_reasons_json=excluded.alertability_reasons_json""",
+        (
+            user_id, job_id, fingerprint, evaluated_at, int(details["match"]),
+            int(details["score"]), json.dumps(details["reasons"], ensure_ascii=False),
+            details["experience_min_years"], details["experience_max_years"],
+            json.dumps(alertability_reasons),
+        ),
+    )
+    return {**details, "evaluated_at": evaluated_at, "preference_fingerprint": fingerprint}
+
+
+def refresh_user_job_evaluations(
+    user_id: int,
+    preferences: dict[str, Any],
+    job_ids: list[int] | None = None,
+) -> int:
+    if not preferences.get("target_roles") or not preferences.get("locations"):
+        return 0
+    if job_ids and len(job_ids) > 500:
+        return sum(
+            refresh_user_job_evaluations(user_id, preferences, job_ids[start:start + 500])
+            for start in range(0, len(job_ids), 500)
+        )
+    with connect_sqlite(DB_PATH) as conn:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+    if not {"jobs", "user_job_evaluations"}.issubset(tables):
+        return 0
+    fingerprint = user_preferences.preferences_fingerprint(
+        preferences, MATCHER_RULES_VERSION
+    )
+    changed = 0
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        sql = """SELECT j.id
+                 FROM jobs j
+                 LEFT JOIN user_job_evaluations e
+                   ON e.job_id=j.id AND e.user_id=?
+                 WHERE (e.job_id IS NULL OR e.preference_fingerprint != ?)"""
+        params: list[Any] = [int(user_id), fingerprint]
+        if job_ids:
+            placeholders = ",".join("?" for _ in job_ids)
+            sql += f" AND j.id IN ({placeholders})"
+            params.extend(int(job_id) for job_id in job_ids)
+        sql += " ORDER BY j.first_seen_at ASC, j.id ASC"
+        rows = conn.execute(sql, params).fetchall()
+        for row in rows:
+            _persist_user_job_evaluation(
+                conn, int(user_id), int(row["id"]), preferences
+            )
+            changed += 1
+        conn.commit()
+    return changed
+
+
+def ensure_user_job_evaluations_initialized(
+    user_id: int, preferences: dict[str, Any]
+) -> int:
+    if not preferences.get("target_roles") or not preferences.get("locations"):
+        return 0
+    with connect_sqlite(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"jobs", "user_job_evaluations"}.issubset(tables):
+            return 0
+        jobs_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        existing = conn.execute(
+            "SELECT 1 FROM user_job_evaluations WHERE user_id=? LIMIT 1",
+            (int(user_id),),
+        ).fetchone()
+    if jobs_count and existing is None:
+        return refresh_user_job_evaluations(user_id, preferences)
+    return 0
+
+
+def refresh_configured_user_evaluations(job_ids: list[int] | None = None) -> int:
+    with connect_sqlite(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"users", "user_preferences", "jobs", "user_job_evaluations"}.issubset(tables):
+            return 0
+        conn.row_factory = sqlite3.Row
+        users = conn.execute(
+            """SELECT u.id, p.preferences_json
+               FROM users u
+               JOIN user_preferences p ON p.user_id=u.id
+               WHERE u.status='active'"""
+        ).fetchall()
+    total = 0
+    for row in users:
+        try:
+            stored = json.loads(row["preferences_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            continue
+        preferences = {**user_preferences.PREFERENCE_DEFAULTS, **stored}
+        if preferences.get("target_roles") and preferences.get("locations"):
+            total += refresh_user_job_evaluations(int(row["id"]), preferences, job_ids)
+    return total
 
 
 def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
@@ -1212,6 +1826,162 @@ def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
     return None
 
 
+def suppress_initial_source_snapshot_alerts(
+    source: str,
+    started_at: dt.datetime,
+) -> int:
+    """Persistently suppress first-inventory alerts for timestamp-unknown ATS sources.
+
+    Partial first runs are also baseline inventory: subsequent partial runs keep
+    suppressing only newly discovered records until one complete successful run
+    is recorded. Existing canonical opportunities seen before this run are not
+    modified, and other sources are never affected.
+    """
+    if source not in INITIAL_SNAPSHOT_BASELINE_SOURCES:
+        return 0
+
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        has_successful_run = conn.execute(
+            """
+            SELECT 1 FROM source_runs
+            WHERE source=? AND outcome='success'
+            LIMIT 1
+            """,
+            (source,),
+        ).fetchone()
+        if has_successful_run:
+            return 0
+
+        cutoff = iso(started_at)
+        timestamp = iso(now())
+        reasons = json.dumps(
+            [
+                "initial source inventory baseline",
+                "source has no reliable publication timestamp",
+                "do not alert on listings already present before first successful source run",
+            ],
+            ensure_ascii=False,
+        )
+        canonical_ids = conn.execute(
+            """
+            SELECT DISTINCT j.canonical_opportunity_id
+            FROM jobs j
+            WHERE j.source=?
+              AND j.canonical_opportunity_id IS NOT NULL
+              AND j.first_seen_at >= ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM jobs earlier
+                  WHERE earlier.canonical_opportunity_id=j.canonical_opportunity_id
+                    AND earlier.first_seen_at < ?
+              )
+            """,
+            (source, cutoff, cutoff),
+        ).fetchall()
+        suppressed = 0
+        for row in canonical_ids:
+            cursor = conn.execute(
+                """
+                UPDATE notification_ledger
+                SET status='suppressed',
+                    candidate_job_id=NULL,
+                    baseline_suppressed=1,
+                    updated_at=?,
+                    decision_reason_json=?
+                WHERE canonical_opportunity_id=?
+                  AND baseline_suppressed=0
+                  AND status IN ('pending', 'queued', 'suppressed')
+                  AND attempt_count=0
+                  AND sent_at IS NULL
+                """,
+                (timestamp, reasons, int(row["canonical_opportunity_id"])),
+            )
+            suppressed += max(0, cursor.rowcount)
+        conn.commit()
+    return suppressed
+
+
+def suppress_activated_board_inventory(source: str) -> int:
+    """Silence the first snapshot of each newly activated employer board.
+
+    Board discovery can identify an existing vacancy archive. These rows are
+    useful in the dashboard, but should not be mistaken for freshly published
+    jobs when an administrator first connects a company. The first successful
+    source poll marks those board rows as baseline and cancels any unattempted
+    legacy/member queue records for the same jobs.
+    """
+    suppressed_jobs = 0
+    timestamp = iso(now())
+    reasons = json.dumps([
+        "initial employer-board inventory baseline",
+        "board was explicitly activated after discovery and endpoint verification",
+        "historical inventory is visible in the dashboard but is not a new-job alert",
+    ], ensure_ascii=False)
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        registry_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ats_board_registry'"
+        ).fetchone()
+        if not registry_exists:
+            return 0
+        pending_rows = conn.execute(
+            "SELECT id FROM ats_board_registry WHERE collector_source=? AND baseline_pending=1 AND review_status='active'",
+            (source,),
+        ).fetchall()
+        pending_ids = {int(row["id"]) for row in pending_rows}
+        if not pending_ids:
+            return 0
+        rows = conn.execute(
+            "SELECT id,canonical_opportunity_id,source_details_json FROM jobs WHERE source=?",
+            (source,),
+        ).fetchall()
+        seen_registry_ids: set[int] = set()
+        for row in rows:
+            try:
+                details = json.loads(row["source_details_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                details = {}
+            raw_registry_id = details.get("board_registry_id") if isinstance(details, dict) else None
+            try:
+                registry_id = int(raw_registry_id) if raw_registry_id is not None else None
+            except (TypeError, ValueError):
+                registry_id = None
+            if registry_id not in pending_ids:
+                continue
+            seen_registry_ids.add(registry_id)
+            job_id = int(row["id"])
+            conn.execute("UPDATE jobs SET source_initial_baseline=1 WHERE id=?", (job_id,))
+            canonical_id = row["canonical_opportunity_id"]
+            if canonical_id is not None:
+                conn.execute(
+                    """UPDATE notification_ledger
+                       SET status='suppressed',candidate_job_id=NULL,baseline_suppressed=1,
+                           next_attempt_at=NULL,claimed_at=NULL,updated_at=?,decision_reason_json=?
+                       WHERE canonical_opportunity_id=? AND candidate_job_id=?
+                         AND baseline_suppressed=0
+                         AND status IN ('pending','queued','suppressed')
+                         AND attempt_count=0 AND sent_at IS NULL""",
+                    (timestamp, reasons, int(canonical_id), job_id),
+                )
+            conn.execute(
+                """UPDATE user_notification_ledger
+                   SET status='cancelled',claimed_at=NULL,next_attempt_at=NULL,
+                       last_error='initial_employer_board_baseline',updated_at=?
+                   WHERE candidate_job_id=? AND status IN ('queued','failed','sending')
+                     AND attempt_count=0 AND sent_at IS NULL""",
+                (timestamp, job_id),
+            )
+            suppressed_jobs += 1
+        for registry_id in seen_registry_ids:
+            conn.execute(
+                "UPDATE ats_board_registry SET baseline_pending=0,updated_at=? WHERE id=?",
+                (timestamp, registry_id),
+            )
+        conn.commit()
+    return suppressed_jobs
+
+
 def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     config = config or get_config()
     now_value = now()
@@ -1219,14 +1989,16 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
     rediscovery_cutoff = iso(now_value - dt.timedelta(minutes=10))
     changed = 0
 
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
 
         candidates = conn.execute(
             """
             SELECT canonical_opportunity_id, status
             FROM notification_ledger
-            WHERE status IN ('pending', 'queued')
+            WHERE baseline_suppressed=0
+              AND (
+                status IN ('pending', 'queued')
                OR (
                     status='suppressed'
                     AND EXISTS (
@@ -1237,6 +2009,7 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
                           AND j.discovered_at >= ?
                     )
                )
+              )
             ORDER BY created_at ASC
             """,
             (rediscovery_cutoff,),
@@ -1607,12 +2380,14 @@ def _tracked_source_get(
     headers: dict[str, str] | None = None,
     timeout: int = 20,
     retry_attempt: bool = False,
+    allow_redirects: bool = True,
 ) -> requests.Response:
     """Record safe request metadata; never persist URLs, query strings or payloads."""
     started_monotonic = time.monotonic()
     try:
         response = requests.get(
-            endpoint, params=params, headers=headers, timeout=timeout
+            endpoint, params=params, headers=headers, timeout=timeout,
+            allow_redirects=allow_redirects,
         )
     except Exception:
         _record_source_request(
@@ -1628,6 +2403,36 @@ def _tracked_source_get(
         status_code=getattr(response, "status_code", None),
         duration_ms=(time.monotonic() - started_monotonic) * 1000,
         retry_attempt=retry_attempt,
+    )
+    return response
+
+
+def _tracked_source_post(
+    source: str,
+    endpoint: str,
+    *,
+    json_body: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    timeout: int = 20,
+    allow_redirects: bool = True,
+) -> requests.Response:
+    """Record safe request metadata for a JSON POST; never persist payloads or URLs."""
+    started_monotonic = time.monotonic()
+    try:
+        response = requests.post(
+            endpoint, json=json_body, headers=headers, timeout=timeout,
+            allow_redirects=allow_redirects,
+        )
+    except Exception:
+        _record_source_request(
+            source, status_code=None,
+            duration_ms=(time.monotonic() - started_monotonic) * 1000,
+            exception=True,
+        )
+        raise
+    _record_source_request(
+        source, status_code=getattr(response, "status_code", None),
+        duration_ms=(time.monotonic() - started_monotonic) * 1000,
     )
     return response
 
@@ -1689,7 +2494,7 @@ def record_run(
     columns = ", ".join(fields)
     placeholders = ", ".join("?" for _ in fields)
     metric_values = [metrics.get(field) for field in fields]
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         conn.execute(
             f"""
             INSERT INTO source_runs(
@@ -1722,7 +2527,7 @@ def restore_linkedin_rate_limit_state() -> None:
         seconds=LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS
     ))
     try:
-        with db_lock, sqlite3.connect(DB_PATH) as conn:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
             rows = conn.execute(
                 """
                 SELECT started_at, finished_at, rate_limit_detected_at,
@@ -1786,6 +2591,50 @@ def restore_linkedin_rate_limit_state() -> None:
             "linkedin: restored 429 streak from recent history; streak=%s",
             linkedin_rate_limit_streak,
         )
+
+
+def restore_workday_rate_limit_state() -> None:
+    """Restore the latest Workday Retry-After cooldown after an application restart."""
+    runtime = source_state.setdefault("workday", {})
+    try:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT http_status,rate_limit_detected_at,finished_at,cooldown_seconds,retry_after_seconds "
+                "FROM source_runs WHERE source='workday' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+    except sqlite3.Error:
+        log.exception("workday: unable to restore persisted 429 cooldown")
+        return
+
+    if not row or int(row[0] or 0) != 429:
+        for key in (
+            "rate_limited_until", "rate_limited_until_monotonic",
+            "rate_limit_cooldown_seconds", "rate_limit_retry_after_seconds",
+            "rate_limit_detected_at",
+        ):
+            runtime.pop(key, None)
+        return
+
+    detected_at = parse_relative(row[1] or row[2])
+    if detected_at is None:
+        log.warning("workday: skipped invalid persisted rate-limit timestamp")
+        return
+    cooldown_seconds = max(60, min(
+        WORKDAY_MAX_429_COOLDOWN_SECONDS,
+        int(row[3] or WORKDAY_DEFAULT_429_COOLDOWN_SECONDS),
+    ))
+    elapsed_seconds = max(0.0, (now() - detected_at).total_seconds())
+    remaining_seconds = max(0.0, cooldown_seconds - elapsed_seconds)
+    runtime["rate_limit_detected_at"] = iso(detected_at)
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_retry_after_seconds"] = row[4]
+    if remaining_seconds > 0:
+        runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=remaining_seconds))
+        runtime["rate_limited_until_monotonic"] = time.monotonic() + remaining_seconds
+        log.warning("workday: restored persisted 429 cooldown; remaining=%ss", int(remaining_seconds))
+    else:
+        runtime.pop("rate_limited_until", None)
+        runtime.pop("rate_limited_until_monotonic", None)
 
 
 def normalize_phrase(value: str) -> str:
@@ -2058,6 +2907,48 @@ def extract_linkedin_labeled_experience(text: str) -> tuple[float | None, float 
         years = float(single_match.group(1))
         return years, years
     return None, None
+
+
+def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
+    """Resolve job-level experience bounds and where the evidence came from.
+
+    LinkedIn's explicit Experience label is treated as employer-stated source
+    metadata. Explicit requirements parsed from the job description are
+    description-derived. Generic year mentions remain marked inferred rather
+    than being presented as an employer requirement.
+    """
+    description = str(job.get("description") or "")
+    source = str(job.get("source") or "").casefold()
+
+    if job.get("jd_experience_source") == "gemini_verified":
+        low = job.get("jd_experience_min_years")
+        high = job.get("jd_experience_max_years")
+        if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "high"}
+
+    if source == "linkedin":
+        low, high = extract_linkedin_labeled_experience(description)
+        if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
+
+    low, high = extract_jd_experience(description)
+    explicit_context = bool(re.search(
+        r"\b(?:overall|total|professional)\b[^.!?]{0,120}\bexperience\b"
+        r"|\bwork\s+experience\b"
+        r"|\bexperience\b[^.!?]{0,80}\b(?:required|minimum|at\s+least)\b"
+        r"|\b(?:minimum|at\s+least|required|requires?)\b[^.!?]{0,100}\bexperience\b"
+        r"|\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+experience\b",
+        description,
+        re.I,
+    ))
+    if (low is not None or high is not None) and explicit_context:
+        return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
+
+    low, high = extract_experience(f"{job.get('title', '')} {description}")
+    if low is not None or high is not None:
+        return {"min_years": low, "max_years": high, "provenance": "inferred", "confidence": "low"}
+
+    return {"min_years": None, "max_years": None, "provenance": "unknown", "confidence": "unknown"}
 
 
 def _linkedin_job_id(url: str) -> str | None:
@@ -2477,6 +3368,82 @@ def _retry_after_seconds(response: requests.Response) -> float | None:
 
 
 
+def _set_workday_rate_limit(response: requests.Response) -> int:
+    """Record a conservative source-wide Workday cooldown from a 429 response."""
+    return _set_source_rate_limit(
+        "workday", response,
+        default_seconds=WORKDAY_DEFAULT_429_COOLDOWN_SECONDS,
+        maximum_seconds=WORKDAY_MAX_429_COOLDOWN_SECONDS,
+    )
+
+
+def _workday_cooldown_remaining() -> float:
+    return _source_cooldown_remaining("workday")
+
+
+def _set_source_rate_limit(
+    source: str,
+    response: requests.Response,
+    *,
+    default_seconds: int = 300,
+    maximum_seconds: int = 3600,
+) -> int:
+    """Persist a conservative source-wide Retry-After cooldown in runtime state."""
+    retry_after = _retry_after_seconds(response)
+    requested = default_seconds if retry_after is None else max(60, retry_after)
+    cooldown_seconds = int(min(maximum_seconds, requested))
+    runtime = source_state.setdefault(source, {})
+    runtime["rate_limit_retry_after_seconds"] = retry_after
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_detected_at"] = iso(now())
+    runtime["rate_limited_until_monotonic"] = time.monotonic() + cooldown_seconds
+    runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=cooldown_seconds))
+    log.warning("%s: HTTP 429; pausing source requests for %ss", source, cooldown_seconds)
+    return cooldown_seconds
+
+
+def _source_cooldown_remaining(source: str) -> float:
+    return max(
+        0.0,
+        float(source_state.get(source, {}).get("rate_limited_until_monotonic", 0.0))
+        - time.monotonic(),
+    )
+
+
+def restore_source_rate_limit_state(source: str) -> None:
+    """Restore one source's last persisted HTTP 429 cooldown after restart."""
+    runtime = source_state.setdefault(source, {})
+    try:
+        with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT http_status,rate_limit_detected_at,finished_at,cooldown_seconds,retry_after_seconds "
+                "FROM source_runs WHERE source=? ORDER BY id DESC LIMIT 1", (source,)
+            ).fetchone()
+    except sqlite3.Error:
+        log.exception("%s: unable to restore persisted 429 cooldown", source)
+        return
+    if not row or int(row[0] or 0) != 429:
+        for key in ("rate_limited_until", "rate_limited_until_monotonic", "rate_limit_cooldown_seconds", "rate_limit_retry_after_seconds", "rate_limit_detected_at"):
+            runtime.pop(key, None)
+        return
+    detected_at = parse_relative(row[1] or row[2])
+    if detected_at is None:
+        log.warning("%s: skipped invalid persisted rate-limit timestamp", source)
+        return
+    cooldown_seconds = max(60, min(3600, int(row[3] or 300)))
+    remaining = max(0.0, cooldown_seconds - max(0.0, (now() - detected_at).total_seconds()))
+    runtime["rate_limit_detected_at"] = iso(detected_at)
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_retry_after_seconds"] = row[4]
+    if remaining > 0:
+        runtime["rate_limited_until"] = iso(now() + dt.timedelta(seconds=remaining))
+        runtime["rate_limited_until_monotonic"] = time.monotonic() + remaining
+        log.warning("%s: restored persisted 429 cooldown; remaining=%ss", source, int(remaining))
+    else:
+        runtime.pop("rate_limited_until", None)
+        runtime.pop("rate_limited_until_monotonic", None)
+
+
 def _source_run_error_metadata(exc: Exception) -> dict[str, Any]:
     """Return safe, structured error details without persisting exception URLs or secrets."""
     response = getattr(exc, "response", None)
@@ -2843,7 +3810,7 @@ def _record_naukri_feed_state(
     jobs_count: int,
     payload_sha256: str,
 ) -> bool:
-    with db_lock, sqlite3.connect(DB_PATH) as conn:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
         previous = conn.execute(
             "SELECT payload_sha256 FROM source_feed_state WHERE source='naukri'"
         ).fetchone()
@@ -3071,64 +4038,155 @@ def naukri_collect() -> list[dict[str, Any]]:
         _record_source_page("naukri", False)
         raise
 
+INSTAHYRE_PAGE_SIZE = 35
+INSTAHYRE_MAX_PAGES_PER_SCAN = 4
+
+
+def _instahyre_search_location(config: dict[str, Any]) -> str:
+    """Map profile location labels to Instahyre's accepted city names."""
+    configured = config.get("locations", [])
+    locations = configured if isinstance(configured, list) else []
+    selected = next(
+        (
+            str(value).split(",")[0].strip()
+            for value in locations
+            if str(value).strip() and "remote" not in str(value).lower()
+        ),
+        "",
+    )
+    if not selected:
+        selected = next(
+            (str(value).split(",")[0].strip() for value in locations if str(value).strip()),
+            "Bangalore",
+        )
+    if not selected:
+        selected = "Bangalore"
+
+    aliases = {
+        "bengaluru": "Bangalore",
+        "gurugram": "Gurgaon",
+        "delhi": "Delhi / NCR",
+        "remote": "Work From Home",
+        "remote india": "Work From Home",
+        "work from home": "Work From Home",
+    }
+    return aliases.get(selected.casefold(), selected)
+
+
 def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
-    try:
-        response = _tracked_source_get(
-            "instahyre",
-            endpoint,
-            params={
-                "jobLocations": next(
-                    (
-                        str(x).split(",")[0]
-                        for x in config.get("locations", [])
-                        if "remote" not in str(x).lower()
-                    ),
-                    "Bangalore",
-                ),
-                "limit": 35,
-            },
-            headers={**UA, "Referer": "https://www.instahyre.com/"},
-            timeout=25,
-        )
-        response.raise_for_status()
-        payload = response.json()
-    except Exception:
-        _record_source_page("instahyre", False)
-        raise
-    _record_source_page("instahyre", True)
-    items = []
-    if isinstance(payload, list):
-        items = payload
-    elif isinstance(payload, dict):
-        for key in ("jobs", "jobDetails", "results", "data", "job_details"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                items = value
-                break
-    jobs = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        source_id = item.get("jobId") or item.get("id") or item.get("jobID")
-        if not source_id:
-            continue
-        url = str(
-            item.get("url") or item.get("publicUrl") or item.get("jobUrl")
-            or f"https://www.instahyre.com/job-{source_id}-"
-        )
-        posted_raw = item.get("postedAt") or item.get("posted_at") or item.get("postedDate")
-        posted_at = parse_relative(str(posted_raw)) if posted_raw else None
-        jobs.append(normalize_job(
-            "instahyre", str(source_id),
-            str(item.get("companyName") or item.get("company") or ""),
-            str(item.get("title") or item.get("jobTitle") or ""),
-            str(item.get("location") or item.get("locations") or ""),
-            url, posted_at, "minute" if posted_at else "unknown",
-            str(item.get("description") or item.get("descriptionText") or ""),
-        ))
-    return jobs
+    location = _instahyre_search_location(config)
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    offset = 0
 
+    for _page_number in range(INSTAHYRE_MAX_PAGES_PER_SCAN):
+        params = {
+            "jobLocations": location,
+            "limit": INSTAHYRE_PAGE_SIZE,
+            "offset": offset,
+        }
+        try:
+            response = _tracked_source_get(
+                "instahyre",
+                endpoint,
+                params=params,
+                headers={**UA, "Referer": "https://www.instahyre.com/"},
+                timeout=25,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            next_page = None
+            if isinstance(payload, list):
+                items = payload
+            elif isinstance(payload, dict):
+                items = None
+                for key in ("objects", "jobs", "jobDetails", "results", "data", "job_details"):
+                    value = payload.get(key)
+                    if isinstance(value, list):
+                        items = value
+                        break
+                meta = payload.get("meta")
+                if isinstance(meta, dict):
+                    next_page = meta.get("next")
+                if items is None:
+                    raise ValueError("Instahyre response did not contain a jobs list")
+            else:
+                raise ValueError("Instahyre response was not a jobs list or object")
+        except Exception:
+            _record_source_page("instahyre", False)
+            raise
+
+        _record_source_page("instahyre", True)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            source_id = item.get("jobId") or item.get("id") or item.get("jobID")
+            if not source_id:
+                continue
+            source_id = str(source_id)
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            employer = item.get("employer")
+            employer_name = (
+                employer.get("company_name") or employer.get("name") or ""
+                if isinstance(employer, dict)
+                else ""
+            )
+            url = str(
+                item.get("public_url") or item.get("url") or item.get("publicUrl")
+                or item.get("jobUrl")
+                or f"https://www.instahyre.com/job-{source_id}-"
+            )
+            posted_raw = item.get("postedAt") or item.get("posted_at") or item.get("postedDate")
+            posted_at = parse_relative(str(posted_raw)) if posted_raw else None
+
+            raw_location = item.get("location") or item.get("locations") or ""
+            if isinstance(raw_location, dict):
+                job_location = str(raw_location.get("name") or "")
+            elif isinstance(raw_location, list):
+                job_location = ", ".join(str(value) for value in raw_location if value)
+            else:
+                job_location = str(raw_location)
+
+            description = str(item.get("description") or item.get("descriptionText") or "")
+            if not description:
+                keywords = item.get("keywords")
+                if isinstance(keywords, list):
+                    keyword_values = [
+                        str(value).strip()
+                        for value in keywords
+                        if isinstance(value, (str, int, float)) and str(value).strip()
+                    ]
+                    if keyword_values:
+                        description = "Keywords: " + ", ".join(keyword_values)
+
+            jobs.append(normalize_job(
+                "instahyre",
+                source_id,
+                str(item.get("companyName") or item.get("company") or employer_name),
+                str(item.get("title") or item.get("jobTitle") or item.get("candidate_title") or ""),
+                job_location,
+                url,
+                posted_at,
+                "minute" if posted_at else "unknown",
+                description,
+            ))
+
+        if not items or not next_page:
+            break
+        next_offset = offset + INSTAHYRE_PAGE_SIZE
+        if isinstance(next_page, str):
+            match = re.search(r"(?:[?&])offset=(\d+)", next_page)
+            if match:
+                next_offset = int(match.group(1))
+        if next_offset <= offset:
+            break
+        offset = next_offset
+
+    return jobs
 
 
 def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -3250,6 +4308,7 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 published_at,
                 posted_precision,
                 description,
+                source_details={"board_registry_id": board.get("registry_id")},
             ))
 
     if successful_boards == 0:
@@ -3367,6 +4426,7 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 jobs.append(normalize_job(
                     "ashby", source_id, company, title.strip(), location,
                     direct_url, published_at, posted_precision, description,
+                    source_details={"board_registry_id": board.get("registry_id")},
                 ))
             except (TypeError, ValueError) as exc:
                 log.warning("ashby: board=%s skipped malformed job error_type=%s", name, type(exc).__name__)
@@ -3384,14 +4444,1082 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _lever_public_url(value: Any, *, site: str, instance: str, posting_id: str) -> str:
+    """Accept only a Lever-hosted posting URL; derive its canonical public URL otherwise."""
+    allowed_host = "jobs.eu.lever.co" if instance == "eu" else "jobs.lever.co"
+    if isinstance(value, str) and value.strip():
+        parsed = urlsplit(value.strip())
+        expected_prefix = f"/{site}/"
+        relative_path = unquote(parsed.path[len(expected_prefix):]) if parsed.path.startswith(expected_prefix) else ""
+        path_segments = relative_path.split("/")
+        if (
+            parsed.scheme.lower() == "https"
+            and parsed.hostname
+            and parsed.hostname.lower() == allowed_host
+            and parsed.port in (None, 443)
+            and parsed.username is None
+            and parsed.password is None
+            and bool(relative_path)
+            and all(segment not in {"", ".", ".."} for segment in path_segments)
+            and "\\" not in relative_path
+            and parsed.query == ""
+            and parsed.fragment == ""
+        ):
+            return value.strip()
+    return f"https://{allowed_host}/{site}/{posting_id}"
+
+
+def _normalize_lever_posting(
+    item: dict[str, Any],
+    *,
+    site: str,
+    company: str,
+    instance: str,
+    registry_id: int | None = None,
+) -> dict[str, Any] | None:
+    raw_id = item.get("id")
+    title = item.get("text")
+    if raw_id in (None, "") or not isinstance(title, str) or not title.strip():
+        return None
+
+    posting_id = str(raw_id).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", posting_id):
+        return None
+    source_id = f"lever-{instance}-{site}-{posting_id}"
+    hosted_url = _lever_public_url(
+        item.get("hostedUrl"),
+        site=site,
+        instance=instance,
+        posting_id=posting_id,
+    )
+
+    categories = item.get("categories")
+    if not isinstance(categories, dict):
+        categories = {}
+    locations = categories.get("allLocations")
+    location_values = (
+        [value.strip() for value in locations if isinstance(value, str) and value.strip()]
+        if isinstance(locations, list)
+        else []
+    )
+    primary_location = categories.get("location")
+    location = (
+        primary_location.strip()
+        if isinstance(primary_location, str) and primary_location.strip()
+        else ", ".join(dict.fromkeys(location_values))
+    )
+
+    plain_description = item.get("descriptionPlain")
+    if isinstance(plain_description, str) and plain_description.strip():
+        description = plain_description.strip()
+    else:
+        html_description = item.get("description") or item.get("descriptionBody")
+        description = (
+            BeautifulSoup(
+                html_lib.unescape(html_description),
+                "html.parser",
+            ).get_text(" ", strip=True)
+            if isinstance(html_description, str)
+            else ""
+        )
+
+    extra_lines: list[str] = []
+    for field, label in (
+        ("team", "Team"),
+        ("department", "Department"),
+        ("commitment", "Commitment"),
+        ("level", "Level"),
+    ):
+        value = categories.get(field)
+        if isinstance(value, str) and value.strip():
+            extra_lines.append(f"{label}: {value.strip()}")
+
+    workplace_type = item.get("workplaceType")
+    if isinstance(workplace_type, str) and workplace_type.strip():
+        extra_lines.append(f"Workplace type: {workplace_type.strip()}")
+
+    sections = item.get("lists")
+    if isinstance(sections, list):
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            section_name = str(section.get("text") or "").strip()
+            section_html = section.get("content")
+            section_text = (
+                BeautifulSoup(
+                    html_lib.unescape(section_html),
+                    "html.parser",
+                ).get_text(" ", strip=True)
+                if isinstance(section_html, str)
+                else ""
+            )
+            if section_name or section_text:
+                extra_lines.append(f"{section_name}: {section_text}".strip(": "))
+
+    if extra_lines:
+        description = "\n".join(part for part in (description, *extra_lines) if part)
+
+    salary_range = item.get("salaryRange")
+    source_details = {
+        "lever_instance": instance,
+        "lever_site": site,
+        "board_registry_id": registry_id,
+        "team": categories.get("team"),
+        "department": categories.get("department"),
+        "commitment": categories.get("commitment"),
+        "level": categories.get("level"),
+        "workplace_type": workplace_type if isinstance(workplace_type, str) else None,
+        "salary_range": salary_range if isinstance(salary_range, dict) else None,
+    }
+    return normalize_job(
+        "lever",
+        source_id,
+        company,
+        title.strip(),
+        location,
+        hosted_url,
+        None,
+        "unknown",
+        description,
+        source_details=source_details,
+    )
+
+
+def lever_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect published postings from explicit Lever public-site allowlist entries.
+
+    The public Postings API uses skip/limit pagination. No authentication or
+    application endpoint is used. The v0 public field contract does not promise
+    a trustworthy publication timestamp, so source_posted_at stays unknown.
+    """
+    boards = config.get("lever_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Lever is enabled but no public lever_boards are configured")
+    if len(boards) > LEVER_MAX_BOARDS:
+        raise RuntimeError("Lever board allowlist exceeds the configured safety limit")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+
+    for board in boards:
+        site = str(board.get("site") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        instance = str(board.get("instance") or "global").strip().lower() if isinstance(board, dict) else "global"
+        if (
+            not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", site)
+            or not company
+            or len(company) > 120
+            or instance not in {"global", "eu"}
+        ):
+            _record_source_board("lever", False)
+            failures.append(f"{site or '<missing-site>'}: invalid board configuration")
+            continue
+
+        api_host = "api.eu.lever.co" if instance == "eu" else "api.lever.co"
+        endpoint = f"https://{api_host}/v0/postings/{site}"
+        successful_pages = 0
+
+        for page_number in range(LEVER_MAX_PAGES_PER_BOARD):
+            try:
+                response = _tracked_source_get(
+                    "lever",
+                    endpoint,
+                    params={
+                        "mode": "json",
+                        "limit": LEVER_PAGE_SIZE,
+                        "skip": page_number * LEVER_PAGE_SIZE,
+                    },
+                    headers={**UA, "Accept": "application/json"},
+                    timeout=20,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, list):
+                    raise ValueError("Lever response did not contain a postings list")
+            except Exception as exc:
+                _record_source_page("lever", False)
+                failures.append(
+                    f"{site} page {page_number + 1}: {type(exc).__name__}"
+                )
+                log.warning(
+                    "lever: site=%s page=%s failed error_type=%s",
+                    site,
+                    page_number + 1,
+                    type(exc).__name__,
+                )
+                break
+
+            _record_source_page("lever", True)
+            successful_pages += 1
+            for item in payload:
+                if not isinstance(item, dict):
+                    continue
+                job = _normalize_lever_posting(
+                    item,
+                    site=site,
+                    company=company,
+                    instance=instance,
+                    registry_id=board.get("registry_id"),
+                )
+                if job and job["source_job_id"] not in seen_ids:
+                    seen_ids.add(job["source_job_id"])
+                    jobs.append(job)
+
+            if len(payload) < LEVER_PAGE_SIZE:
+                break
+            if page_number == LEVER_MAX_PAGES_PER_BOARD - 1:
+                log.warning(
+                    "lever: site=%s reached bounded pagination cap pages=%s page_size=%s",
+                    site,
+                    LEVER_MAX_PAGES_PER_BOARD,
+                    LEVER_PAGE_SIZE,
+                )
+
+        if successful_pages:
+            successful_boards += 1
+            _record_source_board("lever", True)
+        else:
+            _record_source_board("lever", False)
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Lever boards failed: {details}")
+    if failures:
+        log.warning(
+            "lever: partial board/page failures=%s successful_boards=%s",
+            len(failures),
+            successful_boards,
+        )
+    log.info(
+        "lever: boards=%s successful=%s failed=%s jobs=%s timestamped=0 pages_cap=%s",
+        len(boards),
+        successful_boards,
+        len(failures),
+        len(jobs),
+        LEVER_MAX_PAGES_PER_BOARD,
+    )
+    return jobs
+
+
+def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect a bounded set of public Workday career-site postings.
+
+    This uses the public candidate career-site CXS interface, not the authenticated
+    Workday REST API. Boards must be explicitly allowlisted by real career URL.
+    The first page is polled frequently; pagination and detail calls are bounded.
+    """
+    boards = config.get("workday_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Workday is enabled but no public workday_boards are configured")
+    if len(boards) > WORKDAY_MAX_BOARDS:
+        raise RuntimeError("Workday board allowlist exceeds the configured safety limit")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    headers = {**UA, "Accept": "application/json", "Content-Type": "application/json"}
+
+    for board in boards:
+        parsed_board = _parse_workday_board_url(
+            board.get("url") if isinstance(board, dict) else None
+        )
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not parsed_board or not company:
+            _record_source_board("workday", False)
+            failures.append("invalid Workday public board configuration")
+            continue
+
+        host = parsed_board["host"]
+        tenant = parsed_board["tenant"]
+        site = parsed_board["site"]
+        board_url = parsed_board["url"]
+        list_endpoint = f"https://{host}/wday/cxs/{tenant}/{site}/jobs"
+        successful_pages = 0
+        details_attempted = 0
+        details_fetched = 0
+        board_jobs: list[dict[str, Any]] = []
+        rate_limited = False
+
+        for page_number in range(WORKDAY_MAX_PAGES_PER_BOARD):
+            offset = page_number * WORKDAY_PAGE_SIZE
+            payload = {
+                "appliedFacets": {},
+                "limit": WORKDAY_PAGE_SIZE,
+                "offset": offset,
+                "searchText": "",
+            }
+            try:
+                response = _tracked_source_post(
+                    "workday", list_endpoint, json_body=payload, headers=headers, timeout=20
+                )
+                response.raise_for_status()
+                data = response.json()
+                postings = data.get("jobPostings") if isinstance(data, dict) else None
+                if not isinstance(postings, list):
+                    raise ValueError("Workday response did not contain jobPostings")
+                successful_pages += 1
+                _record_source_page("workday", True)
+            except Exception as exc:
+                _record_source_page("workday", False)
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_workday_rate_limit(failed_response)
+                    rate_limited = True
+                    failures.append(f"{tenant}/{site} list rate limited")
+                else:
+                    failures.append(
+                        f"{tenant}/{site} page {page_number + 1}: {type(exc).__name__}"
+                    )
+                log.warning(
+                    "workday: tenant=%s site=%s page=%s failed error_type=%s",
+                    tenant, site, page_number + 1, type(exc).__name__,
+                )
+                break
+
+            for item in postings:
+                if not isinstance(item, dict):
+                    continue
+                title = item.get("title")
+                external_path = item.get("externalPath")
+                if not isinstance(title, str) or not title.strip():
+                    continue
+                if not isinstance(external_path, str) or not external_path.startswith("/job/"):
+                    continue
+                try:
+                    parsed_path = urlsplit(external_path)
+                except ValueError:
+                    continue
+                if (
+                    parsed_path.scheme or parsed_path.netloc or parsed_path.query
+                    or parsed_path.fragment or parsed_path.path != external_path
+                    or external_path.startswith("//") or "\\" in external_path
+                    or any(part in {".", ".."} for part in external_path.split("/"))
+                ):
+                    continue
+
+                bullet_fields = item.get("bulletFields")
+                safe_bullet_fields = (
+                    [str(value).strip() for value in bullet_fields
+                     if isinstance(value, (str, int)) and str(value).strip()][:10]
+                    if isinstance(bullet_fields, list) else []
+                )
+
+                detail_info: dict[str, Any] = {}
+                # Detail retrieval does not depend on the administrator's role or
+                # location filters; per-user evaluation happens after ingestion.
+                if details_attempted < WORKDAY_MAX_DETAILS_PER_BOARD:
+                    try:
+                        if details_attempted:
+                            time.sleep(WORKDAY_DETAIL_DELAY_SECONDS)
+                        details_attempted += 1
+                        detail_response = _tracked_source_get(
+                            "workday",
+                            f"https://{host}/wday/cxs/{tenant}/{site}{external_path}",
+                            headers={**UA, "Accept": "application/json"},
+                            timeout=20,
+                        )
+                        detail_response.raise_for_status()
+                        detail_payload = detail_response.json()
+                        candidate_info = (
+                            detail_payload.get("jobPostingInfo")
+                            if isinstance(detail_payload, dict) else None
+                        )
+                        if isinstance(candidate_info, dict):
+                            detail_info = candidate_info
+                        details_fetched += 1
+                    except Exception as exc:
+                        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                        log.warning(
+                            "workday: tenant=%s site=%s detail failed status=%s error_type=%s",
+                            tenant, site, status_code, type(exc).__name__,
+                        )
+                        if status_code == 429:
+                            _set_workday_rate_limit(exc.response)
+                            rate_limited = True
+                            failures.append(f"{tenant}/{site} detail rate limited")
+                            break
+
+                raw_requisition_id = (
+                    detail_info.get("jobReqId")
+                    or (safe_bullet_fields[0] if safe_bullet_fields else None)
+                    or detail_info.get("jobPostingId")
+                    or detail_info.get("id")
+                    or external_path.rsplit("/", 1)[-1]
+                )
+                requisition_id = re.sub(
+                    r"[^A-Za-z0-9_-]+", "-", str(raw_requisition_id)
+                ).strip("-_")
+                if not requisition_id:
+                    continue
+                source_id = f"workday-{tenant}-{site}-{requisition_id}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+
+                locations: list[str] = []
+                primary_location = (
+                    detail_info.get("location")
+                    or detail_info.get("jobRequisitionLocation")
+                )
+                if isinstance(primary_location, dict):
+                    primary_location = (
+                        primary_location.get("descriptor")
+                        or primary_location.get("name")
+                    )
+                if isinstance(primary_location, str) and primary_location.strip():
+                    locations.append(primary_location.strip())
+                extra_locations = detail_info.get("additionalLocations")
+                if isinstance(extra_locations, list):
+                    locations.extend(
+                        value.strip() for value in extra_locations
+                        if isinstance(value, str) and value.strip()
+                    )
+                location = ", ".join(dict.fromkeys(locations))
+
+                raw_description = detail_info.get("jobDescription")
+                description = (
+                    BeautifulSoup(
+                        html_lib.unescape(raw_description), "html.parser"
+                    ).get_text(" ", strip=True)
+                    if isinstance(raw_description, str) else ""
+                )
+                details = {
+                    "workday_tenant": tenant,
+                    "workday_cluster": parsed_board["cluster"],
+                    "workday_site": site,
+                    "board_registry_id": board.get("registry_id"),
+                    "requisition_id": requisition_id,
+                    "job_posting_id": detail_info.get("jobPostingId"),
+                    "posted_on_label": item.get("postedOn") or detail_info.get("postedOn"),
+                    "locations_text": item.get("locationsText"),
+                    "employment_type": detail_info.get("timeType"),
+                    "start_date": detail_info.get("startDate"),
+                    "additional_locations": (
+                        extra_locations if isinstance(extra_locations, list) else []
+                    ),
+                    "details_fetched": bool(detail_info),
+                    "listing_bullet_fields": safe_bullet_fields,
+                }
+                board_jobs.append(normalize_job(
+                    "workday",
+                    source_id,
+                    company,
+                    str(detail_info.get("title") or title).strip(),
+                    location,
+                    board_url + external_path,
+                    None,
+                    "unknown",
+                    description,
+                    source_details=details,
+                ))
+
+            if rate_limited or len(postings) < WORKDAY_PAGE_SIZE:
+                break
+            if page_number == WORKDAY_MAX_PAGES_PER_BOARD - 1:
+                log.warning(
+                    "workday: tenant=%s site=%s reached bounded pagination cap pages=%s page_size=%s",
+                    tenant, site, WORKDAY_MAX_PAGES_PER_BOARD, WORKDAY_PAGE_SIZE,
+                )
+
+        if successful_pages:
+            successful_boards += 1
+            _record_source_board("workday", True)
+            jobs.extend(board_jobs)
+        else:
+            _record_source_board("workday", False)
+        if rate_limited:
+            break
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Workday boards failed: {details}")
+    if failures:
+        log.warning(
+            "workday: partial board/page failures=%s successful_boards=%s",
+            len(failures), successful_boards,
+        )
+    log.info(
+        "workday: boards=%s successful=%s failed=%s jobs=%s detail_attempt_cap_per_board=%s",
+        len(boards), successful_boards, len(failures), len(jobs),
+        WORKDAY_MAX_DETAILS_PER_BOARD,
+    )
+    return jobs
+
+
+def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect active PUBLIC SmartRecruiters postings with bounded detail lookups."""
+    boards = config.get("smartrecruiters_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("SmartRecruiters is enabled but no smartrecruiters_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    headers = {**UA, "Accept": "application/json"}
+    for board in boards:
+        identifier = str(board.get("company_identifier") or board.get("identifier") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", identifier) or not company:
+            _record_source_board("smartrecruiters", False)
+            failures.append("invalid SmartRecruiters board configuration")
+            continue
+        endpoint = f"https://api.smartrecruiters.com/v1/companies/{identifier}/postings"
+        board_jobs: list[dict[str, Any]] = []
+        pages_succeeded = 0
+        detail_attempts = 0
+        total_found = None
+        rate_limited = False
+        for page_number in range(SMARTRECRUITERS_MAX_PAGES_PER_BOARD):
+            offset = page_number * SMARTRECRUITERS_PAGE_SIZE
+            try:
+                response = _tracked_source_get(
+                    "smartrecruiters", endpoint,
+                    params={"limit": SMARTRECRUITERS_PAGE_SIZE, "offset": offset, "destination": "PUBLIC"},
+                    headers=headers, timeout=20,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                content = payload.get("content") if isinstance(payload, dict) else None
+                if not isinstance(content, list):
+                    raise ValueError("SmartRecruiters response did not contain a content list")
+                total_found = payload.get("totalFound")
+                pages_succeeded += 1
+                _record_source_page("smartrecruiters", True)
+            except Exception as exc:
+                _record_source_page("smartrecruiters", False)
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_source_rate_limit("smartrecruiters", failed_response)
+                    rate_limited = True
+                failures.append(f"{identifier} page {page_number + 1}: {type(exc).__name__}")
+                log.warning("smartrecruiters: identifier=%s page=%s failed error_type=%s", identifier, page_number + 1, type(exc).__name__)
+                break
+
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                raw_id = item.get("id")
+                title = str(item.get("name") or "").strip()
+                if raw_id in (None, "") or not title:
+                    continue
+                source_id = f"smartrecruiters-{identifier}-{raw_id}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+
+                raw_location = item.get("location") if isinstance(item.get("location"), dict) else {}
+                location_parts = [
+                    str(raw_location.get(field) or "").strip()
+                    for field in ("city", "region", "country")
+                    if str(raw_location.get(field) or "").strip()
+                ]
+                location = str(raw_location.get("fullLocation") or ", ".join(location_parts)).strip()
+                if raw_location.get("remote"):
+                    location = f"{location} (Remote)".strip()
+                elif raw_location.get("hybrid"):
+                    location = f"{location} (Hybrid)".strip()
+                published_raw = item.get("releasedDate")
+                published_at = parse_relative(published_raw) if isinstance(published_raw, str) else None
+                precision = "minute" if published_at and re.search(r"\d{2}:\d{2}", str(published_raw)) else "date" if published_at else "unknown"
+
+                detail: dict[str, Any] = {}
+                if detail_attempts < SMARTRECRUITERS_MAX_DETAILS_PER_BOARD:
+                    try:
+                        if detail_attempts:
+                            time.sleep(SMARTRECRUITERS_DETAIL_DELAY_SECONDS)
+                        detail_attempts += 1
+                        detail_response = _tracked_source_get(
+                            "smartrecruiters", f"{endpoint}/{raw_id}",
+                            headers=headers, timeout=20,
+                        )
+                        detail_response.raise_for_status()
+                        detail_payload = detail_response.json()
+                        if isinstance(detail_payload, dict):
+                            detail = detail_payload
+                    except Exception as exc:
+                        failed_response = getattr(exc, "response", None)
+                        if getattr(failed_response, "status_code", None) == 429:
+                            _set_source_rate_limit("smartrecruiters", failed_response)
+                            rate_limited = True
+                            failures.append(f"{identifier} detail rate limited")
+                        log.warning("smartrecruiters: identifier=%s detail failed error_type=%s", identifier, type(exc).__name__)
+
+                sections = (((detail.get("jobAd") or {}).get("sections")) if isinstance(detail.get("jobAd"), dict) else {})
+                description_parts = []
+                if isinstance(sections, dict):
+                    for key in ("jobDescription", "qualifications", "additionalInformation", "companyDescription"):
+                        value = sections.get(key)
+                        text_value = value.get("text") if isinstance(value, dict) else None
+                        if isinstance(text_value, str) and text_value.strip():
+                            description_parts.append(BeautifulSoup(html_lib.unescape(text_value), "html.parser").get_text(" ", strip=True))
+                description = " ".join(part for part in description_parts if part)
+                department = (item.get("department") or {}).get("label") if isinstance(item.get("department"), dict) else None
+                function = (item.get("function") or {}).get("label") if isinstance(item.get("function"), dict) else None
+                employment_type = (item.get("typeOfEmployment") or {}).get("label") if isinstance(item.get("typeOfEmployment"), dict) else None
+                experience_level = (item.get("experienceLevel") or {}).get("label") if isinstance(item.get("experienceLevel"), dict) else None
+                posting_url = detail.get("postingUrl") or item.get("postingUrl") or detail.get("applyUrl") or item.get("applyUrl")
+                if not isinstance(posting_url, str) or not posting_url.startswith("https://"):
+                    posting_url = f"https://jobs.smartrecruiters.com/{identifier}/{raw_id}"
+                details = {
+                    "company_identifier": identifier, "posting_id": str(raw_id),
+                    "board_registry_id": board.get("registry_id"),
+                    "job_ad_id": item.get("jobAdId"), "ref_number": item.get("refNumber"),
+                    "department": department, "function": function,
+                    "employment_type": employment_type, "experience_level": experience_level,
+                    "details_fetched": bool(detail),
+                }
+                board_jobs.append(normalize_job(
+                    "smartrecruiters", source_id,
+                    str((item.get("company") or {}).get("name") if isinstance(item.get("company"), dict) else "") or company,
+                    title, location, posting_url, published_at, precision, description,
+                    source_details=details,
+                ))
+                if rate_limited:
+                    break
+
+            if rate_limited or len(content) < SMARTRECRUITERS_PAGE_SIZE:
+                break
+            if total_found is not None and offset + len(content) >= int(total_found):
+                break
+        if pages_succeeded:
+            successful_boards += 1
+            _record_source_board("smartrecruiters", True)
+            jobs.extend(board_jobs)
+        else:
+            _record_source_board("smartrecruiters", False)
+        if rate_limited:
+            break
+    if successful_boards == 0:
+        raise RuntimeError("All configured SmartRecruiters boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("smartrecruiters: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("smartrecruiters: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
+def workable_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect a public Workable account's published job widget (details included)."""
+    boards = config.get("workable_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Workable is enabled but no workable_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    for board in boards:
+        account = str(board.get("account") or board.get("subdomain") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,100}", account) or not company:
+            _record_source_board("workable", False)
+            failures.append("invalid Workable board configuration")
+            continue
+        endpoint = f"https://apply.workable.com/api/v1/widget/accounts/{account}"
+        try:
+            response = _tracked_source_get(
+                "workable", endpoint, params={"details": "true"},
+                headers={**UA, "Accept": "application/json"}, timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            postings = payload.get("jobs") if isinstance(payload, dict) else None
+            if not isinstance(postings, list):
+                raise ValueError("Workable response did not contain a jobs list")
+            _record_source_page("workable", True)
+            _record_source_board("workable", True)
+            successful_boards += 1
+        except Exception as exc:
+            _record_source_page("workable", False)
+            _record_source_board("workable", False)
+            failed_response = getattr(exc, "response", None)
+            if getattr(failed_response, "status_code", None) == 429:
+                _set_source_rate_limit("workable", failed_response)
+            failures.append(f"{account}: {type(exc).__name__}")
+            log.warning("workable: account=%s failed error_type=%s", account, type(exc).__name__)
+            if _source_cooldown_remaining("workable") > 0:
+                break
+            continue
+        if len(postings) > WORKABLE_MAX_JOBS_PER_BOARD:
+            log.warning("workable: account=%s returned %s jobs; processing first %s under the request budget", account, len(postings), WORKABLE_MAX_JOBS_PER_BOARD)
+        for item in postings[:WORKABLE_MAX_JOBS_PER_BOARD]:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            shortcode = str(item.get("shortcode") or item.get("code") or "").strip()
+            if not title or not shortcode:
+                continue
+            source_id = f"workable-{account}-{shortcode}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+            locations: list[str] = []
+            raw_locations = item.get("locations")
+            if isinstance(raw_locations, list):
+                for value in raw_locations:
+                    if not isinstance(value, dict):
+                        continue
+                    parts = [str(value.get(k) or "").strip() for k in ("city", "region", "country") if str(value.get(k) or "").strip()]
+                    label = ", ".join(parts)
+                    if label and label not in locations:
+                        locations.append(label)
+            if not locations:
+                parts = [str(item.get(k) or "").strip() for k in ("city", "state", "country") if str(item.get(k) or "").strip()]
+                if parts:
+                    locations.append(", ".join(parts))
+            workplace = str(item.get("workplace_type") or "").strip().lower()
+            if not workplace and item.get("telecommuting"):
+                workplace = "remote"
+            location = ", ".join(locations)
+            if workplace in {"remote", "hybrid", "on_site"}:
+                location = f"{location} ({'On-site' if workplace == 'on_site' else workplace.title()})".strip()
+            published_raw = item.get("published_on")
+            published_at = parse_relative(published_raw) if isinstance(published_raw, str) else None
+            precision = "date" if published_at else "unknown"
+            description_html = item.get("description")
+            description = (
+                BeautifulSoup(html_lib.unescape(description_html), "html.parser").get_text(" ", strip=True)
+                if isinstance(description_html, str) else ""
+            )
+            posting_url = item.get("url") or item.get("application_url") or f"https://apply.workable.com/{account}/"
+            if not isinstance(posting_url, str) or not posting_url.startswith("https://"):
+                posting_url = f"https://apply.workable.com/{account}/"
+            details = {
+                "account": account, "shortcode": shortcode,
+                "board_registry_id": board.get("registry_id"),
+                "employment_type": item.get("employment_type"),
+                "department": item.get("department"), "function": item.get("function"),
+                "industry": item.get("industry"), "experience": item.get("experience"),
+                "education": item.get("education"), "telecommuting": bool(item.get("telecommuting")),
+                "workplace_type": item.get("workplace_type"),
+                "created_at": item.get("created_at"),
+                "details_fetched": bool(description),
+            }
+            jobs.append(normalize_job(
+                "workable", source_id, company or str(payload.get("name") or account),
+                title, location, posting_url, published_at, precision, description,
+                source_details=details,
+            ))
+    if successful_boards == 0:
+        raise RuntimeError("All configured Workable boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("workable: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("workable: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
+
+def _safe_board_redirect_url(url: str) -> str:
+    """Validate every Keka careers-page redirect before following it."""
+    return board_discovery._public_https_url(url)
+
+
+def _keka_fetch_careers_page(source: str, careers_url: str) -> tuple[str, str]:
+    current = _safe_board_redirect_url(careers_url)
+    expected_host = (urlsplit(current).hostname or "").lower()
+    headers = {**UA, "Accept": "text/html,application/xhtml+xml"}
+    for _ in range(4):
+        response = _tracked_source_get(
+            source, current, headers=headers, timeout=20, allow_redirects=False
+        )
+        if response.status_code in {301, 302, 303, 307, 308}:
+            location = response.headers.get("Location")
+            if not location:
+                raise ValueError("Keka careers page redirected without a destination.")
+            next_url = _safe_board_redirect_url(urljoin(current, location))
+            if (urlsplit(next_url).hostname or "").lower() != expected_host:
+                raise ValueError("Keka careers page attempted to redirect to a different host.")
+            current = next_url
+            continue
+        response.raise_for_status()
+        if len(response.content) > board_discovery.MAX_HTML_BYTES:
+            raise ValueError("Keka careers page exceeded the HTML size limit.")
+        content_type = str(response.headers.get("Content-Type", "")).lower()
+        if content_type and "html" not in content_type:
+            raise ValueError("Keka careers page did not return HTML.")
+        return current, response.text
+    raise ValueError("Keka careers page exceeded the redirect limit.")
+
+
+def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect published Keka jobs through the public careers-site embed feed."""
+    boards = config.get("keka_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Keka is enabled but no keka_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    for board in boards:
+        careers_url = str(board.get("careers_url") or board.get("url") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        detected = board_discovery.detect_ats_board(careers_url)
+        if not detected or detected.get("provider") != "keka" or not company:
+            _record_source_board("keka", False)
+            failures.append("invalid Keka careers board configuration")
+            continue
+        tenant = str(detected["board_key"]).lower()
+        try:
+            final_url, html = _keka_fetch_careers_page("keka", careers_url)
+            feed_match = re.search(
+                r"/ats/documents/([0-9a-fA-F-]{16,})/careerportal/?",
+                html,
+                re.I,
+            )
+            if not feed_match:
+                raise ValueError("Keka careers page did not expose a public career feed.")
+            feed_id = feed_match.group(1)
+            parsed = urlsplit(final_url)
+            endpoint = f"https://{parsed.hostname}/careers/api/embedjobs/default/active/{feed_id}"
+            response = _tracked_source_get(
+                "keka", endpoint,
+                headers={**UA, "Accept": "application/json"},
+                timeout=30, allow_redirects=False,
+            )
+            response.raise_for_status()
+            if len(response.content) > 8_000_000:
+                raise ValueError("Keka public career feed exceeded the response size limit.")
+            payload = response.json()
+            if not isinstance(payload, list):
+                raise ValueError("Keka public career feed did not contain a jobs array.")
+            _record_source_page("keka", True)
+        except Exception as exc:
+            _record_source_page("keka", False)
+            failed_response = getattr(exc, "response", None)
+            if getattr(failed_response, "status_code", None) == 429:
+                _set_source_rate_limit("keka", failed_response)
+            _record_source_board("keka", False)
+            failures.append(f"{tenant}: {type(exc).__name__}")
+            log.warning("keka: tenant=%s failed error_type=%s", tenant, type(exc).__name__)
+            if _source_cooldown_remaining("keka") > 0:
+                break
+            continue
+
+        successful_boards += 1
+        _record_source_board("keka", True)
+        if len(payload) > KEKA_MAX_JOBS_PER_BOARD:
+            log.warning(
+                "keka: tenant=%s returned %s jobs; processing first %s under the request budget",
+                tenant, len(payload), KEKA_MAX_JOBS_PER_BOARD,
+            )
+        for item in payload[:KEKA_MAX_JOBS_PER_BOARD]:
+            if not isinstance(item, dict):
+                continue
+            raw_id = item.get("id")
+            title = str(item.get("title") or "").strip()
+            if raw_id in (None, "") or not title:
+                continue
+            source_id = f"keka-{tenant}-{raw_id}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            locations: list[str] = []
+            raw_locations = item.get("jobLocations")
+            if isinstance(raw_locations, list):
+                for loc in raw_locations:
+                    if not isinstance(loc, dict):
+                        continue
+                    label = str(loc.get("name") or "").strip()
+                    if not label:
+                        parts = [
+                            str(loc.get(field) or "").strip()
+                            for field in ("city", "state", "countryName")
+                            if str(loc.get(field) or "").strip()
+                        ]
+                        label = ", ".join(parts)
+                    if label and label not in locations:
+                        locations.append(label)
+            location = "; ".join(locations)
+            description_html = item.get("description") or item.get("excerpt") or ""
+            description = (
+                BeautifulSoup(html_lib.unescape(str(description_html)), "html.parser").get_text(" ", strip=True)
+                if description_html else ""
+            )
+            published_raw = item.get("publishedOn")
+            published_at = parse_relative(published_raw) if published_raw not in (None, "") else None
+            precision = (
+                "minute"
+                if published_at and isinstance(published_raw, str)
+                and re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}", published_raw)
+                else "date" if published_at else "unknown"
+            )
+            url = f"https://{parsed.hostname}/careers/jobdetails/{quote(str(raw_id), safe='')}"
+            salary = item.get("salaryRange") if isinstance(item.get("salaryRange"), dict) else {}
+            details = {
+                "tenant": tenant,
+                "board_registry_id": board.get("registry_id"),
+                "job_number": item.get("jobNumber"),
+                "department_id": item.get("departmentIdentifier"),
+                "department": item.get("departmentName"),
+                "experience": item.get("experience"),
+                "job_type_code": item.get("jobType"),
+                "salary_currency": salary.get("currency"),
+                "salary_period_code": salary.get("salaryPeriod"),
+                "salary_range_format": item.get("salaryRangeFormat"),
+                "skill_names": item.get("skillNames") if isinstance(item.get("skillNames"), list) else [],
+                "published_since_days": item.get("publishedSinceDays"),
+                "details_fetched": bool(description),
+            }
+            jobs.append(normalize_job(
+                "keka", source_id, company, title, location, url,
+                published_at, precision, description, source_details=details,
+            ))
+    if successful_boards == 0:
+        raise RuntimeError("All configured Keka boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("keka: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("keka: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
+def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect public candidate-site postings where the tenant exposes its careers feed."""
+    boards = config.get("darwinbox_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Darwinbox is enabled but no darwinbox_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    headers = {**UA, "Accept": "application/json"}
+    for board in boards:
+        careers_url = str(board.get("careers_url") or board.get("url") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        detected = board_discovery.detect_ats_board(careers_url)
+        if not detected or detected.get("provider") != "darwinbox" or not company:
+            _record_source_board("darwinbox", False)
+            failures.append("invalid Darwinbox careers board configuration")
+            continue
+        tenant = str(detected.get("tenant") or "").lower()
+        company_id = str(detected["board_key"])
+        parsed = urlsplit(detected["board_url"])
+        origin = f"https://{parsed.netloc}"
+        successful_pages = 0
+        failed_pages = 0
+        board_jobs: list[dict[str, Any]] = []
+        rate_limited = False
+        for page_number in range(1, DARWINBOX_MAX_PAGES_PER_BOARD + 1):
+            if page_number > 1:
+                time.sleep(DARWINBOX_PAGE_DELAY_SECONDS)
+            endpoint = f"{origin}/ms/candidateapi/job/alljobs?companyId={company_id}"
+            try:
+                response = _tracked_source_post(
+                    "darwinbox", endpoint,
+                    json_body={
+                        "companyId": company_id,
+                        "page": page_number,
+                        "sort_option": "new",
+                        "limit": DARWINBOX_PAGE_SIZE,
+                    },
+                    headers={**headers, "Content-Type": "application/json", "Referer": detected["board_url"]},
+                    timeout=25,
+                    allow_redirects=False,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                rows = payload.get("data") if isinstance(payload, dict) and payload.get("status") == "success" else None
+                if not isinstance(rows, list):
+                    raise ValueError("Darwinbox public candidate endpoint returned an unexpected response envelope.")
+                _record_source_page("darwinbox", True)
+                successful_pages += 1
+            except Exception as exc:
+                _record_source_page("darwinbox", False)
+                failed_pages += 1
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_source_rate_limit("darwinbox", failed_response)
+                    rate_limited = True
+                failures.append(f"{tenant}/{company_id} page {page_number}: {type(exc).__name__}")
+                log.warning("darwinbox: tenant=%s page=%s failed error_type=%s", tenant, page_number, type(exc).__name__)
+                break
+            for item in rows:
+                if not isinstance(item, dict):
+                    continue
+                raw_id = item.get("id")
+                title = str(item.get("title") or "").strip()
+                if raw_id in (None, "") or not title:
+                    continue
+                source_id = f"darwinbox-{tenant}-{company_id}-{raw_id}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+                raw_locations = item.get("tool_tip_locations")
+                locations = []
+                if isinstance(raw_locations, list):
+                    for value in raw_locations:
+                        label = BeautifulSoup(str(value or ""), "html.parser").get_text(" ", strip=True)
+                        if label and label not in locations:
+                            locations.append(label)
+                if not locations:
+                    label = str(item.get("locations") or "").strip()
+                    if label:
+                        locations.append(label)
+                posted_raw = item.get("posted_on")
+                if posted_raw in (None, ""):
+                    posted_raw = item.get("created_on")
+                published_at = parse_relative(posted_raw) if posted_raw not in (None, "") else None
+                precision = (
+                    "minute"
+                    if published_at and (isinstance(posted_raw, (int, float)) or (isinstance(posted_raw, str) and re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}", posted_raw)))
+                    else "date" if published_at else "unknown"
+                )
+                description_html = item.get("jd") or ""
+                description = BeautifulSoup(html_lib.unescape(str(description_html)), "html.parser").get_text(" ", strip=True)
+                url = f"{origin}/ms/candidatev2/{company_id}/careers/jobDetails/{quote(str(raw_id), safe='')}"
+                details = {
+                    "tenant": tenant,
+                    "company_id": company_id,
+                    "board_registry_id": board.get("registry_id"),
+                    "internal_job_code": item.get("internal_job_code"),
+                    "experience": item.get("experience"),
+                    "locations_raw": item.get("locations"),
+                    "details_fetched": bool(description),
+                }
+                board_jobs.append(normalize_job(
+                    "darwinbox", source_id, company, title, "; ".join(locations),
+                    url, published_at, precision, description, source_details=details,
+                ))
+            if len(rows) < DARWINBOX_PAGE_SIZE or rate_limited:
+                break
+        if successful_pages:
+            successful_boards += 1
+            _record_source_board("darwinbox", True)
+            jobs.extend(board_jobs)
+        else:
+            _record_source_board("darwinbox", False)
+        if rate_limited:
+            break
+    if successful_boards == 0:
+        raise RuntimeError("All configured Darwinbox boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("darwinbox: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("darwinbox: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
     "instahyre": instahyre_collect,
     "greenhouse": greenhouse_collect,
     "ashby": ashby_collect,
+    "lever": lever_collect,
+    "workday": workday_collect,
+    "smartrecruiters": smartrecruiters_collect,
+    "workable": workable_collect,
+    "keka": keka_collect,
+    "darwinbox": darwinbox_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
+
+
+def _legacy_notifications_enabled(
+    config: dict[str, Any], credentials_available: bool
+) -> bool:
+    """Require both configured credentials and the explicit global feature switch."""
+    return bool(credentials_available and config.get("notifications_enabled", True))
 
 
 def run_source(source: str, config: dict[str, Any]) -> None:
@@ -3447,7 +5575,27 @@ def run_source(source: str, config: dict[str, Any]) -> None:
                 source,
                 type(exc).__name__,
             )
-        new_jobs = upsert_jobs(jobs, config)
+        new_jobs = upsert_jobs(
+            jobs,
+            config,
+            source_run_started_at=started_at,
+        )
+        board_baseline_suppressed = suppress_activated_board_inventory(source)
+        if board_baseline_suppressed:
+            log.info(
+                "source=%s newly activated board baseline suppressed jobs=%s",
+                source, board_baseline_suppressed,
+            )
+        baseline_suppressed = suppress_initial_source_snapshot_alerts(
+            source,
+            started_at,
+        )
+        if baseline_suppressed:
+            log.info(
+                "source=%s initial inventory baseline suppressed canonical_opportunities=%s",
+                source,
+                baseline_suppressed,
+            )
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
 
@@ -3456,7 +5604,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         try:
             from v2.telegram import credentials_available, deliver_queued_notifications
 
-            if credentials_available():
+            if _legacy_notifications_enabled(config, credentials_available()):
                 delivered = deliver_queued_notifications(50)
                 if delivered:
                     log.info("telegram: delivered=%s source=%s", delivered, source)
@@ -3466,13 +5614,15 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         finished = now()
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         cooldown_remaining = (
-            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
-        )
-        rate_limit_seen = (
-            source == "linkedin"
-            and linkedin_rate_limit_generation != rate_limit_generation_at_start
+            _linkedin_cooldown_remaining() if source == "linkedin"
+            else _source_cooldown_remaining(source) if source in PUBLIC_ATS_RATE_LIMIT_SOURCES
+            else 0.0
         )
         metrics = request_metrics or {}
+        rate_limit_seen = (
+            (source == "linkedin" and linkedin_rate_limit_generation != rate_limit_generation_at_start)
+            or (source in PUBLIC_ATS_RATE_LIMIT_SOURCES and bool(metrics.get("http_429", 0)))
+        )
         partial_page_failure = (
             metrics.get("pages_failed", 0) > 0
             and metrics.get("pages_succeeded", 0) > 0
@@ -3567,6 +5717,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             )
         elif not rate_limit_seen:
             runtime.pop("rate_limited_until", None)
+            runtime.pop("rate_limited_until_monotonic", None)
             runtime.pop("rate_limit_cooldown_seconds", None)
             runtime.pop("rate_limit_retry_after_seconds", None)
             runtime.pop("rate_limit_detected_at", None)
@@ -3582,10 +5733,22 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         metadata = _source_run_error_metadata(exc)
         cooldown_remaining = (
-            _linkedin_cooldown_remaining() if source == "linkedin" else 0.0
+            _linkedin_cooldown_remaining() if source == "linkedin"
+            else _source_cooldown_remaining(source) if source in PUBLIC_ATS_RATE_LIMIT_SOURCES
+            else 0.0
         )
         if source == "linkedin" and cooldown_remaining > 0:
             metadata["rate_limited"] = True
+        if source in PUBLIC_ATS_RATE_LIMIT_SOURCES and cooldown_remaining > 0:
+            metadata.update({
+                "rate_limited": True,
+                "http_status": 429,
+                "error": "HTTP 429",
+                "error_type": "HTTPError",
+                "retry_after_seconds": source_state.get(source, {}).get(
+                    "rate_limit_retry_after_seconds"
+                ),
+            })
         if metadata["rate_limited"]:
             outcome = "rate_limited"
         else:
@@ -3612,7 +5775,7 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             cooldown_seconds=cooldown_seconds,
             rate_limit_detected_at=(
                 source_state.get(source, {}).get("rate_limit_detected_at")
-                if source == "linkedin" and metadata["rate_limited"] else None
+                if (source == "linkedin" or source in PUBLIC_ATS_RATE_LIMIT_SOURCES) and metadata["rate_limited"] else None
             ),
             request_metrics=request_metrics,
         )
@@ -3654,14 +5817,24 @@ async def notification_worker() -> None:
                 recover_stale_claims,
             )
 
-            await asyncio.to_thread(recover_stale_claims)
-
-            if credentials_available():
+            legacy_notifications_enabled = _legacy_notifications_enabled(
+                get_config(), credentials_available()
+            )
+            if legacy_notifications_enabled:
+                await asyncio.to_thread(recover_stale_claims)
                 delivered = await asyncio.to_thread(deliver_queued_notifications, 10)
                 if delivered:
                     log.info("telegram: delivered=%s", delivered)
         except Exception:
-            log.exception("telegram worker failed")
+            log.exception("legacy Telegram worker failed")
+
+        # Member delivery is independent of the legacy admin chat ID.
+        try:
+            user_delivered = await asyncio.to_thread(user_notifications.dispatch, DB_PATH, 20, MATCHER_RULES_VERSION)
+            if user_delivered:
+                log.info("telegram: per-user delivered=%s", user_delivered)
+        except Exception:
+            log.exception("per-user Telegram worker failed")
 
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=15)
@@ -3682,6 +5855,8 @@ async def scheduler() -> None:
                 continue
             if name == "linkedin" and _linkedin_cooldown_remaining() > 0:
                 continue
+            if name in PUBLIC_ATS_RATE_LIMIT_SOURCES and _source_cooldown_remaining(name) > 0:
+                continue
             if source_state.get(name, {}).get("running"):
                 continue
             interval = max(60, int(intervals.get(name, 600)))
@@ -3701,10 +5876,16 @@ async def scheduler() -> None:
 async def startup() -> None:
     init_db()
     restore_linkedin_rate_limit_state()
+    restore_workday_rate_limit_state()
+    restore_source_rate_limit_state("smartrecruiters")
+    restore_source_rate_limit_state("workable")
+    restore_source_rate_limit_state("keka")
+    restore_source_rate_limit_state("darwinbox")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
     refresh_notification_decisions(config)
+    refresh_configured_user_evaluations()
     app.state.scheduler_task = asyncio.create_task(scheduler())
     app.state.notification_worker_task = asyncio.create_task(notification_worker())
 
@@ -3721,6 +5902,7 @@ async def shutdown() -> None:
 SESSION_COOKIE_NAME = "job_beeper_session"
 CSRF_COOKIE_NAME = "job_beeper_csrf"
 CSRF_HEADER_NAME = "X-CSRF-Token"
+GOOGLE_STATE_COOKIE_NAME = "job_beeper_google_state"
 
 
 class AuthLoginRequest(BaseModel):
@@ -3747,6 +5929,27 @@ def _expected_login_origin(request: Request):
     return expected
 
 
+def _issue_user_session(request: Request, response: Response, user: dict[str, Any]) -> None:
+    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if previous_session:
+        auth.revoke_session(DB_PATH, previous_session)
+    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
+    with connect_sqlite(DB_PATH) as conn:
+        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
+    cookie_options = {
+        "path": "/",
+        "secure": _auth_cookie_secure(),
+        "samesite": "lax",
+        "max_age": auth.SESSION_TTL_SECONDS,
+    }
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME, value=session_token, httponly=True, **cookie_options
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME, value=csrf_token, httponly=False, **cookie_options
+    )
+
+
 def get_current_user(request: Request) -> dict[str, Any]:
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     user = auth.get_session_user(DB_PATH, session_token or "")
@@ -3756,12 +5959,10 @@ def get_current_user(request: Request) -> dict[str, Any]:
     return user
 
 
-def require_admin(
+def require_authenticated(
     request: Request,
     user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Administrator access required.")
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         session_token = request.cookies.get(SESSION_COOKIE_NAME, "")
         cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
@@ -3773,6 +5974,14 @@ def require_admin(
             or not auth.validate_csrf(DB_PATH, session_token, header_token)
         ):
             raise HTTPException(status_code=403, detail="CSRF validation failed.")
+    return user
+
+
+def require_admin(
+    user: dict[str, Any] = Depends(require_authenticated),
+) -> dict[str, Any]:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required.")
     return user
 
 
@@ -3806,33 +6015,97 @@ def auth_login(payload: AuthLoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     auth.record_login_attempt(DB_PATH, email, client_ip, success=True)
 
-    # A successful login replaces any browser session cookie already presented,
-    # including a session for a different account. Failed logins leave it intact.
-    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
-    if previous_session:
-        auth.revoke_session(DB_PATH, previous_session)
-    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
-    cookie_options = {
-        "path": "/",
-        "secure": _auth_cookie_secure(),
-        "samesite": "lax",
-        "max_age": auth.SESSION_TTL_SECONDS,
-    }
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=session_token,
-        httponly=True,
-        **cookie_options,
-    )
-    response.set_cookie(
-        key=CSRF_COOKIE_NAME,
-        value=csrf_token,
-        httponly=False,
-        **cookie_options,
-    )
+    # A successful login replaces any browser session cookie already presented.
+    _issue_user_session(request, response, user)
     return {"user": user}
+
+
+@app.get("/api/auth/google/status")
+def google_auth_status():
+    try:
+        configured = google_oauth.load_config() is not None
+    except ValueError:
+        configured = False
+    return {"enabled": configured}
+
+
+@app.get("/api/auth/google/start")
+def google_auth_start():
+    try:
+        config = google_oauth.load_config()
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if config is None:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+    authorization_url = google_oauth.create_authorization_url(DB_PATH, config)
+    state = parse_qs(urlsplit(authorization_url).query).get("state", [""])[0]
+    response = RedirectResponse(authorization_url, status_code=302)
+    response.set_cookie(
+        key=GOOGLE_STATE_COOKIE_NAME,
+        value=state,
+        httponly=True,
+        secure=_auth_cookie_secure(),
+        samesite="lax",
+        max_age=google_oauth.STATE_TTL_SECONDS,
+        path="/api/auth/google",
+    )
+    return response
+
+
+@app.get("/api/auth/google/callback")
+def google_auth_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    error: str = "",
+):
+    failure_url = "/dashboard/?google_auth=failed"
+
+    def finish_redirect(url: str):
+        redirect = RedirectResponse(url, status_code=303)
+        redirect.delete_cookie(
+            key=GOOGLE_STATE_COOKIE_NAME,
+            httponly=True,
+            secure=_auth_cookie_secure(),
+            samesite="lax",
+            path="/api/auth/google",
+        )
+        return redirect
+
+    # Validate and consume the one-time state before interpreting either a
+    # successful authorization or Google's cancellation/error response.
+    browser_state = request.cookies.get(GOOGLE_STATE_COOKIE_NAME, "")
+    if not browser_state or not state or not secrets.compare_digest(browser_state, state):
+        return finish_redirect(failure_url)
+    state_data = google_oauth.consume_authorization_state(DB_PATH, state)
+    if state_data is None:
+        return finish_redirect(failure_url)
+    if error:
+        return finish_redirect("/dashboard/?google_auth=cancelled")
+
+    try:
+        config = google_oauth.load_config()
+    except ValueError:
+        return finish_redirect(failure_url)
+    if config is None:
+        return finish_redirect(failure_url)
+
+    expected_nonce, code_verifier = state_data
+    try:
+        identity = google_oauth.exchange_code_for_identity(code, code_verifier, config)
+        if not google_oauth.validate_nonce(identity["claims"], expected_nonce):
+            raise ValueError("Google identity nonce validation failed.")
+        user = auth.create_or_link_google_user(
+            DB_PATH, identity["email"], identity["subject"]
+        )
+        user_preferences.ensure_user_preferences(DB_PATH, user["id"])
+    except Exception as exc:
+        log.warning("Google sign-in failed error_type=%s", type(exc).__name__)
+        return finish_redirect(failure_url)
+
+    response = finish_redirect("/dashboard/")
+    _issue_user_session(request, response, user)
+    return response
 
 
 @app.get("/api/auth/me")
@@ -3878,6 +6151,192 @@ def health():
 
 
 
+@app.get("/api/preferences")
+def read_user_preferences(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if preferences["onboarding_complete"]:
+        ensure_user_job_evaluations_initialized(user["id"], preferences)
+    return {"preferences": preferences}
+
+
+@app.post("/api/preferences/resume")
+async def parse_user_resume(
+    file: UploadFile = File(...),
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    """Parse an optional resume into suggestions; never persist the uploaded file or preferences."""
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Resume-assisted preferences are for member accounts.")
+    filename = file.filename or "resume"
+    suffix = Path(filename).suffix.lower()
+    allowed_types = {
+        ".pdf": {"application/pdf", "application/octet-stream"},
+        ".docx": {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/octet-stream",
+        },
+    }
+    if suffix not in allowed_types or (file.content_type and file.content_type.lower() not in allowed_types[suffix]):
+        await file.close()
+        raise HTTPException(status_code=422, detail="File extension and content type must match a PDF or DOCX resume.")
+    try:
+        # Read at most one byte beyond the hard limit, rather than trusting Content-Length.
+        content = await file.read(resume_parser.MAX_RESUME_BYTES + 1)
+        result = resume_parser.parse_resume(filename, content)
+    except resume_parser.ResumeParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        await file.close()
+    # Deliberately return only bounded suggestions. No file, path, raw text, or DB write.
+    return result
+
+
+@app.get("/api/notifications/settings")
+def read_user_notification_settings(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    settings = user_notifications.get_settings(DB_PATH, user["id"])
+    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    return {"settings": settings, "telegram_connected": bool(connection)}
+
+
+@app.put("/api/notifications/settings")
+def update_user_notification_settings(payload: dict[str, Any], user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    if set(payload) != {"enabled"} or not isinstance(payload.get("enabled"), bool):
+        raise HTTPException(status_code=422, detail="Provide only an enabled boolean.")
+    if payload["enabled"] and not telegram_linking.get_connection(DB_PATH, user["id"]):
+        raise HTTPException(status_code=409, detail="Connect a private Telegram chat before enabling notifications.")
+    try:
+        settings = user_notifications.set_enabled(DB_PATH, user["id"], payload["enabled"])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"settings": settings}
+
+
+@app.get("/api/telegram/status")
+def telegram_connection_status(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+    configured = bool(
+        username
+        and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username)
+        and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
+    )
+    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    return {"configured": configured, "bot_username": username if configured else None,
+            "connection": connection or {"connected": False}}
+
+
+@app.post("/api/telegram/link")
+def create_telegram_link(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+    configured = bool(
+        username
+        and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username)
+        and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
+    )
+    if not configured:
+        raise HTTPException(status_code=503, detail="Telegram linking is not configured yet.")
+    token, expires_at = telegram_linking.create_link_token(DB_PATH, user["id"])
+    return {"url": f"https://t.me/{username}?start={token}", "expires_in_seconds": telegram_linking.TOKEN_TTL_SECONDS,
+            "expires_at": expires_at}
+
+
+@app.delete("/api/telegram/link")
+def disconnect_telegram_account(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    disconnected = telegram_linking.disconnect(DB_PATH, user["id"])
+    return {"connected": False, "disconnected": disconnected}
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_link_webhook(request: Request, background_tasks: BackgroundTasks):
+    expected_secret = os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", "")
+    supplied_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not expected_secret or not supplied_secret or not secrets.compare_digest(expected_secret, supplied_secret):
+        raise HTTPException(status_code=403, detail="Webhook authentication failed.")
+    if not os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN"):
+        raise HTTPException(status_code=503, detail="Telegram bot is not configured.")
+    if request.headers.get("content-length", "").isdigit() and int(request.headers["content-length"]) > 65536:
+        raise HTTPException(status_code=413, detail="Telegram update is too large.")
+    try:
+        raw_update = await request.body()
+        if len(raw_update) > 65536:
+            raise HTTPException(status_code=413, detail="Telegram update is too large.")
+        update = json.loads(raw_update)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.") from None
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.")
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return {"ok": True}
+    chat = message.get("chat")
+    text = message.get("text")
+    if not isinstance(chat, dict) or not isinstance(text, str):
+        return {"ok": True}
+    chat_id = str(chat.get("id", ""))
+    chat_type = str(chat.get("type", ""))
+    match = re.fullmatch(r"/start(?:@\w+)?\s+([A-Za-z0-9_-]{20,128})", text.strip())
+    if match is None:
+        return {"ok": True}
+    try:
+        linked_user_id = telegram_linking.consume_link_token(
+            DB_PATH, match.group(1), chat_id, chat_type
+        )
+    except ValueError:
+        log.warning("Telegram link attempt rejected: chat is already linked to another account")
+        return {"ok": True}
+    if linked_user_id is not None:
+        background_tasks.add_task(
+            _send_telegram_link_confirmation,
+            os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN", ""), chat_id,
+        )
+    return {"ok": True}
+
+
+def _send_telegram_link_confirmation(bot_token: str, chat_id: str) -> None:
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": "Your Telegram account is now connected to Job Beeper. You can return to the dashboard."},
+            timeout=10,
+        ).raise_for_status()
+    except requests.RequestException:
+        log.warning("Could not send Telegram account-link confirmation")
+
+
+@app.put("/api/preferences")
+def update_user_preferences(
+    payload: dict[str, Any],
+    background_tasks: BackgroundTasks,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    if user["role"] == "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator candidate preferences are managed through /api/config.",
+        )
+    try:
+        saved = user_preferences.save_user_preferences(DB_PATH, user["id"], payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    background_tasks.add_task(refresh_user_job_evaluations, user["id"], saved)
+    return {"preferences": saved}
+
+
 @app.get("/api/config", dependencies=[Depends(require_admin)])
 def read_config():
     return {
@@ -3890,8 +6349,7 @@ def read_config():
 @app.put("/api/config", dependencies=[Depends(require_admin)])
 def update_config(payload: dict[str, Any]):
     saved = save_config(payload)
-    refresh_job_evaluations(saved)
-    refresh_notification_decisions(saved)
+    user_preferences.sync_first_admin_preferences(DB_PATH, saved)
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
@@ -3901,7 +6359,7 @@ def latency_summary(hours: int = 24):
     cutoff = iso(now() - dt.timedelta(hours=hours))
 
     source_placeholders = ",".join("?" for _ in SOURCE_NAMES)
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         rows = conn.execute(f"""
             SELECT source, discovery_latency_seconds
             FROM jobs
@@ -3941,11 +6399,374 @@ def latency_summary(hours: int = 24):
     return {"hours": hours, "sources": summary}
 
 
+@app.post("/api/discovery/companies/scan", dependencies=[Depends(require_admin)])
+def discover_company_boards(payload: dict[str, Any]):
+    """Register one employer and discover public ATS board candidates for review."""
+    company_name = str(payload.get("company_name") or "").strip()
+    website_url = str(payload.get("website_url") or "").strip()
+    careers_url_value = payload.get("careers_url")
+    careers_url = str(careers_url_value).strip() if careers_url_value else None
+    country_value = payload.get("country")
+    country = str(country_value).strip()[:80] if country_value else None
+    if not company_name or not website_url:
+        raise HTTPException(status_code=422, detail="company_name and website_url are required.")
+    try:
+        result = board_discovery.discover_public_careers(
+            company_name, website_url, careers_url
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    domain = board_discovery.domain_key(result["website_url"])
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO employer_companies(
+                   company_name,domain,website_url,careers_url,country,discovery_status,
+                   pages_checked,last_discovered_at,error_count,created_at,updated_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(domain) DO UPDATE SET
+                   company_name=excluded.company_name,
+                   website_url=excluded.website_url,
+                   careers_url=excluded.careers_url,
+                   country=COALESCE(excluded.country,employer_companies.country),
+                   discovery_status=excluded.discovery_status,
+                   pages_checked=excluded.pages_checked,
+                   last_discovered_at=excluded.last_discovered_at,
+                   error_count=excluded.error_count,
+                   updated_at=excluded.updated_at""",
+            (
+                company_name, domain, result["website_url"], result["careers_url"],
+                country, result["discovery_status"], result["pages_checked"],
+                timestamp, len(result["errors"]), timestamp, timestamp,
+            ),
+        )
+        company_row = conn.execute(
+            "SELECT id FROM employer_companies WHERE domain=?", (domain,)
+        ).fetchone()
+        company_id = int(company_row[0])
+        stored_ids: list[int] = []
+        for board in result["boards"]:
+            conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,
+                       created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,'discovered',?,?,?)
+                   ON CONFLICT(company_id,provider,board_key) DO UPDATE SET
+                       board_url=excluded.board_url,
+                       discovered_from=excluded.discovered_from,
+                       confidence=excluded.confidence,
+                       collector_source=excluded.collector_source,
+                       collector_available=excluded.collector_available,
+                       last_seen_at=excluded.last_seen_at,
+                       review_status=CASE
+                           WHEN ats_board_registry.review_status IN ('active','rejected')
+                           THEN ats_board_registry.review_status
+                           ELSE 'discovered' END,
+                       updated_at=excluded.updated_at""",
+                (
+                    company_id, board["provider"], board["board_key"],
+                    board["board_url"], board["discovered_from"],
+                    board.get("confidence", "medium"), board.get("collector_source"),
+                    int(bool(board.get("collector_available"))), timestamp,
+                    timestamp, timestamp,
+                ),
+            )
+            row = conn.execute(
+                "SELECT id FROM ats_board_registry WHERE company_id=? AND provider=? AND board_key=?",
+                (company_id, board["provider"], board["board_key"]),
+            ).fetchone()
+            if row:
+                stored_ids.append(int(row[0]))
+        conn.commit()
+
+    return {
+        "company_id": company_id,
+        "company_name": company_name,
+        "domain": domain,
+        "discovery_status": result["discovery_status"],
+        "pages_checked": result["pages_checked"],
+        "boards_discovered": len(result["boards"]),
+        "board_ids": stored_ids,
+        "boards": result["boards"],
+        "errors": result["errors"],
+        "activation_note": "Discovery never enables a source. Review and verify each board before connecting it to a collector.",
+    }
+
+
+@app.get("/api/discovery/companies", dependencies=[Depends(require_admin)])
+def list_discovered_companies(limit: int = 100):
+    limit = max(1, min(int(limit), 500))
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT c.id,c.company_name,c.domain,c.website_url,c.careers_url,c.country,
+                      c.discovery_status,c.pages_checked,c.last_discovered_at,c.error_count,
+                      COUNT(b.id) AS board_count
+               FROM employer_companies c LEFT JOIN ats_board_registry b ON b.company_id=c.id
+               GROUP BY c.id ORDER BY c.updated_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return {"companies": [dict(row) for row in rows]}
+
+
+@app.get("/api/discovery/boards", dependencies=[Depends(require_admin)])
+def list_discovered_boards(status: str | None = None, limit: int = 250):
+    limit = max(1, min(int(limit), 1000))
+    query = """SELECT b.id,b.company_id,c.company_name,c.domain,b.provider,b.board_key,
+                      b.board_url,b.discovered_from,b.confidence,b.collector_source,
+                      b.collector_available,b.review_status,b.last_verified_at,
+                      b.last_seen_at,b.last_error_type
+               FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id"""
+    values: list[Any] = []
+    if status:
+        if status not in {"discovered", "reviewed", "verified", "rejected", "active"}:
+            raise HTTPException(status_code=422, detail="Unsupported board review status.")
+        query += " WHERE b.review_status=?"
+        values.append(status)
+    query += " ORDER BY b.last_seen_at DESC,b.id DESC LIMIT ?"
+    values.append(limit)
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(query, values).fetchall()
+    return {"boards": [dict(row) for row in rows]}
+
+
+@app.post("/api/discovery/boards/{board_id}/verify", dependencies=[Depends(require_admin)])
+def verify_discovered_board(board_id: int):
+    """Probe a known public ATS endpoint; verification never enables polling."""
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """SELECT id,provider,board_key,board_url,collector_available
+               FROM ats_board_registry WHERE id=?""", (board_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Discovered board was not found.")
+    candidate = dict(row)
+    if not candidate["collector_available"]:
+        raise HTTPException(status_code=409, detail="This ATS has been discovered but its V2 collector is not implemented yet.")
+    try:
+        result = board_discovery.probe_public_board(candidate)
+    except (ValueError, requests.RequestException) as exc:
+        error_type = type(exc).__name__
+        with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+            conn.execute(
+                "UPDATE ats_board_registry SET last_error_type=?,updated_at=? WHERE id=?",
+                (error_type, iso(now()), board_id),
+            )
+            conn.commit()
+        raise HTTPException(
+            status_code=502,
+            detail=f"Public {candidate['provider']} board verification failed ({error_type}).",
+        ) from exc
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """UPDATE ats_board_registry
+               SET review_status='verified',last_verified_at=?,last_seen_at=?,
+                   last_error_type=NULL,updated_at=? WHERE id=?""",
+            (timestamp, timestamp, timestamp, board_id),
+        )
+        conn.commit()
+    return {"board_id": board_id, **result, "scheduler_enabled": False}
+
+
+@app.post("/api/discovery/boards/{board_id}/review", dependencies=[Depends(require_admin)])
+def review_discovered_board(board_id: int, payload: dict[str, Any]):
+    status = str(payload.get("status") or "").strip().lower()
+    if status not in {"reviewed", "rejected"}:
+        raise HTTPException(status_code=422, detail="status must be 'reviewed' or 'rejected'.")
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        cursor = conn.execute(
+            "UPDATE ats_board_registry SET review_status=?,updated_at=? WHERE id=? AND review_status!='active'",
+            (status, iso(now()), board_id),
+        )
+        if cursor.rowcount == 0:
+            existing = conn.execute("SELECT review_status FROM ats_board_registry WHERE id=?", (board_id,)).fetchone()
+            if not existing:
+                raise HTTPException(status_code=404, detail="Discovered board was not found.")
+            if existing[0] == "active":
+                raise HTTPException(status_code=409, detail="Active boards cannot be changed through discovery review.")
+        conn.commit()
+    return {"board_id": board_id, "review_status": status}
+
+
+@app.post("/api/discovery/boards/{board_id}/activate", dependencies=[Depends(require_admin)])
+def activate_discovered_board(board_id: int):
+    """Attach a verified board to its collector and enable that source.
+
+    The first successful poll is marked as historical baseline so an existing
+    vacancy archive does not trigger a backfill alert burst.
+    """
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """SELECT b.id,b.provider,b.board_key,b.board_url,b.collector_source,
+                      b.collector_available,b.review_status,c.company_name
+               FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id
+               WHERE b.id=?""", (board_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Discovered board was not found.")
+    board = dict(row)
+    if board["review_status"] != "verified":
+        raise HTTPException(status_code=409, detail="Verify this public board endpoint before activation.")
+    if not board["collector_available"] or not board["collector_source"]:
+        raise HTTPException(status_code=409, detail="This ATS has been discovered but no supported V2 collector is available.")
+
+    source = str(board["collector_source"])
+    provider = str(board["provider"])
+    key = str(board["board_key"])
+    company = str(board["company_name"])
+    registry_entry: dict[str, Any]
+    config_key: str
+    if provider == "workday":
+        config_key = "workday_boards"
+        registry_entry = {"url": board["board_url"], "company": company}
+    elif provider == "greenhouse":
+        config_key = "greenhouse_boards"
+        registry_entry = {"token": key, "company": company}
+    elif provider == "ashby":
+        config_key = "ashby_boards"
+        registry_entry = {"board": key, "company": company}
+    elif provider == "lever":
+        config_key = "lever_boards"
+        registry_entry = {
+            "site": key, "company": company,
+            "instance": "eu" if ".eu." in (urlsplit(board["board_url"]).hostname or "") else "global",
+        }
+    elif provider == "smartrecruiters":
+        config_key = "smartrecruiters_boards"
+        registry_entry = {"company_identifier": key, "company": company}
+    elif provider == "workable":
+        config_key = "workable_boards"
+        registry_entry = {"account": key, "company": company}
+    elif provider == "keka":
+        config_key = "keka_boards"
+        registry_entry = {"careers_url": board["board_url"], "company": company}
+    elif provider == "darwinbox":
+        config_key = "darwinbox_boards"
+        registry_entry = {"careers_url": board["board_url"], "company": company}
+    else:
+        raise HTTPException(status_code=409, detail="This board provider has no activation mapping.")
+
+    config = get_config()
+    current_entries = list(config.get(config_key) or [])
+
+    def same_configured_board(item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        if provider == "greenhouse":
+            return str(item.get("token") or "").strip().lower() == key.lower()
+        if provider == "ashby":
+            return str(item.get("board") or "").strip().lower() == key.lower()
+        if provider == "lever":
+            item_instance = str(item.get("instance") or "global").strip().lower()
+            expected_instance = "eu" if ".eu." in (urlsplit(board["board_url"]).hostname or "") else "global"
+            return str(item.get("site") or "").strip().lower() == key.lower() and item_instance == expected_instance
+        if provider == "smartrecruiters":
+            value = item.get("company_identifier") or item.get("identifier")
+            return isinstance(value, str) and value.strip().lower() == key.lower()
+        if provider == "workable":
+            value = item.get("account") or item.get("subdomain")
+            return isinstance(value, str) and value.strip().lower() == key.lower()
+        if provider == "workday":
+            parsed = _parse_workday_board_url(item.get("url"))
+            return bool(parsed and f"{parsed['tenant']}:{parsed['site']}".lower() == key.lower())
+        if provider in {"keka", "darwinbox"}:
+            value = item.get("careers_url") or item.get("url")
+            detected = board_discovery.detect_ats_board(value) if isinstance(value, str) else None
+            return bool(detected and detected.get("provider") == provider and str(detected.get("board_key", "")).lower() == key.lower())
+        return False
+
+    existing = next((
+        item for item in current_entries
+        if isinstance(item, dict) and str(item.get("registry_id") or "") == str(board_id)
+    ), None)
+    if existing is None:
+        existing = next((item for item in current_entries if same_configured_board(item)), None)
+        if existing is not None:
+            linked_id = existing.get("registry_id")
+            if linked_id not in (None, "", board_id, str(board_id)):
+                raise HTTPException(status_code=409, detail="This board is already linked to a different registry entry.")
+            existing["registry_id"] = board_id
+    if existing is None:
+        registry_entry["registry_id"] = board_id
+        current_entries.append(registry_entry)
+    config[config_key] = current_entries
+    config.setdefault("source_enabled", {})[source] = True
+    try:
+        saved = save_config(config)
+    except HTTPException:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Board configuration could not be activated: {type(exc).__name__}.") from exc
+
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """UPDATE ats_board_registry
+               SET review_status='active',baseline_pending=1,last_verified_at=COALESCE(last_verified_at,?),
+                   last_seen_at=?,last_error_type=NULL,updated_at=? WHERE id=?""",
+            (timestamp, timestamp, timestamp, board_id),
+        )
+        conn.commit()
+    refresh_job_evaluations(saved)
+    refresh_notification_decisions(saved)
+    refresh_configured_user_evaluations()
+    interval = int(saved.get("poll_seconds", {}).get(source, 120))
+    return {
+        "board_id": board_id, "provider": provider, "collector_source": source,
+        "review_status": "active", "source_enabled": True,
+        "poll_interval_seconds": interval, "baseline_pending": True,
+        "first_poll_note": "Existing board inventory will be ingested silently once before fresh-job alerts are eligible.",
+    }
+
+
+@app.get("/api/source-status/summary", dependencies=[Depends(require_admin)])
+def source_status_summary():
+    """Return the reduced source summary to administrators only."""
+    config = get_config()
+    with connect_sqlite(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs
+            FROM source_runs sr
+            JOIN (
+                SELECT source, MAX(finished_at) AS latest_finished_at
+                FROM source_runs GROUP BY source
+            ) latest
+              ON latest.source = sr.source AND latest.latest_finished_at = sr.finished_at
+            ORDER BY sr.source
+        """).fetchall()
+    history = {
+        row[0]: {"last_run": row[1], "jobs_seen": row[2] or 0, "new_jobs": row[3] or 0}
+        for row in rows
+    }
+    sources = []
+    for source in SOURCE_NAMES:
+        item = history.get(source, {})
+        runtime = source_state.get(source, {})
+        sources.append({
+            "source": source,
+            "enabled": bool(config.get("source_enabled", {}).get(source, True)),
+            "last_run": item.get("last_run"),
+            "jobs_seen": item.get("jobs_seen", 0),
+            "new_jobs": item.get("new_jobs", 0),
+            "runtime": {
+                "running": bool(runtime.get("running")),
+                "last_success": runtime.get("last_success"),
+            },
+        })
+    return {"sources": sources}
+
+
 @app.get("/api/source-status", dependencies=[Depends(require_admin)])
 def source_status():
     config = get_config()
     cutoff = iso(now() - dt.timedelta(hours=24))
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         latest_rows = conn.execute("""
             SELECT
                 sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs, sr.error,
@@ -4163,7 +6984,7 @@ def source_status():
 @app.get("/api/dedupe-candidates", dependencies=[Depends(require_admin)])
 def dedupe_candidates(limit: int = 100):
     limit = max(1, min(limit, 500))
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         source_placeholders = ",".join("?" for _ in SOURCE_NAMES)
         rows = conn.execute(f"""
@@ -4227,7 +7048,7 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     cutoff = iso(current_day_start_utc()) if today_only else iso(
         now() - dt.timedelta(minutes=minutes)
     )
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT
@@ -4254,34 +7075,142 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     }
 
 
-@app.get("/api/jobs", dependencies=[Depends(require_admin)])
+@app.get("/api/jobs")
 def jobs(
     minutes: int = 60,
     limit: int = 100,
     today_only: bool = False,
     q: str = "",
+    search: str = "",
+    page: int | None = None,
+    per_page: int | None = None,
+    status: str | None = None,
+    source: str = "",
+    min_score: int = 0,
+    max_age_hours: int | None = None,
+    sort: str = "newest",
+    sort_by: str | None = None,
+    sort_order: str | None = None,
+    alertable_only: bool = False,
+    remote_only: bool = False,
+    user: dict[str, Any] = Depends(require_authenticated),
 ):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening the job feed.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     minutes = max(1, min(minutes, 10080))
-    limit = max(1, min(limit, 500))
+    legacy_limit = max(1, min(limit, 500))
+    paginated = page is not None or per_page is not None
+    page_number = max(1, int(page or 1))
+    page_size = max(1, min(int(per_page or legacy_limit), 100)) if paginated else legacy_limit
+    offset = (page_number - 1) * page_size if paginated else 0
     cutoff = (
         iso(current_day_start_utc())
         if today_only
         else iso(now() - dt.timedelta(minutes=minutes))
     )
 
-    # Apply text search in SQLite before LIMIT. Otherwise a relevant older
-    # posting can be hidden by the newest 500 rows and never reach the UI.
-    query = (q or "").strip()[:200]
+    query = (search or q or "").strip()[:200]
     escaped_query = (
         query.replace("\\", "\\\\")
         .replace("%", "\\%")
         .replace("_", "\\_")
     )
     search_pattern = f"%{escaped_query.lower()}%" if query else "%"
+    source_filter = (source or "").strip().casefold()[:64]
+    min_score = max(0, min(int(min_score), 100))
+    max_age_hours = None if max_age_hours is None else max(1, min(int(max_age_hours), 72))
+    status = (status or ("all" if user["role"] == "admin" else "matched")).strip().casefold()
+    if status not in {"matched", "all", "unmatched"}:
+        raise HTTPException(status_code=422, detail="status must be matched, all, or unmatched.")
+    if user["role"] != "admin" and status != "matched":
+        raise HTTPException(status_code=403, detail="Users can only view their matched opportunities.")
+    legacy_sort = sort if sort in {"newest", "match", "company"} else "newest"
+    sort_by = sort_by or {
+        "newest": "created_at", "match": "match_score", "company": "company"
+    }[legacy_sort]
+    if sort_by not in {"created_at", "match_score", "company"}:
+        raise HTTPException(status_code=422, detail="sort_by must be created_at, match_score, or company.")
+    sort_order = (sort_order or ("asc" if sort_by == "company" else "desc")).casefold()
+    if sort_order not in {"asc", "desc"}:
+        raise HTTPException(status_code=422, detail="sort_order must be asc or desc.")
+    age_cutoff = iso(now() - dt.timedelta(hours=max_age_hours)) if max_age_hours else None
+    threshold = int(preferences.get("match_threshold", 55))
 
-    with sqlite3.connect(DB_PATH) as conn:
+    score_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.score, 0) ELSE COALESCE(e.score, 0) END"
+    match_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END"
+    alertable_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.alertable, 0) ELSE COALESCE(e.alertable, 0) END"
+    where_sql = """
+        WHERE (?='all'
+          OR (?='matched' AND (CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END)=1)
+          OR (?='unmatched' AND ?='admin' AND COALESCE(ge.match, 0)=0))
+          AND j.discovered_at >= ?
+          AND LOWER(
+                COALESCE(j.company, '') || ' ' ||
+                COALESCE(j.title, '') || ' ' ||
+                COALESCE(j.location, '') || ' ' ||
+                COALESCE(j.source, '') || ' ' ||
+                COALESCE(j.source_job_id, '') || ' ' ||
+                COALESCE(j.description, '') || ' ' ||
+                COALESCE(j.source_details_json, '{{}}') || ' ' ||
+                COALESCE(e.reasons_json, '') || ' ' ||
+                COALESCE(ge.reasons_json, '')
+              ) LIKE ? ESCAPE '\\'
+          AND (?='' OR LOWER(j.source)=?)
+          AND (?=0 OR (
+                {score_sql} >= ?
+                AND (? < ? OR {match_sql}=1)
+              ))
+          AND (? IS NULL OR julianday(COALESCE(j.source_posted_at, j.discovered_at)) >= julianday(?))
+          AND (?=0 OR {alertable_sql}=1)
+          AND (?=0 OR LOWER(COALESCE(j.location, '') || ' ' || COALESCE(j.description, '')) LIKE '%remote%')
+    """.format(score_sql=score_sql, match_sql=match_sql, alertable_sql=alertable_sql)
+
+    base_params = (
+        user["id"], status, status, user["role"], status, user["role"],
+        cutoff, search_pattern,
+        source_filter, source_filter,
+        min_score, user["role"], min_score, min_score, threshold, user["role"],
+        age_cutoff, age_cutoff,
+        int(bool(alertable_only)), user["role"],
+        int(bool(remote_only)),
+    )
+
+    order_expressions = {
+        "created_at": "COALESCE(j.source_posted_at, j.discovered_at)",
+        "match_score": score_sql,
+        "company": "j.company COLLATE NOCASE",
+    }
+    order_sql = (
+        "ORDER BY " + order_expressions[sort_by] + " " + sort_order.upper()
+        + ", COALESCE(j.source_posted_at, j.discovered_at) DESC, j.id DESC"
+    )
+    order_params = (user["role"],) if sort_by == "match_score" else ()
+
+    count_params = (user["id"], *base_params[1:])
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        total = int(conn.execute(
+            "SELECT COUNT(*) FROM jobs j "
+            "LEFT JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=? "
+            "LEFT JOIN job_evaluations ge ON ge.job_id=j.id "
+            + where_sql,
+            count_params,
+        ).fetchone()[0])
+        page_count = (total + page_size - 1) // page_size if total else 0
+        if paginated and page_count:
+            page_number = min(page_number, page_count)
+            offset = (page_number - 1) * page_size
+        elif paginated and not page_count:
+            page_number = 1
+            offset = 0
+
+        rows = conn.execute(
+            """
             SELECT
                 j.*,
                 e.match AS evaluation_match,
@@ -4291,29 +7220,26 @@ def jobs(
                 e.experience_max_years AS evaluation_experience_max_years,
                 e.alertable AS evaluation_alertable,
                 e.alertability_reasons_json AS evaluation_alertability_reasons_json,
+                ge.alertable AS admin_evaluation_alertable,
+                ge.alertability_reasons_json AS admin_evaluation_alertability_reasons_json,
                 nl.status AS notification_status,
                 nl.decision_reason_json AS notification_decision_reasons_json,
                 nl.sent_at AS notification_sent_at,
                 nl.last_error AS notification_last_error,
                 nl.candidate_job_id AS notification_candidate_job_id
             FROM jobs j
-            LEFT JOIN job_evaluations e ON e.job_id=j.id
+            LEFT JOIN user_job_evaluations e
+              ON e.job_id=j.id AND e.user_id=?
+            LEFT JOIN job_evaluations ge ON ge.job_id=j.id
             LEFT JOIN notification_ledger nl
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
-            WHERE j.discovered_at >= ?
-              AND LOWER(
-                    COALESCE(j.company, '') || ' ' ||
-                    COALESCE(j.title, '') || ' ' ||
-                    COALESCE(j.location, '') || ' ' ||
-                    COALESCE(j.source, '') || ' ' ||
-                    COALESCE(j.source_job_id, '') || ' ' ||
-                    COALESCE(j.description, '') || ' ' ||
-                    COALESCE(j.source_details_json, '{}')
-                  ) LIKE ? ESCAPE '\\'
-            ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
-                     j.discovered_at DESC
-            LIMIT ?
-        """, (cutoff, search_pattern, limit)).fetchall()
+             AND ?='admin'
+            """
+            + where_sql
+            + " " + order_sql
+            + " LIMIT ? OFFSET ?",
+            (user["id"], user["role"], *base_params[1:], *order_params, page_size, offset),
+        ).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:
@@ -4335,22 +7261,33 @@ def jobs(
         item["source_details"] = (
             parsed_source_details if isinstance(parsed_source_details, dict) else {}
         )
-        # Telegram reads job_evaluations and notification_ledger directly.
-        # The dashboard deliberately returns those same decisions rather than
-        # independently re-running the matcher at request time.
         item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
         score = item.pop("evaluation_score", None)
         item["match_score"] = int(score or 0)
-        item["match_reasons"] = parse_json_list(
-            item.pop("evaluation_reasons_json", None)
-        )
+        item["match_reasons"] = parse_json_list(item.pop("evaluation_reasons_json", None))
         exp_min = item.pop("evaluation_experience_min_years", None)
         exp_max = item.pop("evaluation_experience_max_years", None)
-        item["experience_min_years"] = exp_min
-        item["experience_max_years"] = exp_max
-        item["alertable"] = bool(item.pop("evaluation_alertable", 0) or 0)
+        item["experience_min_years"] = exp_min if exp_min is not None else item.get("experience_min_years")
+        item["experience_max_years"] = exp_max if exp_max is not None else item.get("experience_max_years")
+        item["experience_provenance"] = item.get("experience_provenance") or "unknown"
+        item["experience_confidence"] = item.get("experience_confidence") or "unknown"
+        if item["experience_provenance"] == "unknown":
+            inferred_experience = _experience_provenance_details(item)
+            item["experience_provenance"] = inferred_experience["provenance"]
+            item["experience_confidence"] = inferred_experience["confidence"]
+            if item["experience_min_years"] is None:
+                item["experience_min_years"] = inferred_experience["min_years"]
+            if item["experience_max_years"] is None:
+                item["experience_max_years"] = inferred_experience["max_years"]
+        user_alertable = item.pop("evaluation_alertable", 0)
+        user_alertability_reasons = item.pop("evaluation_alertability_reasons_json", None)
+        admin_alertable = item.pop("admin_evaluation_alertable", 0)
+        admin_alertability_reasons = item.pop("admin_evaluation_alertability_reasons_json", None)
+        item["alertable"] = bool(
+            (admin_alertable if user["role"] == "admin" else user_alertable) or 0
+        )
         item["alertability_reasons"] = parse_json_list(
-            item.pop("evaluation_alertability_reasons_json", None)
+            admin_alertability_reasons if user["role"] == "admin" else user_alertability_reasons
         )
         item["notification_status"] = item.get("notification_status") or "not_eligible"
         item["notification_decision_reasons"] = parse_json_list(
@@ -4360,13 +7297,22 @@ def jobs(
         item["notification_last_error"] = item.get("notification_last_error")
         item["notification_candidate_job_id"] = item.get("notification_candidate_job_id")
         result.append(item)
-    return {"jobs": result}
+
+    pagination = {
+        "page": page_number,
+        "per_page": page_size,
+        "total": total,
+        "total_pages": page_count,
+        "has_previous": page_number > 1,
+        "has_next": offset + len(result) < total,
+    }
+    return {"jobs": result, "pagination": pagination}
 
 
 @app.get("/api/notification-queue", dependencies=[Depends(require_admin)])
 def notification_queue(limit: int = 100):
     limit = max(1, min(limit, 500))
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT
@@ -4409,7 +7355,7 @@ def notification_queue(limit: int = 100):
 
 @app.get("/api/opportunities/{opportunity_id}", dependencies=[Depends(require_admin)])
 def opportunity_detail(opportunity_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         opportunity = conn.execute("""
             SELECT id, canonical_url, company_norm, title_norm, location_norm,
@@ -4442,10 +7388,17 @@ def llm_shadow_status():
     return shadow_status(DB_PATH)
 
 
-@app.get("/api/daily-summary", dependencies=[Depends(require_admin)])
-def daily_summary():
+@app.get("/api/daily-summary")
+def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening the job feed.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     cutoff = iso(current_day_start_utc())
-    with sqlite3.connect(DB_PATH) as conn:
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         total = conn.execute(
             "SELECT COUNT(*) FROM jobs WHERE discovered_at >= ?", (cutoff,)
@@ -4453,21 +7406,24 @@ def daily_summary():
         matched = conn.execute("""
             SELECT COUNT(*)
             FROM jobs j
-            JOIN job_evaluations e ON e.job_id=j.id
+            JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
             WHERE j.discovered_at >= ? AND e.match=1
-        """, (cutoff,)).fetchone()[0]
-        alertable = conn.execute("""
-            SELECT COUNT(*)
-            FROM jobs j
-            JOIN job_evaluations e ON e.job_id=j.id
-            WHERE j.discovered_at >= ? AND e.alertable=1
-        """, (cutoff,)).fetchone()[0]
-        alerted = conn.execute("""
-            SELECT COUNT(*)
-            FROM notification_ledger nl
-            JOIN jobs j ON j.id=nl.candidate_job_id
-            WHERE j.discovered_at >= ? AND nl.status='sent'
-        """, (cutoff,)).fetchone()[0]
+        """, (user["id"], cutoff)).fetchone()[0]
+        alertable = 0
+        alerted = 0
+        if user["role"] == "admin":
+            alertable = conn.execute("""
+                SELECT COUNT(*)
+                FROM jobs j
+                JOIN job_evaluations e ON e.job_id=j.id
+                WHERE j.discovered_at >= ? AND e.alertable=1
+            """, (cutoff,)).fetchone()[0]
+            alerted = conn.execute("""
+                SELECT COUNT(*)
+                FROM notification_ledger nl
+                JOIN jobs j ON j.id=nl.candidate_job_id
+                WHERE j.discovered_at >= ? AND nl.status='sent'
+            """, (cutoff,)).fetchone()[0]
 
     local_now = now().astimezone(IST)
     return {
@@ -4481,14 +7437,59 @@ def daily_summary():
     }
 
 
-@app.get("/api/jobs/{job_id}", dependencies=[Depends(require_admin)])
-def job_detail(job_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
+@app.get("/api/jobs/{job_id}")
+def job_detail(
+    job_id: int,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening job details.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
+    with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        row = conn.execute(
+            """SELECT j.*, e.match AS likely_match, e.score AS match_score,
+                      e.reasons_json AS match_reasons_json,
+                      e.experience_min_years AS evaluation_experience_min_years,
+                      e.experience_max_years AS evaluation_experience_max_years
+               FROM jobs j
+               JOIN user_job_evaluations e
+                 ON e.job_id=j.id AND e.user_id=?
+               WHERE j.id=?""",
+            (user["id"], job_id),
+        ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
-    return dict(row)
+    result = dict(row)
+    result["experience_min_years"] = (
+        result.pop("evaluation_experience_min_years")
+        if result.get("evaluation_experience_min_years") is not None
+        else result.get("experience_min_years")
+    )
+    result["experience_max_years"] = (
+        result.pop("evaluation_experience_max_years")
+        if result.get("evaluation_experience_max_years") is not None
+        else result.get("experience_max_years")
+    )
+    result["experience_provenance"] = result.get("experience_provenance") or "unknown"
+    result["experience_confidence"] = result.get("experience_confidence") or "unknown"
+    if result["experience_provenance"] == "unknown":
+        inferred_experience = _experience_provenance_details(result)
+        result["experience_provenance"] = inferred_experience["provenance"]
+        result["experience_confidence"] = inferred_experience["confidence"]
+        if result["experience_min_years"] is None:
+            result["experience_min_years"] = inferred_experience["min_years"]
+        if result["experience_max_years"] is None:
+            result["experience_max_years"] = inferred_experience["max_years"]
+    try:
+        result["match_reasons"] = json.loads(result.pop("match_reasons_json") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        result["match_reasons"] = []
+    return result
 
 @app.get("/", include_in_schema=False)
 def root():
