@@ -49,7 +49,7 @@
 
 ## Deployment and branch boundary
 
-- Fixes exist only in local worktree `/tmp/job-radar-pr46-integration`, branch `integration/pr46-v2-rebase-20261108`; not pushed or deployed.
+- Fixes are in pushed branch `integration/pr46-v2-rebase-20261108` at `676dfaf`; not deployed. An isolated synthetic QA app runs on loopback 8005 / tunnel 18005; port 8004 is still the old pre-fix branch.
 - Running port 8004 still uses `/tmp/job-radar-user-preferences` (original PR #46 branch). It was not restarted or changed.
 - Production 8000 and shared development 8001 are untouched. No source enablement, collection schedule, credentials or notification config changed.
 - Next: run Prompt 1 in `docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md` against the candidate build, then Prompt 3. Keep PR #46 draft until browser and GitHub CI verification are green.
