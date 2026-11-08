@@ -126,3 +126,63 @@ Therefore the existing SSH-key-only `ubuntu` login has full passwordless sudo au
 This confirms that the tagged image is present and inspectable with sudo on the Oracle VM. Preserve this exact image ID/tag for verification. The image inspection alone is not a deployment: no evidence has yet been provided that the shared-dev container was recreated or that the candidate is serving on port 8001.
 
 **Next step:** use the same SSH session and prefix privileged operations with `sudo`. Before replacing the shared-dev container, create a fresh online SQLite snapshot immediately before promotion using the existing approved snapshot service, e.g. `sudo systemctl start --no-block job-radar-sqlite-snapshot.service`, then verify the service completion, snapshot timestamp/path/size and `PRAGMA integrity_check`. Do not reuse the older 09:44 UTC snapshot. After the fresh backup is verified, continue with the shared-dev-only runbook above. Keep production port 8000 untouched.
+
+
+## 2026-11-08 — Shared-dev candidate deployed and live source integrations exercised
+
+**This is the current operational state and supersedes earlier notes saying the connected `ubuntu` session could not use Docker.** The owner confirmed `sudo -n -l` permits `(ALL : ALL) ALL` and `(ALL) NOPASSWD: ALL`; all privileged operations below used `sudo`.
+
+### Candidate currently serving on shared dev
+
+- PR #51 branch: `integration/pr46-v2-rebase-20261108`.
+- Exact deployed branch head: `754809fe406e8c5cb09f8e36140ac5cf3e4f7238`.
+- V2 CI run `42474145630`: completed successfully, including py_compile, dashboard JavaScript syntax, focused tests and the full V2 unittest suite.
+- Current image tag: `job-radar-dev-multitenant:b16fb83`.
+- Current image ID: `sha256:75f8855338f150a79794d388c32733305e548165f71dd417cfa04e6443c8c917`.
+- Container `job-radar-dev` was recreated at `2026-11-08T11:07:58.298331082Z`, serving only `127.0.0.1:8001->8000/tcp`; health returned HTTP 200.
+- The first candidate `cf778c1` remains as a locally retained intermediate rollback artifact. Original rollback image `f43cd4a` also remains.
+- Production container `v2-radar-1` on port 8000 was not recreated or restarted. Its health remained HTTP 200 during dev rollout.
+- The external persistent volume `job-radar-dev_radar-dev-data`, read-only config bind mount, project/container identity and `.env` location were preserved.
+
+### Fresh online SQLite backups
+
+1. Before first candidate recreation: `/var/backups/job-radar-daily/development-pre-candidate-20261108T105233Z.sqlite3`; 8,383 jobs; 13 tables; 45,342,720 bytes; `PRAGMA integrity_check=ok`; SHA-256 `412a9232f60f1e25703061f95b370e34d31136170d5eac05ff78533830d9b85a`.
+2. Before the Instahyre parser fix recreation: `/var/backups/job-radar-daily/development-pre-instahyre-fix-20261108T110723Z.sqlite3`; 8,386 jobs; 20 tables; 45,588,480 bytes; integrity `ok`; SHA-256 `295f839e9954ae6ed0edaf928ee91f00f0ab74f6aba2b0b36f92e59326a38216`.
+
+Both are root-owned mode 0600 backups. They were created using SQLite's online backup API from the live dev container and separately integrity-checked after copy.
+
+### Adapter live end-to-end results
+
+The following one-off `radar.run_source` invocations used the live shared-dev DB and exercised source GET → parser/normalization → upsert → canonical opportunity linkage → global/per-user matching/evaluations → notification decision ledger. They did not turn on background scheduler flags. Telegram/Gemini/LLM delivery/enrichment remained off.
+
+| Source | Live outcome | Request/board evidence | DB inserts |
+|---|---|---|---:|
+| Naukri | Successful scheduler cycles; latest observed 302 jobs, no error. Earlier post-deploy cycle observed 307 and inserted 3. | Public relay HTTP 200; one request/one page per poll. | 3 total over the observed polls |
+| Instahyre | Success; 140 jobs observed | 4 requests, 4 HTTP 200 pages, 0 failed; 140 unique IDs | 140 |
+| Greenhouse | Success; 369 jobs observed | 3/3 configured boards successful; 3 HTTP 200; 0 failed | 369 |
+| Ashby | Success; 828 jobs observed, all 828 timestamped | 2/2 configured boards successful; 2 HTTP 200; 0 failed | 34 (the others already existed/deduplicated) |
+| Lever | Success; 500 jobs observed | One-off public board `paytmpayments`; 5/5 HTTP 200 pages; bounded five-page cap reached | 500 |
+
+The initial Instahyre attempt exposed a genuine integration mismatch: the current endpoint returned `objects` and nested `employer.company_name`, `public_url`, and `locations`; its location validation rejected `Bengaluru` and accepted `Bangalore`. The parser was fixed, aliases were added, four-page pagination is bounded, and three regression tests were added. The fixed candidate was rebuilt as `b16fb83`; the full V2 CI run passed and a real Instahyre poll returned 140 unique rows across four successful pages.
+
+Lever's `paytmpayments` board was passed only to this one-off test invocation; `lever_boards` remains empty in persisted dev config and Lever remains disabled in the scheduler. Do not infer that Lever is configured for recurring collection.
+
+### Live DB and delivery safety after all four one-off adapter pipelines
+
+At the final post-run check:
+- SQLite integrity: `ok`.
+- `jobs`, `canonical_opportunities`, `job_evaluations`, `user_job_evaluations`, and `notification_ledger`: 9,429 rows each.
+- `users`: 1; `user_preferences`: 1; `source_runs`: 7,851.
+- Notification ledger: 56 pending, 9,373 suppressed; zero rows with a non-null `sent_at`. Per-user notification ledger was empty; no Telegram credential/chat was set.
+- Persisted scheduler config remains Naukri only: LinkedIn/Instahyre/Greenhouse/Ashby/Lever all disabled, Naukri enabled. Notifications disabled.
+- Gemini extraction/matcher and LLM router/matcher all explicitly false.
+- No Telegram messages were sent.
+
+### Remaining gates / limitations
+
+- LinkedIn live verification has **not** been performed. Production health reports an active LinkedIn rate-limit cooldown until `2026-11-08T11:25:12.064175+00:00`. Do not probe before that timestamp; after it expires, if proceeding, use a single small paced request and stop immediately on 429. LinkedIn's unit/CI coverage is green, but that is not a live-source pass.
+- Naukri is the only source enabled by the persisted scheduler config. Instahyre/Greenhouse/Ashby/Lever were verified by controlled one-off application runs, not left enabled continuously.
+- Lever sample board has a 500-post bounded cap and is not in persisted config.
+- Protected APIs returned 401 when queried without a session, as expected. Owner must log in through the SSH-tunnel browser to verify admin/member interactive flows; this run did not establish a real member login.
+- The known 320px hit-test overlap remains deferred by owner priority; do not report the 320px flow as passing.
+- Shared dev is deployed and tested; **production has not been promoted**. PR #51 remains draft/open. Production requires a separate explicit promotion decision after remaining gates are reviewed.
