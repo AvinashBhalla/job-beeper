@@ -87,3 +87,9 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - Cooldown restoration is derived only from persisted LinkedIn HTTP 429 rows, keeps retry-after and applied cooldown, and supports old rows by using finished_at if the new detection timestamp is NULL.
 - Focused persistence tests: 9 passed; full V2 suite: **215 passed** locally. GitHub CI required before merge. This remains code-only, not deployed.
 - First production deployment limitation: the current live source_runs table has no HTTP status history, so old 429s visible only in logs cannot be backfilled. The first deploy starts with empty DB-backed breaker history and will persist new 429s going forward.
+## 2026-11-08 — LinkedIn 429 policy and durable breaker complete in V2 code
+
+- PR #48 merged as `5b4b2fa`: 4-hour maximum fallback and 24-hour escalation reset. PR #49 merged as `596bbbe`: persist actual LinkedIn 429 detection times and restore cooldown/streak on startup. CI passed 209 and then 215 full V2 tests, respectively.
+- Neither merge was deployed. Production's legacy DB has no structured history for the prior 27 log-only 429s, so the first rollout starts with empty persisted breaker state; newly recorded 429s are durable across restarts.
+- Old parser branch was redundant: labelled-experience helper and regression tests already exist in V2; stale branch removed. Current LinkedIn code remains under conservative cooldown; no request-pressure or access-method change.
+- Next priority: diagnose and fix the preferences-save validation/UI issue on PR #46, then validate per-user Telegram link/opt-in/delivery/opt-out E2E. Keep #46 draft until those release gates pass.
