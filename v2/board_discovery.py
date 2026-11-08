@@ -36,6 +36,8 @@ PROVIDER_PATTERNS = (
     ("lever", re.compile(r"^(?:jobs\.)?(?:eu\.)?lever\.co$|^jobs\.lever\.co$", re.I)),
     ("smartrecruiters", re.compile(r"^(?:jobs|careers)\.smartrecruiters\.com$", re.I)),
     ("workable", re.compile(r"^(?:apply\.)?workable\.com$", re.I)),
+    ("keka", re.compile(r"^(?P<slug>[a-z0-9-]+)\.keka\.com$", re.I)),
+    ("darwinbox", re.compile(r"^(?P<slug>[a-z0-9-]+)\.darwinbox\.(?:in|com)$", re.I)),
     ("recruitee", re.compile(r"^(?P<slug>[a-z0-9-]+)\.recruitee\.com$", re.I)),
     ("breezy", re.compile(r"^(?P<slug>[a-z0-9-]+)\.breezy\.hr$", re.I)),
     ("teamtailor", re.compile(r"^(?P<slug>[a-z0-9-]+)\.teamtailor\.com$", re.I)),
@@ -51,6 +53,8 @@ COLLECTOR_SOURCES = {
     "lever": "lever",
     "smartrecruiters": "smartrecruiters",
     "workable": "workable",
+    "keka": "keka",
+    "darwinbox": "darwinbox",
 }
 
 
@@ -144,6 +148,21 @@ def detect_ats_board(value: str) -> dict[str, Any] | None:
                     return None
                 board_key = details["slug"]
                 display_key = board_key
+            elif provider == "keka":
+                if not segments or segments[0].lower() != "careers":
+                    return None
+                board_key = details["slug"]
+                display_key = board_key
+            elif provider == "darwinbox":
+                match_careers = re.match(
+                    r"^/ms/candidatev2/(?P<company_id>[A-Za-z0-9_-]{1,100})/careers(?:/|$)",
+                    parsed.path,
+                    re.I,
+                )
+                if not match_careers:
+                    return None
+                board_key = match_careers.group("company_id")
+                display_key = board_key
             elif provider == "rippling":
                 if not segments or segments[0].lower() != "api":
                     # Public board URLs use ats.rippling.com/{slug}/jobs.
@@ -175,6 +194,8 @@ def detect_ats_board(value: str) -> dict[str, Any] | None:
                     "cluster": details["cluster"],
                     "site": display_key,
                 })
+            elif provider in {"keka", "darwinbox"}:
+                candidate["tenant"] = details["slug"]
             return candidate
     except (ValueError, TypeError):
         return None
@@ -250,6 +271,45 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         jobs = payload.get("jobs") if isinstance(payload, dict) else None
         if not isinstance(jobs, list):
             raise ValueError("Workable response did not contain published jobs.")
+    elif provider == "keka":
+        careers_url = _public_https_url(board_url)
+        final_url, html = _safe_fetch(careers_url)
+        if (urlsplit(final_url).hostname or "").lower() != (urlsplit(careers_url).hostname or "").lower():
+            raise ValueError("Keka careers page redirected to a different host.")
+        feed_match = re.search(
+            r"/ats/documents/([0-9a-fA-F-]{16,})/careerportal/?",
+            html,
+            re.I,
+        )
+        if not feed_match:
+            raise ValueError("Keka careers page did not expose a public career-portal feed identifier.")
+        feed_id = feed_match.group(1)
+        origin = f"https://{urlsplit(final_url).hostname}"
+        endpoint = f"{origin}/careers/api/embedjobs/default/active/{feed_id}"
+        response = requests.get(
+            endpoint, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS,
+            allow_redirects=False,
+        )
+        response.raise_for_status()
+        jobs = response.json()
+        if not isinstance(jobs, list):
+            raise ValueError("Keka public career feed did not return a jobs list.")
+    elif provider == "darwinbox":
+        parsed = urlsplit(board_url)
+        company_id = candidate["board_key"]
+        endpoint = f"{parsed.scheme}://{parsed.netloc}/ms/candidateapi/job/alljobs?companyId={company_id}"
+        response = requests.post(
+            endpoint,
+            json={"companyId": company_id, "page": 1, "sort_option": "new", "limit": 50},
+            headers={**headers, "Content-Type": "application/json"},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+            allow_redirects=False,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        jobs = payload.get("data") if isinstance(payload, dict) and payload.get("status") == "success" else None
+        if not isinstance(jobs, list):
+            raise ValueError("Darwinbox candidate API did not return a successful public jobs list.")
     elif provider == "lever":
         api_host = "api.eu.lever.co" if ".eu." in candidate["host"] else "api.lever.co"
         endpoint = f"https://{api_host}/v0/postings/{candidate['board_key']}"

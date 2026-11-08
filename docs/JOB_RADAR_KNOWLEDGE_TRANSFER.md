@@ -3420,3 +3420,13 @@ Every source completion means a real public board test over two polls or a real 
 ## 2026-11-08 — Exact Workday commit CI completed
 
 GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66cd05419242a761939f4c1ff883b4266d0`. All job steps passed, including Python compile, modern Node dashboard syntax, focused router/extractor tests and full V2 unittest suite. PR #51 remains open/draft and unmerged. Workday is committed but not deployed or enabled in shared dev.
+
+
+## 2026-11-08 — External repo study and Keka/Darwinbox candidate snapshot
+
+- Production: `job-radar-prod-canary:7b1a80d` on port 8000, health HTTP 200. Keka and Darwinbox are **not deployed**. Keep production config, SQLite volume and Telegram settings unchanged.
+- Research: `docs/REFERENCE_REPOSITORIES_RESEARCH_2026-11-08.md`, doc-only draft PR #52. Career-Ops is a high-value reference for provider contracts, bounded HTTP, validation, redirect safety and per-source tests. Career-Ops Extension is application form filling/answer learning with a manual submit checkpoint; it is not a source collector.
+- Connector candidate: `/tmp/job-radar-next`, branch `feat/darwinbox-keka-20261108`; new code adds Keka/Darwinbox discovery, verification and collectors, config v15 opt-in flags, admin controls, tests. Both flags default false.
+- Live integration evidence: Keka Bridgestone 109 postings and Darwinbox JG Summit 18 postings. For each, first poll was silent baseline, second poll zero new duplicates, no alert sends, DB integrity `ok`. Darwinbox proof is for one tenant only.
+- Local V2 suite: 387 tests pass in 215.671s; compileall/config JSON/diff checks pass. Exact-SHA GitHub CI and isolated browser QA are still outstanding. Feature branch is not yet pushed/deployed.
+- Next: review diff → push feature branch → exact-SHA CI → isolated admin browser QA → latency telemetry → reviewed promotion/canary. First production admin account also needs a user-supplied admin email; Google OAuth is currently disabled.

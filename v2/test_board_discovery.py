@@ -223,6 +223,33 @@ class BoardDiscoveryApiTests(unittest.TestCase):
             row = conn.execute("SELECT review_status,baseline_pending FROM ats_board_registry WHERE id=?", (board_id,)).fetchone()
         self.assertEqual(row, ("active", 1))
 
+    def test_verified_keka_board_activation_maps_registry_to_public_careers_url(self):
+        timestamp = radar.iso(radar.now())
+        careers_url = "https://bridgestone1.keka.com/careers"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""INSERT INTO employer_companies
+                (company_name,domain,website_url,careers_url,discovery_status,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?)""",
+                ("Bridgestone", "bridgestone.example", "https://bridgestone.com/", careers_url, "boards_found", timestamp, timestamp))
+            company_id = conn.execute("SELECT id FROM employer_companies WHERE domain='bridgestone.example'").fetchone()[0]
+            conn.execute("""INSERT INTO ats_board_registry
+                (company_id,provider,board_key,board_url,discovered_from,confidence,collector_source,collector_available,review_status,last_verified_at,last_seen_at,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,1,'verified',?,?,?,?)""",
+                (company_id, "keka", "bridgestone1", careers_url, careers_url, "high", "keka", timestamp, timestamp, timestamp, timestamp))
+            board_id = conn.execute("SELECT id FROM ats_board_registry WHERE company_id=?", (company_id,)).fetchone()[0]
+            conn.commit()
+        with patch.object(radar, "refresh_job_evaluations"), patch.object(radar, "refresh_notification_decisions"), patch.object(radar, "refresh_configured_user_evaluations"):
+            response = self.client.post(
+                f"/api/discovery/boards/{board_id}/activate",
+                headers={"X-CSRF-Token": self.csrf},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["collector_source"], "keka")
+        self.assertTrue(response.json()["baseline_pending"])
+        config = radar.get_config()
+        self.assertTrue(config["source_enabled"]["keka"])
+        self.assertIn({"careers_url": careers_url, "company": "Bridgestone", "registry_id": board_id}, config["keka_boards"])
+
     def test_unverified_board_cannot_be_activated(self):
         board_id = self._insert_verified_greenhouse_board()
         with sqlite3.connect(self.db_path) as conn:
@@ -433,3 +460,196 @@ class PublicATSCollectorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KekaDarwinboxCollectorTests(unittest.TestCase):
+    class Response(PublicATSCollectorTests.Response):
+        def __init__(self, payload=None, status_code=200, headers=None, text=None):
+            super().__init__(payload, status_code, headers)
+            self.text = text if text is not None else ""
+            self.content = self.text.encode("utf-8") if text is not None else json.dumps(payload).encode("utf-8")
+
+    def test_discovery_recognises_keka_and_darwinbox_board_paths(self):
+        keka = board_discovery.detect_ats_board("https://bridgestone1.keka.com/careers")
+        self.assertEqual((keka["provider"], keka["board_key"]), ("keka", "bridgestone1"))
+        darwin = board_discovery.detect_ats_board(
+            "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+        )
+        self.assertEqual((darwin["provider"], darwin["board_key"]), ("darwinbox", "a6373b98b30596"))
+
+    def test_keka_maps_public_embed_feed_with_stable_ids_and_publication_time(self):
+        careers_html = '''<html><body>
+          <script src="/ats/documents/af8a241d-4ca4-4c8e-8e85-df4ccf00ea56/careerportal/main.js"></script>
+        </body></html>'''
+        payload = [
+            {
+                "id": 94681, "title": "Process Excellence Manager",
+                "publishedOn": "2026-11-04T10:34:15.250Z", "publishedSinceDays": 4,
+                "description": "<div><strong>Lead operations</strong> and build Python services.</div>",
+                "excerpt": "Lead operations", "experience": "7+ Years",
+                "departmentIdentifier": "dept-1", "departmentName": "Engineering",
+                "jobLocations": [{"id": 13171, "name": "Bengaluru, Karnataka", "countryCode": "IN", "countryName": "India"}],
+                "jobNumber": "KEK-94681", "jobType": 2,
+                "salaryRange": {"currency": "INR", "salaryPeriod": 0},
+                "salaryRangeFormat": "", "skillNames": ["Python"],
+            },
+            {
+                "id": 94682, "title": "Backend Developer", "publishedOn": "2026-11-03T08:00:00Z",
+                "description": "<p>Build platform services.</p>",
+                "jobLocations": [{"city": "Pune", "state": "MH", "countryName": "India"}],
+            },
+        ]
+        calls = []
+        def tracked(source, endpoint, **kwargs):
+            calls.append((source, endpoint, kwargs))
+            if endpoint.endswith("/careers"):
+                return self.Response(text=careers_html, headers={"Content-Type": "text/html"})
+            return self.Response(payload, headers={"Content-Type": "application/json"})
+        with patch.object(radar, "_tracked_source_get", side_effect=tracked):
+            jobs = radar.keka_collect({
+                "keka_boards": [{
+                    "careers_url": "https://bridgestone1.keka.com/careers",
+                    "company": "Bridgestone",
+                    "registry_id": 72,
+                }]
+            })
+        self.assertEqual(len(jobs), 2)
+        first = jobs[0]
+        self.assertEqual(first["source_job_id"], "keka-bridgestone1-94681")
+        self.assertEqual(first["posted_precision"], "minute")
+        self.assertEqual(first["source_details"]["board_registry_id"], 72)
+        self.assertEqual(first["location"], "Bengaluru, Karnataka")
+        self.assertEqual(first["url"], "https://bridgestone1.keka.com/careers/jobdetails/94681")
+        self.assertIn("Python services", first["description"])
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(calls[0][2]["allow_redirects"])
+        self.assertFalse(calls[1][2]["allow_redirects"])
+
+    def test_keka_rejects_feed_missing_from_careers_page(self):
+        html = "<html><body>Careers page without public feed</body></html>"
+        with patch.object(radar, "_tracked_source_get", return_value=self.Response(text=html)):
+            with self.assertRaisesRegex(RuntimeError, "All configured Keka boards failed"):
+                radar.keka_collect({
+                    "keka_boards": [{
+                        "careers_url": "https://bridgestone1.keka.com/careers",
+                        "company": "Bridgestone",
+                    }]
+                })
+
+    def test_keka_429_persists_source_cooldown(self):
+        limited = self.Response({}, 429, {"Retry-After": "120"})
+        with patch.object(radar, "source_state", {}), patch.object(
+            radar, "_tracked_source_get", return_value=limited
+        ):
+            with self.assertRaisesRegex(RuntimeError, "All configured Keka boards failed"):
+                radar.keka_collect({
+                    "keka_boards": [{
+                        "careers_url": "https://bridgestone1.keka.com/careers",
+                        "company": "Bridgestone",
+                    }]
+                })
+            self.assertEqual(radar.source_state["keka"]["rate_limit_retry_after_seconds"], 120.0)
+            self.assertGreater(radar._source_cooldown_remaining("keka"), 100)
+
+    def test_darwinbox_maps_public_candidate_endpoint_response(self):
+        payload = {
+            "status": "success", "job_counts": 2,
+            "data": [
+                {
+                    "id": 501, "title": "Python Engineer", "posted_on": 1793788455,
+                    "internal_job_code": "DB-501", "locations": "Bengaluru",
+                    "tool_tip_locations": ["Bengaluru, India"],
+                    "jd": "<p>Build Python APIs.</p>", "experience": "3+ Years",
+                },
+                {
+                    "id": 502, "title": "Backend Engineer",
+                    "created_on": "2026-11-07T10:00:00Z",
+                    "locations": "Remote", "jd": "<p>Build backend services.</p>",
+                },
+            ],
+        }
+        calls = []
+        def tracked(source, endpoint, **kwargs):
+            calls.append((source, endpoint, kwargs))
+            return self.Response(payload)
+        board = "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+        with patch.object(radar, "_tracked_source_post", side_effect=tracked):
+            jobs = radar.darwinbox_collect({
+                "darwinbox_boards": [{
+                    "careers_url": board, "company": "J G Summit", "registry_id": 91,
+                }]
+            })
+        self.assertEqual(len(jobs), 2)
+        first = jobs[0]
+        self.assertEqual(first["source_job_id"], "darwinbox-jgsummit-a6373b98b30596-501")
+        self.assertEqual(first["posted_precision"], "minute")
+        self.assertEqual(first["source_details"]["board_registry_id"], 91)
+        self.assertIn("Python APIs", first["description"])
+        self.assertEqual(first["url"], "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/jobDetails/501")
+        self.assertEqual(calls[0][2]["json_body"]["limit"], 50)
+        self.assertFalse(calls[0][2]["allow_redirects"])
+
+    def test_darwinbox_403_is_not_misclassified_as_rate_limit(self):
+        denied = self.Response({}, 403)
+        with patch.object(radar, "source_state", {}), patch.object(
+            radar, "_tracked_source_post", return_value=denied
+        ):
+            with self.assertRaisesRegex(RuntimeError, "All configured Darwinbox boards failed"):
+                radar.darwinbox_collect({
+                    "darwinbox_boards": [{
+                        "careers_url": "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs",
+                        "company": "J G Summit",
+                    }]
+                })
+            self.assertEqual(radar._source_cooldown_remaining("darwinbox"), 0)
+
+    def test_discovery_probe_uses_keka_feed_and_darwinbox_candidate_endpoint(self):
+        board = "https://bridgestone1.keka.com/careers"
+        html = '<script src="/ats/documents/af8a241d-4ca4-4c8e-8e85-df4ccf00ea56/careerportal/main.js"></script>'
+        with patch.object(board_discovery, "_safe_fetch", return_value=(board, html)), patch.object(
+            board_discovery.requests, "get", return_value=self.Response([{"id": 1}])
+        ):
+            result = board_discovery.probe_public_board({"provider": "keka", "board_url": board})
+        self.assertEqual(result["jobs_observed"], 1)
+
+        darwin = "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+        with patch.object(
+            board_discovery.requests, "post",
+            return_value=self.Response({"status": "success", "data": [{"id": 1}]}),
+        ):
+            result = board_discovery.probe_public_board({"provider": "darwinbox", "board_url": darwin})
+        self.assertEqual(result["jobs_observed"], 1)
+
+    def test_new_connectors_are_opt_in_and_config_migration_disables_them(self):
+        base = radar._default_config()
+        config = radar.validate_config({
+            **base,
+            "keka_boards": [{
+                "careers_url": "https://bridgestone1.keka.com/careers",
+                "company": "Bridgestone", "registry_id": 72,
+            }],
+            "darwinbox_boards": [{
+                "careers_url": "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs",
+                "company": "J G Summit", "registry_id": 91,
+            }],
+        })
+        self.assertFalse(config["source_enabled"]["keka"])
+        self.assertFalse(config["source_enabled"]["darwinbox"])
+        self.assertEqual(config["keka_boards"][0]["registry_id"], 72)
+        self.assertEqual(config["darwinbox_boards"][0]["registry_id"], 91)
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config({**base, "source_enabled": {"darwinbox": True}})
+        migrated = radar._merge_config(
+            {"config_version": 15, "source_enabled": {"keka": False, "darwinbox": False}},
+            {"config_version": 14, "source_enabled": {"keka": True, "darwinbox": True}},
+        )
+        self.assertFalse(migrated["source_enabled"]["keka"])
+        self.assertFalse(migrated["source_enabled"]["darwinbox"])
+
+    def test_keka_career_page_redirect_cannot_change_host(self):
+        redirect = self.Response({}, 302, {"Location": "https://attacker.example/careers"})
+        with patch.object(radar, "_tracked_source_get", return_value=redirect), patch.object(
+            radar.board_discovery, "_public_https_url", side_effect=lambda value: value
+        ):
+            with self.assertRaisesRegex(ValueError, "different host"):
+                radar._keka_fetch_careers_page("keka", "https://bridgestone1.keka.com/careers")

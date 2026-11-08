@@ -17,7 +17,7 @@ import uuid
 import warnings
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urljoin, urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
@@ -80,7 +80,13 @@ SMARTRECRUITERS_MAX_BOARDS = 50
 SMARTRECRUITERS_DETAIL_DELAY_SECONDS = 0.1
 WORKABLE_MAX_JOBS_PER_BOARD = 500
 WORKABLE_MAX_BOARDS = 50
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable"})
+KEKA_MAX_BOARDS = 50
+KEKA_MAX_JOBS_PER_BOARD = 1000
+DARWINBOX_MAX_BOARDS = 50
+DARWINBOX_PAGE_SIZE = 50
+DARWINBOX_MAX_PAGES_PER_BOARD = 5
+DARWINBOX_PAGE_DELAY_SECONDS = 0.2
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox"})
 INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
@@ -208,6 +214,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     if current_version < 14 <= default_version:
         merged.setdefault("source_enabled", {})["smartrecruiters"] = False
         merged.setdefault("source_enabled", {})["workable"] = False
+    if current_version < 15 <= default_version:
+        merged.setdefault("source_enabled", {})["keka"] = False
+        merged.setdefault("source_enabled", {})["darwinbox"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -229,6 +238,9 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         if current_version < 14 <= default_version:
             merged["source_enabled"]["smartrecruiters"] = False
             merged["source_enabled"]["workable"] = False
+        if current_version < 15 <= default_version:
+            merged["source_enabled"]["keka"] = False
+            merged["source_enabled"]["darwinbox"] = False
     return merged
 
 
@@ -505,6 +517,58 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_workable.append(normalized_entry)
     config["workable_boards"] = normalized_workable
 
+    keka_boards = config.get("keka_boards", [])
+    if not isinstance(keka_boards, list) or len(keka_boards) > KEKA_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"keka_boards must be a list with at most {KEKA_MAX_BOARDS} entries.")
+    normalized_keka: list[dict[str, Any]] = []
+    seen_keka: set[str] = set()
+    for board in keka_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Keka board must be an object.")
+        careers_url = board.get("careers_url") or board.get("url")
+        detected = board_discovery.detect_ats_board(careers_url) if isinstance(careers_url, str) else None
+        company = board.get("company")
+        if not detected or detected.get("provider") != "keka":
+            raise HTTPException(status_code=422, detail="Each Keka board requires a public HTTPS https://<tenant>.keka.com/careers URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Keka board requires a company label of at most 120 characters.")
+        tenant = str(detected["board_key"]).lower()
+        if tenant in seen_keka:
+            raise HTTPException(status_code=422, detail=f"Duplicate Keka tenant: {tenant}.")
+        seen_keka.add(tenant)
+        entry = {"careers_url": detected["board_url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Keka")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_keka.append(entry)
+    config["keka_boards"] = normalized_keka
+
+    darwinbox_boards = config.get("darwinbox_boards", [])
+    if not isinstance(darwinbox_boards, list) or len(darwinbox_boards) > DARWINBOX_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"darwinbox_boards must be a list with at most {DARWINBOX_MAX_BOARDS} entries.")
+    normalized_darwinbox: list[dict[str, Any]] = []
+    seen_darwinbox: set[tuple[str, str]] = set()
+    for board in darwinbox_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Darwinbox board must be an object.")
+        careers_url = board.get("careers_url") or board.get("url")
+        detected = board_discovery.detect_ats_board(careers_url) if isinstance(careers_url, str) else None
+        company = board.get("company")
+        if not detected or detected.get("provider") != "darwinbox":
+            raise HTTPException(status_code=422, detail="Each Darwinbox board requires a public HTTPS /ms/candidatev2/<companyId>/careers URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Darwinbox board requires a company label of at most 120 characters.")
+        identity = (str(detected["host"]).lower(), str(detected["board_key"]).lower())
+        if identity in seen_darwinbox:
+            raise HTTPException(status_code=422, detail="Duplicate Darwinbox careers board.")
+        seen_darwinbox.add(identity)
+        entry = {"careers_url": detected["board_url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Darwinbox")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_darwinbox.append(entry)
+    config["darwinbox_boards"] = normalized_darwinbox
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -518,13 +582,20 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "workday": bool(source_enabled.get("workday", False)),
         "smartrecruiters": bool(source_enabled.get("smartrecruiters", False)),
         "workable": bool(source_enabled.get("workable", False)),
+        "keka": bool(source_enabled.get("keka", False)),
+        "darwinbox": bool(source_enabled.get("darwinbox", False)),
     }
     if config["source_enabled"]["workday"] and not normalized_workday_boards:
         raise HTTPException(
             status_code=422,
             detail="Add at least one verified Workday public career board before enabling Workday.",
         )
-    for source, configured_boards in (("smartrecruiters", normalized_smartrecruiters), ("workable", normalized_workable)):
+    for source, configured_boards in (
+        ("smartrecruiters", normalized_smartrecruiters),
+        ("workable", normalized_workable),
+        ("keka", normalized_keka),
+        ("darwinbox", normalized_darwinbox),
+    ):
         if config["source_enabled"][source] and not configured_boards:
             raise HTTPException(status_code=422, detail=f"Add at least one verified {source.title()} public career board before enabling {source.title()}.")
 
@@ -543,6 +614,8 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "workday": 120,
             "smartrecruiters": 120,
             "workable": 120,
+            "keka": 120,
+            "darwinbox": 120,
         }.items()
     }
 
@@ -2307,12 +2380,14 @@ def _tracked_source_get(
     headers: dict[str, str] | None = None,
     timeout: int = 20,
     retry_attempt: bool = False,
+    allow_redirects: bool = True,
 ) -> requests.Response:
     """Record safe request metadata; never persist URLs, query strings or payloads."""
     started_monotonic = time.monotonic()
     try:
         response = requests.get(
-            endpoint, params=params, headers=headers, timeout=timeout
+            endpoint, params=params, headers=headers, timeout=timeout,
+            allow_redirects=allow_redirects,
         )
     except Exception:
         _record_source_request(
@@ -2339,12 +2414,14 @@ def _tracked_source_post(
     json_body: dict[str, Any],
     headers: dict[str, str] | None = None,
     timeout: int = 20,
+    allow_redirects: bool = True,
 ) -> requests.Response:
     """Record safe request metadata for a JSON POST; never persist payloads or URLs."""
     started_monotonic = time.monotonic()
     try:
         response = requests.post(
-            endpoint, json=json_body, headers=headers, timeout=timeout
+            endpoint, json=json_body, headers=headers, timeout=timeout,
+            allow_redirects=allow_redirects,
         )
     except Exception:
         _record_source_request(
@@ -5132,6 +5209,296 @@ def workable_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+
+def _safe_board_redirect_url(url: str) -> str:
+    """Validate every Keka careers-page redirect before following it."""
+    return board_discovery._public_https_url(url)
+
+
+def _keka_fetch_careers_page(source: str, careers_url: str) -> tuple[str, str]:
+    current = _safe_board_redirect_url(careers_url)
+    expected_host = (urlsplit(current).hostname or "").lower()
+    headers = {**UA, "Accept": "text/html,application/xhtml+xml"}
+    for _ in range(4):
+        response = _tracked_source_get(
+            source, current, headers=headers, timeout=20, allow_redirects=False
+        )
+        if response.status_code in {301, 302, 303, 307, 308}:
+            location = response.headers.get("Location")
+            if not location:
+                raise ValueError("Keka careers page redirected without a destination.")
+            next_url = _safe_board_redirect_url(urljoin(current, location))
+            if (urlsplit(next_url).hostname or "").lower() != expected_host:
+                raise ValueError("Keka careers page attempted to redirect to a different host.")
+            current = next_url
+            continue
+        response.raise_for_status()
+        if len(response.content) > board_discovery.MAX_HTML_BYTES:
+            raise ValueError("Keka careers page exceeded the HTML size limit.")
+        content_type = str(response.headers.get("Content-Type", "")).lower()
+        if content_type and "html" not in content_type:
+            raise ValueError("Keka careers page did not return HTML.")
+        return current, response.text
+    raise ValueError("Keka careers page exceeded the redirect limit.")
+
+
+def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect published Keka jobs through the public careers-site embed feed."""
+    boards = config.get("keka_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Keka is enabled but no keka_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    for board in boards:
+        careers_url = str(board.get("careers_url") or board.get("url") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        detected = board_discovery.detect_ats_board(careers_url)
+        if not detected or detected.get("provider") != "keka" or not company:
+            _record_source_board("keka", False)
+            failures.append("invalid Keka careers board configuration")
+            continue
+        tenant = str(detected["board_key"]).lower()
+        try:
+            final_url, html = _keka_fetch_careers_page("keka", careers_url)
+            feed_match = re.search(
+                r"/ats/documents/([0-9a-fA-F-]{16,})/careerportal/?",
+                html,
+                re.I,
+            )
+            if not feed_match:
+                raise ValueError("Keka careers page did not expose a public career feed.")
+            feed_id = feed_match.group(1)
+            parsed = urlsplit(final_url)
+            endpoint = f"https://{parsed.hostname}/careers/api/embedjobs/default/active/{feed_id}"
+            response = _tracked_source_get(
+                "keka", endpoint,
+                headers={**UA, "Accept": "application/json"},
+                timeout=30, allow_redirects=False,
+            )
+            response.raise_for_status()
+            if len(response.content) > 8_000_000:
+                raise ValueError("Keka public career feed exceeded the response size limit.")
+            payload = response.json()
+            if not isinstance(payload, list):
+                raise ValueError("Keka public career feed did not contain a jobs array.")
+            _record_source_page("keka", True)
+        except Exception as exc:
+            _record_source_page("keka", False)
+            failed_response = getattr(exc, "response", None)
+            if getattr(failed_response, "status_code", None) == 429:
+                _set_source_rate_limit("keka", failed_response)
+            _record_source_board("keka", False)
+            failures.append(f"{tenant}: {type(exc).__name__}")
+            log.warning("keka: tenant=%s failed error_type=%s", tenant, type(exc).__name__)
+            if _source_cooldown_remaining("keka") > 0:
+                break
+            continue
+
+        successful_boards += 1
+        _record_source_board("keka", True)
+        if len(payload) > KEKA_MAX_JOBS_PER_BOARD:
+            log.warning(
+                "keka: tenant=%s returned %s jobs; processing first %s under the request budget",
+                tenant, len(payload), KEKA_MAX_JOBS_PER_BOARD,
+            )
+        for item in payload[:KEKA_MAX_JOBS_PER_BOARD]:
+            if not isinstance(item, dict):
+                continue
+            raw_id = item.get("id")
+            title = str(item.get("title") or "").strip()
+            if raw_id in (None, "") or not title:
+                continue
+            source_id = f"keka-{tenant}-{raw_id}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            locations: list[str] = []
+            raw_locations = item.get("jobLocations")
+            if isinstance(raw_locations, list):
+                for loc in raw_locations:
+                    if not isinstance(loc, dict):
+                        continue
+                    label = str(loc.get("name") or "").strip()
+                    if not label:
+                        parts = [
+                            str(loc.get(field) or "").strip()
+                            for field in ("city", "state", "countryName")
+                            if str(loc.get(field) or "").strip()
+                        ]
+                        label = ", ".join(parts)
+                    if label and label not in locations:
+                        locations.append(label)
+            location = "; ".join(locations)
+            description_html = item.get("description") or item.get("excerpt") or ""
+            description = (
+                BeautifulSoup(html_lib.unescape(str(description_html)), "html.parser").get_text(" ", strip=True)
+                if description_html else ""
+            )
+            published_raw = item.get("publishedOn")
+            published_at = parse_relative(published_raw) if published_raw not in (None, "") else None
+            precision = (
+                "minute"
+                if published_at and isinstance(published_raw, str)
+                and re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}", published_raw)
+                else "date" if published_at else "unknown"
+            )
+            url = f"https://{parsed.hostname}/careers/jobdetails/{quote(str(raw_id), safe='')}"
+            salary = item.get("salaryRange") if isinstance(item.get("salaryRange"), dict) else {}
+            details = {
+                "tenant": tenant,
+                "board_registry_id": board.get("registry_id"),
+                "job_number": item.get("jobNumber"),
+                "department_id": item.get("departmentIdentifier"),
+                "department": item.get("departmentName"),
+                "experience": item.get("experience"),
+                "job_type_code": item.get("jobType"),
+                "salary_currency": salary.get("currency"),
+                "salary_period_code": salary.get("salaryPeriod"),
+                "salary_range_format": item.get("salaryRangeFormat"),
+                "skill_names": item.get("skillNames") if isinstance(item.get("skillNames"), list) else [],
+                "published_since_days": item.get("publishedSinceDays"),
+                "details_fetched": bool(description),
+            }
+            jobs.append(normalize_job(
+                "keka", source_id, company, title, location, url,
+                published_at, precision, description, source_details=details,
+            ))
+    if successful_boards == 0:
+        raise RuntimeError("All configured Keka boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("keka: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("keka: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
+def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect public candidate-site postings where the tenant exposes its careers feed."""
+    boards = config.get("darwinbox_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Darwinbox is enabled but no darwinbox_boards are configured")
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    headers = {**UA, "Accept": "application/json"}
+    for board in boards:
+        careers_url = str(board.get("careers_url") or board.get("url") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        detected = board_discovery.detect_ats_board(careers_url)
+        if not detected or detected.get("provider") != "darwinbox" or not company:
+            _record_source_board("darwinbox", False)
+            failures.append("invalid Darwinbox careers board configuration")
+            continue
+        tenant = str(detected.get("tenant") or "").lower()
+        company_id = str(detected["board_key"])
+        parsed = urlsplit(detected["board_url"])
+        origin = f"https://{parsed.netloc}"
+        successful_pages = 0
+        failed_pages = 0
+        board_jobs: list[dict[str, Any]] = []
+        rate_limited = False
+        for page_number in range(1, DARWINBOX_MAX_PAGES_PER_BOARD + 1):
+            if page_number > 1:
+                time.sleep(DARWINBOX_PAGE_DELAY_SECONDS)
+            endpoint = f"{origin}/ms/candidateapi/job/alljobs?companyId={company_id}"
+            try:
+                response = _tracked_source_post(
+                    "darwinbox", endpoint,
+                    json_body={
+                        "companyId": company_id,
+                        "page": page_number,
+                        "sort_option": "new",
+                        "limit": DARWINBOX_PAGE_SIZE,
+                    },
+                    headers={**headers, "Content-Type": "application/json", "Referer": detected["board_url"]},
+                    timeout=25,
+                    allow_redirects=False,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                rows = payload.get("data") if isinstance(payload, dict) and payload.get("status") == "success" else None
+                if not isinstance(rows, list):
+                    raise ValueError("Darwinbox public candidate endpoint returned an unexpected response envelope.")
+                _record_source_page("darwinbox", True)
+                successful_pages += 1
+            except Exception as exc:
+                _record_source_page("darwinbox", False)
+                failed_pages += 1
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_source_rate_limit("darwinbox", failed_response)
+                    rate_limited = True
+                failures.append(f"{tenant}/{company_id} page {page_number}: {type(exc).__name__}")
+                log.warning("darwinbox: tenant=%s page=%s failed error_type=%s", tenant, page_number, type(exc).__name__)
+                break
+            for item in rows:
+                if not isinstance(item, dict):
+                    continue
+                raw_id = item.get("id")
+                title = str(item.get("title") or "").strip()
+                if raw_id in (None, "") or not title:
+                    continue
+                source_id = f"darwinbox-{tenant}-{company_id}-{raw_id}"
+                if source_id in seen_ids:
+                    continue
+                seen_ids.add(source_id)
+                raw_locations = item.get("tool_tip_locations")
+                locations = []
+                if isinstance(raw_locations, list):
+                    for value in raw_locations:
+                        label = BeautifulSoup(str(value or ""), "html.parser").get_text(" ", strip=True)
+                        if label and label not in locations:
+                            locations.append(label)
+                if not locations:
+                    label = str(item.get("locations") or "").strip()
+                    if label:
+                        locations.append(label)
+                posted_raw = item.get("posted_on")
+                if posted_raw in (None, ""):
+                    posted_raw = item.get("created_on")
+                published_at = parse_relative(posted_raw) if posted_raw not in (None, "") else None
+                precision = (
+                    "minute"
+                    if published_at and (isinstance(posted_raw, (int, float)) or (isinstance(posted_raw, str) and re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}", posted_raw)))
+                    else "date" if published_at else "unknown"
+                )
+                description_html = item.get("jd") or ""
+                description = BeautifulSoup(html_lib.unescape(str(description_html)), "html.parser").get_text(" ", strip=True)
+                url = f"{origin}/ms/candidatev2/{company_id}/careers/jobDetails/{quote(str(raw_id), safe='')}"
+                details = {
+                    "tenant": tenant,
+                    "company_id": company_id,
+                    "board_registry_id": board.get("registry_id"),
+                    "internal_job_code": item.get("internal_job_code"),
+                    "experience": item.get("experience"),
+                    "locations_raw": item.get("locations"),
+                    "details_fetched": bool(description),
+                }
+                board_jobs.append(normalize_job(
+                    "darwinbox", source_id, company, title, "; ".join(locations),
+                    url, published_at, precision, description, source_details=details,
+                ))
+            if len(rows) < DARWINBOX_PAGE_SIZE or rate_limited:
+                break
+        if successful_pages:
+            successful_boards += 1
+            _record_source_board("darwinbox", True)
+            jobs.extend(board_jobs)
+        else:
+            _record_source_board("darwinbox", False)
+        if rate_limited:
+            break
+    if successful_boards == 0:
+        raise RuntimeError("All configured Darwinbox boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("darwinbox: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("darwinbox: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -5142,6 +5509,8 @@ COLLECTORS = {
     "workday": workday_collect,
     "smartrecruiters": smartrecruiters_collect,
     "workable": workable_collect,
+    "keka": keka_collect,
+    "darwinbox": darwinbox_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -5510,6 +5879,8 @@ async def startup() -> None:
     restore_workday_rate_limit_state()
     restore_source_rate_limit_state("smartrecruiters")
     restore_source_rate_limit_state("workable")
+    restore_source_rate_limit_state("keka")
+    restore_source_rate_limit_state("darwinbox")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -6272,6 +6643,12 @@ def activate_discovered_board(board_id: int):
     elif provider == "workable":
         config_key = "workable_boards"
         registry_entry = {"account": key, "company": company}
+    elif provider == "keka":
+        config_key = "keka_boards"
+        registry_entry = {"careers_url": board["board_url"], "company": company}
+    elif provider == "darwinbox":
+        config_key = "darwinbox_boards"
+        registry_entry = {"careers_url": board["board_url"], "company": company}
     else:
         raise HTTPException(status_code=409, detail="This board provider has no activation mapping.")
 

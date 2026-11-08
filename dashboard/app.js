@@ -1560,6 +1560,8 @@
         workday: 'Workday',
         smartrecruiters: 'SmartRecruiters',
         workable: 'Workable',
+        keka: 'Keka',
+        darwinbox: 'Darwinbox',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
@@ -1629,6 +1631,10 @@
     if (smartRecruitersBoards) smartRecruitersBoards.value = JSON.stringify(c.smartrecruiters_boards || [], null, 2);
     const workableBoards = $('cfgWorkableBoards');
     if (workableBoards) workableBoards.value = JSON.stringify(c.workable_boards || [], null, 2);
+    const kekaBoards = $('cfgKekaBoards');
+    if (kekaBoards) kekaBoards.value = JSON.stringify(c.keka_boards || [], null, 2);
+    const darwinboxBoards = $('cfgDarwinboxBoards');
+    if (darwinboxBoards) darwinboxBoards.value = JSON.stringify(c.darwinbox_boards || [], null, 2);
 
   }
 
@@ -1662,6 +1668,8 @@
       ['cfgWorkdayBoards', 'workday_boards', 'Workday'],
       ['cfgSmartRecruitersBoards', 'smartrecruiters_boards', 'SmartRecruiters'],
       ['cfgWorkableBoards', 'workable_boards', 'Workable'],
+      ['cfgKekaBoards', 'keka_boards', 'Keka'],
+      ['cfgDarwinboxBoards', 'darwinbox_boards', 'Darwinbox'],
     ];
     for (const [elementId, configKey, label] of boardArrays) {
       const raw = $(elementId)?.value.trim() || '[]';
@@ -2196,6 +2204,8 @@
       { value: 'workday', label: 'Workday' },
       { value: 'smartrecruiters', label: 'SmartRecruiters' },
       { value: 'workable', label: 'Workable' },
+      { value: 'keka', label: 'Keka' },
+      { value: 'darwinbox', label: 'Darwinbox' },
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';

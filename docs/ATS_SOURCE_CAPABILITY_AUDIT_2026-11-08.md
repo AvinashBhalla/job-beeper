@@ -41,3 +41,12 @@ Recommended expansion order:
 4. Decide separately whether Workable, Remotive, RemoteOK, Arbeitnow and additional generic discovery platforms merit migration.
 
 No source should be enabled just because its adapter is merged. New sources stay opt-in until a bounded, read-only canary validates endpoint behavior, normalization, duplicates, timestamps, source health and failure handling.
+
+## 2026-11-08 follow-up — Keka/Darwinbox connector candidate (isolated worktree)
+
+An uncommitted candidate feature branch at `feat/darwinbox-keka-20261108` now contains dedicated Keka and Darwinbox V2 collectors, company-board discovery/probe support, admin activation mapping, opt-in config fields and focused regression tests. This changes the **candidate code status**, not the production status. The production container is still on build `7b1a80d`; Keka/Darwinbox are not in that image and are not production-enabled.
+
+- Keka public Bridgestone tenant: endpoint probe HTTP 200, 109 postings. Two `run_source` polls on a disposable SQLite DB gave 109 baseline jobs then 0 new; notifications disabled; integrity `ok`.
+- Darwinbox JG Summit candidate endpoint: endpoint probe HTTP 200, 18 postings. Two `run_source` polls gave 18 baseline jobs then 0 new; notifications disabled; integrity `ok`. This proves this employer endpoint only, not universal tenant coverage.
+- Full local V2 suite on the candidate: 387 passed, 215.671s, zero failures. Python compile, config JSON and diff checks pass.
+- Remaining release gates: push the final worktree SHA, pass exact-SHA GitHub CI, do admin browser QA on an isolated feature environment, review redirect/SSRF behavior and measure live request latency. Both source switches remain false by default.

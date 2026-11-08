@@ -4895,9 +4895,10 @@ class WorkdayCollectorTests(unittest.TestCase):
             def raise_for_status(self): return None
             def json(self): return self.payload
 
-        def fake_post(url, *, json, headers, timeout):
-            post_calls.append((url, dict(json)))
-            if json["offset"] == 0:
+        def fake_post(source, url, *, json_body, headers, timeout, **kwargs):
+            self.assertEqual(source, "workday")
+            post_calls.append((url, dict(json_body)))
+            if json_body["offset"] == 0:
                 return Response({"jobPostings": first_page, "total": 2000})
             return Response({"jobPostings": [], "total": 2000})
 
@@ -4926,9 +4927,13 @@ class WorkdayCollectorTests(unittest.TestCase):
             "locations": ["California, United States"],
             "remote_only": False,
         }
+        def tracked_get(source, url, **kwargs):
+            self.assertEqual(source, "workday")
+            return fake_get(url, params=kwargs.get("params"), headers=kwargs.get("headers"), timeout=kwargs.get("timeout", 20))
+
         with patch.object(radar, "WORKDAY_MAX_PAGES_PER_BOARD", 2), patch.object(
-            radar.requests, "post", side_effect=fake_post
-        ), patch.object(radar.requests, "get", side_effect=fake_get), patch.object(
+            radar, "_tracked_source_post", side_effect=fake_post
+        ), patch.object(radar, "_tracked_source_get", side_effect=tracked_get), patch.object(
             radar.time, "sleep", return_value=None
         ):
             jobs = radar.workday_collect(config)

@@ -572,6 +572,8 @@
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workday"> Workday</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="smartrecruiters"> SmartRecruiters</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workable"> Workable</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="keka"> Keka</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="darwinbox"> Darwinbox</label>
                 </div>
                 <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
                   <label class="form-field-label" for="cfgWorkdayBoards">Workday public career boards (JSON)</label>
@@ -584,6 +586,10 @@
                   <textarea id="cfgSmartRecruitersBoards" rows="3" spellcheck="false" placeholder='[{"company_identifier":"BoschGroup","company":"Bosch Group"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
                   <label class="form-field-label" for="cfgWorkableBoards">Workable public account slugs (JSON)</label>
                   <textarea id="cfgWorkableBoards" rows="3" spellcheck="false" placeholder='[{"account":"huggingface","company":"Hugging Face"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <label class="form-field-label" for="cfgKekaBoards">Keka public careers URLs (JSON)</label>
+                  <textarea id="cfgKekaBoards" rows="3" spellcheck="false" placeholder='[{"careers_url":"https://company.keka.com/careers","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
+                  <label class="form-field-label" for="cfgDarwinboxBoards">Darwinbox public careers URLs (JSON)</label>
+                  <textarea id="cfgDarwinboxBoards" rows="3" spellcheck="false" placeholder='[{"careers_url":"https://tenant.darwinbox.in/ms/candidatev2/companyId/careers/allJobs","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
                   <span style="font-size:11px;color:var(--text-muted);">Use identifiers discovered and verified from the employer's public careers board. All sources remain off until explicitly enabled.</span>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
