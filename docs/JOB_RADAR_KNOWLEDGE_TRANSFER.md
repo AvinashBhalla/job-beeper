@@ -3502,3 +3502,11 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Full V2 suite on branch `feat/server-application-tracker-20261109`: 400 tests passed in 307.495s. The earlier test process had loaded the pre-fix route audit, so its single failure was superseded by the fresh successful run.
 - `py_compile` and `git diff --check` passed. The local host only has Node 12; rely on the modern Node syntax gate in GitHub Actions.
 - Production is still not running this feature. Do not call the tracker deployed until PR merge and backup-backed data-copy canary/cutover evidence exists.
+
+
+### 2026-11-09 — P0.5 CI/canary checkpoint (not deployed)
+
+- PR #55 exact head `dd89a02585d352ea634881e4e400d1ca9ae0d200`; GitHub CI run `42515519714` passed. Local full V2 suite 400/400 passed in 307.495s.
+- Exact-head Docker image `job-radar-apps-canary:dd89a02` was started on disposable port 8013 with a fresh production DB copy and all sources/notifications disabled. Health/dashboard 200; anonymous applications API 401; new table present; counts preserved (22,721 jobs / 22,409 canonical / 10 boards); foreign keys clear; integrity `ok`.
+- Snapshot/hash and config hash are in the latest P0.5 section of `JOB_RADAR_HANDOVER.md`. Canary container/network removed. Production stays at image `job-radar-prod-canary:00820f0`, unchanged.
+- Tool execution safety blocked creation of synthetic canary user accounts, so no live two-user API smoke was possible. Equivalent two-user/owner-scope/CRUD/CSRF tests passed locally and in exact GitHub CI. Do not claim two-user canary is done or bypass the guard. PR #55 remains open and undeployed until an approved test path/release decision.

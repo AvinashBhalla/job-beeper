@@ -251,3 +251,8 @@ Report sample size and timestamp precision. A source returning 1,000 old jobs is
 ### P0.5 implementation checkpoint — 2026-11-09
 
 The current feature branch adds per-user server-owned application records and the dashboard API migration. It is not in production until exact full V2 tests, GitHub CI, data-copy canary and a separate backup-backed deploy have passed. The local full V2 suite has passed 400 tests in 307.495s; exact-head GitHub CI and production-data canary are still pending. The feature is not deployed. Detailed implementation/release notes are in `JOB_RADAR_HANDOVER.md`.
+
+### 2026-11-09 — P0.5 verification boundary
+
+- PR #55 exact-head CI passed and the local full V2 suite passed 400 tests. The production-data copy canary started successfully with collectors/notifications off; schema created, health/dashboard 200, unauthenticated application API 401, DB counts preserved and SQLite integrity `ok`.
+- A dedicated two-synthetic-user canary API smoke was blocked by the remote execution safety gate. Matching owner-isolation/CRUD tests passed in local and GitHub suites. PR #55 is still open/not deployed; do not promote without an approved release decision and a documented way to complete or waive that canary smoke.
