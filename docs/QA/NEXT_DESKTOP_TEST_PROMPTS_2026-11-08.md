@@ -105,3 +105,20 @@ Automated coverage now includes: canonical marker exclusion at enqueue; cancella
 - On a public `/browse/role/{slug}` page, test the location filter and text search for title/company/location. Record how filtering interacts with the displayed 200-result cap and whether pagination or only client-side filtering exists.
 - Open one public job detail. Record whether employer application instructions, external application link, source, remote/work mode, posted/discovered times and employer privacy/EEO text are displayed, and whether the apply route is sign-in gated.
 - Treat any landing-page statements about six-hour subscriber head start, paid Telegram/browser/app alerts, application tracking and company preferences as claims until the actual UI flow corroborates them. Do not sign up, pay, or submit an application.
+## Prompt 4 — Diagnose 320px mobile interaction hit-testing (read-only)
+
+Run only against `http://localhost:18005/dashboard/`, using the existing synthetic member/admin contexts. This is a diagnostic follow-up to `docs/QA/desktop-final-visual-evidence-2026-11-08.md`. Do not repeat QA-001 or modify code/config/database. Do not issue POST/PUT/PATCH/DELETE; no collectors, OAuth, Telegram or real account actions.
+
+At 320×740 for each role:
+
+1. Scroll `#jobsListContainer` to its maximum scroll position and locate the final `.btn-action-applied` button containing “Mark Applied”.
+2. Confirm the target is still connected (`button.isConnected`) and take its `getBoundingClientRect()` twice over stable animation frames.
+3. Compute the exact viewport CSS-pixel center `x = rect.left + rect.width/2`, `y = rect.top + rect.height/2` and call `document.elementFromPoint(x,y)` plus `document.elementsFromPoint(x,y)` immediately. Do not add document scroll or internal scrollTop to these viewport coordinates.
+4. Record the full returned stack: tag, id, class, text, bounding rect, computed `position`, `z-index`, `pointer-events`, `opacity`, `visibility`, transform, overflow and containing block. Also record the intended button, parent `.opportunity-row`, `#jobsListContainer`, `.feed-filter-toolbar`, `.feed-status-strip` and `.mobile-bottom-navigation` rectangles/styles.
+5. Record target and blocker intersection geometry. Inspect whether any ancestor has transform/filter/contain that creates a stacking context. Check whether an element was detached/replaced between measurement and hit-test.
+6. Perform read-only hit tests at the button's four inset corners and center. Use only `elementFromPoint`/`elementsFromPoint`; do not click the button.
+7. Repeat once at 375×812 as a passing control. Provide JSON-like structured measurements and inline captures if possible. Do not guess the cause.
+
+Expected prior reproduction: member 320px hit-test returns `BUTTON` “Newest First”; admin returns `.feed-status-strip`. At 375px both should return the `SPAN` “Mark Applied” descendant. Bottom navigation begins at y=684 in the 320×740 viewport and has height 56px; the final button rects were previously above it.
+
+Save a report at `C:\Users\avibh\Documents\Codex\JobBeeper-QA-Context\desktop-320px-hit-test-diagnostics-2026-11-08.md`. No code fix in this task. State exactly which coordinate/stack evidence confirms a real overlay versus stale element/coordinate error. Return the report path and concise root-cause verdict.
