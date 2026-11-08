@@ -59,3 +59,12 @@ Deleted: `feat/structured-naukri-details-20261106` (after #3 closure), `fix/rela
 - Current planned app branches after cleanup: `main`, `v2-live-radar`, and `feat/user-preferences-evaluations-20261106` (open draft PR #46). PR #35 remains the V2-to-main release gate and is not merge-ready.
 - The isolated 8003 preview is restored: health/dashboard/assets return HTTP 200, source-status remains admin-only (401 anonymously), and all five collector switches and notifications remain disabled with synthetic source-run examples only.
 - Next prioritized feature task: diagnose the PR #46 preferences-save validation/UI error before considering the multi-user branch merge. Do not merge PR #46 or promote to shared dev/production until preference save and per-user Telegram E2E are verified.
+
+## 2026-11-08 — PR #46 local V2 integration candidate
+
+- A local-only integration worktree `/tmp/job-radar-pr46-integration` merges `feat/user-preferences-evaluations-20261106` onto the latest `v2-live-radar` base at `a719138`. This is a rebase/conflict-resolution candidate only; it has not been pushed and does not alter the 8002 feature service or 8004 desktop QA service.
+- Shared conflict in `v2/radar.py` was resolved by combining both implementations: preserve monotonic `last_seen_at`, safe source-posted timestamp handling and description-change-only global reevaluation; retain experience provenance/confidence ranking, min/max persistence and per-user evaluation refresh for only touched/new jobs.
+- `dashboard/app.js` and `dashboard/index.html` auto-merged. Six conflict files were originally detected; the docs conflicts are being resolved by keeping the newer V2 handover/roadmap/audit and appending current PR #46/browser QA status. Feature-only docs and tests (OAuth, resume parser, Telegram, local browser QA) remain included from PR #46.
+- Important next integration: ensure `user_notification_ledger` enqueue/delivery excludes global `notification_ledger.baseline_suppressed=1` opportunities before Lever or other first-snapshot ATS inventory is enabled for member Telegram. The user notification path must not bypass the initial-inventory baseline.
+- This local candidate must pass the full V2 suite and user-preferences/OAuth/resume/Telegram focused suites. Keep PR #46 remote draft unchanged until owner desktop Browser report is returned and this candidate has full green CI.
+- No push/deploy/runtime changes.

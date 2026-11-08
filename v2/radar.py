@@ -17,19 +17,19 @@ import uuid
 import warnings
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth
+from v2 import auth, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -62,6 +62,7 @@ LINKEDIN_DEEP_SCAN_SECONDS = 1800
 LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -559,6 +560,9 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
     if not row:
         return None
     job = dict(row)
+    if job.get("experience_min_years") is not None or job.get("experience_max_years") is not None:
+        job["jd_experience_min_years"] = job.get("experience_min_years")
+        job["jd_experience_max_years"] = job.get("experience_max_years")
     # Reuse only a fresh, exact-JD Gemini cache result that has validated
     # verbatim evidence for required total-professional experience. The regex
     # parser remains the fallback whenever Gemini is unavailable or ambiguous.
@@ -758,7 +762,12 @@ def init_db() -> None:
             discovery_latency_seconds INTEGER,
             description TEXT NOT NULL DEFAULT '',
             description_format TEXT NOT NULL DEFAULT 'plain',
+            experience_min_years REAL,
+            experience_max_years REAL,
+            experience_provenance TEXT NOT NULL DEFAULT 'unknown',
+            experience_confidence TEXT NOT NULL DEFAULT 'unknown',
             source_details_json TEXT NOT NULL DEFAULT '{}',
+            source_initial_baseline INTEGER NOT NULL DEFAULT 0,
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
             canonical_opportunity_id INTEGER,
@@ -859,7 +868,12 @@ def init_db() -> None:
         )
         """)
         _ensure_column(conn, "jobs", "description_format", "TEXT NOT NULL DEFAULT 'plain'")
+        _ensure_column(conn, "jobs", "experience_min_years", "REAL")
+        _ensure_column(conn, "jobs", "experience_max_years", "REAL")
+        _ensure_column(conn, "jobs", "experience_provenance", "TEXT NOT NULL DEFAULT 'unknown'")
+        _ensure_column(conn, "jobs", "experience_confidence", "TEXT NOT NULL DEFAULT 'unknown'")
         _ensure_column(conn, "jobs", "source_details_json", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(conn, "jobs", "source_initial_baseline", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
         _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
@@ -916,15 +930,63 @@ def init_db() -> None:
     backfill_canonical_opportunities()
     backfill_notification_ledger()
     auth.init_auth_schema(DB_PATH)
+    user_preferences.init_preferences_schema(DB_PATH)
+    telegram_linking.init_schema(DB_PATH)
+    user_notifications.init_schema(DB_PATH)
+    user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
-def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
+def upsert_jobs(
+    jobs: list[dict[str, Any]],
+    config: dict[str, Any] | None = None,
+    source_run_started_at: dt.datetime | None = None,
+) -> int:
     new_count = 0
+    affected_job_ids: list[int] = []
     config = config or get_config()
+    baseline_cutoff_text = iso(source_run_started_at or now())
+    baseline_pending_by_source: dict[str, bool] = {}
+
     with db_lock, sqlite3.connect(DB_PATH) as conn:
+        def mark_initial_baseline(job_id: int, source: str) -> None:
+            source_key = source.strip().lower()
+            if source_key not in INITIAL_SNAPSHOT_BASELINE_SOURCES:
+                return
+            if source_key not in baseline_pending_by_source:
+                prior_success = conn.execute(
+                    "SELECT 1 FROM source_runs WHERE source=? AND outcome='success' LIMIT 1",
+                    (source_key,),
+                ).fetchone()
+                baseline_pending_by_source[source_key] = prior_success is None
+            if not baseline_pending_by_source[source_key]:
+                return
+
+            canonical = conn.execute(
+                "SELECT canonical_opportunity_id FROM jobs WHERE id=?",
+                (int(job_id),),
+            ).fetchone()
+            if not canonical or not canonical[0]:
+                return
+            first_seen = conn.execute(
+                "SELECT first_seen_at FROM canonical_opportunities WHERE id=?",
+                (int(canonical[0]),),
+            ).fetchone()
+            first_seen_at = parse_relative(first_seen[0]) if first_seen else None
+            cutoff_at = parse_relative(baseline_cutoff_text)
+            if first_seen_at and cutoff_at and first_seen_at >= cutoff_at:
+                conn.execute(
+                    "UPDATE jobs SET source_initial_baseline=1 WHERE id=?",
+                    (int(job_id),),
+                )
+
         for incoming in jobs:
             j = dict(incoming)
             incoming_description = str(j.get("description") or "")
+            experience_details = _experience_provenance_details(j)
+            j["experience_min_years"] = experience_details["min_years"]
+            j["experience_max_years"] = experience_details["max_years"]
+            j["experience_provenance"] = experience_details["provenance"]
+            j["experience_confidence"] = experience_details["confidence"]
             incoming_description_format = (
                 "markdown"
                 if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -951,10 +1013,43 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 j["discovery_latency_seconds"] = None
 
             existing = conn.execute(
-                "SELECT id, canonical_opportunity_id, discovered_at, source_posted_at, posted_precision, description, description_format FROM jobs WHERE source=? AND source_job_id=?",
-                (j["source"], j["source_job_id"])
+                """SELECT
+                       id, canonical_opportunity_id, discovered_at,
+                       source_posted_at, posted_precision, description,
+                       description_format, experience_min_years,
+                       experience_max_years, experience_provenance,
+                       experience_confidence
+                   FROM jobs
+                   WHERE source=? AND source_job_id=?""",
+                (j["source"], j["source_job_id"]),
             ).fetchone()
             if existing:
+                experience_rank = {
+                    "unknown": 0,
+                    "inferred": 1,
+                    "description": 2,
+                    "employer_stated": 3,
+                }
+                confidence_rank = {
+                    "unknown": 0,
+                    "low": 1,
+                    "medium": 2,
+                    "high": 3,
+                }
+                existing_experience_rank = (
+                    experience_rank.get(str(existing[9] or "unknown"), 0),
+                    confidence_rank.get(str(existing[10] or "unknown"), 0),
+                )
+                incoming_experience_rank = (
+                    experience_rank.get(str(j["experience_provenance"]), 0),
+                    confidence_rank.get(str(j["experience_confidence"]), 0),
+                )
+                if incoming_experience_rank < existing_experience_rank:
+                    j["experience_min_years"] = existing[7]
+                    j["experience_max_years"] = existing[8]
+                    j["experience_provenance"] = existing[9]
+                    j["experience_confidence"] = existing[10]
+
                 posted_at_for_update = j["source_posted_at"]
                 precision_for_update = j["posted_precision"]
                 first_discovered_at = parse_relative(existing[2])
@@ -985,6 +1080,16 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
                         ELSE description_format
                     END,
+                    experience_min_years=COALESCE(?, experience_min_years),
+                    experience_max_years=COALESCE(?, experience_max_years),
+                    experience_provenance=CASE
+                        WHEN ?!='unknown' THEN ?
+                        ELSE experience_provenance
+                    END,
+                    experience_confidence=CASE
+                        WHEN ?!='unknown' THEN ?
+                        ELSE experience_confidence
+                    END,
                     source_details_json=CASE
                         WHEN ? <> '{}' THEN ?
                         ELSE source_details_json
@@ -997,10 +1102,16 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                     precision_for_update,
                     incoming_description_format, incoming_description, incoming_description,
                     incoming_description_format, incoming_description, incoming_description_format,
-                    source_details_json, source_details_json, existing[0]
+                    j["experience_min_years"], j["experience_max_years"],
+                    j["experience_provenance"], j["experience_provenance"],
+                    j["experience_confidence"], j["experience_confidence"],
+                    source_details_json, source_details_json, existing[0],
                 ))
-                if not existing[1]:
+
+                newly_canonicalized = not existing[1]
+                if newly_canonicalized:
                     _assign_canonical(conn, int(existing[0]))
+                mark_initial_baseline(int(existing[0]), str(j["source"]))
 
                 existing_description = str(existing[5] or "")
                 existing_format = str(existing[6] or "plain")
@@ -1017,22 +1128,35 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         and len(incoming_description) > len(existing_description)
                     )
                 )
-                next_description = incoming_description if update_description else existing_description
-                next_format = incoming_description_format if update_description else existing_format
+                next_description = (
+                    incoming_description if update_description else existing_description
+                )
+                next_format = (
+                    incoming_description_format if update_description else existing_format
+                )
                 next_posted_at = posted_at_for_update or existing[3]
                 next_precision = (
                     precision_for_update
                     if precision_for_update == "minute"
                     else existing[4]
                 )
+                experience_inputs_changed = (
+                    j["experience_min_years"] != existing[7]
+                    or j["experience_max_years"] != existing[8]
+                    or j["experience_provenance"] != existing[9]
+                    or j["experience_confidence"] != existing[10]
+                )
                 evaluation_inputs_changed = (
                     next_description != existing_description
                     or next_format != existing_format
                     or next_posted_at != existing[3]
                     or next_precision != existing[4]
+                    or experience_inputs_changed
                 )
                 if evaluation_inputs_changed:
                     _persist_job_evaluation(conn, int(existing[0]), config)
+                if evaluation_inputs_changed or newly_canonicalized:
+                    affected_job_ids.append(int(existing[0]))
             else:
                 if j.get("needs_jd_enrichment"):
                     j = enrich_linkedin_job(j)
@@ -1040,6 +1164,11 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                 # LinkedIn enrichment may replace the original search snippet
                 # with a full JD; persist the post-enrichment values.
                 incoming_description = str(j.get("description") or "")
+                experience_details = _experience_provenance_details(j)
+                j["experience_min_years"] = experience_details["min_years"]
+                j["experience_max_years"] = experience_details["max_years"]
+                j["experience_provenance"] = experience_details["provenance"]
+                j["experience_confidence"] = experience_details["confidence"]
                 incoming_description_format = (
                     "markdown"
                     if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -1057,20 +1186,29 @@ def upsert_jobs(jobs: list[dict[str, Any]], config: dict[str, Any] | None = None
                         source, source_job_id, company, title, location, url,
                         source_posted_at, posted_precision, discovered_at,
                         discovery_latency_seconds, description, description_format,
-                        source_details_json, first_seen_at, last_seen_at
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        experience_min_years, experience_max_years, experience_provenance,
+                        experience_confidence, source_details_json, first_seen_at,
+                        last_seen_at, source_initial_baseline
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                 """, (
                     j["source"], j["source_job_id"], j["company"], j["title"],
                     j["location"], j["url"], j["source_posted_at"],
                     j["posted_precision"], j["discovered_at"],
                     j["discovery_latency_seconds"], incoming_description,
-                    incoming_description_format, source_details_json,
+                    incoming_description_format, j["experience_min_years"],
+                    j["experience_max_years"], j["experience_provenance"],
+                    j["experience_confidence"], source_details_json,
                     j["discovered_at"], iso(last_seen_at) or j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
+                mark_initial_baseline(int(cur.lastrowid), str(j["source"]))
                 _persist_job_evaluation(conn, int(cur.lastrowid), config)
+                affected_job_ids.append(int(cur.lastrowid))
                 new_count += 1
         conn.commit()
+    # Shared ingestion evaluates only the touched jobs for every configured user.
+    if affected_job_ids:
+        refresh_configured_user_evaluations(affected_job_ids)
     return new_count
 
 # Increment whenever deterministic matching/alertability rules change so
@@ -1193,6 +1331,148 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
             count += 1
         conn.commit()
     return count
+
+
+def _persist_user_job_evaluation(
+    conn: sqlite3.Connection,
+    user_id: int,
+    job_id: int,
+    preferences: dict[str, Any],
+) -> dict[str, Any]:
+    job = _job_for_canonical(conn, job_id)
+    if not job:
+        raise ValueError(f"Job {job_id} does not exist")
+    details = match_details(job, preferences)
+    evaluated_at = iso(now())
+    fingerprint = user_preferences.preferences_fingerprint(
+        preferences, MATCHER_RULES_VERSION
+    )
+    # These legacy alertability fields are admin-policy metadata only.
+    # Member delivery uses user_notifications with explicit opt-in, a
+    # user-scoped ledger and a separately linked private Telegram chat.
+    alertability_reasons = ["member alerts use separate per-user opt-in and delivery policy"]
+    conn.execute(
+        """INSERT INTO user_job_evaluations (
+               user_id, job_id, preference_fingerprint, evaluated_at, match, score,
+               reasons_json, experience_min_years, experience_max_years,
+               alertable, alertability_reasons_json
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+           ON CONFLICT(user_id, job_id) DO UPDATE SET
+               preference_fingerprint=excluded.preference_fingerprint,
+               evaluated_at=excluded.evaluated_at,
+               match=excluded.match,
+               score=excluded.score,
+               reasons_json=excluded.reasons_json,
+               experience_min_years=excluded.experience_min_years,
+               experience_max_years=excluded.experience_max_years,
+               alertable=0,
+               alertability_reasons_json=excluded.alertability_reasons_json""",
+        (
+            user_id, job_id, fingerprint, evaluated_at, int(details["match"]),
+            int(details["score"]), json.dumps(details["reasons"], ensure_ascii=False),
+            details["experience_min_years"], details["experience_max_years"],
+            json.dumps(alertability_reasons),
+        ),
+    )
+    return {**details, "evaluated_at": evaluated_at, "preference_fingerprint": fingerprint}
+
+
+def refresh_user_job_evaluations(
+    user_id: int,
+    preferences: dict[str, Any],
+    job_ids: list[int] | None = None,
+) -> int:
+    if not preferences.get("target_roles") or not preferences.get("locations"):
+        return 0
+    if job_ids and len(job_ids) > 500:
+        return sum(
+            refresh_user_job_evaluations(user_id, preferences, job_ids[start:start + 500])
+            for start in range(0, len(job_ids), 500)
+        )
+    with sqlite3.connect(DB_PATH) as conn:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+    if not {"jobs", "user_job_evaluations"}.issubset(tables):
+        return 0
+    fingerprint = user_preferences.preferences_fingerprint(
+        preferences, MATCHER_RULES_VERSION
+    )
+    changed = 0
+    with db_lock, sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        sql = """SELECT j.id
+                 FROM jobs j
+                 LEFT JOIN user_job_evaluations e
+                   ON e.job_id=j.id AND e.user_id=?
+                 WHERE (e.job_id IS NULL OR e.preference_fingerprint != ?)"""
+        params: list[Any] = [int(user_id), fingerprint]
+        if job_ids:
+            placeholders = ",".join("?" for _ in job_ids)
+            sql += f" AND j.id IN ({placeholders})"
+            params.extend(int(job_id) for job_id in job_ids)
+        sql += " ORDER BY j.first_seen_at ASC, j.id ASC"
+        rows = conn.execute(sql, params).fetchall()
+        for row in rows:
+            _persist_user_job_evaluation(
+                conn, int(user_id), int(row["id"]), preferences
+            )
+            changed += 1
+        conn.commit()
+    return changed
+
+
+def ensure_user_job_evaluations_initialized(
+    user_id: int, preferences: dict[str, Any]
+) -> int:
+    if not preferences.get("target_roles") or not preferences.get("locations"):
+        return 0
+    with sqlite3.connect(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"jobs", "user_job_evaluations"}.issubset(tables):
+            return 0
+        jobs_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        existing = conn.execute(
+            "SELECT 1 FROM user_job_evaluations WHERE user_id=? LIMIT 1",
+            (int(user_id),),
+        ).fetchone()
+    if jobs_count and existing is None:
+        return refresh_user_job_evaluations(user_id, preferences)
+    return 0
+
+
+def refresh_configured_user_evaluations(job_ids: list[int] | None = None) -> int:
+    with sqlite3.connect(DB_PATH) as conn:
+        tables = {
+            row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        if not {"users", "user_preferences", "jobs", "user_job_evaluations"}.issubset(tables):
+            return 0
+        conn.row_factory = sqlite3.Row
+        users = conn.execute(
+            """SELECT u.id, p.preferences_json
+               FROM users u
+               JOIN user_preferences p ON p.user_id=u.id
+               WHERE u.status='active'"""
+        ).fetchall()
+    total = 0
+    for row in users:
+        try:
+            stored = json.loads(row["preferences_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            continue
+        preferences = {**user_preferences.PREFERENCE_DEFAULTS, **stored}
+        if preferences.get("target_roles") and preferences.get("locations"):
+            total += refresh_user_job_evaluations(int(row["id"]), preferences, job_ids)
+    return total
 
 
 def _alert_age_timestamp(job: dict[str, Any]) -> dt.datetime | None:
@@ -2058,6 +2338,48 @@ def extract_linkedin_labeled_experience(text: str) -> tuple[float | None, float 
         years = float(single_match.group(1))
         return years, years
     return None, None
+
+
+def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
+    """Resolve job-level experience bounds and where the evidence came from.
+
+    LinkedIn's explicit Experience label is treated as employer-stated source
+    metadata. Explicit requirements parsed from the job description are
+    description-derived. Generic year mentions remain marked inferred rather
+    than being presented as an employer requirement.
+    """
+    description = str(job.get("description") or "")
+    source = str(job.get("source") or "").casefold()
+
+    if job.get("jd_experience_source") == "gemini_verified":
+        low = job.get("jd_experience_min_years")
+        high = job.get("jd_experience_max_years")
+        if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "high"}
+
+    if source == "linkedin":
+        low, high = extract_linkedin_labeled_experience(description)
+        if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
+
+    low, high = extract_jd_experience(description)
+    explicit_context = bool(re.search(
+        r"\b(?:overall|total|professional)\b[^.!?]{0,120}\bexperience\b"
+        r"|\bwork\s+experience\b"
+        r"|\bexperience\b[^.!?]{0,80}\b(?:required|minimum|at\s+least)\b"
+        r"|\b(?:minimum|at\s+least|required|requires?)\b[^.!?]{0,100}\bexperience\b"
+        r"|\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+experience\b",
+        description,
+        re.I,
+    ))
+    if (low is not None or high is not None) and explicit_context:
+        return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
+
+    low, high = extract_experience(f"{job.get('title', '')} {description}")
+    if low is not None or high is not None:
+        return {"min_years": low, "max_years": high, "provenance": "inferred", "confidence": "low"}
+
+    return {"min_years": None, "max_years": None, "provenance": "unknown", "confidence": "unknown"}
 
 
 def _linkedin_job_id(url: str) -> str | None:
@@ -3447,7 +3769,11 @@ def run_source(source: str, config: dict[str, Any]) -> None:
                 source,
                 type(exc).__name__,
             )
-        new_jobs = upsert_jobs(jobs, config)
+        new_jobs = upsert_jobs(
+            jobs,
+            config,
+            source_run_started_at=started_at,
+        )
         refresh_job_evaluations(config)
         refresh_notification_decisions(config)
 
@@ -3661,7 +3987,15 @@ async def notification_worker() -> None:
                 if delivered:
                     log.info("telegram: delivered=%s", delivered)
         except Exception:
-            log.exception("telegram worker failed")
+            log.exception("legacy Telegram worker failed")
+
+        # Member delivery is independent of the legacy admin chat ID.
+        try:
+            user_delivered = await asyncio.to_thread(user_notifications.dispatch, DB_PATH, 20, MATCHER_RULES_VERSION)
+            if user_delivered:
+                log.info("telegram: per-user delivered=%s", user_delivered)
+        except Exception:
+            log.exception("per-user Telegram worker failed")
 
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=15)
@@ -3705,6 +4039,7 @@ async def startup() -> None:
     config = get_config()
     refresh_job_evaluations(config)
     refresh_notification_decisions(config)
+    refresh_configured_user_evaluations()
     app.state.scheduler_task = asyncio.create_task(scheduler())
     app.state.notification_worker_task = asyncio.create_task(notification_worker())
 
@@ -3721,6 +4056,7 @@ async def shutdown() -> None:
 SESSION_COOKIE_NAME = "job_beeper_session"
 CSRF_COOKIE_NAME = "job_beeper_csrf"
 CSRF_HEADER_NAME = "X-CSRF-Token"
+GOOGLE_STATE_COOKIE_NAME = "job_beeper_google_state"
 
 
 class AuthLoginRequest(BaseModel):
@@ -3747,6 +4083,27 @@ def _expected_login_origin(request: Request):
     return expected
 
 
+def _issue_user_session(request: Request, response: Response, user: dict[str, Any]) -> None:
+    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
+    if previous_session:
+        auth.revoke_session(DB_PATH, previous_session)
+    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
+    cookie_options = {
+        "path": "/",
+        "secure": _auth_cookie_secure(),
+        "samesite": "lax",
+        "max_age": auth.SESSION_TTL_SECONDS,
+    }
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME, value=session_token, httponly=True, **cookie_options
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME, value=csrf_token, httponly=False, **cookie_options
+    )
+
+
 def get_current_user(request: Request) -> dict[str, Any]:
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
     user = auth.get_session_user(DB_PATH, session_token or "")
@@ -3756,12 +4113,10 @@ def get_current_user(request: Request) -> dict[str, Any]:
     return user
 
 
-def require_admin(
+def require_authenticated(
     request: Request,
     user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Administrator access required.")
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         session_token = request.cookies.get(SESSION_COOKIE_NAME, "")
         cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "")
@@ -3773,6 +4128,14 @@ def require_admin(
             or not auth.validate_csrf(DB_PATH, session_token, header_token)
         ):
             raise HTTPException(status_code=403, detail="CSRF validation failed.")
+    return user
+
+
+def require_admin(
+    user: dict[str, Any] = Depends(require_authenticated),
+) -> dict[str, Any]:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required.")
     return user
 
 
@@ -3806,33 +4169,97 @@ def auth_login(payload: AuthLoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     auth.record_login_attempt(DB_PATH, email, client_ip, success=True)
 
-    # A successful login replaces any browser session cookie already presented,
-    # including a session for a different account. Failed logins leave it intact.
-    previous_session = request.cookies.get(SESSION_COOKIE_NAME, "")
-    if previous_session:
-        auth.revoke_session(DB_PATH, previous_session)
-    session_token, csrf_token, _ = auth.create_session(DB_PATH, user["id"])
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
-    cookie_options = {
-        "path": "/",
-        "secure": _auth_cookie_secure(),
-        "samesite": "lax",
-        "max_age": auth.SESSION_TTL_SECONDS,
-    }
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=session_token,
-        httponly=True,
-        **cookie_options,
-    )
-    response.set_cookie(
-        key=CSRF_COOKIE_NAME,
-        value=csrf_token,
-        httponly=False,
-        **cookie_options,
-    )
+    # A successful login replaces any browser session cookie already presented.
+    _issue_user_session(request, response, user)
     return {"user": user}
+
+
+@app.get("/api/auth/google/status")
+def google_auth_status():
+    try:
+        configured = google_oauth.load_config() is not None
+    except ValueError:
+        configured = False
+    return {"enabled": configured}
+
+
+@app.get("/api/auth/google/start")
+def google_auth_start():
+    try:
+        config = google_oauth.load_config()
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if config is None:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+    authorization_url = google_oauth.create_authorization_url(DB_PATH, config)
+    state = parse_qs(urlsplit(authorization_url).query).get("state", [""])[0]
+    response = RedirectResponse(authorization_url, status_code=302)
+    response.set_cookie(
+        key=GOOGLE_STATE_COOKIE_NAME,
+        value=state,
+        httponly=True,
+        secure=_auth_cookie_secure(),
+        samesite="lax",
+        max_age=google_oauth.STATE_TTL_SECONDS,
+        path="/api/auth/google",
+    )
+    return response
+
+
+@app.get("/api/auth/google/callback")
+def google_auth_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    error: str = "",
+):
+    failure_url = "/dashboard/?google_auth=failed"
+
+    def finish_redirect(url: str):
+        redirect = RedirectResponse(url, status_code=303)
+        redirect.delete_cookie(
+            key=GOOGLE_STATE_COOKIE_NAME,
+            httponly=True,
+            secure=_auth_cookie_secure(),
+            samesite="lax",
+            path="/api/auth/google",
+        )
+        return redirect
+
+    # Validate and consume the one-time state before interpreting either a
+    # successful authorization or Google's cancellation/error response.
+    browser_state = request.cookies.get(GOOGLE_STATE_COOKIE_NAME, "")
+    if not browser_state or not state or not secrets.compare_digest(browser_state, state):
+        return finish_redirect(failure_url)
+    state_data = google_oauth.consume_authorization_state(DB_PATH, state)
+    if state_data is None:
+        return finish_redirect(failure_url)
+    if error:
+        return finish_redirect("/dashboard/?google_auth=cancelled")
+
+    try:
+        config = google_oauth.load_config()
+    except ValueError:
+        return finish_redirect(failure_url)
+    if config is None:
+        return finish_redirect(failure_url)
+
+    expected_nonce, code_verifier = state_data
+    try:
+        identity = google_oauth.exchange_code_for_identity(code, code_verifier, config)
+        if not google_oauth.validate_nonce(identity["claims"], expected_nonce):
+            raise ValueError("Google identity nonce validation failed.")
+        user = auth.create_or_link_google_user(
+            DB_PATH, identity["email"], identity["subject"]
+        )
+        user_preferences.ensure_user_preferences(DB_PATH, user["id"])
+    except Exception as exc:
+        log.warning("Google sign-in failed error_type=%s", type(exc).__name__)
+        return finish_redirect(failure_url)
+
+    response = finish_redirect("/dashboard/")
+    _issue_user_session(request, response, user)
+    return response
 
 
 @app.get("/api/auth/me")
@@ -3878,6 +4305,192 @@ def health():
 
 
 
+@app.get("/api/preferences")
+def read_user_preferences(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if preferences["onboarding_complete"]:
+        ensure_user_job_evaluations_initialized(user["id"], preferences)
+    return {"preferences": preferences}
+
+
+@app.post("/api/preferences/resume")
+async def parse_user_resume(
+    file: UploadFile = File(...),
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    """Parse an optional resume into suggestions; never persist the uploaded file or preferences."""
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Resume-assisted preferences are for member accounts.")
+    filename = file.filename or "resume"
+    suffix = Path(filename).suffix.lower()
+    allowed_types = {
+        ".pdf": {"application/pdf", "application/octet-stream"},
+        ".docx": {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/octet-stream",
+        },
+    }
+    if suffix not in allowed_types or (file.content_type and file.content_type.lower() not in allowed_types[suffix]):
+        await file.close()
+        raise HTTPException(status_code=422, detail="File extension and content type must match a PDF or DOCX resume.")
+    try:
+        # Read at most one byte beyond the hard limit, rather than trusting Content-Length.
+        content = await file.read(resume_parser.MAX_RESUME_BYTES + 1)
+        result = resume_parser.parse_resume(filename, content)
+    except resume_parser.ResumeParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        await file.close()
+    # Deliberately return only bounded suggestions. No file, path, raw text, or DB write.
+    return result
+
+
+@app.get("/api/notifications/settings")
+def read_user_notification_settings(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    settings = user_notifications.get_settings(DB_PATH, user["id"])
+    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    return {"settings": settings, "telegram_connected": bool(connection)}
+
+
+@app.put("/api/notifications/settings")
+def update_user_notification_settings(payload: dict[str, Any], user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    if set(payload) != {"enabled"} or not isinstance(payload.get("enabled"), bool):
+        raise HTTPException(status_code=422, detail="Provide only an enabled boolean.")
+    if payload["enabled"] and not telegram_linking.get_connection(DB_PATH, user["id"]):
+        raise HTTPException(status_code=409, detail="Connect a private Telegram chat before enabling notifications.")
+    try:
+        settings = user_notifications.set_enabled(DB_PATH, user["id"], payload["enabled"])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"settings": settings}
+
+
+@app.get("/api/telegram/status")
+def telegram_connection_status(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+    configured = bool(
+        username
+        and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username)
+        and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
+    )
+    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    return {"configured": configured, "bot_username": username if configured else None,
+            "connection": connection or {"connected": False}}
+
+
+@app.post("/api/telegram/link")
+def create_telegram_link(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+    configured = bool(
+        username
+        and re.fullmatch(r"[A-Za-z0-9_]{5,32}", username)
+        and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
+        and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
+    )
+    if not configured:
+        raise HTTPException(status_code=503, detail="Telegram linking is not configured yet.")
+    token, expires_at = telegram_linking.create_link_token(DB_PATH, user["id"])
+    return {"url": f"https://t.me/{username}?start={token}", "expires_in_seconds": telegram_linking.TOKEN_TTL_SECONDS,
+            "expires_at": expires_at}
+
+
+@app.delete("/api/telegram/link")
+def disconnect_telegram_account(user: dict[str, Any] = Depends(require_authenticated)):
+    if user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    disconnected = telegram_linking.disconnect(DB_PATH, user["id"])
+    return {"connected": False, "disconnected": disconnected}
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_link_webhook(request: Request, background_tasks: BackgroundTasks):
+    expected_secret = os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", "")
+    supplied_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not expected_secret or not supplied_secret or not secrets.compare_digest(expected_secret, supplied_secret):
+        raise HTTPException(status_code=403, detail="Webhook authentication failed.")
+    if not os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN"):
+        raise HTTPException(status_code=503, detail="Telegram bot is not configured.")
+    if request.headers.get("content-length", "").isdigit() and int(request.headers["content-length"]) > 65536:
+        raise HTTPException(status_code=413, detail="Telegram update is too large.")
+    try:
+        raw_update = await request.body()
+        if len(raw_update) > 65536:
+            raise HTTPException(status_code=413, detail="Telegram update is too large.")
+        update = json.loads(raw_update)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.") from None
+    if not isinstance(update, dict):
+        raise HTTPException(status_code=400, detail="Invalid Telegram update.")
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return {"ok": True}
+    chat = message.get("chat")
+    text = message.get("text")
+    if not isinstance(chat, dict) or not isinstance(text, str):
+        return {"ok": True}
+    chat_id = str(chat.get("id", ""))
+    chat_type = str(chat.get("type", ""))
+    match = re.fullmatch(r"/start(?:@\w+)?\s+([A-Za-z0-9_-]{20,128})", text.strip())
+    if match is None:
+        return {"ok": True}
+    try:
+        linked_user_id = telegram_linking.consume_link_token(
+            DB_PATH, match.group(1), chat_id, chat_type
+        )
+    except ValueError:
+        log.warning("Telegram link attempt rejected: chat is already linked to another account")
+        return {"ok": True}
+    if linked_user_id is not None:
+        background_tasks.add_task(
+            _send_telegram_link_confirmation,
+            os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN", ""), chat_id,
+        )
+    return {"ok": True}
+
+
+def _send_telegram_link_confirmation(bot_token: str, chat_id: str) -> None:
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": "Your Telegram account is now connected to Job Beeper. You can return to the dashboard."},
+            timeout=10,
+        ).raise_for_status()
+    except requests.RequestException:
+        log.warning("Could not send Telegram account-link confirmation")
+
+
+@app.put("/api/preferences")
+def update_user_preferences(
+    payload: dict[str, Any],
+    background_tasks: BackgroundTasks,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    if user["role"] == "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator candidate preferences are managed through /api/config.",
+        )
+    try:
+        saved = user_preferences.save_user_preferences(DB_PATH, user["id"], payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    background_tasks.add_task(refresh_user_job_evaluations, user["id"], saved)
+    return {"preferences": saved}
+
+
 @app.get("/api/config", dependencies=[Depends(require_admin)])
 def read_config():
     return {
@@ -3890,8 +4503,10 @@ def read_config():
 @app.put("/api/config", dependencies=[Depends(require_admin)])
 def update_config(payload: dict[str, Any]):
     saved = save_config(payload)
+    user_preferences.sync_first_admin_preferences(DB_PATH, saved)
     refresh_job_evaluations(saved)
     refresh_notification_decisions(saved)
+    refresh_configured_user_evaluations()
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
@@ -3939,6 +4554,43 @@ def latency_summary(hours: int = 24):
         }
 
     return {"hours": hours, "sources": summary}
+
+
+@app.get("/api/source-status/summary")
+def source_status_summary(user: dict[str, Any] = Depends(require_authenticated)):
+    """Expose operational availability without leaking collector diagnostics to members."""
+    config = get_config()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT sr.source, sr.finished_at, sr.jobs_seen, sr.new_jobs
+            FROM source_runs sr
+            JOIN (
+                SELECT source, MAX(finished_at) AS latest_finished_at
+                FROM source_runs GROUP BY source
+            ) latest
+              ON latest.source = sr.source AND latest.latest_finished_at = sr.finished_at
+            ORDER BY sr.source
+        """).fetchall()
+    history = {
+        row[0]: {"last_run": row[1], "jobs_seen": row[2] or 0, "new_jobs": row[3] or 0}
+        for row in rows
+    }
+    sources = []
+    for source in SOURCE_NAMES:
+        item = history.get(source, {})
+        runtime = source_state.get(source, {})
+        sources.append({
+            "source": source,
+            "enabled": bool(config.get("source_enabled", {}).get(source, True)),
+            "last_run": item.get("last_run"),
+            "jobs_seen": item.get("jobs_seen", 0),
+            "new_jobs": item.get("new_jobs", 0),
+            "runtime": {
+                "running": bool(runtime.get("running")),
+                "last_success": runtime.get("last_success"),
+            },
+        })
+    return {"sources": sources}
 
 
 @app.get("/api/source-status", dependencies=[Depends(require_admin)])
@@ -4254,34 +4906,142 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
     }
 
 
-@app.get("/api/jobs", dependencies=[Depends(require_admin)])
+@app.get("/api/jobs")
 def jobs(
     minutes: int = 60,
     limit: int = 100,
     today_only: bool = False,
     q: str = "",
+    search: str = "",
+    page: int | None = None,
+    per_page: int | None = None,
+    status: str | None = None,
+    source: str = "",
+    min_score: int = 0,
+    max_age_hours: int | None = None,
+    sort: str = "newest",
+    sort_by: str | None = None,
+    sort_order: str | None = None,
+    alertable_only: bool = False,
+    remote_only: bool = False,
+    user: dict[str, Any] = Depends(require_authenticated),
 ):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening the job feed.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     minutes = max(1, min(minutes, 10080))
-    limit = max(1, min(limit, 500))
+    legacy_limit = max(1, min(limit, 500))
+    paginated = page is not None or per_page is not None
+    page_number = max(1, int(page or 1))
+    page_size = max(1, min(int(per_page or legacy_limit), 100)) if paginated else legacy_limit
+    offset = (page_number - 1) * page_size if paginated else 0
     cutoff = (
         iso(current_day_start_utc())
         if today_only
         else iso(now() - dt.timedelta(minutes=minutes))
     )
 
-    # Apply text search in SQLite before LIMIT. Otherwise a relevant older
-    # posting can be hidden by the newest 500 rows and never reach the UI.
-    query = (q or "").strip()[:200]
+    query = (search or q or "").strip()[:200]
     escaped_query = (
         query.replace("\\", "\\\\")
         .replace("%", "\\%")
         .replace("_", "\\_")
     )
     search_pattern = f"%{escaped_query.lower()}%" if query else "%"
+    source_filter = (source or "").strip().casefold()[:64]
+    min_score = max(0, min(int(min_score), 100))
+    max_age_hours = None if max_age_hours is None else max(1, min(int(max_age_hours), 72))
+    status = (status or ("all" if user["role"] == "admin" else "matched")).strip().casefold()
+    if status not in {"matched", "all", "unmatched"}:
+        raise HTTPException(status_code=422, detail="status must be matched, all, or unmatched.")
+    if user["role"] != "admin" and status != "matched":
+        raise HTTPException(status_code=403, detail="Users can only view their matched opportunities.")
+    legacy_sort = sort if sort in {"newest", "match", "company"} else "newest"
+    sort_by = sort_by or {
+        "newest": "created_at", "match": "match_score", "company": "company"
+    }[legacy_sort]
+    if sort_by not in {"created_at", "match_score", "company"}:
+        raise HTTPException(status_code=422, detail="sort_by must be created_at, match_score, or company.")
+    sort_order = (sort_order or ("asc" if sort_by == "company" else "desc")).casefold()
+    if sort_order not in {"asc", "desc"}:
+        raise HTTPException(status_code=422, detail="sort_order must be asc or desc.")
+    age_cutoff = iso(now() - dt.timedelta(hours=max_age_hours)) if max_age_hours else None
+    threshold = int(preferences.get("match_threshold", 55))
 
+    score_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.score, 0) ELSE COALESCE(e.score, 0) END"
+    match_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END"
+    alertable_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.alertable, 0) ELSE COALESCE(e.alertable, 0) END"
+    where_sql = """
+        WHERE (?='all'
+          OR (?='matched' AND (CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END)=1)
+          OR (?='unmatched' AND ?='admin' AND COALESCE(ge.match, 0)=0))
+          AND j.discovered_at >= ?
+          AND LOWER(
+                COALESCE(j.company, '') || ' ' ||
+                COALESCE(j.title, '') || ' ' ||
+                COALESCE(j.location, '') || ' ' ||
+                COALESCE(j.source, '') || ' ' ||
+                COALESCE(j.source_job_id, '') || ' ' ||
+                COALESCE(j.description, '') || ' ' ||
+                COALESCE(j.source_details_json, '{{}}') || ' ' ||
+                COALESCE(e.reasons_json, '') || ' ' ||
+                COALESCE(ge.reasons_json, '')
+              ) LIKE ? ESCAPE '\\'
+          AND (?='' OR LOWER(j.source)=?)
+          AND (?=0 OR (
+                {score_sql} >= ?
+                AND (? < ? OR {match_sql}=1)
+              ))
+          AND (? IS NULL OR julianday(COALESCE(j.source_posted_at, j.discovered_at)) >= julianday(?))
+          AND (?=0 OR {alertable_sql}=1)
+          AND (?=0 OR LOWER(COALESCE(j.location, '') || ' ' || COALESCE(j.description, '')) LIKE '%remote%')
+    """.format(score_sql=score_sql, match_sql=match_sql, alertable_sql=alertable_sql)
+
+    base_params = (
+        user["id"], status, status, user["role"], status, user["role"],
+        cutoff, search_pattern,
+        source_filter, source_filter,
+        min_score, user["role"], min_score, min_score, threshold, user["role"],
+        age_cutoff, age_cutoff,
+        int(bool(alertable_only)), user["role"],
+        int(bool(remote_only)),
+    )
+
+    order_expressions = {
+        "created_at": "COALESCE(j.source_posted_at, j.discovered_at)",
+        "match_score": score_sql,
+        "company": "j.company COLLATE NOCASE",
+    }
+    order_sql = (
+        "ORDER BY " + order_expressions[sort_by] + " " + sort_order.upper()
+        + ", COALESCE(j.source_posted_at, j.discovered_at) DESC, j.id DESC"
+    )
+    order_params = (user["role"],) if sort_by == "match_score" else ()
+
+    count_params = (user["id"], *base_params[1:])
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        total = int(conn.execute(
+            "SELECT COUNT(*) FROM jobs j "
+            "LEFT JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=? "
+            "LEFT JOIN job_evaluations ge ON ge.job_id=j.id "
+            + where_sql,
+            count_params,
+        ).fetchone()[0])
+        page_count = (total + page_size - 1) // page_size if total else 0
+        if paginated and page_count:
+            page_number = min(page_number, page_count)
+            offset = (page_number - 1) * page_size
+        elif paginated and not page_count:
+            page_number = 1
+            offset = 0
+
+        rows = conn.execute(
+            """
             SELECT
                 j.*,
                 e.match AS evaluation_match,
@@ -4291,29 +5051,26 @@ def jobs(
                 e.experience_max_years AS evaluation_experience_max_years,
                 e.alertable AS evaluation_alertable,
                 e.alertability_reasons_json AS evaluation_alertability_reasons_json,
+                ge.alertable AS admin_evaluation_alertable,
+                ge.alertability_reasons_json AS admin_evaluation_alertability_reasons_json,
                 nl.status AS notification_status,
                 nl.decision_reason_json AS notification_decision_reasons_json,
                 nl.sent_at AS notification_sent_at,
                 nl.last_error AS notification_last_error,
                 nl.candidate_job_id AS notification_candidate_job_id
             FROM jobs j
-            LEFT JOIN job_evaluations e ON e.job_id=j.id
+            LEFT JOIN user_job_evaluations e
+              ON e.job_id=j.id AND e.user_id=?
+            LEFT JOIN job_evaluations ge ON ge.job_id=j.id
             LEFT JOIN notification_ledger nl
               ON nl.canonical_opportunity_id=j.canonical_opportunity_id
-            WHERE j.discovered_at >= ?
-              AND LOWER(
-                    COALESCE(j.company, '') || ' ' ||
-                    COALESCE(j.title, '') || ' ' ||
-                    COALESCE(j.location, '') || ' ' ||
-                    COALESCE(j.source, '') || ' ' ||
-                    COALESCE(j.source_job_id, '') || ' ' ||
-                    COALESCE(j.description, '') || ' ' ||
-                    COALESCE(j.source_details_json, '{}')
-                  ) LIKE ? ESCAPE '\\'
-            ORDER BY COALESCE(j.source_posted_at, j.discovered_at) DESC,
-                     j.discovered_at DESC
-            LIMIT ?
-        """, (cutoff, search_pattern, limit)).fetchall()
+             AND ?='admin'
+            """
+            + where_sql
+            + " " + order_sql
+            + " LIMIT ? OFFSET ?",
+            (user["id"], user["role"], *base_params[1:], *order_params, page_size, offset),
+        ).fetchall()
 
     def parse_json_list(value: Any) -> list[Any]:
         try:
@@ -4335,22 +5092,33 @@ def jobs(
         item["source_details"] = (
             parsed_source_details if isinstance(parsed_source_details, dict) else {}
         )
-        # Telegram reads job_evaluations and notification_ledger directly.
-        # The dashboard deliberately returns those same decisions rather than
-        # independently re-running the matcher at request time.
         item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
         score = item.pop("evaluation_score", None)
         item["match_score"] = int(score or 0)
-        item["match_reasons"] = parse_json_list(
-            item.pop("evaluation_reasons_json", None)
-        )
+        item["match_reasons"] = parse_json_list(item.pop("evaluation_reasons_json", None))
         exp_min = item.pop("evaluation_experience_min_years", None)
         exp_max = item.pop("evaluation_experience_max_years", None)
-        item["experience_min_years"] = exp_min
-        item["experience_max_years"] = exp_max
-        item["alertable"] = bool(item.pop("evaluation_alertable", 0) or 0)
+        item["experience_min_years"] = exp_min if exp_min is not None else item.get("experience_min_years")
+        item["experience_max_years"] = exp_max if exp_max is not None else item.get("experience_max_years")
+        item["experience_provenance"] = item.get("experience_provenance") or "unknown"
+        item["experience_confidence"] = item.get("experience_confidence") or "unknown"
+        if item["experience_provenance"] == "unknown":
+            inferred_experience = _experience_provenance_details(item)
+            item["experience_provenance"] = inferred_experience["provenance"]
+            item["experience_confidence"] = inferred_experience["confidence"]
+            if item["experience_min_years"] is None:
+                item["experience_min_years"] = inferred_experience["min_years"]
+            if item["experience_max_years"] is None:
+                item["experience_max_years"] = inferred_experience["max_years"]
+        user_alertable = item.pop("evaluation_alertable", 0)
+        user_alertability_reasons = item.pop("evaluation_alertability_reasons_json", None)
+        admin_alertable = item.pop("admin_evaluation_alertable", 0)
+        admin_alertability_reasons = item.pop("admin_evaluation_alertability_reasons_json", None)
+        item["alertable"] = bool(
+            (admin_alertable if user["role"] == "admin" else user_alertable) or 0
+        )
         item["alertability_reasons"] = parse_json_list(
-            item.pop("evaluation_alertability_reasons_json", None)
+            admin_alertability_reasons if user["role"] == "admin" else user_alertability_reasons
         )
         item["notification_status"] = item.get("notification_status") or "not_eligible"
         item["notification_decision_reasons"] = parse_json_list(
@@ -4360,7 +5128,16 @@ def jobs(
         item["notification_last_error"] = item.get("notification_last_error")
         item["notification_candidate_job_id"] = item.get("notification_candidate_job_id")
         result.append(item)
-    return {"jobs": result}
+
+    pagination = {
+        "page": page_number,
+        "per_page": page_size,
+        "total": total,
+        "total_pages": page_count,
+        "has_previous": page_number > 1,
+        "has_next": offset + len(result) < total,
+    }
+    return {"jobs": result, "pagination": pagination}
 
 
 @app.get("/api/notification-queue", dependencies=[Depends(require_admin)])
@@ -4442,8 +5219,15 @@ def llm_shadow_status():
     return shadow_status(DB_PATH)
 
 
-@app.get("/api/daily-summary", dependencies=[Depends(require_admin)])
-def daily_summary():
+@app.get("/api/daily-summary")
+def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening the job feed.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     cutoff = iso(current_day_start_utc())
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -4453,21 +5237,24 @@ def daily_summary():
         matched = conn.execute("""
             SELECT COUNT(*)
             FROM jobs j
-            JOIN job_evaluations e ON e.job_id=j.id
+            JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
             WHERE j.discovered_at >= ? AND e.match=1
-        """, (cutoff,)).fetchone()[0]
-        alertable = conn.execute("""
-            SELECT COUNT(*)
-            FROM jobs j
-            JOIN job_evaluations e ON e.job_id=j.id
-            WHERE j.discovered_at >= ? AND e.alertable=1
-        """, (cutoff,)).fetchone()[0]
-        alerted = conn.execute("""
-            SELECT COUNT(*)
-            FROM notification_ledger nl
-            JOIN jobs j ON j.id=nl.candidate_job_id
-            WHERE j.discovered_at >= ? AND nl.status='sent'
-        """, (cutoff,)).fetchone()[0]
+        """, (user["id"], cutoff)).fetchone()[0]
+        alertable = 0
+        alerted = 0
+        if user["role"] == "admin":
+            alertable = conn.execute("""
+                SELECT COUNT(*)
+                FROM jobs j
+                JOIN job_evaluations e ON e.job_id=j.id
+                WHERE j.discovered_at >= ? AND e.alertable=1
+            """, (cutoff,)).fetchone()[0]
+            alerted = conn.execute("""
+                SELECT COUNT(*)
+                FROM notification_ledger nl
+                JOIN jobs j ON j.id=nl.candidate_job_id
+                WHERE j.discovered_at >= ? AND nl.status='sent'
+            """, (cutoff,)).fetchone()[0]
 
     local_now = now().astimezone(IST)
     return {
@@ -4481,14 +5268,59 @@ def daily_summary():
     }
 
 
-@app.get("/api/jobs/{job_id}", dependencies=[Depends(require_admin)])
-def job_detail(job_id: int):
+@app.get("/api/jobs/{job_id}")
+def job_detail(
+    job_id: int,
+    user: dict[str, Any] = Depends(require_authenticated),
+):
+    preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
+    if not preferences["onboarding_complete"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your target role and location preferences before opening job details.",
+        )
+    ensure_user_job_evaluations_initialized(user["id"], preferences)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        row = conn.execute(
+            """SELECT j.*, e.match AS likely_match, e.score AS match_score,
+                      e.reasons_json AS match_reasons_json,
+                      e.experience_min_years AS evaluation_experience_min_years,
+                      e.experience_max_years AS evaluation_experience_max_years
+               FROM jobs j
+               JOIN user_job_evaluations e
+                 ON e.job_id=j.id AND e.user_id=?
+               WHERE j.id=?""",
+            (user["id"], job_id),
+        ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
-    return dict(row)
+    result = dict(row)
+    result["experience_min_years"] = (
+        result.pop("evaluation_experience_min_years")
+        if result.get("evaluation_experience_min_years") is not None
+        else result.get("experience_min_years")
+    )
+    result["experience_max_years"] = (
+        result.pop("evaluation_experience_max_years")
+        if result.get("evaluation_experience_max_years") is not None
+        else result.get("experience_max_years")
+    )
+    result["experience_provenance"] = result.get("experience_provenance") or "unknown"
+    result["experience_confidence"] = result.get("experience_confidence") or "unknown"
+    if result["experience_provenance"] == "unknown":
+        inferred_experience = _experience_provenance_details(result)
+        result["experience_provenance"] = inferred_experience["provenance"]
+        result["experience_confidence"] = inferred_experience["confidence"]
+        if result["experience_min_years"] is None:
+            result["experience_min_years"] = inferred_experience["min_years"]
+        if result["experience_max_years"] is None:
+            result["experience_max_years"] = inferred_experience["max_years"]
+    try:
+        result["match_reasons"] = json.loads(result.pop("match_reasons_json") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        result["match_reasons"] = []
+    return result
 
 @app.get("/", include_in_schema=False)
 def root():

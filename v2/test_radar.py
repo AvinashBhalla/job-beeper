@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import v2.radar as radar
+from v2 import auth, user_preferences
 from v2.dedupe import auto_link_allowed, canonical_match_score, canonicalize_url, normalize_company, normalize_location
 from v2.radar import (
     _merge_config,
@@ -48,6 +49,13 @@ def make_job(title, description="", location="Bengaluru, India"):
 class MatcherTests(unittest.TestCase):
 
     def setUp(self):
+        self._runtime_config_dir = TemporaryDirectory()
+        self._runtime_config_patch = patch.object(
+            radar,
+            "RUNTIME_CONFIG_PATH",
+            Path(self._runtime_config_dir.name) / "runtime-config.json",
+        )
+        self._runtime_config_patch.start()
         # These module-level values model a process-wide LinkedIn 429 cooldown.
         # Reset them between tests so a rate-limit test cannot make unrelated
         # collector tests order-dependent or flaky.
@@ -65,6 +73,8 @@ class MatcherTests(unittest.TestCase):
         radar.linkedin_rate_limit_generation = 0
 
     def tearDown(self):
+        self._runtime_config_patch.stop()
+        self._runtime_config_dir.cleanup()
         (
             radar.linkedin_last_http_request_monotonic,
             radar.linkedin_rate_limited_until_monotonic,
@@ -72,6 +82,13 @@ class MatcherTests(unittest.TestCase):
             radar.linkedin_rate_limit_streak,
             radar.linkedin_rate_limit_generation,
         ) = self._linkedin_rate_state
+
+    def _create_direct_api_admin(self):
+        admin = auth.create_first_admin(
+            radar.DB_PATH, "api-admin@example.com", "direct-api-admin-password"
+        )
+        user_preferences.migrate_first_admin_preferences(radar.DB_PATH, BASE_CONFIG)
+        return admin
 
     def test_explicit_work_location_overrides_broad_feed_location(self):
         job = make_job(
@@ -990,6 +1007,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 job = normalize_job(
                     "linkedin", "li-api-consistency", "Acme", "Software Engineer",
                     "Bengaluru, India", "https://linkedin.com/jobs/view/api-consistency",
@@ -1010,7 +1028,7 @@ class MatcherTests(unittest.TestCase):
                     """).fetchone()
 
                 with patch.object(radar, "get_config", return_value=BASE_CONFIG):
-                    response = radar.jobs(minutes=60, limit=100, today_only=True)
+                    response = radar.jobs(minutes=60, limit=100, today_only=True, user=admin)
                 item = next(
                     entry for entry in response["jobs"]
                     if entry["source_job_id"] == "li-api-consistency"
@@ -2491,6 +2509,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 day_start = radar.current_day_start_utc()
 
                 older_match = normalize_job(
@@ -2533,6 +2552,7 @@ class MatcherTests(unittest.TestCase):
                     minutes=4320,
                     limit=1,
                     q="NOVISYNC",
+                    user=admin,
                 )
 
                 self.assertEqual(len(result["jobs"]), 1)
@@ -2545,6 +2565,7 @@ class MatcherTests(unittest.TestCase):
                     minutes=4320,
                     limit=10,
                     q="backend services",
+                    user=admin,
                 )
                 self.assertEqual(
                     [item["source_job_id"] for item in description_result["jobs"]],
@@ -2559,6 +2580,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 literal_percent = normalize_job(
                     "naukri",
                     "nk-percent-literal",
@@ -2590,6 +2612,7 @@ class MatcherTests(unittest.TestCase):
                     minutes=4320,
                     limit=10,
                     q="100%",
+                    user=admin,
                 )
                 self.assertEqual(
                     [item["source_job_id"] for item in result["jobs"]],
@@ -2604,6 +2627,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 source_details = {
                     "role": "Back End Developer",
                     "role_category": "Software Development",
@@ -2632,7 +2656,7 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(upsert_jobs([job], BASE_CONFIG), 1)
 
                 with patch.object(radar, "get_config", return_value=BASE_CONFIG):
-                    result = radar.jobs(minutes=10080, limit=10, q="pandas")
+                    result = radar.jobs(minutes=10080, limit=10, q="pandas", user=admin)
 
                 item = next(
                     entry for entry in result["jobs"]
@@ -2657,7 +2681,7 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(upsert_jobs([older_payload], BASE_CONFIG), 0)
 
                 with patch.object(radar, "get_config", return_value=BASE_CONFIG):
-                    result_after = radar.jobs(minutes=10080, limit=10, q="pandas")
+                    result_after = radar.jobs(minutes=10080, limit=10, q="pandas", user=admin)
                 item_after = next(
                     entry for entry in result_after["jobs"]
                     if entry["source_job_id"] == "nk-rich-description-1"
@@ -2676,6 +2700,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 day_start = radar.current_day_start_utc()
 
                 old_job = normalize_job(
@@ -2720,7 +2745,7 @@ class MatcherTests(unittest.TestCase):
                     2,
                 )
 
-                result = radar.jobs(today_only=True, limit=100)
+                result = radar.jobs(today_only=True, limit=100, user=admin)
                 ids = {row["source_job_id"] for row in result["jobs"]}
 
                 self.assertNotIn("li-old-day", ids)
@@ -2748,6 +2773,7 @@ class MatcherTests(unittest.TestCase):
             try:
                 radar.DB_PATH = Path(tmp) / "jobs.db"
                 radar.init_db()
+                admin = self._create_direct_api_admin()
                 config = {
                     **BASE_CONFIG,
                     "notifications_enabled": False,
@@ -2789,7 +2815,7 @@ class MatcherTests(unittest.TestCase):
                 self.assertIsNotNone(persisted)
                 opportunity_id = persisted["canonical_opportunity_id"]
                 api_job = next(
-                    item for item in radar.jobs(minutes=10080, limit=500)["jobs"]
+                    item for item in radar.jobs(minutes=10080, limit=500, user=admin)["jobs"]
                     if item["source_job_id"] == "naukri-consistency-1"
                 )
                 api_opportunity = next(
@@ -4058,6 +4084,178 @@ class AshbyCollectorTests(unittest.TestCase):
         with self.assertRaises(radar.HTTPException): radar.validate_config(base)
         with self.assertRaises(radar.HTTPException):
             radar.validate_config({**BASE_CONFIG,"ashby_boards":[{"board":"../unsafe","company":"Bad"}]})
+
+
+
+class InitialSourceBaselineMarkerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.original_db = radar.DB_PATH
+        radar.DB_PATH = Path(self.temp_dir.name) / "baseline.sqlite3"
+        self.addCleanup(setattr, radar, "DB_PATH", self.original_db)
+        radar.init_db()
+
+    def _job(self, source, source_id, url=None, discovered_at=None):
+        job = radar.normalize_job(
+            source,
+            source_id,
+            "Baseline Example",
+            "Software Engineer",
+            "Bengaluru, India",
+            url or f"https://example.invalid/{source}/{source_id}",
+            None,
+            "unknown",
+            "Build Python backend APIs and services. 2 years of professional experience required.",
+        )
+        if discovered_at:
+            job["discovered_at"] = radar.iso(discovered_at)
+        return job
+
+    def _flag(self, source, source_id):
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT source_initial_baseline FROM jobs WHERE source=? AND source_job_id=?",
+                (source, source_id),
+            ).fetchone()
+        return int(row[0])
+
+    def _record_source_run(self, source, started_at, outcome):
+        radar.record_run(
+            source,
+            started_at,
+            radar.now(),
+            1,
+            1,
+            None if outcome == "success" else "partial source scan",
+            run_id=f"{source}-{outcome}-{started_at.timestamp()}",
+            outcome=outcome,
+            duration_seconds=1.0,
+        )
+
+    def test_lever_partial_initial_runs_are_marked_before_user_evaluation_then_success_completes_baseline(self):
+        first_start = radar.now() - radar.dt.timedelta(seconds=2)
+        first_job = self._job(
+            "lever", "posting-one",
+            discovered_at=first_start + radar.dt.timedelta(seconds=1),
+        )
+        radar.upsert_jobs(
+            [first_job],
+            BASE_CONFIG,
+            source_run_started_at=first_start,
+        )
+        self.assertEqual(self._flag("lever", "posting-one"), 1)
+
+        # A partial run is not a successful baseline; new items on the next
+        # partial cycle are also marked before per-user evaluation refresh.
+        self._record_source_run("lever", first_start, "partial_failed")
+        second_start = radar.now() - radar.dt.timedelta(seconds=1)
+        second_job = self._job(
+            "lever", "posting-two",
+            discovered_at=second_start + radar.dt.timedelta(milliseconds=100),
+        )
+        radar.upsert_jobs(
+            [second_job],
+            BASE_CONFIG,
+            source_run_started_at=second_start,
+        )
+        self.assertEqual(self._flag("lever", "posting-two"), 1)
+
+        # The first successful run completes the baseline. Later postings are
+        # not initial inventory and remain eligible for ordinary user alerts.
+        self._record_source_run("lever", second_start, "success")
+        third_start = radar.now() - radar.dt.timedelta(seconds=1)
+        third_job = self._job(
+            "lever", "posting-three",
+            discovered_at=third_start + radar.dt.timedelta(milliseconds=100),
+        )
+        radar.upsert_jobs(
+            [third_job],
+            BASE_CONFIG,
+            source_run_started_at=third_start,
+        )
+        self.assertEqual(self._flag("lever", "posting-three"), 0)
+
+    def test_existing_cross_source_canonical_opportunity_is_not_baseline_suppressed(self):
+        old_start = radar.now() - radar.dt.timedelta(hours=1)
+        shared_url = "https://example.invalid/shared-opportunity"
+        radar.upsert_jobs(
+            [self._job("greenhouse", "existing-1", url=shared_url, discovered_at=old_start)],
+            BASE_CONFIG,
+        )
+        run_start = radar.now() - radar.dt.timedelta(seconds=1)
+        radar.upsert_jobs(
+            [self._job(
+                "lever",
+                "same-opportunity",
+                url=shared_url,
+                discovered_at=run_start + radar.dt.timedelta(milliseconds=100),
+            )],
+            BASE_CONFIG,
+            source_run_started_at=run_start,
+        )
+        self.assertEqual(self._flag("lever", "same-opportunity"), 0)
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            canonical_ids = conn.execute(
+                "SELECT COUNT(DISTINCT canonical_opportunity_id) FROM jobs"
+            ).fetchone()[0]
+        self.assertEqual(canonical_ids, 1)
+
+    def test_baseline_policy_does_not_change_naukri_or_other_sources(self):
+        start = radar.now() - radar.dt.timedelta(seconds=1)
+        jobs = [
+            self._job("naukri", "naukri-one", discovered_at=start + radar.dt.timedelta(milliseconds=100)),
+            self._job("greenhouse", "greenhouse-one", discovered_at=start + radar.dt.timedelta(milliseconds=100)),
+        ]
+        radar.upsert_jobs(jobs, BASE_CONFIG, source_run_started_at=start)
+        self.assertEqual(self._flag("naukri", "naukri-one"), 0)
+        self.assertEqual(self._flag("greenhouse", "greenhouse-one"), 0)
+
+    def test_legacy_jobs_table_migration_adds_baseline_column_default_zero(self):
+        with TemporaryDirectory() as tmp:
+            database = Path(tmp) / "legacy.sqlite3"
+            with sqlite3.connect(database) as conn:
+                conn.execute("""
+                    CREATE TABLE jobs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source TEXT NOT NULL,
+                        source_job_id TEXT NOT NULL,
+                        company TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        location TEXT NOT NULL,
+                        url TEXT NOT NULL,
+                        source_posted_at TEXT,
+                        posted_precision TEXT NOT NULL DEFAULT 'unknown',
+                        discovered_at TEXT NOT NULL,
+                        discovery_latency_seconds INTEGER,
+                        description TEXT NOT NULL DEFAULT '',
+                        first_seen_at TEXT NOT NULL,
+                        last_seen_at TEXT NOT NULL,
+                        UNIQUE(source, source_job_id)
+                    )
+                """)
+                conn.execute(
+                    "INSERT INTO jobs(source,source_job_id,company,title,location,url,discovered_at,first_seen_at,last_seen_at) "
+                    "VALUES('naukri','legacy','Acme','Engineer','India','https://example.invalid/legacy',"
+                    "'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+                )
+            original = radar.DB_PATH
+            try:
+                radar.DB_PATH = database
+                radar.init_db()
+                with sqlite3.connect(database) as conn:
+                    columns = {
+                        row[1] for row in conn.execute("PRAGMA table_info(jobs)")
+                    }
+                    value = conn.execute(
+                        "SELECT source_initial_baseline FROM jobs WHERE source_job_id='legacy'"
+                    ).fetchone()[0]
+                self.assertIn("source_initial_baseline", columns)
+                self.assertEqual(value, 0)
+            finally:
+                radar.DB_PATH = original
+
+
 
 
 if __name__ == "__main__":

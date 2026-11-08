@@ -105,6 +105,73 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         app_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("app.js"))
         self.assertLess(auth_index, app_index, "auth client must load before the dashboard application")
 
+    def test_members_use_the_existing_dashboard_shell_and_user_scoped_preferences(self):
+        parser = DashboardAuthMarkupParser()
+        parser.feed((ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+        self.assertTrue({"jobsSection", "appliedSection", "preferencesSection", "sourcesSection", "accessSection", "userOnboardingNotice"}.issubset(parser.ids))
+        self.assertNotIn("userWorkspace", parser.ids, "members must not be routed to a separate simplified dashboard")
+        self.assertIn('class="app-shell"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        for required in (
+            "initializeWorkspace(user)", "state.isAdmin ? '/config' : '/preferences'",
+            "state.isAdmin ? collectPreferencesPayload() : collectUserPreferencesPayload()",
+            "state.currentUser.id", "'/source-status/summary'", "userOnboardingNotice",
+        ):
+            self.assertIn(required, source, f"shared dashboard must implement {required}")
+        self.assertIn("admin-only-setting", (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+
+    def test_preferences_save_uses_visible_tags_and_surfaces_backend_validation(self):
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        for required in (
+            "function readRenderedTags()",
+            "chip.cloneNode(true)",
+            "const rendered = readRenderedTags()",
+            "if (input.value.trim()) addTag(input.value)",
+            "if (!payload.target_roles?.length) missing.push('at least one target role')",
+            "if (!payload.locations?.length) missing.push('at least one target location')",
+            "const errorData = await response.json().catch(() => ({}))",
+            "const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : ''",
+            "showToast(message, 'error', 7000)",
+            "saveStatusMessage",
+        ):
+            self.assertIn(required, source, f"preferences save must implement {required}")
+
+    def test_dashboard_feed_polling_is_bounded_and_skips_hidden_tabs(self):
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("setInterval(refreshFeedIfVisible, 60000)", source)
+        self.assertIn("document.visibilityState !== 'visible'", source)
+        self.assertIn("addEventListener('visibilitychange'", source)
+        self.assertNotIn("}, 10000);", source, "the feed must not poll every ten seconds")
+
+    def test_dashboard_uses_server_pagination_and_filter_parameters(self):
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        for required in (
+            "page: String(state.feedPage)",
+            "per_page: String(state.feedPageSize)",
+            "params.set('search', searchQuery)",
+            "status: state.isAdmin ? 'all' : 'matched'",
+            "sort_by: sortParameters.sort_by",
+            "sort_order: sortParameters.sort_order",
+            "params.set('source', state.filters.source)",
+            "params.set('min_score', String(state.filters.minScore))",
+            "params.set('max_age_hours', String(state.filters.maxAge))",
+            "params.set('alertable_only', 'true')",
+            "params.set('remote_only', 'true')",
+            "previousJobsPageBtn",
+            "nextJobsPageBtn",
+        ):
+            self.assertIn(required, source, f"dashboard feed must implement {required}")
+        self.assertIn('id="feedPagination"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+
+    def test_job_cards_label_experience_provenance(self):
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("Employer-stated", source)
+        self.assertIn("From description", source)
+        self.assertIn("Text inference", source)
+        self.assertIn("experience_provenance", source)
+        self.assertIn("experience_confidence", source)
+        self.assertIn("rule-based evidence strength", source)
+
     def test_admin_dashboard_initialization_is_gated_by_session_bootstrap(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         for required in ("JobBeeperAuth.resolveApiBase", "JobBeeperAuth.createClient", "authClient.bootstrap", "initializeWorkspace"):

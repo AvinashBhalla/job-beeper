@@ -1,0 +1,77 @@
+{
+  "poll_seconds": {
+    "linkedin": 180,
+    "naukri": 300,
+    "instahyre": 600,
+    "greenhouse": 900,
+    "ashby": 1800
+  },
+  "locations": [
+    "Remote, India"
+  ],
+  "naukri_locations": [
+    "Bangalore",
+    "Gurgaon",
+    "Delhi"
+  ],
+  "linkedin_queries": [
+    "software engineer OR software developer",
+    "full stack developer OR full stack engineer OR frontend developer OR frontend engineer OR backend developer OR backend engineer",
+    "react developer OR react engineer OR python developer OR python engineer OR automation engineer",
+    "AI engineer OR LLM engineer OR AI developer"
+  ],
+  "naukri_queries": [
+    "software engineer",
+    "full stack developer",
+    "react developer",
+    "python developer",
+    "automation engineer",
+    "AI engineer"
+  ],
+  "target_roles": [
+    "Software Engineer"
+  ],
+  "skills": [],
+  "candidate_experience_years": null,
+  "match_threshold": 55,
+  "title_exclude": [],
+  "max_experience_years": 3,
+  "remote_only": false,
+  "min_experience_years": null,
+  "max_age_hours": 72,
+  "require_explicit_experience_for_alerts": false,
+  "excluded_role_terms": [],
+  "notifications_enabled": false,
+  "source_enabled": {
+    "linkedin": false,
+    "naukri": false,
+    "instahyre": false,
+    "greenhouse": false,
+    "ashby": false
+  },
+  "config_version": 11,
+  "greenhouse_boards": [
+    {
+      "token": "coinbase",
+      "company": "Coinbase"
+    },
+    {
+      "token": "gravitonresearchcapital",
+      "company": "Graviton Research Capital"
+    },
+    {
+      "token": "zocdoc",
+      "company": "Zocdoc"
+    }
+  ],
+  "ashby_boards": [
+    {
+      "board": "openai",
+      "company": "OpenAI"
+    },
+    {
+      "board": "posthog",
+      "company": "PostHog"
+    }
+  ]
+}

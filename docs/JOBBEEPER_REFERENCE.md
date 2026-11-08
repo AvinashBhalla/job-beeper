@@ -233,3 +233,29 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - [CI #40651562286](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651562286): focused tests 32 passed in 0.061 seconds; full V2 suite 134 passed in 17.009 seconds. This is CI evidence only, not VM or live-provider validation.
 - Keep LLM_ROUTER_ENABLED=false and LLM_ROUTER_MATCHER_ENABLED=false until a separate rollout is approved. Keep Telegram credentials blank and notifications disabled; no VM, DB, named volume or production-like service was changed.
 - Next: read-only inspect/fetch of /home/ubuntu/job-beeper-dev and explicit ahead/behind/path assessment before any fast-forward. Preserve local v2/config.json, .venv/, .env, and job-radar-dev_radar-dev-data.
+
+
+## 2026-11-07 — Current-system comparison and browser evidence required
+
+The public product claims remain reference points, not verified implementation details. The latest read-only audit is in `docs/INGESTION_FIRST_ROADMAP.md`. In brief: our current code has five collectors, production enables two, shared dev enables one; LinkedIn is receiving repeated HTTP 429 responses; Naukri is a five-minute external relay with date-only posting dates. We cannot currently claim parity with JobBeeper's breadth or freshness.
+
+Next reverse-engineering pass should use the user's authorized logged-in browser session to capture sanitized Network metadata for initial load, background refresh, filters, pagination, job detail loading, timestamps and source labels. Record observed facts separately from inferences. Do not extract private backend code, replay authenticated endpoints, expose session tokens, bypass access controls or evade rate limits. The evidence report belongs in `docs/JOBBEEPER_NETWORK_EVIDENCE_YYYY-MM-DD.md`.
+
+The product priority remains ingestion reliability and source expansion. However, on 2026-11-07 the owner explicitly asked to continue existing authentication, resume-parser and Telegram feature work in parallel on isolated PR #46 while the JobBeeper browser/network investigation proceeds. Keep that branch draft and isolated; do not merge or promote it until explicit approval and release gates. The ingestion-first strategy still governs production priorities.
+
+
+## 2026-11-07 — Parallel feature work confirmation
+
+- The owner's Codex `@Chrome`/CDP JobBeeper network investigation is a separate workstream. Await its sanitized report/HAR; do not claim private backend behavior from frontend network evidence.
+- Continue auth/Google signup, resume parser and per-user Telegram feature development on `feat/user-preferences-evaluations-20261106` in parallel. PR #46 stays draft.
+- Current checkpoint: commit `51db2f9`, CI run `42370884022` green; isolated full suite **272 passed, 1 skipped**. Dedicated Telegram dev bot and public HTTPS webhook E2E remain pending.
+- Keep shared dev (8001) and production (8000) untouched absent explicit approval.
+
+
+## Authenticated browser evidence — 2026-11-07
+
+See JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md for the full sanitized request inventory and observation windows. This section supplements the public product reference above; it does not reveal or establish JobBeeper's private backend design.
+
+Observed in the owner's authenticated browser: browser-fetched list API with numeric page and page size 20; server-requested keyword search; separate metadata and tracker requests on detail open; a view-marking POST; source labels LinkedIn, Ashby, Naukri, Lever and Hirist; and experience provenance labels for employer-stated vs description-derived values. Ten minutes of idle observation in an expired-subscription account produced no feed-related Fetch/XHR, WebSocket or SSE events. Active-account refresh behavior remains unknown.
+
+Implications for this repository: implement stable server-side pagination; preserve experience provenance; keep source-posted and discovered timestamps distinct; measure each source's unique-job yield; and avoid adding detail-tracker endpoints without a user-facing requirement. Current local code already has server-side keyword search, newest-first ordering and separate source-posted/discovered timestamps, but still loads up to 500 jobs in one request and does not expose numeric page metadata. The dashboard feed refresh cadence has been reduced from 10 seconds to 60 seconds while visible.

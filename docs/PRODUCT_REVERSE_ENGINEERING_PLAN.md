@@ -93,3 +93,47 @@ The next product milestone is now **multi-user support**, not additional source 
 HAPPPY-like referral intelligence remains a later phase, but is now explicitly documented as a product workflow: application tracking, relevant contact discovery from authorized/public sources, explainable contact ranking, user-approved referral/follow-up drafts, user-authorized email integration, draft creation, follow-up reminders and response tracking. Keep email sending human-approved in the first release. Do not automate LinkedIn connection requests/messages or evade platform controls.
 
 The delivery sequence is: current search/description release -> multi-user identity/RBAC -> per-user preferences/evaluations -> per-user Telegram -> small beta/feedback -> application tracker -> referral intelligence. Hiring-post discovery remains later.
+
+
+## 2026-11-07 — Priority reset: ingestion first, JobBeeper browser evidence next
+
+The previous 2026-11-06 multi-user-first sequence is superseded. The primary product promise is now fresh, broad, reliable job ingestion into the portal. See `docs/INGESTION_FIRST_ROADMAP.md` for the verified runtime audit, current source metrics, JobBeeper browser evidence plan, adapter architecture, source catalog and acceptance gates.
+
+- P0: audit/fix ingestion freshness, source coverage, request budgets, 429 behavior, timestamp quality and per-source observability.
+- P1: inspect JobBeeper's observable authenticated UI/network behavior using a sanitized HAR from the user's own browser session. Do not infer private backend implementation or bypass access controls.
+- P2: build a measured source/provider catalog and add public/authorized adapters incrementally toward 100 useful sources.
+- P3: validate 24–72 hour canaries, useful unique-job yield and freshness.
+- P4: continue multi-user signup/preferences, resume parsing and Telegram work in parallel on isolated PR #46, per the owner's 2026-11-07 update. Referral intelligence remains later scope. Do not merge or promote the feature branch while ingestion acceptance gates remain open.
+
+Verified 2026-11-07: current feature code has five collectors (LinkedIn, Naukri, Instahyre, Greenhouse, Ashby); production has only LinkedIn and Naukri enabled; shared dev has only Naukri enabled. Production logged 36 LinkedIn HTTP 429 events in the previous 24 hours. In the same period, production recorded 313 new LinkedIn rows and 173 new Naukri rows; Naukri's relay is polled every five minutes and its current feed uses date-level posting timestamps. These findings mean we are not yet at 100-source coverage or reliably minute-level discovery. All runtime inspection was read-only.
+
+
+## 2026-11-07 — Owner-requested parallel feature development
+
+The owner clarified that ingestion-first product priorities do not require serializing engineering work. Continue the authentication/Google signup, resume parser and per-user Telegram work on the existing isolated feature branch while the owner performs the JobBeeper `@Chrome`/CDP network investigation. Earlier instructions in this document to pause all multi-user/resume/Telegram code work are superseded.
+
+- Feature branch: `feat/user-preferences-evaluations-20261106`; PR #46 remains draft.
+- Latest code commit at this checkpoint: `51db2f9`; GitHub V2 CI run `42370884022` passed.
+- Full isolated V2 suite: **272 passed, 1 skipped**; focused tests: Google OAuth 15/15, resume parser 15/15, per-user notifications 12/12.
+- Isolated feature runtime is rebuilt and healthy on loopback port 8002. Shared dev and production remain untouched.
+- Dedicated dev Telegram bot and public HTTPS webhook are pending. Do not use production bot `Qdhorvbot` for testing.
+- The JobBeeper sanitized HAR/report will be reviewed separately; ingestion engineering remains active and is not blocked by this feature track.
+
+
+## 2026-11-07 — Authenticated JobBeeper network investigation completed
+
+- Sanitized report added: docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md.
+- Direct observations: page-number feed pagination (page, per_page=20), server-side keyword search, separate metadata/tracker detail GETs, a view-marking POST, visible source labels and experience-provenance labels.
+- Ten minutes of idle observation on an expired-subscription account showed no feed-related network events. It does not establish active-account refresh cadence.
+- Unknowns remain: API response schemas, exact filter parameters beyond keyword search, timestamp semantics, longer polling/push behavior and private ingestion architecture.
+- Local comparison is recorded in docs/INGESTION_FIRST_ROADMAP.md. The first product changes are to bound dashboard polling, plan server-side pagination and close the experience-provenance gap; source expansion remains governed by the ingestion acceptance gates.
+- Continue only with the sanitized evidence. Do not retain/replay authenticated request bodies, cookies, authorization headers or account/session material.
+
+
+## 2026-11-07 — Second-round JobBeeper evidence and local feed parity work
+
+The second-round sanitized report is now in docs/JOBBEEPER_NETWORK_EVIDENCE_2026-11-07.md. It confirms search, numeric page, per_page=20, status=matched, sort_by=created_at and sort_order=desc. Search reset page=1 in the tested browser action. Other filter dropdown mappings, response schemas, stable page-ID overlap, exact experience provenance fields, repeated detail-view behavior, save/application requests, and active/hidden refresh behavior remain unknown. Ten idle one-minute windows again showed no refresh traffic, but the account remained expired with a six-hour feed-delay message, so no inference about an active subscription is justified.
+
+Our own isolated implementation now supports the observed list query vocabulary at GET /api/jobs while retaining legacy aliases. It applies its own search/source/score/age/alertability/remote filters in SQL before pagination; those local filter names are not claims about JobBeeper. The dashboard requests 20 jobs per page and provides numeric navigation. Our total/page/has-next response fields are locally designed because JobBeeper's response body was intentionally not retained.
+
+Experience values now carry a provenance category and qualitative evidence-strength grade in our data model and dashboard. The grade is rule-based and not a calibrated probability. Do not claim that our classifier reproduces JobBeeper's private implementation; its underlying provenance fields remain unknown.

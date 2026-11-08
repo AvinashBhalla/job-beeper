@@ -6034,3 +6034,12 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Redundant parser branch `fix/linkedin-experience-parser` was inspected; current V2 already includes `extract_linkedin_labeled_experience` plus its two regression tests, and the full 215-test CI covers them. Remove the stale branch, not the code.
 - PR/branch audit: `docs/PR_BRANCH_AUDIT_2026-11-08.md`. Cooldown evidence: `docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md`. Persistent design/migration: `docs/LINKEDIN_COOLDOWN_PERSISTENCE_2026-11-08.md`.
 - Next task: investigate PR #46 preference-save error and surface useful server validation feedback. Keep PR #46 draft until preference persistence and per-user Telegram E2E are proven.
+
+## 2026-11-08 — PR #46 local V2 integration candidate
+
+- A local-only integration worktree `/tmp/job-radar-pr46-integration` merges `feat/user-preferences-evaluations-20261106` onto the latest `v2-live-radar` base at `a719138`. This is a rebase/conflict-resolution candidate only; it has not been pushed and does not alter the 8002 feature service or 8004 desktop QA service.
+- Shared conflict in `v2/radar.py` was resolved by combining both implementations: preserve monotonic `last_seen_at`, safe source-posted timestamp handling and description-change-only global reevaluation; retain experience provenance/confidence ranking, min/max persistence and per-user evaluation refresh for only touched/new jobs.
+- `dashboard/app.js` and `dashboard/index.html` auto-merged. Six conflict files were originally detected; the docs conflicts are being resolved by keeping the newer V2 handover/roadmap/audit and appending current PR #46/browser QA status. Feature-only docs and tests (OAuth, resume parser, Telegram, local browser QA) remain included from PR #46.
+- Important next integration: ensure `user_notification_ledger` enqueue/delivery excludes global `notification_ledger.baseline_suppressed=1` opportunities before Lever or other first-snapshot ATS inventory is enabled for member Telegram. The user notification path must not bypass the initial-inventory baseline.
+- This local candidate must pass the full V2 suite and user-preferences/OAuth/resume/Telegram focused suites. Keep PR #46 remote draft unchanged until owner desktop Browser report is returned and this candidate has full green CI.
+- No push/deploy/runtime changes.
