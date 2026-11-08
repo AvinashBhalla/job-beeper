@@ -45,40 +45,40 @@ The preflight snapshot is evidence, not the final deployment backup. Take a fres
 - Restore the fresh database backup only if candidate initialization caused a confirmed data/schema issue and only after stopping the dev container and validating the backup. Do not restore merely because an HTTP smoke check failed.
 - Verify old-image health and row counts after rollback.
 
-## Current release gates — updated 2026-11-08
+## Core-functionality status — real-data dry run 2026-11-08
 
-- **QA-001: PASS.** Final browser regression on candidate port 18005 verified member desktop/mobile Source Health hidden, direct member `#sources` redirect to Jobs, no member telemetry polling for 35 seconds, member source-health GETs returning 403, and admin desktop/mobile visibility plus API GETs returning 200. See `docs/QA/desktop-final-candidate-verification-2026-11-08.md` and `docs/QA/QA001_CSS_HIDDEN_ROOT_CAUSE_2026-11-08.md`.
-- **QA-002 responsive layout: PASS.** Member/admin were measured at 1536×900, 1280×800, 768×1024, 390×844, 375×812 and 320×740. No horizontal overflow or metric overlap was reported. “Discovered” wraps below “Today” at 320px but remains visible.
-- **QA-002 mobile bottom-navigation occlusion: BLOCKED.** The browser session could not provide a reliable archival obstruction rectangle or exported screenshot proving that the final content is not obscured by the mobile navigation.
-- **QA-002 screenshot artifact delivery: BLOCKED.** Inline captures were taken, but no PNG/JPEG files could be exported from the browser control surface. Re-run the evidence-only portion with a capture-capable local browser harness; do not fabricate screenshot files.
-- **QA-003 console smoke: PASS.** No member/admin console errors or warnings were observed.
-- **Manual CSRF negative mutation checks: UNKNOWN.** No state-changing request was sent in the read-only acceptance pass.
-- **Manual session/logout/expiry mutation checks: UNKNOWN.** These were also excluded by design. Automated CSRF/logout-protection tests passed in the previously recorded V2 CI run; that does not convert the manual browser checks to PASS.
-- **Candidate code validation:** GitHub Actions V2 CI run `42468551208` completed successfully on `cf778c1f1da33c773f820cafea991fb084c58da8`, with 337 tests passed. Subsequent documentation-only commits must not be described as independently CI-verified until the current branch status is checked.
-- **Promotion status:** no shared-dev promotion, service restart, config edit, database migration, feature-flag change, or production action has occurred. PR #51 remains draft. The existing preflight database snapshot is not a substitute for a fresh backup immediately before a future promotion.
+- Candidate code commit: `cf778c1f1da33c773f820cafea991fb084c58da8`. Current candidate PR head may be newer because subsequent commits are documentation-only; verify exact current head/CI before promotion.
+- Real-data functional report: `docs/QA/real-data-pipeline-dry-run-2026-11-08.md`.
+- Using a disposable copy of the 44 MB shared-dev snapshot, candidate `radar.init_db()` preserved the existing 8,368 jobs, users/preferences, canonical opportunities, global evaluations, per-user evaluations and notification-ledger rows. SQLite integrity remained `ok`.
+- Candidate recomputed all 8,368 global and all 8,368 per-user evaluations; 130 matched the stored profile. A user-role feed query returned 40 matched jobs in the previous seven days; an admin all-jobs query returned 2,193. The role-specific query was invoked directly against the existing stored profile row; this was not a real member authentication test.
+- Candidate Naukri ingestion fetched one fresh public relay snapshot: HTTP 200, 318 jobs, feed age 351.46 seconds, one request/one successful page, seven new jobs. On the disposable DB the totals became 8,375 jobs/canonical opportunities/evaluation rows, with 130 matches and integrity `ok`.
+- Notification delivery remained disabled. Global ledger contained 24 pending items explicitly marked “Telegram notifications disabled; awaiting future re-evaluation” and 8,351 suppressed items. No member Telegram settings/chat were enabled, no Telegram token or Gemini key was configured, and no message was sent.
+- **Scope:** real-data dry run verifies the Naukri → normalize/upsert → canonical linkage → deterministic matching → feed/decision ledger path using a real shared-dev snapshot and one fresh public Naukri relay poll. It does not prove all six adapters or a candidate run against the live shared-dev volume. Historical Ashby records are present but stale/disabled in shared dev; only Naukri was actively exercised.
 
-## Updated release blockers — final visual evidence follow-up
+## Deferred UI finding — deliberately not on the critical path
 
-- **320px interaction: FAIL for both roles.** At 320×740, member `Mark Applied` hit-testing returned the “Newest First” button; admin hit-testing returned `.feed-status-strip`. At 390×844 and 375×812, both roles passed. The target button rectangles are above the 56px bottom bar, whose top is y=684; exact overlay/cause is unconfirmed. See `docs/QA/desktop-final-visual-evidence-2026-11-08.md`.
-- **Screenshot export: BLOCKED.** In-memory browser screenshot bytes were returned but could not be written to the requested local screenshot directory. No PNG files exist. A local Playwright runner with `page.screenshot({path: ...})` or equivalent is required.
-- **QA-001 remains PASS** and responsive metric layout remains PASS. The new 320px failure is a separate hit-testing/accessibility issue and must not be conflated with the earlier layout result.
-- **Manual CSRF/session mutation: UNKNOWN** as previously recorded.
+- The 320px hit-test diagnostic is now complete: actual overlap is confirmed. Member card buttons sit underneath `.feed-filter-toolbar`; admin card button center is underneath `.feed-status-strip`. At 375px both contexts pass. See `docs/QA/desktop-320px-hit-test-diagnostics-2026-11-08.md`.
+- Per owner priority, no UI code fix is being attempted in this phase. Treat this as a known narrow-mobile usability defect, not a blocker for a desktop/shared-dev real-data ingestion canary. Do not represent the 320px path as passing.
+- Screenshot file export remains blocked by the connected browser harness; it is not a data-pipeline blocker.
+- Manual CSRF/session mutation tests remain UNKNOWN (they were intentionally not run); automated CSRF/logout-protection tests pass in CI. Keep this distinction in any later release/security review.
 
-## Required next actions before promotion
+## Recommended next push — shared dev only, not production
 
-1. Obtain exact 320px hit-test x/y, `elementsFromPoint()` stack, bounds and computed styles for the intended and returned elements in both roles. Confirm the target button remains connected and coordinates use viewport CSS pixels.
-2. Apply a minimal root-cause fix only after the diagnostic identifies the overlap or coordinate issue. Add a regression test covering the relevant DOM/CSS contract and recheck 320px, 375px and 390px.
-3. Use a capture-capable local Playwright runner to export and validate PNG screenshots.
-4. Decide how to close manual CSRF/session UNKNOWNs through isolated synthetic testing or owner/security acceptance.
-5. Re-check CI for the latest code head and obtain explicit owner approval before any shared-dev promotion. Take a fresh online SQLite backup immediately before promotion and follow the runbook above.
+The core Naukri pipeline has passed a real-data dry run. The next useful step is a controlled candidate promotion to shared dev port 8001, then a live Naukri soak on the real persistent database. This has **not** happened yet.
 
-Workday/SmartRecruiters remain legacy-only and Darwinbox is generic discovery only; they are not part of the six-source V2 release scope.
+Promotion invariants:
 
+1. Obtain explicit owner approval before deployment.
+2. Take a fresh SQLite online backup from the running `job-radar-dev` container immediately before promotion; record file size and `PRAGMA integrity_check`.
+3. Build an immutable candidate image from the exact reviewed code commit; do not overwrite `job-radar-dev-multitenant:f43cd4a` rollback image.
+4. Preserve `/tmp/job-radar-dev-live.yml`, project/container identity, named volume `job-radar-dev_radar-dev-data`, config mount, `.env` in place, and current Telegram-blanking invariants.
+5. Keep Naukri enabled, LinkedIn disabled, Instahyre/Greenhouse/Ashby/Lever disabled, all Telegram/notification delivery disabled, and Gemini/LLM disabled. Do not expand source scope during this first canary.
+6. Recreate only `job-radar-dev` (port 8001); production port 8000 and feature/QA ports remain untouched.
+7. Observe at least two real Naukri scheduler cycles and compare `source_runs`, jobs added, canonical linkage, evaluation counts/matches, feed API output and notification ledgers. Confirm zero sends.
+8. Only after the shared-dev soak succeeds, review a separate production promotion. Do not merge/deploy production as part of this step.
 
-1. Obtain screenshot files through a capture-capable harness and archive redacted desktop/member/admin-mobile evidence.
-2. Verify bottom-nav occlusion with stable geometry and hit-testing at the bottom of scrolled mobile content; retain actual measurements and screenshots.
-3. Decide how to close the manual CSRF/session checks: run them only in a separately scoped synthetic QA pass, or explicitly record them as accepted release unknowns after owner/security review. Never target shared dev or production with these mutation checks.
-4. Re-check CI against the final candidate code state and ensure the PR is still based on `v2-live-radar`.
-5. Obtain explicit owner approval before any shared-dev promotion. Immediately before promotion, take and integrity-check a fresh SQLite online backup, preserve the live Compose/env/config invariants, build an immutable candidate image, and follow the targeted rollback procedure above.
+## Current operational blocker
+
+The Termalin connection can reach the VM and read the disposable snapshot, but its `docker` command returns `permission denied` on `/var/run/docker.sock`. No `sudo`, Docker group change or permission workaround was attempted. Therefore I cannot build/recreate the shared-dev container through the current Termalin session. An authorized Docker operator/session is required for the promotion. The live shared-dev health endpoint returned HTTP 200; protected unauthenticated API calls returned 401. No live app, volume, database, config or runtime changes were made.
 
 Workday/SmartRecruiters remain legacy-only and Darwinbox is generic discovery only; they are not part of the six-source V2 release scope.
