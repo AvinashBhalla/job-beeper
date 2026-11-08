@@ -6152,3 +6152,7 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - Member notification suite: **17 passed**. Full integration suite: **336 passed** in 194.322 seconds. Python compilation and `git diff --check` passed.
 - No Telegram HTTP calls or messages occurred. Lever remains disabled and the candidate preview collector flags remain off. No shared-dev or production deployment.
 - Updated QA prompt with this additional safety invariant. Current candidate still awaits browser Prompt 1 and security Prompt 3.
+
+- The prior note that member enqueue/claim/send already checked the global canonical `notification_ledger.baseline_suppressed` marker was inaccurate. A subsequent line-by-line review found only the per-job `source_initial_baseline` filter.
+- Corrected in commit `08c256f` (candidate head after documentation replay `9ac6fab`): member enqueue query, queue claim/cancellation and final send-time validation now also check canonical baseline suppression. Added three cross-source/canonical regression tests.
+- Current validation: **17** `test_user_notifications` tests pass; full V2 suite **336 passed** in **194.322 seconds**; Python compilation and `git diff --check` pass.
