@@ -134,3 +134,23 @@ After those tests the live DB reported 9,429 jobs, canonical opportunities, glob
 - Protected endpoints return 401 without login; a real browser admin/member login was not tested in this pass.
 - 320px toolbar overlap remains a known, deliberately deferred UI defect.
 - Shared-dev deployment is complete; production remains untouched. PR #51 remains open/draft. Production promotion requires a separate explicit approval after the remaining LinkedIn/auth checks are reviewed.
+
+
+## 2026-11-08 — final integration checkpoint and 36-platform scope
+
+Final shared-dev verification at 11:39:59 UTC: health and dashboard HTTP 200, image b16fb83. Production health HTTP 200 and production container untouched. Dev SQLite integrity ok; 9,444 jobs, canonical opportunities, global evaluations, per-user evaluations and global ledger rows; 7,858 source runs. Notification sent_at count zero. Persisted config Naukri only, notifications false, Telegram credentials blank, Gemini/LLM false.
+
+Real live source pipeline outcomes:
+- Naukri recurring: successful schedule polls.
+- Instahyre: 140 seen/new, 4 HTTP 200 pages after live parser repair.
+- Greenhouse: 369 seen/new, 3/3 boards successful.
+- Ashby: 828 seen / 34 new, 2/2 boards successful.
+- Lever: 500 seen/new on one-off paytmpayments board, 5/5 pages 200 and page cap reached; not saved/enabled.
+- LinkedIn: one paced request after cooldown, 10 unique jobs / HTTP 200, same fetched rows ingested 10; not saved/enabled.
+V2 source registry remains only six adapters; only Naukri on recurring scheduler.
+
+Known production gate: notification worker recover_stale_claims threw sqlite3.OperationalError database is locked during concurrent ingestion (twice observed around tests); investigate/fix and add concurrency coverage before prod. No user Telegram ledger entries exist on dev, so user-specific delivery remains unverified.
+
+Owner added a mandatory source coverage goal covering all 36 systems listed in docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md. Workday and Darwinbox are highest-priority missing ATS integrations. The roadmap defines employer board discovery, vendor-specific polling/webhook behaviour, a 2-minute target where permitted, normalized source records, per-user match/outbox/delivery, and an ordered build plan. Most ATS sources are employer-specific tenants; marketplace sources need separate access/terms review. Do not state 36-platform coverage until each row has validated live evidence.
+
+Production read-only preflight on disposable copy preserved rows, but production has Telegram credentials and notifications enabled. Keep prod untouched; prior approval was dev only. Next agent must fix SQLite contention, prove per-user Telegram with safe test accounts, build Workday/Darwinbox and board discovery, then proceed through the 36-platform roadmap before requesting distinct prod approval.
