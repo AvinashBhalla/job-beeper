@@ -4,10 +4,10 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-11-06 (multi-user authentication foundation implemented on an isolated feature branch; not deployed)**
+**Last updated: 2026-11-08 (candidate integration branch; final read-only browser regression recorded; acceptance remains blocked by evidence-only gates; not deployed)**
 **Release integration branch:** `v2-live-radar`
 
-**Active feature branch:** `feat/multi-user-foundation-20261106`
+**Active candidate branch:** `integration/pr46-v2-rebase-20261108`
 **Repository:** `AvinashBhalla/job-beeper`
 
 > ## Mandatory agent handover rule — every prompt
@@ -6156,3 +6156,16 @@ Until that gate exists, Lever remains default-off with an empty configured allow
 - The prior note that member enqueue/claim/send already checked the global canonical `notification_ledger.baseline_suppressed` marker was inaccurate. A subsequent line-by-line review found only the per-job `source_initial_baseline` filter.
 - Corrected in commit `08c256f` (candidate head after documentation replay `9ac6fab`): member enqueue query, queue claim/cancellation and final send-time validation now also check canonical baseline suppression. Added three cross-source/canonical regression tests.
 - Current validation: **17** `test_user_notifications` tests pass; full V2 suite **336 passed** in **194.322 seconds**; Python compilation and `git diff --check` pass.
+
+## 2026-11-08 — Final candidate browser regression and release-gate update
+
+- Final Desktop browser report: `docs/QA/desktop-final-candidate-verification-2026-11-08.md`. Target was only `http://localhost:18005/dashboard/`; candidate branch `integration/pr46-v2-rebase-20261108`; tested SHA `cf778c1f1da33c773f820cafea991fb084c58da8`.
+- Two independent synthetic browser contexts were used (member id 2 and admin id 1). Only GET/navigation, DOM inspection, screenshot capture attempts, Network and console reads were performed. No app/config/DB mutation, collectors, OAuth, Telegram, applications, other ports, shared dev or production were touched.
+- **QA-001 PASS:** member desktop and mobile Source Health links have `display:none`, `hidden:true`, zero-size geometry. Member direct `#sources` route settles at `#jobs` without a flash. No source-health telemetry request occurred during a 35-second observation. Member GETs to `/api/source-status`, `/api/source-status/summary`, `/api/latency-summary` returned 403. Admin nav/section visible at desktop and mobile widths; matching GETs returned 200.
+- **QA-002 responsive layout PASS:** tested 1536×900, 1280×800, 768×1024, 390×844, 375×812 and 320×740 for member and admin. Body scroll width equaled viewport width at each size; metrics did not overlap or clip. At 320px, “discovered” wraps below “Today” but stays visible.
+- **QA-002 BLOCKED:** mobile bottom-nav occlusion could not be archived with a reliable obstruction rectangle/hit-test; screenshot export is also blocked. Inline captures were taken, but no screenshot files were written. No files should be fabricated or treated as existing.
+- **QA-003 PASS:** member/admin console errors and warnings were empty.
+- **UNKNOWN:** manual CSRF negative mutation tests and session/logout/expiry mutation checks were deliberately not run due to read-only scope. Previous automated CSRF/logout-protection test coverage passed in the 337-test CI run; do not conflate automated coverage with manual browser verification.
+- GitHub Actions V2 CI run `42468551208` completed successfully on exact SHA `cf778c1f1da33c773f820cafea991fb084c58da8`: 337 tests passed. The docs-only commits that follow this report are not source-code changes; check latest branch/CI status before asserting exact-head validation.
+- No application code change was made in this report-only work unit. PR #51 remains open/draft against `v2-live-radar`; not merged. No shared-dev or production deployment/restart, DB migration, config edit or feature flag change occurred.
+- **Next actions:** (1) screenshot-capable local browser pass to export redacted desktop/member/admin-mobile/bottom-scroll PNGs; (2) stable bottom-nav geometry and hit-testing at 390×844/375×812/320×740; (3) separately scoped synthetic-only CSRF/session mutation pass or explicit owner-reviewed acceptance of UNKNOWNs; (4) verify CI at final code head; (5) ask for explicit shared-dev promotion approval and take a fresh online DB backup immediately before promotion. Do not merge or promote while evidence gates remain open.
