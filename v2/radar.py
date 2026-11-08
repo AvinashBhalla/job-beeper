@@ -6539,7 +6539,7 @@ def list_discovered_boards(status: str | None = None, limit: int = 250):
     limit = max(1, min(int(limit), 1000))
     query = """SELECT b.id,b.company_id,c.company_name,c.domain,b.provider,b.board_key,
                       b.board_url,b.discovered_from,b.confidence,b.collector_source,
-                      b.collector_available,b.review_status,b.last_verified_at,
+                      b.collector_available,b.review_status,b.baseline_pending,b.last_verified_at,
                       b.last_seen_at,b.last_error_type
                FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id"""
     values: list[Any] = []
@@ -6745,6 +6745,71 @@ def activate_discovered_board(board_id: int):
         "review_status": "active", "source_enabled": True,
         "poll_interval_seconds": interval, "baseline_pending": True,
         "first_poll_note": "Existing board inventory will be ingested silently once before fresh-job alerts are eligible.",
+    }
+
+
+@app.post("/api/discovery/boards/{board_id}/deactivate", dependencies=[Depends(require_admin)])
+def deactivate_discovered_board(board_id: int):
+    """Remove one active employer board without disabling its provider peers."""
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT id,provider,collector_source,review_status FROM ats_board_registry WHERE id=?",
+            (board_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Discovered board was not found.")
+    board = dict(row)
+    if board["review_status"] != "active":
+        raise HTTPException(status_code=409, detail="Only an active board can be disabled.")
+
+    source = str(board["collector_source"] or "")
+    config_key = {
+        "greenhouse": "greenhouse_boards",
+        "ashby": "ashby_boards",
+        "lever": "lever_boards",
+        "workday": "workday_boards",
+        "smartrecruiters": "smartrecruiters_boards",
+        "workable": "workable_boards",
+        "keka": "keka_boards",
+        "darwinbox": "darwinbox_boards",
+    }.get(str(board["provider"]))
+    if not source or not config_key:
+        raise HTTPException(status_code=409, detail="This board has no supported collector configuration.")
+    if source_state.get(source, {}).get("running"):
+        raise HTTPException(status_code=409, detail="This provider is polling now. Retry after the current poll completes.")
+
+    config = get_config()
+    entries = list(config.get(config_key) or [])
+    remaining = [
+        item for item in entries
+        if not (isinstance(item, dict) and str(item.get("registry_id") or "") == str(board_id))
+    ]
+    if len(remaining) == len(entries):
+        raise HTTPException(status_code=409, detail="Board is not linked to its provider allowlist; configuration was not changed.")
+
+    config[config_key] = remaining
+    if not remaining:
+        config.setdefault("source_enabled", {})[source] = False
+    try:
+        saved = save_config(config)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Board configuration could not be updated: {type(exc).__name__}.") from exc
+
+    timestamp = iso(now())
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            "UPDATE ats_board_registry SET review_status='verified',baseline_pending=0,updated_at=? WHERE id=?",
+            (timestamp, board_id),
+        )
+        conn.commit()
+    return {
+        "board_id": board_id,
+        "review_status": "verified",
+        "source": source,
+        "source_enabled": bool(saved.get("source_enabled", {}).get(source)),
+        "remaining_boards": len(remaining),
+        "takes_effect_next_poll": True,
     }
 
 

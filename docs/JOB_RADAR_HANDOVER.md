@@ -6491,3 +6491,50 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Seven added sources were paused after the first scan; LinkedIn and Naukri remain enabled. All 10 registry entries were reset to `baseline_pending=1`, so the fixed code can safely reprocess the initial inventory already stored in the DB. No jobs or source history were deleted.
 - Hotfix branch `fix/board-baseline-pending-20261108` updates the baseline helper to suppress a null-candidate ledger row only when the newly activated board introduced the canonical opportunity, while preserving a pre-existing cross-source canonical opportunity. Tests cover the null-candidate case and preservation of a prior source observation. Full V2 suite and exact-SHA CI are required before re-enabling the 7 sources.
 - Lever remains inactive because the sample Lever URLs tested did not resolve to valid public board endpoints. Instahyre remains inactive pending a safe first-source baseline for its non-board collector. Do not turn on either based on discovery alone.
+
+
+## 2026-11-08 — Production release completed; admin onboarding still requires owner bootstrap
+
+### Release and production state
+
+- PR #51 merged to `v2-live-radar` as `0aac3cb01730a3d06ab093168e3ef7b9a5171ac2`; exact-head PR and manual V2 CI both passed. Production initially deployed image `job-radar-prod-canary:0aac3cb` with the original external `v2_radar-data` volume unchanged.
+- The first live ATS inventory exposed the null-candidate notification-ledger edge case. Seven newly enabled providers were paused (LinkedIn/Naukri left running), and all 10 board markers retained as pending. PR #53 hotfix merged as `93a137209327c801c616553a66562d1307f5ef8d`; exact-head CI passed and local full V2 suite passed 390 tests.
+- Production now runs image `job-radar-prod-canary:93a1372`, config v15, health HTTP 200, dashboard HTTP 200, no container restarts. Existing source and job history was retained. Online SQLite backups and config snapshots exist in `/var/backups/job-radar/` with SHA-256 checksums.
+- Ten verified board registry records are active and baseline-pending=0: Greenhouse Coinbase/Graviton Research Capital/Zocdoc; Ashby OpenAI/PostHog; Workday NVIDIA; SmartRecruiters Bosch Group; Workable Hugging Face; Keka Bridgestone; Darwinbox Arvind.
+- The fixed baseline replay ran with notifications temporarily off. Exact successful replay counts: Greenhouse 368, Ashby 826, Workday 20, SmartRecruiters 300, Workable 6, Keka 109, Darwinbox 36. Every replay saw 0 new rows; 1,665 rows carry `source_initial_baseline=1`; all 1,665 related notification ledger rows are `suppressed` with `baseline_suppressed=1`; all 10 registry markers cleared. No historical Telegram backfill was sent. SQLite integrity was `ok`.
+- After replay, notifications were restored to `true` and these sources were re-enabled: LinkedIn, Naukri, Greenhouse, Ashby, Workday, SmartRecruiters, Workable, Keka and Darwinbox. Instahyre and Lever remain off. Source intervals: Greenhouse/Ashby/SmartRecruiters 300s; Workday/Workable/Keka/Darwinbox 120s; LinkedIn 180s; Naukri 300s.
+- NVIDIA Workday collector reaches its bounded one-page cap (20 rows); it does not claim full-board coverage. The ten boards are individual verified examples, not a guarantee for every customer board on each ATS.
+- At final audit: jobs 22,716; canonical opportunities 22,404; source_runs 22,446; SQLite integrity `ok`; no queued/sending source alerts; ten old failed rows remain in the legacy notification ledger. No new source-related Telegram send occurred during the baseline validation window.
+
+### Current admin account blocker and safe first login
+
+- Production has **zero users and zero admins**. The email recorded as supplied by the owner in the prior handover is `bawejaavichal01@gmail.com`.
+- The supported one-time bootstrap is `v2/auth_admin.py`. On the server, run this interactively so the password is typed at a hidden prompt (do not place a password in shell history, command arguments, `.env`, Git or docs):
+
+  `sudo docker exec -it v2-radar-1 python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com`
+
+- The command calls `auth.create_first_admin` (Argon2id password hash) and `user_preferences.migrate_first_admin_preferences`. That migration copies the existing global candidate preference fields from `/data/config.json` into the first admin's `user_preferences` row exactly once. This preserves the owner's current target roles, locations, skills, experience range and matching settings. Ordinary member accounts do not inherit the admin profile.
+- This agent attempted to perform the one-time account creation remotely, but the execution safety gate blocked the production credential mutation. No user/admin row was created and no generated password was stored. The interactive command above is the supported next step. Verify the account appears as role `admin` before using the dashboard.
+- Do **not** use Google OAuth as the bootstrap route: the existing Google callback creates a normal `user` account, never an administrator.
+- Google OAuth code is present but disabled. Production `.env` has no `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` or `GOOGLE_OAUTH_REDIRECT_URI`. To enable it, the owner must create a Google OAuth web client and add the client ID/secret plus `https://<public-host>/api/auth/google/callback` (the exact public HTTPS origin must be chosen and registered). Until then, the Google button remains hidden.
+- `JOB_BEEPER_PUBLIC_ORIGIN` and the Google OAuth variables are unset. `_auth_cookie_secure()` defaults to Secure cookies. Confirm the dashboard is accessed over its real HTTPS origin and set the exact `JOB_BEEPER_PUBLIC_ORIGIN` before relying on browser login. Do not weaken Secure cookies merely to make a direct HTTP port work.
+
+### Telegram status boundary
+
+- Legacy/global Telegram bot token and chat ID are configured and retained; `notifications_enabled=true`.
+- Per-user Telegram linking is **not ready**: `JOB_BEEPER_TELEGRAM_BOT_USERNAME` and `JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET` are unset, and no public HTTPS origin/webhook has been registered. A new member's linking endpoint will remain unavailable until those are securely configured. Do not claim user-scoped Telegram is verified from the legacy global bot settings.
+
+### Board controls in the admin panel
+
+- Before this update, the Source Health workspace could discover, verify and activate boards; an active row had no per-board disable action. Global provider flags and JSON config editor existed but were too coarse for board-by-board testing.
+- Feature branch `feat/admin-board-disable-20261108` adds `POST /api/discovery/boards/{id}/deactivate` and a **Disable board** action. It removes only the selected registry-linked entry, leaves peer boards running, switches the provider off only when its allowlist becomes empty, and returns the board to `verified` so it can be activated again. It refuses a deactivation while that source is actively polling; retry after the run completes. This branch is not yet merged/deployed; exact-SHA CI/full suite and a production-safe deploy are required.
+
+### Immediate next actions for the next agent
+
+1. Finish CI/full suite and merge/deploy the board-disable feature only after passing tests on its exact SHA; do not alter current active-source config as part of the code deploy.
+2. Create the first admin interactively using the command above; verify password login, `/api/auth/me`, `/api/config`, and `/api/discovery/boards` over HTTPS.
+3. Verify the dashboard shows the existing preference values, the 10 active board records, and source telemetry. Ensure active board disable/re-enable works on a QA board first.
+4. Set a real public HTTPS origin and Google OAuth credentials only if the owner provides/authorizes them. Google login must remain member-level; admin login stays password-based unless a deliberate role-linking flow is implemented.
+5. Configure per-user Telegram bot username, strong webhook secret and public webhook URL only after confirming the actual HTTPS host; then link the owner's private chat and test a member notification with explicit opt-in.
+6. Continue observing successful polls, freshness and 429 cooldowns. Do not force LinkedIn out of its persisted cooldown, and do not call Workday's 20-row first page a complete inventory.
+7. Next product feature after release hardening: server-owned application tracker (P0.5 in `PRODUCT_VISION_AND_DELIVERY_ROADMAP.md`).

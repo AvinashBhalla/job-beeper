@@ -2058,7 +2058,7 @@
         ? `<button type="button" class="btn-pill btn-pill-primary board-activate-btn" data-board-id="${esc(board.id)}">Activate source</button>`
         : '';
       const actions = board.review_status === 'active'
-        ? '<span style="color:var(--status-success);">Active</span>'
+        ? `<span style="color:var(--status-success);">Active</span><button type="button" class="btn-pill btn-pill-secondary board-disable-btn" data-board-id="${esc(board.id)}">Disable board</button>`
         : `${verifyButton}${activateButton}<button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="reviewed">Mark reviewed</button><button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="rejected">Reject</button>`;
       return `<tr>
         <td><b>${esc(board.company_name)}</b><div style="font-size:11px;color:var(--text-muted);">${esc(board.domain)}</div></td>
@@ -2080,6 +2080,9 @@
     });
     tbody.querySelectorAll('.board-activate-btn').forEach(button => {
       button.addEventListener('click', () => activateDiscoveredBoard(Number(button.dataset.boardId), button));
+    });
+    tbody.querySelectorAll('.board-disable-btn').forEach(button => {
+      button.addEventListener('click', () => deactivateDiscoveredBoard(Number(button.dataset.boardId), button));
     });
   }
 
@@ -2144,6 +2147,25 @@
     } catch (error) {
       if ($('boardDiscoveryStatus')) $('boardDiscoveryStatus').textContent = error.message || 'Board verification failed.';
       showToast(error.message || 'Board verification failed.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function deactivateDiscoveredBoard(boardId, button) {
+    if (!window.confirm('Disable this employer board? Other boards using the same ATS will continue running.')) return;
+    if (button) button.disabled = true;
+    const status = $('boardDiscoveryStatus');
+    if (status) status.textContent = `Disabling board ${boardId}…`;
+    try {
+      const response = await authClient.request(`/discovery/boards/${encodeURIComponent(boardId)}/deactivate`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Board disable failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `${data.source}: board disabled; ${data.remaining_boards} board(s) remain in this collector. Changes take effect on the next poll.`;
+      await Promise.all([loadDiscoveredBoards(), loadSourceStatusTelemetry()]);
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Board disable failed.';
+      showToast(error.message || 'Board disable failed.', 'error', 7000);
     } finally {
       if (button) button.disabled = false;
     }

@@ -230,14 +230,14 @@ Report sample size and timestamp precision. A source returning 1,000 old jobs is
 - Avoid speculative factories, generic frameworks, extra packages, duplicate job stores, per-user scrapers and premature infrastructure.
 - Update this roadmap and both handover files whenever plans/status change.
 
-## 9. Current next actions
+## 9. Current next actions (reviewed 2026-11-08)
 
-1. Finish production DB migration rehearsal and deploy verified source set without historical Telegram backfill.
-2. Provision first production admin securely and verify a member login.
-3. Link owner's private Telegram chat, intentionally enable notifications and send a real test alert.
-4. Observe feed/latency and fix bugs.
-5. Implement server-backed application tracking before wider beta.
-6. Design resume vault/tailoring using fact provenance and human review.
-7. Build answer bank before browser companion; do not start with brittle LinkedIn scraping or automatic submissions.
+1. Production release is deployed: config v15, seven added ATS sources active across 10 verified boards, silent initial baseline complete, and notifications restored. Continue a measured source/DB soak; preserve provider rate limits.
+2. Provision the first production admin interactively using `python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com` inside the live container. This copies the existing global candidate preferences exactly once. Do not store the password in shell history or docs.
+3. Confirm the actual HTTPS public origin. Google OAuth remains disabled until the owner supplies a Google client ID/secret and registered callback. OAuth must create member accounts only.
+4. Configure per-user Telegram bot username, webhook secret and public webhook URL; link the owner's private chat and test only after explicit user opt-in. Legacy global Telegram credentials do not prove per-user delivery.
+5. Complete board-level disable UI/endpoint PR, exact-SHA CI, full suite, QA and a separate deploy. Current production already supports discovery/verify/activate; the disable action is pending merge/deploy.
+6. Implement server-backed application tracking before a wider beta (P0.5).
+7. Design resume vault/tailoring using fact provenance and human review, then the answer bank before the browser companion. Keep auto-submit gated and off.
 
 **Reminder:** a source adapter in code is not a verified active production connector. A roadmap feature is not implemented until API, UI, tenant tests and release evidence exist.
