@@ -6608,3 +6608,43 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Canary two-synthetic-user API smoke was **not run**: the production execution safety gate blocked the remote account-creation command. Do not work around the gate or call that smoke test complete. The equivalent two-user create/list/update/delete, cross-owner 404, idempotency, CSRF and dedupe-rebuild cases passed in the local 400-test suite and exact GitHub CI. The canary only directly verified unauthenticated route denial plus startup/schema/migration/data preservation.
 - Canary container/network were removed after checks. Production remains on `job-radar-prod-canary:00820f0`, zero restarts, health HTTP 200, users=0, current 9 source flags on, notifications=true, SQLite integrity `ok`. No production config, DB or source flags were changed by P0.5.
 - **Decision: PR #55 remains open and is not deployed.** Exact CI and migration/schema canary are green, but the dedicated two-user smoke on the production-data copy is a remaining release checklist item blocked by the execution safety gate. Next agent can either obtain the permitted/manual owner-approved test path, or rely on the 400-test local/CI evidence with an explicit documented release approval. Do not create or alter real production application records without owner consent.
+
+
+## 2026-11-09 — P0.5 Application Tracker merged and deployed
+
+### Merge and production release
+
+- PR #55 merged to `v2-live-radar` as `6e5becbde4b07e48dc55ae765385dd7c68aa65cf`. The PR's final exact head before merge was `f3ea308daaf7f1a5358e365c1f5f191be7fe80a6`; GitHub V2 CI run `42517201622` passed, including modern Node dashboard syntax, focused tests and full V2 test discovery. Local full V2 suite passed **400 tests in 307.495s**.
+- Built and deployed image `job-radar-prod-canary:6e5becb` from the exact merge commit. The release changes only the app image; the same external `v2_radar-data` volume and `/data` paths remain mounted. Container restarts 0 after deploy.
+- Fresh pre-deploy online backup: `/var/backups/job-radar/job-radar-pre-applications-release-20261108T195502Z.sqlite3`, SHA-256 `b840175c43d98ed62cca76d7f57a385706e6679f1e45b187de52d004cdc50934`; config snapshot SHA-256 `bf122565831c3dc00c48611b3a74c3f6e22c6bc6881ed93a1377b7214e8992c4`; previous compose snapshot SHA-256 `c5befcb4f445d6127abda698ce8d35c5148b8d635811af1ac74a503bd2dc5948`. Both source and online backup integrity were `ok`.
+- Post-deploy health HTTP 200, dashboard HTTP 200, anonymous GET `/api/applications` HTTP 401. `user_applications` table exists; 22,721 jobs, 22,409 canonical opportunities, 22,660 source runs, 22,409 notification ledger rows, 10 board registry rows, users=0, applications=0; `PRAGMA foreign_key_check` empty; `PRAGMA integrity_check` `ok`.
+- Runtime config remains v15. Enabled: LinkedIn, Naukri, Greenhouse, Ashby, Workday, SmartRecruiters, Workable, Keka, Darwinbox. Notifications remain enabled. All 10 ATS board records active and `baseline_pending=0`; 1,665 initial baseline jobs remain tagged and suppressed. No historical Telegram notification replay was triggered.
+- Post-deploy latest source runs for Naukri and all seven newly added ATS collectors were successful with 0 new rows on these known boards (Naukri 287; Greenhouse 368; Ashby 826; Workday 20; SmartRecruiters 300; Workable 6; Keka 109; Darwinbox 36). Workday's NVIDIA collector still has an intentional 20-row page cap; do not describe that as full board coverage. LinkedIn's last recorded run was before the release and returned HTTP 429 with a persisted cooldown; respect it.
+- Ten legacy notification ledger rows remain `failed`; there are no pending/queued/sending rows. Do not silently replay those historical failures.
+
+### Application Tracker current truth
+
+- The server-owned Application Tracker is now deployed. The dashboard Applied view reads and mutates user-owned records; existing local browser records import idempotently on first authenticated page load. Stale old records stay in browser storage with a warning rather than being discarded.
+- User isolation, same-job independent applications, cross-owner 404, CSRF, status/notes CRUD, canonical rebuild reconciliation and legacy import passed the full local/CI suite. Production migration/table startup was validated on a production-data copy and then on production itself. A direct authenticated two-user production canary was not performed because remote synthetic user creation was blocked by the execution safety gate; no test users or application rows were created in production.
+
+### Remaining first-login / sign-up action — owner must perform
+
+- Production still has **0 users and 0 admins**. Admin email to provision: `bawejaavichal01@gmail.com`.
+- Secure interactive bootstrap command (run on the VM/Termalin SSH terminal; enter the password only at the hidden prompt):
+
+  `sudo docker exec -it v2-radar-1 python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com`
+
+- This command is one-time only and uses Argon2id. First admin gets the existing global candidate preferences copied exactly once into their user preference row. It does not change global source flags, scheduler intervals, notification preferences, provider allowlists or board registry. Do not put the password in shell history, code or docs.
+- The agent's remote admin creation attempt was blocked by execution safety. No admin account/password has been created. The user must run the command interactively; then log in using the password they entered. After login, verify `/api/auth/me`, `/api/preferences`, `/api/config`, `/api/discovery/boards`, and the Applied view.
+- Google OAuth remains disabled: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URI` are not configured; the real public HTTPS origin is not yet supplied in `JOB_BEEPER_PUBLIC_ORIGIN`. Owner must create a Google OAuth web client, register `https://<real-public-host>/api/auth/google/callback`, and securely provide the ID/secret. OAuth should create normal member accounts only, never admins. The existing Google button remains hidden until configuration is valid.
+- Per-user Telegram linking remains disabled: bot username, webhook secret and public webhook route are absent. Global legacy bot token/chat ID remain configured and global notifications remain enabled. Do not confuse the two; member Telegram must be separately configured and opted into.
+- Private Termalin dashboard link: `https://termal.in/account#open-site=54768be5-95ea-4d86-9360-96d0c38c2843`. Open it, then use the admin password created with the interactive command above.
+
+### Next priorities
+
+1. Owner provisions first admin and confirms the dashboard over HTTPS.
+2. Confirm real public HTTPS origin; configure Google OAuth only after owner supplies client credentials. Do not weaken Secure cookies.
+3. Configure per-user Telegram webhook/bot username only after HTTPS route and secret are ready; link owner's private chat and explicitly opt in.
+4. Verify Applied migration from the owner's browser localStorage after first login, checking skipped records retain browser backup.
+5. Continue source soak, preserve LinkedIn cooldown, then improve Workday pagination beyond the current 20-row cap after safe live endpoint tests.
+6. Next product phase: resume vault/factual tailoring, then application answer bank, then referral and follow-up workflows. Keep auto-submit disabled.

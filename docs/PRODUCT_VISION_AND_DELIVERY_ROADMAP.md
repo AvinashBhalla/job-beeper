@@ -256,3 +256,9 @@ The current feature branch adds per-user server-owned application records and th
 
 - PR #55 exact-head CI passed and the local full V2 suite passed 400 tests. The production-data copy canary started successfully with collectors/notifications off; schema created, health/dashboard 200, unauthenticated application API 401, DB counts preserved and SQLite integrity `ok`.
 - A dedicated two-synthetic-user canary API smoke was blocked by the remote execution safety gate. Matching owner-isolation/CRUD tests passed in local and GitHub suites. PR #55 is still open/not deployed; do not promote without an approved release decision and a documented way to complete or waive that canary smoke.
+
+### 2026-11-09 — P0.5 tracker released
+
+- PR #55 is merged and production image `job-radar-prod-canary:6e5becb` is live. The Applied tracker is now server-owned and per-user, with idempotent localStorage import and canonical dedupe reconciliation. Local and exact-head CI passed 400 tests; production table migration/data integrity/auth boundary verified.
+- Production currently has zero accounts. Owner must run the secure interactive first-admin CLI command documented in `JOB_RADAR_HANDOVER.md` before signing in. Google OAuth and per-user Telegram need owner-supplied public HTTPS routing and credentials; they remain disabled.
+- Next priorities: finish owner onboarding, verify legacy Applied import in the owner browser, source soak/Workday page depth, then resume vault/factual tailoring and answer bank.

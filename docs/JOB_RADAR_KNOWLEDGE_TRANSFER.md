@@ -3510,3 +3510,14 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Exact-head Docker image `job-radar-apps-canary:dd89a02` was started on disposable port 8013 with a fresh production DB copy and all sources/notifications disabled. Health/dashboard 200; anonymous applications API 401; new table present; counts preserved (22,721 jobs / 22,409 canonical / 10 boards); foreign keys clear; integrity `ok`.
 - Snapshot/hash and config hash are in the latest P0.5 section of `JOB_RADAR_HANDOVER.md`. Canary container/network removed. Production stays at image `job-radar-prod-canary:00820f0`, unchanged.
 - Tool execution safety blocked creation of synthetic canary user accounts, so no live two-user API smoke was possible. Equivalent two-user/owner-scope/CRUD/CSRF tests passed locally and in exact GitHub CI. Do not claim two-user canary is done or bypass the guard. PR #55 remains open and undeployed until an approved test path/release decision.
+
+
+## 2026-11-09 — Application Tracker deployed; first admin still manual
+
+- PR #55 merged as `6e5becbde4b07e48dc55ae765385dd7c68aa65cf`; final PR-head GitHub CI `42517201622` passed. Local full V2 suite passed 400 tests.
+- Production now runs `job-radar-prod-canary:6e5becb` on the original external `v2_radar-data` volume. Fresh online pre-deploy backup and SHA-256 details are in the latest P0.5 section in `JOB_RADAR_HANDOVER.md`. Health/dashboard 200, anonymous `/api/applications` 401, container restart count 0, SQLite integrity `ok`.
+- `user_applications` table created. Jobs 22,721, canonical 22,409, registry boards 10, users 0, application rows 0. Config v15, notifications enabled, all 9 enabled sources unchanged; baseline jobs 1,665 remain suppressed. Seven new ATS collectors and Naukri last runs succeeded with 0 new rows. LinkedIn remains in persisted 429 cooldown.
+- Tracker is server-owned now. Local/CI covers two-user isolation/CRUD/CSRF/dedupe rebuild/legacy browser import. Production-data canary checked migration/data integrity/auth boundary; the direct two-synthetic-user API smoke was blocked by safety gate, so no synthetic or real user was created. Do not claim production two-user traffic test was run.
+- First production admin still needs owner to run secure interactive command: `sudo docker exec -it v2-radar-1 python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com`. No account/password exists yet. First admin receives preserved global preferences once.
+- Google OAuth and per-user Telegram remain disabled until owner provides actual public HTTPS origin and OAuth/client/webhook credentials. Global legacy Telegram remains configured.
+- Private Termalin dashboard: `https://termal.in/account#open-site=54768be5-95ea-4d86-9360-96d0c38c2843`.
