@@ -57,3 +57,18 @@ The fresh authorization, navigation, telemetry, API-status, responsive-layout, a
 2. Verify bottom-navigation occlusion at 390×844, 375×812, and 320×740 using stable element rectangles plus hit-testing at the bottom of the content area. Record actual measurements and screenshots; do not infer PASS from viewport-width checks.
 3. Run a separately scoped, controlled CSRF/session mutation test only against the isolated synthetic QA instance, or explicitly retain these checks as release UNKNOWN. Do not run mutation tests against shared dev or production.
 4. Keep PR #51 draft and do not promote to shared dev until the evidence gates, CI for the final code head, and explicit owner approval are satisfied.
+
+## Addendum — final visual evidence follow-up (2026-11-08)
+
+A second read-only browser pass captured the navigation geometry and hit-testing outcomes. The detailed report is `docs/QA/desktop-final-visual-evidence-2026-11-08.md`.
+
+- Member/admin at 390×844: bottom navigation PASS; the final “Mark Applied” control hit-tests to its `SPAN` descendant.
+- Member/admin at 375×812: bottom navigation PASS; hit-testing resolves to the intended `SPAN` descendant.
+- Member at 320×740: **FAIL**; final control hit-test resolves to the “Newest First” button.
+- Admin at 320×740: **FAIL**; final control hit-test resolves to `.feed-status-strip`.
+- The bottom bar is 56px high and begins at y=684 on 320×740; both reported final-control rectangles are above it. Do not attribute the mismatch to the bottom bar without further evidence.
+- The new report does not include hit-test x/y coordinates, full `elementsFromPoint()` stack, or bounds/CSS of the returned element. Exact root cause remains unconfirmed; collect these before applying a code fix.
+- Screenshot export remains **BLOCKED**. The browser returned in-memory `Uint8Array` screenshot bytes but no filesystem export path. No PNG files exist in the requested directory.
+- Prior QA-001, responsive metric-layout and console results remain PASS; manual CSRF/session mutation checks remain UNKNOWN.
+
+**Disposition:** the 320px interaction criterion is now FAIL for both roles. Candidate acceptance remains blocked. No code, runtime, database, configuration, or deployment state was changed during this browser follow-up.
