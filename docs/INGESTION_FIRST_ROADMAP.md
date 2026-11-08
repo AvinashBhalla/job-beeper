@@ -81,3 +81,9 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - The production DB has not yet been migrated to request-level telemetry, so the 429 counts come from log analysis, not /api/source-status.
 - Code-only backoff correction is prepared on fix/linkedin-429-longer-backoff-20261108: four-hour maximum fallback and 24-hour clean-window reset; honor any larger Retry-After; no increase in request rate/volume. Focused tests 5 passed and full V2 suite 209 passed locally. Run GitHub CI before merging. No deploy.
 - See docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md for evidence, denominator limitations and the production rollout boundary.
+## 2026-11-08 — Durable LinkedIn 429 breaker state
+
+- After merging longer conservative cooldown policy (PR #48), a separate follow-up adds additive source_runs.rate_limit_detected_at and startup restore of recent LinkedIn 429 events, remaining cooldown and the 24-hour escalation streak.
+- Cooldown restoration is derived only from persisted LinkedIn HTTP 429 rows, keeps retry-after and applied cooldown, and supports old rows by using finished_at if the new detection timestamp is NULL.
+- Focused persistence tests: 9 passed; full V2 suite: **215 passed** locally. GitHub CI required before merge. This remains code-only, not deployed.
+- First production deployment limitation: the current live source_runs table has no HTTP status history, so old 429s visible only in logs cannot be backfilled. The first deploy starts with empty DB-backed breaker history and will persist new 429s going forward.

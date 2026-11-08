@@ -814,6 +814,7 @@ def init_db() -> None:
             http_status INTEGER,
             retry_after_seconds REAL,
             cooldown_seconds INTEGER,
+            rate_limit_detected_at TEXT,
             requests_attempted INTEGER,
             responses_received INTEGER,
             request_exceptions INTEGER,
@@ -873,7 +874,12 @@ def init_db() -> None:
         _ensure_column(conn, "source_runs", "http_status", "INTEGER")
         _ensure_column(conn, "source_runs", "retry_after_seconds", "REAL")
         _ensure_column(conn, "source_runs", "cooldown_seconds", "INTEGER")
+        _ensure_column(conn, "source_runs", "rate_limit_detected_at", "TEXT")
         _ensure_column(conn, "source_runs", "requests_attempted", "INTEGER")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_source_runs_linkedin_429 "
+            "ON source_runs(source, http_status, rate_limit_detected_at)"
+        )
         _ensure_column(conn, "source_runs", "responses_received", "INTEGER")
         _ensure_column(conn, "source_runs", "request_exceptions", "INTEGER")
         _ensure_column(conn, "source_runs", "http_2xx", "INTEGER")
@@ -1667,6 +1673,7 @@ def record_run(
     http_status: int | None = None,
     retry_after_seconds: float | None = None,
     cooldown_seconds: int | None = None,
+    rate_limit_detected_at: str | None = None,
     request_metrics: dict[str, Any] | None = None,
 ) -> None:
     run_id = run_id or uuid.uuid4().hex
@@ -1688,17 +1695,97 @@ def record_run(
             INSERT INTO source_runs(
                 source, started_at, finished_at, jobs_seen, new_jobs, error,
                 run_id, outcome, duration_seconds, error_type, http_status,
-                retry_after_seconds, cooldown_seconds, {columns}, http_status_counts_json
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,{placeholders},?)
+                retry_after_seconds, cooldown_seconds, rate_limit_detected_at,
+                {columns}, http_status_counts_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,{placeholders},?)
             """,
             (
                 source, iso(started_at), iso(finished), jobs_seen, new_jobs, error,
                 run_id, outcome, max(0.0, float(duration_seconds)), error_type,
                 http_status, retry_after_seconds, cooldown_seconds,
-                *metric_values, status_counts_json,
+                rate_limit_detected_at, *metric_values, status_counts_json,
             ),
         )
         conn.commit()
+
+
+def restore_linkedin_rate_limit_state() -> None:
+    """Restore the LinkedIn 429 breaker from recent persisted source runs.
+
+    The cooldown clock is monotonic within one process, so persist the UTC
+    detection timestamp and reconstruct the remaining delay on startup.
+    """
+    global linkedin_last_rate_limit_monotonic
+    global linkedin_rate_limit_streak, linkedin_rate_limited_until_monotonic
+
+    cutoff = iso(now() - dt.timedelta(
+        seconds=LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS
+    ))
+    try:
+        with db_lock, sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                """
+                SELECT started_at, finished_at, rate_limit_detected_at,
+                       cooldown_seconds, retry_after_seconds
+                FROM source_runs
+                WHERE source='linkedin'
+                  AND http_status=429
+                  AND COALESCE(rate_limit_detected_at, finished_at) >= ?
+                ORDER BY COALESCE(rate_limit_detected_at, finished_at) DESC, id DESC
+                """,
+                (cutoff,),
+            ).fetchall()
+    except sqlite3.Error:
+        log.exception("linkedin: unable to restore persisted rate-limit state")
+        return
+
+    runtime = source_state.setdefault("linkedin", {})
+    if not rows:
+        linkedin_last_rate_limit_monotonic = 0.0
+        linkedin_rate_limit_streak = 0
+        linkedin_rate_limited_until_monotonic = 0.0
+        for key in (
+            "rate_limited_until",
+            "rate_limit_cooldown_seconds",
+            "rate_limit_retry_after_seconds",
+            "rate_limit_detected_at",
+        ):
+            runtime.pop(key, None)
+        return
+
+    latest_detected_at = rows[0][2] or rows[0][1]
+    detected_at = parse_relative(latest_detected_at)
+    if detected_at is None:
+        log.warning("linkedin: skipped invalid persisted rate-limit timestamp")
+        return
+
+    elapsed_seconds = max(0.0, (now() - detected_at).total_seconds())
+    cooldown_seconds = max(0, int(rows[0][3] or 0))
+    remaining_seconds = max(0.0, cooldown_seconds - elapsed_seconds)
+    monotonic_now = time.monotonic()
+
+    linkedin_rate_limit_streak = len(rows)
+    linkedin_last_rate_limit_monotonic = monotonic_now - elapsed_seconds
+    linkedin_rate_limited_until_monotonic = monotonic_now + remaining_seconds
+
+    runtime["rate_limit_detected_at"] = iso(detected_at)
+    runtime["rate_limit_cooldown_seconds"] = cooldown_seconds
+    runtime["rate_limit_retry_after_seconds"] = rows[0][4]
+    if remaining_seconds > 0:
+        runtime["rate_limited_until"] = iso(
+            now() + dt.timedelta(seconds=remaining_seconds)
+        )
+        log.warning(
+            "linkedin: restored persisted 429 cooldown; streak=%s remaining=%ss",
+            linkedin_rate_limit_streak,
+            int(remaining_seconds),
+        )
+    else:
+        runtime.pop("rate_limited_until", None)
+        log.info(
+            "linkedin: restored 429 streak from recent history; streak=%s",
+            linkedin_rate_limit_streak,
+        )
 
 
 def normalize_phrase(value: str) -> str:
@@ -3445,6 +3532,10 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             http_status=http_status,
             retry_after_seconds=retry_after_seconds,
             cooldown_seconds=cooldown_seconds,
+            rate_limit_detected_at=(
+                current_runtime.get("rate_limit_detected_at")
+                if rate_limit_seen else None
+            ),
             request_metrics=request_metrics,
         )
         runtime = dict(source_state.get(source, {}))
@@ -3519,6 +3610,10 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             http_status=metadata["http_status"],
             retry_after_seconds=retry_after_seconds,
             cooldown_seconds=cooldown_seconds,
+            rate_limit_detected_at=(
+                source_state.get(source, {}).get("rate_limit_detected_at")
+                if source == "linkedin" and metadata["rate_limited"] else None
+            ),
             request_metrics=request_metrics,
         )
         runtime = dict(source_state.get(source, {}))
@@ -3605,6 +3700,7 @@ async def scheduler() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     init_db()
+    restore_linkedin_rate_limit_state()
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)

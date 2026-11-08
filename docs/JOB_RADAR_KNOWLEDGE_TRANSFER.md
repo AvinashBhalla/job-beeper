@@ -3092,3 +3092,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Focused backoff tests: 5 passed. Full V2 suite: 209 passed locally in 76.9s; compilation and diff check passed. GitHub CI still required. No production or shared-dev deployment was performed.
 - Detailed evidence, exact counters and caveats: docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md.
 - Remaining caveat: the LinkedIn cooldown streak remains in-memory and resets after container restart. A persistent breaker state can be considered separately after the backoff PR is validated.
+## 2026-11-08 — LinkedIn cooldown persistence follow-up
+
+- Longer conservative backoff is merged in V2 as PR #48 (`5b4b2fa`): 4-hour maximum fallback, 24-hour reset window, honor larger Retry-After.
+- Persistence follow-up branch `fix/linkedin-cooldown-persistence-20261108` writes `rate_limit_detected_at` to additive source_runs and restores active cooldown + recent streak at startup. Focused 9 tests passed; full V2 suite 215 passed locally; CI pending.
+- Production deployment caveat: legacy live DB has no structured HTTP status history. New column migration cannot reconstruct the 27 historical log-only 429 events, so first rollout starts without old streak; future 429 rows will survive restarts.

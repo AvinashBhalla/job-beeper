@@ -3253,6 +3253,7 @@ class SourceStatusPersistenceTests(unittest.TestCase):
                             http_status INTEGER,
                             retry_after_seconds REAL,
                         cooldown_seconds INTEGER,
+                        rate_limit_detected_at TEXT,
                         requests_attempted INTEGER,
                         responses_received INTEGER,
                         request_exceptions INTEGER,
@@ -3423,6 +3424,7 @@ class SourceLatencySummaryTests(unittest.TestCase):
     def test_init_db_migrates_legacy_source_run_table(self):
         with TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "jobs.db"
+            detected_at = radar.now() - radar.dt.timedelta(minutes=2)
             with sqlite3.connect(db_path) as conn:
                 conn.execute("""
                     CREATE TABLE source_runs (
@@ -3432,31 +3434,64 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         finished_at TEXT NOT NULL,
                         jobs_seen INTEGER NOT NULL,
                         new_jobs INTEGER NOT NULL,
-                        error TEXT
+                        error TEXT,
+                        http_status INTEGER,
+                        retry_after_seconds REAL,
+                        cooldown_seconds INTEGER
                     )
                 """)
                 conn.execute(
                     """INSERT INTO source_runs
-                       (source, started_at, finished_at, jobs_seen, new_jobs, error)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    ("naukri", "2026-11-05T10:00:00+00:00", "2026-11-05T10:01:00+00:00", 12, 3, None),
+                       (source, started_at, finished_at, jobs_seen, new_jobs,
+                        error, http_status, retry_after_seconds, cooldown_seconds)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        "linkedin",
+                        radar.iso(detected_at - radar.dt.timedelta(seconds=2)),
+                        radar.iso(detected_at),
+                        0,
+                        0,
+                        "HTTP 429",
+                        429,
+                        900.0,
+                        900,
+                    ),
                 )
-            with patch.object(radar, "DB_PATH", db_path):
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = db_path
                 radar.init_db()
                 with sqlite3.connect(db_path) as conn:
                     columns = {
                         row[1] for row in conn.execute("PRAGMA table_info(source_runs)")
                     }
+                    indexes = {
+                        row[1] for row in conn.execute("PRAGMA index_list(source_runs)")
+                    }
                     preserved = conn.execute(
-                        "SELECT source, jobs_seen, new_jobs, error FROM source_runs"
+                        "SELECT source, jobs_seen, new_jobs, error, http_status, cooldown_seconds "
+                        "FROM source_runs"
                     ).fetchone()
-            self.assertTrue({
-                "run_id", "outcome", "duration_seconds", "error_type",
-                "http_status", "retry_after_seconds", "cooldown_seconds",
-                "requests_attempted", "http_status_counts_json", "pages_attempted",
-                "boards_attempted", "request_duration_ms_total",
-            }.issubset(columns))
-            self.assertEqual(preserved, ("naukri", 12, 3, None))
+                self.assertTrue({
+                    "run_id", "outcome", "duration_seconds", "error_type",
+                    "http_status", "retry_after_seconds", "cooldown_seconds",
+                    "rate_limit_detected_at", "requests_attempted",
+                    "http_status_counts_json", "pages_attempted", "boards_attempted",
+                    "request_duration_ms_total",
+                }.issubset(columns))
+                self.assertEqual(
+                    preserved,
+                    ("linkedin", 0, 0, "HTTP 429", 429, 900),
+                )
+                self.assertIn("idx_source_runs_linkedin_429", indexes)
+                with patch.object(radar.time, "monotonic", return_value=60000.0):
+                    radar.restore_linkedin_rate_limit_state()
+                    self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+                    remaining = radar._linkedin_cooldown_remaining()
+                    self.assertGreater(remaining, 770)
+                    self.assertLess(remaining, 780)
+            finally:
+                radar.DB_PATH = original_db
 
     def test_run_source_records_429_caught_inside_collector_as_partial_success(self):
         with TemporaryDirectory() as tmp:
@@ -3478,6 +3513,7 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         http_status INTEGER,
                         retry_after_seconds REAL,
                         cooldown_seconds INTEGER,
+                        rate_limit_detected_at TEXT,
                         requests_attempted INTEGER,
                         responses_received INTEGER,
                         request_exceptions INTEGER,
@@ -3553,7 +3589,8 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         row = conn.execute(
                             """
                             SELECT jobs_seen, new_jobs, outcome, http_status,
-                                   retry_after_seconds, cooldown_seconds, error
+                                   retry_after_seconds, cooldown_seconds, error,
+                                   rate_limit_detected_at
                             FROM source_runs WHERE source='linkedin'
                             """
                         ).fetchone()
@@ -3562,6 +3599,11 @@ class SourceLatencySummaryTests(unittest.TestCase):
                 self.assertEqual(row[4], 600.0)
                 self.assertEqual(row[5], 600)
                 self.assertEqual(row[6], "HTTP 429")
+                self.assertIsNotNone(row[7])
+                self.assertEqual(
+                    row[7],
+                    runtime["rate_limit_detected_at"],
+                )
                 self.assertEqual(runtime["last_run_outcome"], "partial_rate_limited")
                 self.assertEqual(runtime["last_success"], "2026-11-05T09:00:00+00:00")
                 self.assertEqual(runtime["rate_limit_retry_after_seconds"], 600.0)
@@ -3595,6 +3637,7 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         http_status INTEGER,
                         retry_after_seconds REAL,
                         cooldown_seconds INTEGER,
+                        rate_limit_detected_at TEXT,
                         requests_attempted INTEGER,
                         responses_received INTEGER,
                         request_exceptions INTEGER,
@@ -3626,10 +3669,12 @@ class SourceLatencySummaryTests(unittest.TestCase):
             original_generation = radar.linkedin_rate_limit_generation
             try:
                 radar.linkedin_rate_limit_generation = 0
+                detected_at = radar.iso(radar.now() - radar.dt.timedelta(seconds=1))
                 source_runtime = {
                     "rate_limited_until": "2026-11-05T10:10:00+00:00",
                     "rate_limit_cooldown_seconds": 600,
                     "rate_limit_retry_after_seconds": 600.0,
+                    "rate_limit_detected_at": detected_at,
                 }
                 collectors = dict(radar.COLLECTORS)
                 collectors["linkedin"] = lambda _config: (_ for _ in ()).throw(error)
@@ -3644,7 +3689,8 @@ class SourceLatencySummaryTests(unittest.TestCase):
                         row = conn.execute(
                             """
                             SELECT error, run_id, outcome, duration_seconds, error_type,
-                                   http_status, retry_after_seconds, cooldown_seconds
+                                   http_status, retry_after_seconds, cooldown_seconds,
+                                   rate_limit_detected_at
                             FROM source_runs
                             WHERE source='linkedin'
                         """
@@ -3658,6 +3704,7 @@ class SourceLatencySummaryTests(unittest.TestCase):
                 self.assertEqual(row[5], 429)
                 self.assertEqual(row[6], 600.0)
                 self.assertEqual(row[7], 600)
+                self.assertEqual(row[8], detected_at)
                 self.assertNotIn("must-not-persist", row[0])
                 rate_limited_until = radar.parse_relative(runtime["rate_limited_until"])
                 remaining_seconds = (rate_limited_until - radar.now()).total_seconds()
@@ -3668,6 +3715,145 @@ class SourceLatencySummaryTests(unittest.TestCase):
                 self.assertEqual(runtime["run_id"], row[1])
             finally:
                 radar.linkedin_rate_limit_generation = original_generation
+
+
+class LinkedInCooldownPersistenceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.original_db = radar.DB_PATH
+        self.original_state = radar.source_state
+        self.original_rate_state = (
+            radar.linkedin_last_http_request_monotonic,
+            radar.linkedin_rate_limited_until_monotonic,
+            radar.linkedin_last_rate_limit_monotonic,
+            radar.linkedin_rate_limit_streak,
+            radar.linkedin_rate_limit_generation,
+        )
+        radar.DB_PATH = Path(self.temp_dir.name) / "jobs.db"
+        radar.source_state = {}
+        radar.linkedin_last_http_request_monotonic = 0.0
+        radar.linkedin_rate_limited_until_monotonic = 0.0
+        radar.linkedin_last_rate_limit_monotonic = 0.0
+        radar.linkedin_rate_limit_streak = 0
+        radar.linkedin_rate_limit_generation = 0
+        radar.init_db()
+        self.addCleanup(self._restore_globals)
+
+    def _restore_globals(self):
+        radar.DB_PATH = self.original_db
+        radar.source_state = self.original_state
+        (
+            radar.linkedin_last_http_request_monotonic,
+            radar.linkedin_rate_limited_until_monotonic,
+            radar.linkedin_last_rate_limit_monotonic,
+            radar.linkedin_rate_limit_streak,
+            radar.linkedin_rate_limit_generation,
+        ) = self.original_rate_state
+
+    def _record_429(self, detected_at, cooldown_seconds, retry_after_seconds=None):
+        finished = detected_at + radar.dt.timedelta(seconds=2)
+        radar.record_run(
+            "linkedin",
+            detected_at,
+            finished,
+            0,
+            0,
+            "HTTP 429",
+            outcome="rate_limited",
+            http_status=429,
+            retry_after_seconds=retry_after_seconds,
+            cooldown_seconds=cooldown_seconds,
+            rate_limit_detected_at=radar.iso(detected_at),
+            request_metrics={},
+        )
+
+    def test_record_run_persists_rate_limit_detection_timestamp(self):
+        detected_at = radar.now() - radar.dt.timedelta(minutes=3)
+        self._record_429(detected_at, 600, retry_after_seconds=900)
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT http_status, cooldown_seconds, retry_after_seconds, "
+                "rate_limit_detected_at FROM source_runs WHERE source='linkedin'"
+            ).fetchone()
+        self.assertEqual(row[0:3], (429, 600, 900))
+        self.assertEqual(row[3], radar.iso(detected_at))
+
+    def test_startup_restore_reconstructs_active_cooldown_and_streak(self):
+        current = radar.now()
+        self._record_429(current - radar.dt.timedelta(hours=3), 1200)
+        latest = current - radar.dt.timedelta(minutes=20)
+        self._record_429(latest, 3000, retry_after_seconds=3000)
+
+        with patch.object(radar.time, "monotonic", return_value=10000.0):
+            radar.restore_linkedin_rate_limit_state()
+            self.assertEqual(radar.linkedin_rate_limit_streak, 2)
+            remaining = radar._linkedin_cooldown_remaining()
+            self.assertGreater(remaining, 1790)
+            self.assertLess(remaining, 1800)
+            runtime = radar.source_state["linkedin"]
+            self.assertEqual(runtime["rate_limit_detected_at"], radar.iso(latest))
+            self.assertEqual(runtime["rate_limit_cooldown_seconds"], 3000)
+            self.assertEqual(runtime["rate_limit_retry_after_seconds"], 3000)
+            self.assertGreater(radar.parse_relative(runtime["rate_limited_until"]), radar.now())
+
+    def test_expired_cooldown_still_restores_escalation_until_24h_clean_window(self):
+        detected_at = radar.now() - radar.dt.timedelta(hours=3)
+        self._record_429(detected_at, 600)
+
+        with patch.object(radar.time, "monotonic", return_value=20000.0):
+            radar.restore_linkedin_rate_limit_state()
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+            self.assertEqual(radar._linkedin_cooldown_remaining(), 0)
+            response = type("Response", (), {"status_code": 429, "headers": {}})()
+            cooldown = radar._activate_linkedin_rate_limit(response)
+            self.assertEqual(radar.linkedin_rate_limit_streak, 2)
+            self.assertEqual(cooldown, 600)
+
+    def test_legacy_429_row_without_detection_column_uses_finished_at(self):
+        detected_at = radar.now() - radar.dt.timedelta(minutes=4)
+        radar.record_run(
+            "linkedin",
+            detected_at - radar.dt.timedelta(seconds=2),
+            detected_at,
+            0,
+            0,
+            "HTTP 429",
+            outcome="rate_limited",
+            http_status=429,
+            cooldown_seconds=900,
+        )
+        with patch.object(radar.time, "monotonic", return_value=30000.0):
+            radar.restore_linkedin_rate_limit_state()
+            self.assertEqual(radar.linkedin_rate_limit_streak, 1)
+            remaining = radar._linkedin_cooldown_remaining()
+            self.assertGreater(remaining, 650)
+            self.assertLess(remaining, 661)
+
+    def test_streak_is_cleared_after_a_full_24_hours_without_429(self):
+        old = radar.now() - radar.dt.timedelta(
+            seconds=radar.LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS + 1
+        )
+        self._record_429(old, 4 * 3600)
+        with patch.object(radar.time, "monotonic", return_value=50000.0):
+            radar.restore_linkedin_rate_limit_state()
+            self.assertEqual(radar.linkedin_rate_limit_streak, 0)
+            self.assertEqual(radar._linkedin_cooldown_remaining(), 0)
+            self.assertNotIn("rate_limited_until", radar.source_state["linkedin"])
+
+    def test_naukri_429_history_does_not_restore_linkedin_breaker(self):
+        detected_at = radar.now() - radar.dt.timedelta(minutes=1)
+        finished = detected_at + radar.dt.timedelta(seconds=1)
+        radar.record_run(
+            "naukri", detected_at, finished, 0, 0, "HTTP 429",
+            outcome="rate_limited", http_status=429,
+            cooldown_seconds=600,
+            rate_limit_detected_at=radar.iso(detected_at),
+        )
+        radar.restore_linkedin_rate_limit_state()
+        self.assertEqual(radar.linkedin_rate_limit_streak, 0)
+        self.assertEqual(radar._linkedin_cooldown_remaining(), 0)
 
 
 class SourceRegistryApiCoverageTests(unittest.TestCase):
@@ -3693,6 +3879,7 @@ class SourceRegistryApiCoverageTests(unittest.TestCase):
                             http_status INTEGER,
                             retry_after_seconds REAL,
                             cooldown_seconds INTEGER,
+                        rate_limit_detected_at TEXT,
                         requests_attempted INTEGER,
                         responses_received INTEGER,
                         request_exceptions INTEGER,
