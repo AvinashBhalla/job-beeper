@@ -3034,6 +3034,103 @@ class SourceRequestMetricsTests(unittest.TestCase):
                 radar.DB_PATH = original_db
 
 
+class InstahyreCollectorTests(unittest.TestCase):
+    class Response:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def test_current_objects_payload_maps_bengaluru_and_preserves_public_fields(self):
+        payload = {
+            "meta": {"next": None},
+            "objects": [{
+                "id": 445690,
+                "title": "Manager - Product Management - Technical",
+                "candidate_title": "Manager - Product Management - Technical",
+                "locations": "Bangalore",
+                "public_url": "https://www.instahyre.com/job-445690-product/",
+                "employer": {"company_name": "Simplotel"},
+                "keywords": ["Product", "Software", "Technology"],
+            }],
+        }
+        with patch.object(
+            radar, "_tracked_source_get", return_value=self.Response(payload)
+        ) as get:
+            jobs = radar.instahyre_collect({
+                "locations": ["Bengaluru, Karnataka, India", "Remote, India"],
+            })
+
+        self.assertEqual(get.call_count, 1)
+        self.assertEqual(get.call_args.kwargs["params"]["jobLocations"], "Bangalore")
+        self.assertEqual(get.call_args.kwargs["params"]["limit"], 35)
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["source"], "instahyre")
+        self.assertEqual(jobs[0]["source_job_id"], "445690")
+        self.assertEqual(jobs[0]["company"], "Simplotel")
+        self.assertEqual(jobs[0]["title"], "Manager - Product Management - Technical")
+        self.assertEqual(jobs[0]["location"], "Bangalore")
+        self.assertEqual(
+            jobs[0]["url"],
+            "https://www.instahyre.com/job-445690-product/",
+        )
+        self.assertEqual(
+            jobs[0]["description"],
+            "Keywords: Product, Software, Technology",
+        )
+
+    def test_current_feed_paginates_by_meta_next_and_deduplicates_ids(self):
+        first = {
+            "meta": {"next": "/api/v1/job_search?limit=35&offset=35"},
+            "objects": [
+                {"id": 1, "title": "Python Engineer", "employer": {"company_name": "One"}, "locations": "Bangalore"},
+                {"id": 2, "title": "React Engineer", "employer": {"company_name": "Two"}, "locations": "Pune"},
+            ],
+        }
+        second = {
+            "meta": {"next": None},
+            "objects": [
+                {"id": 2, "title": "React Engineer", "employer": {"company_name": "Two"}, "locations": "Pune"},
+                {"id": 3, "title": "Automation Engineer", "employer": {"company_name": "Three"}, "locations": "Delhi"},
+            ],
+        }
+        with patch.object(
+            radar,
+            "_tracked_source_get",
+            side_effect=[self.Response(first), self.Response(second)],
+        ) as get:
+            jobs = radar.instahyre_collect({"locations": ["Gurugram, Haryana, India"]})
+
+        self.assertEqual(get.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["params"]["offset"] for call in get.call_args_list],
+            [0, 35],
+        )
+        self.assertEqual(
+            [call.kwargs["params"]["jobLocations"] for call in get.call_args_list],
+            ["Gurgaon", "Gurgaon"],
+        )
+        self.assertEqual({job["source_job_id"] for job in jobs}, {"1", "2", "3"})
+
+    def test_location_aliases_match_instahyre_city_labels(self):
+        cases = {
+            "Bengaluru, Karnataka, India": "Bangalore",
+            "Gurugram, Haryana, India": "Gurgaon",
+            "Delhi, India": "Delhi / NCR",
+            "Remote, India": "Work From Home",
+        }
+        for configured, expected in cases.items():
+            with self.subTest(configured=configured):
+                self.assertEqual(
+                    radar._instahyre_search_location({"locations": [configured]}),
+                    expected,
+                )
+
+
 class NaukriRelayFreshnessTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
