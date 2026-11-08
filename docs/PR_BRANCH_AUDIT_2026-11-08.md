@@ -106,3 +106,11 @@ During a code-level integration review, a remaining cross-source notification ga
 - All member notification tests: **17 passed**. Full integration V2 suite: **336 passed** in **194.322 seconds**. Python compile and `git diff --check` passed.
 - This is a verified source-level fix; no real Telegram message or outbound Telegram request occurred. Lever remains disabled, all candidate QA collector switches remain off, and production/shared-dev are untouched.
 - This correction supersedes the earlier wording that the member queue was fully protected before this change. The newly inspected code path was not covered by the prior test.
+
+
+## Correction to per-user Lever baseline review — candidate head 9ac6fab
+
+- Earlier text in this audit/handover stated the per-user member notification path already checked the global canonical baseline suppression marker. Code inspection showed that statement was incorrect: it checked only `jobs.source_initial_baseline`.
+- Fixed member notification enqueue, claim/cancel and final send revalidation to also check `notification_ledger.baseline_suppressed=1`. This closes cross-source canonical cases where a Lever baseline item shares a canonical opportunity with an earlier row from another source.
+- Added three regression tests for canonical marker exclusion at enqueue, cancellation of a previously queued item, and final pre-send rejection. `test_user_notifications`: 17 passed. Full integration suite: 336 passed in 194.322s. No Telegram HTTP request occurred.
+- Code fix commit `08c256f` was replayed after the GitHub documentation commits and pushed at candidate head `9ac6fab`. No production/shared-dev deployment; Lever remains off.
