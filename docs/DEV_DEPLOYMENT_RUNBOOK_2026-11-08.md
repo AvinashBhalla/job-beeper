@@ -96,3 +96,33 @@ Full execution record: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`.
 
 **Handoff:** resume only from an existing Docker-authorized operator session. Take a fresh SQLite online backup from the live shared-dev volume immediately before promotion, preserve the current volume/compose/env/config/rollback image, keep Naukri-only ingestion and Telegram/Gemini off, recreate only shared dev, then verify and observe at least two Naukri cycles. Do not ask the user to paste credentials into chat.
 Additional check: the existing `job-radar-sqlite-snapshot.service` last succeeded at 02:45:43 UTC (dev snapshot integrity `ok`, 8,333 jobs then), which is too old for this promotion. A non-privileged `systemctl start --no-block` request was denied with `Interactive authentication required`; no new backup was created.
+
+## 2026-11-08 — Oracle VM sudo and candidate image access correction
+
+**This section supersedes the earlier assumption above that the connected `ubuntu` account could not use sudo.** The earlier checks tested Docker and systemd without sudo; they did not establish that the account lacked administrative authorization.
+
+The owner checked the existing SSH account on the Oracle Cloud VM with:
+
+```bash
+sudo -n -l
+```
+
+The host returned:
+
+```text
+User ubuntu may run the following commands on job-radar:
+    (ALL : ALL) ALL
+    (ALL) NOPASSWD: ALL
+```
+
+Therefore the existing SSH-key-only `ubuntu` login has full passwordless sudo authorization. A second SSH account or account password is not required for these privileged operations. The Docker socket is still not directly accessible to plain `ubuntu`; invoke Docker with `sudo` (for example, `sudo docker ps`, `sudo docker build ...`, and `sudo docker compose ...`). Do not change Docker socket permissions or add broad group access as a workaround.
+
+**Candidate image evidence supplied by the owner:** the host successfully returned the following from `sudo docker image inspect job-radar-dev-multitenant:cf778c1`:
+
+- Image tag: `job-radar-dev-multitenant:cf778c1`
+- Image ID: `sha256:843f86af0c40b1aab90d43b5d5bc15c0c1eac29aadc48e56eb580bb9dbbe866a`
+- Docker image Created timestamp: `2026-11-08T10:46:45.873218279Z` (UTC)
+
+This confirms that the tagged image is present and inspectable with sudo on the Oracle VM. Preserve this exact image ID/tag for verification. The image inspection alone is not a deployment: no evidence has yet been provided that the shared-dev container was recreated or that the candidate is serving on port 8001.
+
+**Next step:** use the same SSH session and prefix privileged operations with `sudo`. Before replacing the shared-dev container, create a fresh online SQLite snapshot immediately before promotion using the existing approved snapshot service, e.g. `sudo systemctl start --no-block job-radar-sqlite-snapshot.service`, then verify the service completion, snapshot timestamp/path/size and `PRAGMA integrity_check`. Do not reuse the older 09:44 UTC snapshot. After the fresh backup is verified, continue with the shared-dev-only runbook above. Keep production port 8000 untouched.
