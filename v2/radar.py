@@ -1933,7 +1933,7 @@ def suppress_activated_board_inventory(source: str) -> int:
         if not pending_ids:
             return 0
         rows = conn.execute(
-            "SELECT id,canonical_opportunity_id,source_details_json FROM jobs WHERE source=?",
+            "SELECT id,canonical_opportunity_id,source_details_json,first_seen_at FROM jobs WHERE source=?",
             (source,),
         ).fetchall()
         seen_registry_ids: set[int] = set()
@@ -1954,16 +1954,39 @@ def suppress_activated_board_inventory(source: str) -> int:
             conn.execute("UPDATE jobs SET source_initial_baseline=1 WHERE id=?", (job_id,))
             canonical_id = row["canonical_opportunity_id"]
             if canonical_id is not None:
-                conn.execute(
-                    """UPDATE notification_ledger
-                       SET status='suppressed',candidate_job_id=NULL,baseline_suppressed=1,
-                           next_attempt_at=NULL,claimed_at=NULL,updated_at=?,decision_reason_json=?
-                       WHERE canonical_opportunity_id=? AND candidate_job_id=?
-                         AND baseline_suppressed=0
-                         AND status IN ('pending','queued','suppressed')
-                         AND attempt_count=0 AND sent_at IS NULL""",
-                    (timestamp, reasons, int(canonical_id), job_id),
-                )
+                ledger = conn.execute(
+                    "SELECT candidate_job_id FROM notification_ledger WHERE canonical_opportunity_id=?",
+                    (int(canonical_id),),
+                ).fetchone()
+                if ledger is not None:
+                    candidate_job_id = ledger["candidate_job_id"]
+                    earlier_observation = conn.execute(
+                        """SELECT 1 FROM jobs
+                           WHERE canonical_opportunity_id=? AND id<>? AND first_seen_at<?
+                           LIMIT 1""",
+                        (int(canonical_id), job_id, row["first_seen_at"]),
+                    ).fetchone()
+                    # A ledger row is often created before matching chooses a
+                    # candidate. Suppress that null-candidate row only when this
+                    # activated board introduced the canonical opportunity.
+                    # Preserve an existing cross-source opportunity and any
+                    # already-selected candidate from another source.
+                    safe_to_suppress = (
+                        candidate_job_id == job_id
+                        or (candidate_job_id is None and earlier_observation is None)
+                    )
+                    if safe_to_suppress:
+                        conn.execute(
+                            """UPDATE notification_ledger
+                               SET status='suppressed',candidate_job_id=NULL,baseline_suppressed=1,
+                                   next_attempt_at=NULL,claimed_at=NULL,updated_at=?,decision_reason_json=?
+                               WHERE canonical_opportunity_id=?
+                                 AND (candidate_job_id IS NULL OR candidate_job_id=?)
+                                 AND baseline_suppressed=0
+                                 AND status IN ('pending','queued','suppressed')
+                                 AND attempt_count=0 AND sent_at IS NULL""",
+                            (timestamp, reasons, int(canonical_id), job_id),
+                        )
             conn.execute(
                 """UPDATE user_notification_ledger
                    SET status='cancelled',claimed_at=NULL,next_attempt_at=NULL,
