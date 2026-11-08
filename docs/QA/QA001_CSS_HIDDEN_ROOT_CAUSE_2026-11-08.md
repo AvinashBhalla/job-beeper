@@ -16,11 +16,28 @@ A dashboard contract regression test asserts:
 - `.nav-link-item` and `.mobile-tab-btn` still use flex layout;
 - the stylesheet explicitly enforces the hidden state with `display: none !important`.
 
-## Verification status
+## Verification status — browser retest completed 2026-11-08
 
-- Focused dashboard auth contract: 11 tests passed after the fix.
-- `git diff --check`: passed.
-- Browser retest on candidate port 18005: pending after updated candidate server is refreshed.
-- Required manual result: member desktop and mobile Source Health links absent; admin desktop and mobile links present; direct member `#sources` navigation remains redirected to Jobs.
+**QA-001: PASS** on candidate commit `cf778c1f1da33c773f820cafea991fb084c58da8`.
 
-Do not close QA-001 until that browser retest is recorded.
+- Member desktop: `#navSources`, `#sourcesSection`, and the mobile Source Health link had `display:none`, `hidden:true`, and zero-size geometry at 1536×900.
+- Member mobile: Source Health remained hidden at 390×844, 375×812, and 320×740; member nav exposed Jobs/Applied/Preferences/Account only.
+- Direct member `/dashboard/#sources` navigation settled at `/dashboard/#jobs`; Jobs active, Sources inactive, no flash observed.
+- Member telemetry: no `/api/source-status`, `/api/source-status/summary`, or `/api/latency-summary` requests during a 35-second CDP capture.
+- Member direct GETs to all three source-health endpoints returned 403.
+- Admin desktop: Source Health nav and section visible at 1536×900.
+- Admin mobile: Source Health nav and section visible at 390×844, 375×812, and 320×740.
+- Admin direct GETs to all three source-health endpoints returned 200.
+
+The browser report and complete result matrix are archived in `docs/QA/desktop-final-candidate-verification-2026-11-08.md`.
+
+## Related QA-002 / QA-003 status
+
+- Responsive metrics/layout: PASS for member and admin at 1536×900, 1280×800, 768×1024, 390×844, 375×812, and 320×740. No horizontal overflow or metric overlap; at 320px, “discovered” wraps to a second line but remains visible.
+- Mobile bottom-navigation occlusion: BLOCKED. The browser pass could not retain a reliable obstruction rectangle or exported screenshot for archival verification.
+- Screenshot artifact delivery: BLOCKED. Inline captures were taken, but no files could be exported from the browser control surface.
+- Console smoke: PASS; no console errors or warnings observed in either context.
+- Manual CSRF mutation tests: UNKNOWN; excluded by read-only scope.
+- Session/logout/expiry mutation tests: UNKNOWN; excluded by read-only scope.
+
+The report was performed against the synthetic-only candidate on port 18005. It did not change application code, configuration, database, shared dev, or production. Do not interpret the blocked evidence items as application defects; they are incomplete verification artifacts. Do not interpret UNKNOWN security checks as PASS.
