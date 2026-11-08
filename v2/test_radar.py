@@ -4258,5 +4258,442 @@ class InitialSourceBaselineMarkerTests(unittest.TestCase):
 
 
 
+
+
+class LeverCollectorTests(unittest.TestCase):
+    def _response(self, payload, status_code=200):
+        class Response:
+            def __init__(self, value, status):
+                self.value = value
+                self.status_code = status
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise radar.requests.HTTPError(f"HTTP {self.status_code}")
+
+            def json(self):
+                return self.value
+
+        return Response(payload, status_code)
+
+    def _job(self, **overrides):
+        item = {
+            "id": "posting-123",
+            "text": "Software Engineer",
+            "categories": {
+                "location": "Bengaluru, India",
+                "allLocations": ["Bengaluru, India", "Remote - India"],
+                "team": "Engineering",
+                "department": "Product",
+                "commitment": "Fulltime",
+                "level": "Mid-Level",
+            },
+            "hostedUrl": "https://jobs.lever.co/example/posting-123",
+            "applyUrl": "https://jobs.lever.co/example/posting-123/apply",
+            "descriptionPlain": "Build Python APIs and distributed systems.",
+            "workplaceType": "hybrid",
+            "salaryRange": {"currency": "INR", "min": 1000000, "max": 1800000},
+            "createdAt": 1790000000000,
+        }
+        item.update(overrides)
+        return item
+
+    def _collect_with_metrics(self, config, side_effect):
+        radar._begin_source_run_metrics("lever")
+        try:
+            with patch.object(radar.requests, "get", side_effect=side_effect) as request:
+                jobs = radar.lever_collect(config)
+            metrics = radar._finish_source_run_metrics("lever")
+            return jobs, metrics, request
+        except Exception:
+            radar._finish_source_run_metrics("lever")
+            raise
+
+    def test_public_global_board_normalizes_documented_fields_and_keeps_timestamp_unknown(self):
+        config = {"lever_boards": [{"site": "example", "company": "Example Labs"}]}
+        jobs, metrics, request = self._collect_with_metrics(
+            config,
+            lambda url, **kwargs: self._response([self._job()]),
+        )
+
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        self.assertEqual(job["source"], "lever")
+        self.assertEqual(job["source_job_id"], "lever-global-example-posting-123")
+        self.assertEqual(job["company"], "Example Labs")
+        self.assertEqual(job["title"], "Software Engineer")
+        self.assertEqual(job["location"], "Bengaluru, India")
+        self.assertEqual(job["url"], "https://jobs.lever.co/example/posting-123")
+        self.assertIn("Build Python APIs", job["description"])
+        self.assertIn("Team: Engineering", job["description"])
+        self.assertIn("Workplace type: hybrid", job["description"])
+        self.assertEqual(job["source_details"]["salary_range"]["currency"], "INR")
+        self.assertIsNone(job["source_posted_at"])
+        self.assertEqual(job["posted_precision"], "unknown")
+        self.assertIsNone(job["discovery_latency_seconds"])
+
+        args, kwargs = request.call_args
+        self.assertEqual(args[0], "https://api.lever.co/v0/postings/example")
+        self.assertEqual(kwargs["params"], {"mode": "json", "limit": 100, "skip": 0})
+        self.assertEqual(kwargs["timeout"], 20)
+        self.assertEqual(kwargs["headers"]["Accept"], "application/json")
+        self.assertNotIn("Authorization", kwargs["headers"])
+        self.assertEqual(metrics["pages_attempted"], 1)
+        self.assertEqual(metrics["pages_succeeded"], 1)
+        self.assertEqual(metrics["boards_attempted"], 1)
+        self.assertEqual(metrics["boards_succeeded"], 1)
+
+    def test_eu_instance_uses_eu_api_and_hosted_domain(self):
+        item = self._job(hostedUrl="https://jobs.eu.lever.co/example/posting-123")
+        jobs, _, request = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example EU", "instance": "eu"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(request.call_args.args[0], "https://api.eu.lever.co/v0/postings/example")
+        self.assertEqual(jobs[0]["source_job_id"], "lever-eu-example-posting-123")
+        self.assertEqual(jobs[0]["url"], "https://jobs.eu.lever.co/example/posting-123")
+
+    def test_paginates_until_a_short_page_and_deduplicates_ids(self):
+        first_page = [self._job(id=f"posting-{i}") for i in range(100)]
+        second_page = [self._job(id="posting-100"), self._job(id="posting-100")]
+        def get(url, **kwargs):
+            return self._response(first_page if kwargs["params"]["skip"] == 0 else second_page)
+
+        jobs, metrics, request = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            get,
+        )
+        self.assertEqual(len(jobs), 101)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["params"]["skip"] for call in request.call_args_list],
+            [0, 100],
+        )
+        self.assertEqual(metrics["pages_attempted"], 2)
+        self.assertEqual(metrics["pages_succeeded"], 2)
+        self.assertEqual(metrics["pages_failed"], 0)
+
+    def test_partial_page_failure_retains_previous_page_jobs_and_reports_page_failure(self):
+        first_page = [self._job(id=f"posting-{i}") for i in range(100)]
+        def get(url, **kwargs):
+            if kwargs["params"]["skip"] == 0:
+                return self._response(first_page)
+            raise radar.requests.Timeout("simulated page timeout")
+
+        jobs, metrics, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            get,
+        )
+        self.assertEqual(len(jobs), 100)
+        self.assertEqual(metrics["pages_attempted"], 2)
+        self.assertEqual(metrics["pages_succeeded"], 1)
+        self.assertEqual(metrics["pages_failed"], 1)
+        self.assertEqual(metrics["boards_succeeded"], 1)
+        self.assertEqual(metrics["boards_failed"], 0)
+
+    def test_failed_board_does_not_discard_successful_board(self):
+        def get(url, **kwargs):
+            if "/bad" in url:
+                raise radar.requests.HTTPError("404 board not found")
+            return self._response([self._job(id="good-posting")])
+
+        jobs, metrics, _ = self._collect_with_metrics(
+            {"lever_boards": [
+                {"site": "bad", "company": "Bad Board"},
+                {"site": "good", "company": "Good Board"},
+            ]},
+            get,
+        )
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["company"], "Good Board")
+        self.assertEqual(jobs[0]["source_job_id"], "lever-global-good-good-posting")
+        self.assertEqual(metrics["boards_attempted"], 2)
+        self.assertEqual(metrics["boards_succeeded"], 1)
+        self.assertEqual(metrics["boards_failed"], 1)
+
+    def test_rejects_malformed_response_when_all_boards_fail(self):
+        with self.assertRaisesRegex(RuntimeError, "All configured Lever boards failed"):
+            self._collect_with_metrics(
+                {"lever_boards": [{"site": "bad", "company": "Bad Board"}]},
+                lambda url, **kwargs: self._response({"jobs": []}),
+            )
+
+    def test_untrusted_hosted_url_is_replaced_with_canonical_lever_url(self):
+        item = self._job(hostedUrl="https://attacker.example/collect")
+        jobs, _, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(jobs[0]["url"], "https://jobs.lever.co/example/posting-123")
+
+    def test_pagination_is_bounded_to_five_full_pages_per_board(self):
+        def get(url, **kwargs):
+            page_start = kwargs["params"]["skip"]
+            full_page = [
+                self._job(id=f"posting-{page_start + index}")
+                for index in range(radar.LEVER_PAGE_SIZE)
+            ]
+            return self._response(full_page)
+
+        jobs, metrics, request = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            get,
+        )
+        self.assertEqual(request.call_count, radar.LEVER_MAX_PAGES_PER_BOARD)
+        self.assertEqual(len(jobs), radar.LEVER_PAGE_SIZE * radar.LEVER_MAX_PAGES_PER_BOARD)
+        self.assertEqual(metrics["pages_attempted"], radar.LEVER_MAX_PAGES_PER_BOARD)
+        self.assertEqual(metrics["pages_succeeded"], radar.LEVER_MAX_PAGES_PER_BOARD)
+
+    def test_unsafe_posting_id_is_skipped_without_url_construction(self):
+        item = self._job(id="../other-company/secret")
+        jobs, _, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(jobs, [])
+
+    def test_hosted_url_path_traversal_falls_back_to_safe_canonical_url(self):
+        item = self._job(hostedUrl="https://jobs.lever.co/example/../other-company/posting-123")
+        jobs, _, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(jobs[0]["url"], "https://jobs.lever.co/example/posting-123")
+
+    def test_no_public_boards_configured_is_a_clear_source_error(self):
+        with self.assertRaisesRegex(RuntimeError, "no public lever_boards"):
+            radar.lever_collect({"lever_boards": []})
+
+
+class LeverInitialSnapshotBaselineTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.original_db = radar.DB_PATH
+        radar.DB_PATH = Path(self.temp_dir.name) / "jobs.db"
+        self.addCleanup(setattr, radar, "DB_PATH", self.original_db)
+        radar.init_db()
+        self.config = {
+            **BASE_CONFIG,
+            "require_explicit_experience_for_alerts": False,
+            "notifications_enabled": True,
+        }
+
+    def _job(self, source_id):
+        return radar.normalize_job(
+            "lever",
+            source_id,
+            "Example Labs",
+            "Software Engineer",
+            "Bengaluru, India",
+            f"https://jobs.lever.co/example/{source_id}",
+            None,
+            "unknown",
+            "Python backend APIs. Requires 2 years of professional software engineering experience.",
+        )
+
+    def _ledger_rows(self):
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            return conn.execute(
+                "SELECT nl.canonical_opportunity_id, nl.status, nl.baseline_suppressed, "
+                "j.source, j.source_job_id "
+                "FROM notification_ledger nl "
+                "JOIN jobs j ON j.canonical_opportunity_id=nl.canonical_opportunity_id "
+                "ORDER BY j.source_job_id"
+            ).fetchall()
+
+    def _record(self, started_at, outcome):
+        radar.record_run(
+            "lever",
+            started_at,
+            radar.now(),
+            1,
+            1,
+            "partial source scan" if outcome != "success" else None,
+            run_id=f"lever-{outcome}-{started_at.timestamp()}",
+            outcome=outcome,
+            duration_seconds=1.0,
+        )
+
+    def test_first_inventory_and_partial_runs_are_durable_baseline_not_alerts(self):
+        first_started = radar.now() - radar.dt.timedelta(seconds=2)
+        radar.upsert_jobs([self._job("posting-one")], self.config)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", first_started),
+            1,
+        )
+        radar.refresh_job_evaluations(self.config)
+        radar.refresh_notification_decisions(self.config)
+        rows = self._ledger_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1:3], ("suppressed", 1))
+
+        # A partial first run does not complete the source baseline. New rows
+        # from another partial scan are also inventory, not alert candidates.
+        self._record(first_started, "partial_failed")
+        second_started = radar.now() - radar.dt.timedelta(seconds=1)
+        radar.upsert_jobs([self._job("posting-two")], self.config)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", second_started),
+            1,
+        )
+        radar.refresh_job_evaluations(self.config)
+        radar.refresh_notification_decisions(self.config)
+        rows = self._ledger_rows()
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(row[1] == "suppressed" and row[2] == 1 for row in rows))
+
+        # Once a successful source run is persisted, later new jobs must follow
+        # normal matching and notification rules.
+        self._record(second_started, "success")
+        third_started = radar.now() - radar.dt.timedelta(seconds=1)
+        radar.upsert_jobs([self._job("posting-three")], self.config)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", third_started),
+            0,
+        )
+        radar.refresh_job_evaluations(self.config)
+        radar.refresh_notification_decisions(self.config)
+        rows = self._ledger_rows()
+        third = next(row for row in rows if row[4] == "posting-three")
+        self.assertEqual(third[1:3], ("queued", 0))
+
+    def test_initial_baseline_does_not_suppress_existing_canonical_opportunity(self):
+        old_started = radar.now() - radar.dt.timedelta(hours=1)
+        old_job = radar.normalize_job(
+            "greenhouse", "gh-existing", "Example Labs", "Software Engineer",
+            "Bengaluru, India", "https://jobs.lever.co/example/shared-posting",
+            None, "unknown", "Python backend APIs",
+        )
+        old_job["discovered_at"] = radar.iso(old_started)
+        radar.upsert_jobs([old_job], self.config)
+
+        new_started = radar.now() - radar.dt.timedelta(seconds=1)
+        lever_job = self._job("shared-posting")
+        lever_job["url"] = old_job["url"]
+        lever_job["discovered_at"] = radar.iso(new_started)
+        radar.upsert_jobs([lever_job], self.config)
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT COUNT(DISTINCT canonical_opportunity_id), "
+                "MIN(first_seen_at), MAX(first_seen_at) FROM jobs"
+            ).fetchone()
+        self.assertEqual(rows[0], 1)
+        self.assertLess(
+            radar.parse_relative(rows[1]),
+            new_started,
+        )
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("lever", new_started),
+            0,
+        )
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            flag = conn.execute(
+                "SELECT baseline_suppressed FROM notification_ledger"
+            ).fetchone()[0]
+        self.assertEqual(flag, 0)
+
+    def test_other_sources_are_never_baselined_by_lever_policy(self):
+        started = radar.now() - radar.dt.timedelta(seconds=1)
+        self.assertEqual(
+            radar.suppress_initial_source_snapshot_alerts("naukri", started),
+            0,
+        )
+
+    def test_legacy_notification_ledger_migration_adds_baseline_flag(self):
+        with TemporaryDirectory() as tmp:
+            db = Path(tmp) / "legacy.db"
+            with sqlite3.connect(db) as conn:
+                conn.execute("""
+                    CREATE TABLE notification_ledger (
+                        canonical_opportunity_id INTEGER PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        candidate_job_id INTEGER,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        decision_reason_json TEXT NOT NULL DEFAULT '[]',
+                        attempt_count INTEGER NOT NULL DEFAULT 0,
+                        next_attempt_at TEXT,
+                        claimed_at TEXT,
+                        sent_at TEXT,
+                        last_error TEXT
+                    )
+                """)
+                conn.execute(
+                    "INSERT INTO notification_ledger "
+                    "(canonical_opportunity_id,status,created_at,updated_at) "
+                    "VALUES (1,'pending','2026-11-01T00:00:00+00:00','2026-11-01T00:00:00+00:00')"
+                )
+            original = radar.DB_PATH
+            try:
+                radar.DB_PATH = db
+                radar.init_db()
+                with sqlite3.connect(db) as conn:
+                    columns = {row[1] for row in conn.execute("PRAGMA table_info(notification_ledger)")}
+                    value = conn.execute(
+                        "SELECT status, baseline_suppressed FROM notification_ledger "
+                        "WHERE canonical_opportunity_id=1"
+                    ).fetchone()
+                self.assertIn("baseline_suppressed", columns)
+                self.assertEqual(value, ("pending", 0))
+            finally:
+                radar.DB_PATH = original
+
+
+class LeverConfigTests(unittest.TestCase):
+    def test_v12_migration_forces_lever_off_even_if_old_config_enabled_it(self):
+        defaults = {
+            "config_version": 12,
+            "source_enabled": {"linkedin": True, "naukri": True, "instahyre": False,
+                               "greenhouse": False, "ashby": False, "lever": False},
+            "poll_seconds": {"linkedin": 180, "naukri": 300, "instahyre": 600,
+                             "greenhouse": 900, "ashby": 1800, "lever": 1800},
+            "lever_boards": [],
+        }
+        previous = {
+            "config_version": 11,
+            "source_enabled": {"linkedin": True, "naukri": True, "lever": True},
+            "poll_seconds": {"lever": 300},
+            "lever_boards": [{"site": "example", "company": "Example Labs"}],
+        }
+        merged = radar._merge_config(defaults, previous)
+        self.assertEqual(merged["config_version"], 12)
+        self.assertFalse(merged["source_enabled"]["lever"])
+        self.assertEqual(
+            merged["lever_boards"],
+            [{"site": "example", "company": "Example Labs"}],
+        )
+        self.assertEqual(merged["poll_seconds"]["lever"], 300)
+
+    def test_config_validation_accepts_allowlisted_global_and_eu_sites(self):
+        config = {**BASE_CONFIG, "lever_boards": [
+            {"site": "example-global", "company": "Example Global"},
+            {"site": "example-eu", "company": "Example EU", "instance": "eu"},
+        ]}
+        validated = radar.validate_config(config)
+        self.assertEqual(validated["lever_boards"][0]["instance"], "global")
+        self.assertEqual(validated["lever_boards"][1]["instance"], "eu")
+        self.assertFalse(validated["source_enabled"]["lever"])
+        self.assertEqual(validated["poll_seconds"]["lever"], 1800)
+
+    def test_config_validation_rejects_duplicate_sites_and_invalid_instance(self):
+        base = {**BASE_CONFIG, "lever_boards": [
+            {"site": "Example", "company": "Example A"},
+            {"site": "example", "company": "Example B"},
+        ]}
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config(base)
+        invalid_instance = {**BASE_CONFIG, "lever_boards": [
+            {"site": "example", "company": "Example", "instance": "unknown"},
+        ]}
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config(invalid_instance)
+
+    def test_config_validation_rejects_unsafe_site_name(self):
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config({**BASE_CONFIG, "lever_boards": [
+                {"site": "../unsafe", "company": "Bad"},
+            ]})
 if __name__ == "__main__":
     unittest.main()
