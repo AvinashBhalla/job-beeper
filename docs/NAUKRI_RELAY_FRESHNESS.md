@@ -57,3 +57,9 @@ Admin `GET /api/source-status` returns `last_feed` for Naukri (age, age at poll,
 - Python compileall, dashboard build using esbuild 0.25.12 and `git diff --check` passed locally.
 - GitHub V2 CI #1311 / run 42398484593 passed on the earlier consumer implementation commit 04c0605: dashboard JavaScript syntax, focused router/extractor tests 32 passed, and full V2 suite 205 passed. The newer per-job timestamp integration still needs a fresh GitHub CI run after push.
 - No deployment to the 8003 preview, shared dev 8001 or production 8000 has been made.
+
+## 2026-11-08 release status
+
+- Consumer-side source metrics, Naukri freshness validation, last-good feed metadata, per-job observation timestamp import and monotonic first/last-seen persistence are now merged into `v2-live-radar` via JobBeeper PR #47 (merge `dd4d21e`). GitHub CI #1314 passed all **207 V2 tests** and dashboard JavaScript syntax.
+- Publisher-side emission of `relay_first_observed_at` / `relay_last_observed_at` and fail-closed partial-target behavior is in public relay draft PR #4. Relay validation CI `42442285937` passed all 3 stubbed workflow tests. It is not merged, triggered or published.
+- Existing shared-dev and production runtimes have not been deployed with the new consumer; current public feed has not been changed by this work. The consumer still supports the legacy snapshot-level timestamp.
