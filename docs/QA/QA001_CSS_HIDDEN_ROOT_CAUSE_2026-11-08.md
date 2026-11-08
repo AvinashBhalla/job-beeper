@@ -41,3 +41,9 @@ The browser report and complete result matrix are archived in `docs/QA/desktop-f
 - Session/logout/expiry mutation tests: UNKNOWN; excluded by read-only scope.
 
 The report was performed against the synthetic-only candidate on port 18005. It did not change application code, configuration, database, shared dev, or production. Do not interpret the blocked evidence items as application defects; they are incomplete verification artifacts. Do not interpret UNKNOWN security checks as PASS.
+
+## Separate 320px interaction failure — 2026-11-08
+
+QA-001 remains PASS. A later, separate mobile interaction pass found a 320×740 hit-test failure while checking bottom-navigation/content accessibility. At this viewport, member `Mark Applied` hit-testing returned the “Newest First” button; admin hit-testing returned `.feed-status-strip`. The control rectangles were above the 56px bottom bar, which began at y=684, so the bottom bar is not yet established as the cause. At 390×844 and 375×812, both roles passed.
+
+Detailed geometry and current evidence are in `docs/QA/desktop-final-visual-evidence-2026-11-08.md`. Root cause remains unconfirmed because the report lacks the exact hit-test coordinates, `elementsFromPoint()` stack and returned-element bounds/CSS. Do not change CSS speculatively. Obtain a second diagnostic pass, then add a focused regression and verify 320px after any fix. Screenshot file export is still BLOCKED; manual CSRF/session mutation checks remain UNKNOWN.
