@@ -21,6 +21,17 @@ class UserNotificationServiceTests(unittest.TestCase):
               title TEXT, company TEXT, location TEXT, url TEXT, source TEXT,
               source_initial_baseline INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE canonical_opportunities(id INTEGER PRIMARY KEY);
+            CREATE TABLE notification_ledger(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              canonical_opportunity_id INTEGER NOT NULL,
+              baseline_suppressed INTEGER NOT NULL DEFAULT 0,
+              status TEXT NOT NULL DEFAULT 'suppressed',
+              candidate_job_id INTEGER,
+              attempt_count INTEGER NOT NULL DEFAULT 0,
+              sent_at TEXT,
+              updated_at TEXT,
+              decision_reason_json TEXT
+            );
             CREATE TABLE user_preferences(user_id INTEGER PRIMARY KEY, preferences_json TEXT);
             CREATE TABLE user_job_evaluations(user_id INTEGER, job_id INTEGER, preference_fingerprint TEXT, match INTEGER, score INTEGER, reasons_json TEXT);
             CREATE TABLE user_telegram_chats(user_id INTEGER PRIMARY KEY, chat_id TEXT, chat_type TEXT);
@@ -124,6 +135,68 @@ class UserNotificationServiceTests(unittest.TestCase):
                 "SELECT status FROM user_notification_ledger WHERE user_id=1"
             ).fetchone()[0]
         self.assertEqual(status, "cancelled")
+
+    def test_canonical_baseline_marker_excludes_cross_source_opportunity_from_member_queue(self):
+        with user_notifications._connect(self.db) as conn:
+            # The Lever source row can be a baseline row while the canonical
+            # opportunity originated earlier from Naukri. Its canonical-level
+            # marker must still suppress the member notification.
+            conn.execute(
+                "INSERT INTO notification_ledger(canonical_opportunity_id,baseline_suppressed,status) VALUES(101,1,'suppressed')"
+            )
+            conn.execute(
+                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, '2026-11-07T00:00:00+00:00'
+                ),
+                0,
+            )
+            count=conn.execute("SELECT COUNT(*) FROM user_notification_ledger").fetchone()[0]
+        self.assertEqual(count,0)
+
+    def test_canonical_baseline_marker_cancels_previously_queued_member_item(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, '2026-11-07T00:00:00+00:00'
+                ),
+                1,
+            )
+            conn.execute(
+                "INSERT INTO notification_ledger(canonical_opportunity_id,baseline_suppressed,status) VALUES(101,1,'suppressed')"
+            )
+        item=user_notifications._claim_one(self.db)
+        self.assertIsNone(item)
+        with user_notifications._connect(self.db) as conn:
+            row=conn.execute(
+                "SELECT status,last_error FROM user_notification_ledger WHERE user_id=1"
+            ).fetchone()
+        self.assertEqual(row["status"],"cancelled")
+        self.assertEqual(row["last_error"],"initial_source_baseline")
+
+    def test_canonical_baseline_marker_blocks_final_send_revalidation(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, '2026-11-07T00:00:00+00:00'
+                ),
+                1,
+            )
+        item=user_notifications._claim_one(self.db)
+        self.assertIsNotNone(item)
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO notification_ledger(canonical_opportunity_id,baseline_suppressed,status) VALUES(101,1,'suppressed')"
+            )
+        self.assertFalse(user_notifications._still_deliverable(self.db,item))
 
     def test_stale_preference_evaluation_is_not_queued(self):
         with user_notifications._connect(self.db) as conn:

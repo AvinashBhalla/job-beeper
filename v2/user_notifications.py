@@ -114,6 +114,12 @@ def _queue_new_matches(conn: sqlite3.Connection, user_id: int, enabled_at: str, 
       JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
       WHERE e.match=1 AND e.score>=? AND e.preference_fingerprint=?
         AND COALESCE(j.source_initial_baseline,0)=0
+        AND NOT EXISTS (
+          SELECT 1
+          FROM notification_ledger nl
+          WHERE nl.canonical_opportunity_id=j.canonical_opportunity_id
+            AND COALESCE(nl.baseline_suppressed,0)=1
+        )
         AND j.discovered_at>=? AND j.discovered_at>=?
         AND j.canonical_opportunity_id IS NOT NULL
       ORDER BY j.discovered_at,j.id""", (user_id, threshold, expected_fingerprint, enabled_at, fresh_after)).fetchall()
@@ -138,9 +144,15 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
         # queued. Cancel it explicitly rather than leaving an unclaimable row.
         conn.execute("""UPDATE user_notification_ledger
           SET status='cancelled',claimed_at=NULL,updated_at=?,last_error='initial_source_baseline'
-          WHERE status IN ('queued','failed') AND candidate_job_id IN (
-            SELECT id FROM jobs WHERE COALESCE(source_initial_baseline,0)=1
-          )""", (stamp,))
+          WHERE status IN ('queued','failed','sending')
+            AND candidate_job_id IN (
+              SELECT j.id
+              FROM jobs j
+              LEFT JOIN notification_ledger nl
+                ON nl.canonical_opportunity_id=j.canonical_opportunity_id
+              WHERE COALESCE(j.source_initial_baseline,0)=1
+                 OR COALESCE(nl.baseline_suppressed,0)=1
+            )""", (stamp,))
         row = conn.execute("""SELECT l.id,l.user_id,l.attempt_count,t.chat_id,j.title,j.company,j.location,j.url,
           j.source,j.discovered_at,e.score,e.reasons_json
           FROM user_notification_ledger l
@@ -150,6 +162,12 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
           JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
           WHERE (l.status='queued' OR (l.status='failed' AND l.next_attempt_at IS NOT NULL AND l.next_attempt_at<=?))
             AND COALESCE(j.source_initial_baseline,0)=0
+            AND NOT EXISTS (
+              SELECT 1
+              FROM notification_ledger nl
+              WHERE nl.canonical_opportunity_id=l.canonical_opportunity_id
+                AND COALESCE(nl.baseline_suppressed,0)=1
+            )
           ORDER BY l.created_at,l.id LIMIT 1""", (stamp,)).fetchone()
         if row is None:
             return None
@@ -177,7 +195,13 @@ def _still_deliverable(
           JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
           JOIN user_preferences p ON p.user_id=l.user_id
           WHERE l.id=? AND l.status='sending' AND t.chat_id=?
-            AND COALESCE(j.source_initial_baseline,0)=0""",
+            AND COALESCE(j.source_initial_baseline,0)=0
+            AND NOT EXISTS (
+              SELECT 1
+              FROM notification_ledger nl
+              WHERE nl.canonical_opportunity_id=l.canonical_opportunity_id
+                AND COALESCE(nl.baseline_suppressed,0)=1
+            )""",
           (item["id"], item["chat_id"])).fetchone()
     if row is None:
         return False
