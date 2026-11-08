@@ -54,7 +54,8 @@ UA = {
 # Keep LinkedIn requests paced and honor HTTP 429 with an escalating global cooldown.
 LINKEDIN_MIN_REQUEST_INTERVAL_SECONDS = 4.0
 LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS = 300
-LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 1800
+LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 4 * 60 * 60
+LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS = 24 * 60 * 60
 LINKEDIN_DETAIL_WORKERS = 1
 LINKEDIN_FAST_TARGETS_PER_SCAN = 2
 LINKEDIN_DEEP_SCAN_SECONDS = 1800
@@ -2423,16 +2424,18 @@ def _activate_linkedin_rate_limit(response: requests.Response) -> float:
         return remaining
 
     monotonic_now = time.monotonic()
-    # A single successful scan must not erase evidence of repeated 429s. Reset
-    # the escalation streak only after an hour without another rate-limit event.
+    # Keep escalation across the long cooldowns used for repeated 429s.
+    # A full 24 hours without another rate-limit response is required before
+    # returning to the five-minute initial backoff.
     if (
         linkedin_last_rate_limit_monotonic
-        and monotonic_now - linkedin_last_rate_limit_monotonic >= 3600
+        and monotonic_now - linkedin_last_rate_limit_monotonic
+        >= LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS
     ):
         linkedin_rate_limit_streak = 0
     linkedin_rate_limit_streak += 1
     linkedin_last_rate_limit_monotonic = monotonic_now
-    multiplier = 2 ** min(linkedin_rate_limit_streak - 1, 3)
+    multiplier = 2 ** min(linkedin_rate_limit_streak - 1, 6)
     fallback = min(
         LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS,
         LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS * multiplier,
