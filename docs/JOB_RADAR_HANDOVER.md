@@ -5894,3 +5894,105 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - `JOB_BEEPER_COOKIE_SECURE` defaults to true; HTTPS is required. The loopback-only dev Compose service defaults it to false for SSH-tunnel development; production remains true. Set `JOB_BEEPER_PUBLIC_ORIGIN` if the TLS reverse proxy origin differs from Uvicorn’s request base URL. Do not disable Secure publicly.
 - The Termalin encrypted backup job remains DRAFT. Local snapshots do not prove an off-host encrypted archive exists.
 - Next: verify CI and automated re-review on PR #45, merge into `v2-live-radar` when all checks/review threads are clear, then continue with user-scoped preferences/evaluations. No production deployment is authorized.
+
+
+## 2026-11-07 — Source-run observability restacked on current V2 foundation
+
+### Branch and scope
+- New isolated worktree: `/tmp/job-radar-source-observability-clean`; branch: `feat/source-observability-20261107`; base: `v2-live-radar` at `dd7aeb1eea4790564a73367df90f7d4a07e012ea` (includes the merged secure multi-user authentication foundation).
+- This is the ingestion P0 track. It is separate from `feat/user-preferences-evaluations-20261106` / draft PR #46. Keep PR #46 open/draft and do not merge or promote it as part of this task.
+- Scope is observability only: no collector query cadence, request concurrency, retry policy, source enablement, matcher, notification policy, credentials or runtime configuration changes.
+
+### Implemented
+- `source_runs` gains additive nullable columns: `run_id`, `outcome`, `duration_seconds`, `error_type`, `http_status`, `retry_after_seconds`, and `cooldown_seconds`. Existing SQLite rows are retained; legacy databases are migrated with `_ensure_column`.
+- `record_run()` remains backward-compatible with existing callers and assigns a run ID, outcome and monotonic duration when callers omit them.
+- `run_source()` now distinguishes `success`, `failed`, `rate_limited`, and `partial_rate_limited`. It detects HTTP 429 events that LinkedIn catches internally while returning jobs, so partial results are no longer reported as clean success.
+- Persisted error text is sanitized (`HTTP 429`, `HTTP 503`, or exception class); exception URLs, query strings and possible tokens are not stored. Structured fields preserve status, error class, Retry-After and the full applied cooldown duration.
+- A rate-limited run does not advance `last_success`; prior successful timestamp is retained. Runtime state exposes current/last run IDs and outcome metadata.
+- Admin-only `/api/source-status` now returns the latest structured run fields. Source lists continue to derive from the collector registry.
+- No collector behavior or rate-limit evasion was added. LinkedIn's existing cooldown behavior remains unchanged.
+
+### Validation
+- Focused source-status, registry, migration and rate-limit tests: **11 passed**.
+- Full V2 unittest discovery: **196 passed** in 88.014 seconds using an isolated Python 3.10 virtual environment on the VM host.
+- `python -m compileall -q v2` and `git diff --check` passed.
+- GitHub draft PR #47 is open against `v2-live-radar`: https://github.com/AvinashBhalla/job-beeper/pull/47. Implementation commit `a2ec0ba59919704c849cb0c5d7ee2e7c18daf6cf` (followed by documentation-only commit `c498ce8`); V2 CI run #1303 / ID `42388082207` passed on Python 3.12: syntax, focused router/extractor tests and the full suite (**196 tests in 28.011 seconds — OK**).
+- Older draft PR #40 was closed unmerged as superseded by #47; a comment links the replacement. PR #47 remains draft pending review; passing CI is not approval to merge.
+- Docker socket access was denied to the Termalin user, so no container build/runtime validation was attempted.
+
+### Runtime safety
+- No production or shared-dev container, database, volume, config, source schedule, Telegram bot or notification was touched. No LLM/provider calls were made.
+- Test execution produced a whitespace-only local diff in tracked `v2/config.json` in the validation worktrees; parsed JSON keys and values are unchanged. The current worktree diff remains unstaged and is excluded from the PR. The committed PR changes contain only the intended source, tests and documentation.
+- No deployment or merge is authorized. Keep production port 8000 and shared dev port 8001 unchanged.
+
+### Next actions
+1. Review draft PR #47 and merge it into `v2-live-radar` only after human review/approval; do not deploy it to shared dev or production automatically.
+2. Add request/page/status-class counters and explicit partial-board outcomes for multi-board adapters; current telemetry is run-level and captures LinkedIn 429 specifically, not a complete per-request histogram.
+3. Use the new telemetry to diagnose LinkedIn 429 frequency/cooldown without increasing pressure or bypassing provider limits.
+4. Make Naukri relay freshness and incremental processing measurable; retain date-only posting precision.
+5. Continue source-by-source public/authorized adapter validation only after request budgets, stable IDs, timestamp precision, failure isolation and useful unique-job yield are documented.
+6. Keep the separate multi-user/resume/Telegram feature branch isolated; do not merge PR #46 or promote any feature environment without explicit approval.
+
+
+## 2026-11-07 — Source-level request metrics implemented; local preview ready
+
+### Implementation
+- Expanded `source_runs` additively with request attempts, responses, request exceptions, status-class counts, HTTP 429, exact status-code histogram JSON, existing-retry attempts, cumulative request duration, logical page outcomes and employer-board outcomes. Legacy rows remain NULL for these fields.
+- All collector HTTP GETs now pass through one metrics wrapper: LinkedIn (including detail enrichment), Naukri relay, Instahyre, Greenhouse and Ashby. Metrics contain status/timing/count aggregates only; URL paths, query values, headers, bodies, descriptions and secrets are not persisted.
+- `/api/source-status` returns latest request metrics plus rolling 24-hour aggregates with measured-run coverage. Dashboard adds 24h request/429/retry/average-duration/page-board columns and makes unmeasured history explicit. Partial results display PARTIAL; they are not shown as full outages.
+- Outcomes now include `partial_failed` for mixed page/board success and failure, alongside `success`, `failed`, `rate_limited`, and `partial_rate_limited`. Existing collector retry and cooldown behavior is unchanged.
+- See `docs/SOURCE_LEVEL_METRICS.md` for field definitions, semantics, privacy and validation detail.
+
+### Tests
+- Focused source/request metrics, status API, schema migration, partial board and LinkedIn 429 tests: 14 passed.
+- Full V2 suite: 199 passed in 81.744 seconds on `/tmp/job-radar-observability-venv` (Python 3.10).
+- Python compilation and `git diff --check` passed. Local Node 12 is too old for the dashboard's existing optional-chaining/nullish-coalescing syntax; GitHub V2 CI on Node 24 is required to validate dashboard syntax.
+
+### Local preview for owner testing
+- Separate preview server is running on remote loopback `127.0.0.1:8003`, backed by `/tmp/job-radar-source-metrics-local/jobs.db`. It is not the production or shared-dev process.
+- It is configured with all collectors disabled, notifications off, Telegram credentials blank and LLM providers disabled. The five source rows shown in this instance are synthetic illustrative metrics, not live source measurements; no external source requests were made.
+- Owner can open a Windows PowerShell terminal and tunnel it with `ssh -N -L 18003:127.0.0.1:8003 ubuntu@130.210.27.197`, then visit `http://localhost:18003/dashboard`.
+- Preview-only admin: `metrics-admin@local.test`; its temporary password was supplied in the chat, not recorded in Git or this handover. This account/database is disposable; do not reuse the password anywhere else.
+- The separate OAuth feature application remains on `127.0.0.1:8002` and is unaffected. User OAuth tunnel is port 18002. Shared dev 8001 and production 8000 were not touched.
+
+### Safety and next gate
+- No deployment, source enablement, scheduler change, rate-limit-policy change, notification, Telegram send or LLM call was made.
+- Implementation commit: `a9da22f92f9003e5317b8285fbcd5102ea348be9` on `feat/source-observability-20261107`; draft PR #47 is updated. CI #1307 passed all checks and 199 tests. Keep PR #47 draft pending human review; do not merge/deploy without approval.
+
+
+## 2026-11-07 — Naukri relay freshness and repeat-ingestion implementation (local, not deployed)
+
+- Worktree: /tmp/job-radar-source-observability-clean; branch feat/source-observability-20261107; base draft PR #47. This change is separate from the OAuth feature branch.
+- Read-only public relay inspection found top-level updated_at, count, jobs; the sampled snapshot had 322 records. Job objects had stable IDs/URLs and date-level posted, but no per-job relay-observed timestamp.
+- v2/radar.py adds additive source_feed_state for accepted relay timestamp, app observation timestamp, age, count, content hash and same-content indicator. Naukri now rejects malformed/empty/count-mismatched payloads, missing/invalid timestamps, snapshots older than 15 minutes, timestamps over five minutes in the future, and snapshots with no valid normalized jobs. Failed snapshots do not replace last-good feed state or upsert records.
+- The 15-minute staleness ceiling is provisional, derived as three nominal five-minute relay windows. We have not freshly verified actual scheduled-vs-manual relay cadence or workflow duration; measure those before treating the threshold as an operational SLA.
+- The snapshot hash excludes the changing top-level updated_at, so identical job content across relay builds is recognizable. Consumer still downloads/parses the full feed and updates last-seen observations. The upsert_jobs path skips expensive evaluation refresh for unchanged matcher inputs and re-evaluates when description/format/source-posted time/precision changes.
+- Admin /api/source-status includes Naukri last_feed metadata; dashboard Source Health displays last-good relay age, job count and whether the snapshot content is unchanged.
+- Added regression coverage for stale snapshot/last-good retention, empty/count mismatch, unchanged jobs with advancing relay timestamp, feed-health response, repeat-upsert evaluation skip, plus adjusted old test fixtures to use current timestamps.
+- Full V2 suite: 205 passed (Python 3.10 isolated venv). compileall and git diff --check passed. Local Node is 12.22.9 and cannot parse the dashboard's existing modern syntax, so GitHub CI must validate JavaScript after push.
+- Commit 04c0605 (feat: validate Naukri relay freshness and reduce repeat evaluation) has been pushed to feat/source-observability-20261107; PR #47 title/body now include the Naukri scope. PR remains draft/open/unmerged. GitHub V2 CI #1311 / run 42398484593 subsequently passed for implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a: dashboard JavaScript syntax passed, focused router/extractor tests 32 passed, full V2 suite 205 passed in 15.336 seconds. No deploy, feature config change, source schedule change, source enablement change or production/shared-dev operation. Keep PR #47 draft and do not deploy to 8001/8000 without explicit approval.
+- Remaining relay investigation: verify workflow schedule/run durations; consider publisher-side per-job observed_at metadata and reliable conditional requests. Do not call the full-feed polling path per-job incremental yet.
+
+
+## 2026-11-07 — Draft PR #47 updated with Naukri freshness work
+
+- New source implementation commit: 04c0605e078fbc376fc0688def66d3d0b9c18d5a; pushed to feat/source-observability-20261107. PR #47 title/body updated to include Naukri freshness and repeat-evaluation reduction. The PR remains draft and is not merged.
+- Final local verification at push: full V2 suite 205 passed; Python compilation, esbuild 0.25.12 dashboard build and git diff --check passed.
+- GitHub workflow/status lookup returned no run/check for this head yet. Re-check GitHub CI before calling the PR ready for review.
+- No runtime deployment. The source metrics preview on 8003 and OAuth feature on 8002 remain separate; shared dev 8001 and production 8000 are untouched.
+
+
+## 2026-11-07 — GitHub CI passed for source observability plus Naukri freshness
+
+- GitHub V2 CI run #1311 / ID 42398484593 passed on implementation commit 04c0605e078fbc376fc0688def66d3d0b9c18d5a. Syntax job passed including dashboard JavaScript; focused router/extractor tests 32 passed; full V2 test suite 205 passed in 15.336 seconds.
+- The later docs-only handover commit does not change implementation code. PR #47 remains draft/open/unmerged and no runtime rollout was performed.
+
+
+## 2026-11-08 — Relay scheduler, per-job observation and reverse-engineering decision
+
+- Verified active relay architecture: default-branch workflow is workflow_dispatch-only; VM unit timer is OnUnitActiveSec=5min. Latest 15 successful GitHub Actions runs on 2026-11-07 took 138–164 seconds; run #7599 scanned 18 targets (all successful) and generated 325 unique jobs. Do not change the timer or fanout/request pressure as part of this task.
+- Consumer branch now supports optional relay_first_observed_at / relay_last_observed_at, preserving job/canonical first_seen and monotonically updating last_seen. Its snapshot hash excludes volatile last-observed timestamps and is independent of record order. Legacy snapshot-level updated_at remains the compatibility fallback.
+- Consumer branch full V2 suite after the timestamp changes: 207 passed locally. Fresh CI is required after pushing these later changes.
+- Separate relay worktree: /tmp/job-beeper-naukri-relay-main; branch feat/relay-first-seen-preserve-last-good-20261107. Publisher diff adds fail-closed last-good load and aborts publication if any target fails, and publishes per-job observation timestamps. Workflow Python AST and YAML parse pass locally. This publisher change is not yet committed/pushed/CI-validated at this handover point.
+- Read docs/REVERSE_ENGINEERING_SCOPE.md for public product-contract baseline and current gaps. Decision: enough is known to build; do focused black-box acceptance testing only when it informs the next feature. Do not reverse-engineer private endpoints or internal implementation.
+- Current owner UAT backlog remains: email/password signup, Google consent app branding ("n8nApp"), and preferences-save validation error not surfaced (role chip visible but backend says at least one target role required). OAuth and resume parser UAT were confirmed successful.

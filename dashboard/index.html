@@ -551,7 +551,7 @@
             <div class="view-headline-row">
               <div>
                 <h2 class="view-title-main">Source Health &amp; Ingestion Telemetry</h2>
-                <p class="view-subtitle-main">Real-time status of scrapers, rate-limits, and discovery metrics.</p>
+                <p class="view-subtitle-main">Latest source health and measured request, retry, rate-limit and partial-failure totals over the last 24 hours. Historical runs are marked Not measured.</p>
               </div>
               <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
             </div>
@@ -562,8 +562,14 @@
                   <tr>
                     <th>Source</th>
                     <th>Status</th>
-                    <th>Jobs Seen</th>
-                    <th>New Today</th>
+                    <th>Jobs Seen (Latest)</th>
+                    <th>New Jobs (Latest)</th>
+                    <th>Measured Runs (24h)</th>
+                    <th>Requests (24h)</th>
+                    <th>HTTP 429 (24h)</th>
+                    <th>Retries (24h)</th>
+                    <th>Avg Request (24h)</th>
+                    <th>Page / Board Failures (24h)</th>
                     <th>Last Success (IST)</th>
                     <th>Diagnostics</th>
                   </tr>
