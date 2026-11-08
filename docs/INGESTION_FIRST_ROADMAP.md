@@ -100,3 +100,18 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - No reliable published timestamp is documented, so Lever timestamps stay unknown even if sample payloads include a createdAt field. No application endpoint is called.
 - 12 focused tests passed; full V2 suite **227 passed** locally. GitHub CI pending after push. Both configs Lever off with empty allowlist; no live probe, DB write, notifications or deployment.
 - Next after CI: curated one/two-board GET-only two-snapshot canary, evaluate ID stability, fresh yield and India/remote relevance. Keep source disabled until separate review.
+
+## GitHub CI result — 2026-11-08
+
+- Draft PR #50: https://github.com/AvinashBhalla/job-beeper/pull/50
+- GitHub V2 CI run #42452809803 passed on commit `c8967ac140647409e735b7ea5be18ea7c92f133d`: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32 passed), full V2 suite (227 passed in 27.508 seconds).
+- PR #50 remains draft and mergeable. No Lever board has been configured or polled; Lever remains off in both config presets.
+
+
+## Next ATS candidate research — Recruitee vs SmartRecruiters — 2026-11-08
+
+- SmartRecruiters official docs describe a public company postings endpoint `GET /v1/companies/{companyIdentifier}/postings` with `destination=PUBLIC`, `limit` (max 100) and `offset`; its authentication guide lists the public Posting API among no-auth APIs. The separate `/feed/publications` endpoint requires `X-SmartToken`; do not confuse the two contracts. See https://developers.smartrecruiters.com/reference/v1listpostings and https://developers.smartrecruiters.com/docs/authentication.
+- Recruitee's public company feed has two XML URLs per subdomain: formatted `/api/feeds/offers.xml` and raw `/api/offers.xml`. The raw feed contains currently published offers only, disappears when offers are unpublished, and updates immediately. Documented fields include stable reference, title/company, full description, multiple locations, remote/hybrid/on-site flags, hosted/apply URLs, `posted` (feed-added timestamp) and `updated` (last update). See https://support.recruitee.com/en/articles/8213076-faq-api and https://docs.recruitee.com/docs/feed.
+- Recruitee's new Careers Site JSON API `/api/offers` will require `X-Careers-Sites-Token` starting 2027-02-10; official docs say XML feed and jobs widget are not covered by that token requirement. Prefer the raw XML feed if/when implementing. See https://docs.recruitee.com/reference/authentication-1.
+- Critical parser rule: the XML feed may contain a `<credentials>` subtree with third-party job-board secrets. Parse only an allowlist of job fields; never persist/log raw XML or the credentials subtree. Use strict fixed Recruitee host construction from a validated subdomain, bounded response size, one GET/site, no retries, and keep default-off.
+- Recommendation: Recruitee is the next adapter to evaluate after Lever; its feed has stronger location/timestamp signals and remains separate from the upcoming Careers API token cutover. SmartRecruiters is also viable but company-scoped; public endpoints are distinct from its authenticated `feed/publications` API. No Recruitee or SmartRecruiters live request/adapter was implemented in this research step.

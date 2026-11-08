@@ -33,7 +33,7 @@ Source documentation: https://github.com/lever/postings-api (Lever's public Post
 
 - 12 focused tests cover global/EU endpoints, URL allowlist/fallback, stable IDs, fields/descriptions, unknown timestamps, pagination and duplicate removal, page failures preserving earlier pages, board failures not discarding good boards, malformed payloads, empty allowlist, board validation and v12 opt-in migration.
 - Full V2 suite: **227 tests passed** in 80.051 seconds in isolated Python 3.10 environment (`/tmp/job-radar-observability-venv`).
-- Python `py_compile` and `compileall` passed. `git diff --check` to be checked before commit. GitHub CI remains required.
+- Python `py_compile` and `compileall` passed. `git diff --check` to be checked before commit. GitHub V2 CI #42452809803 passed on commit `c8967ac140647409e735b7ea5be18ea7c92f133d`: dashboard JS syntax passed, focused router/extractor tests 32 passed, full V2 suite 227 passed in 27.508 seconds.
 
 ## Operational boundary / next gate
 
