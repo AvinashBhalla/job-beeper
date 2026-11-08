@@ -3513,64 +3513,155 @@ def naukri_collect() -> list[dict[str, Any]]:
         _record_source_page("naukri", False)
         raise
 
+INSTAHYRE_PAGE_SIZE = 35
+INSTAHYRE_MAX_PAGES_PER_SCAN = 4
+
+
+def _instahyre_search_location(config: dict[str, Any]) -> str:
+    """Map profile location labels to Instahyre's accepted city names."""
+    configured = config.get("locations", [])
+    locations = configured if isinstance(configured, list) else []
+    selected = next(
+        (
+            str(value).split(",")[0].strip()
+            for value in locations
+            if str(value).strip() and "remote" not in str(value).lower()
+        ),
+        "",
+    )
+    if not selected:
+        selected = next(
+            (str(value).split(",")[0].strip() for value in locations if str(value).strip()),
+            "Bangalore",
+        )
+    if not selected:
+        selected = "Bangalore"
+
+    aliases = {
+        "bengaluru": "Bangalore",
+        "gurugram": "Gurgaon",
+        "delhi": "Delhi / NCR",
+        "remote": "Work From Home",
+        "remote india": "Work From Home",
+        "work from home": "Work From Home",
+    }
+    return aliases.get(selected.casefold(), selected)
+
+
 def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     endpoint = "https://www.instahyre.com/api/v1/job_search/"
-    try:
-        response = _tracked_source_get(
-            "instahyre",
-            endpoint,
-            params={
-                "jobLocations": next(
-                    (
-                        str(x).split(",")[0]
-                        for x in config.get("locations", [])
-                        if "remote" not in str(x).lower()
-                    ),
-                    "Bangalore",
-                ),
-                "limit": 35,
-            },
-            headers={**UA, "Referer": "https://www.instahyre.com/"},
-            timeout=25,
-        )
-        response.raise_for_status()
-        payload = response.json()
-    except Exception:
-        _record_source_page("instahyre", False)
-        raise
-    _record_source_page("instahyre", True)
-    items = []
-    if isinstance(payload, list):
-        items = payload
-    elif isinstance(payload, dict):
-        for key in ("jobs", "jobDetails", "results", "data", "job_details"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                items = value
-                break
-    jobs = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        source_id = item.get("jobId") or item.get("id") or item.get("jobID")
-        if not source_id:
-            continue
-        url = str(
-            item.get("url") or item.get("publicUrl") or item.get("jobUrl")
-            or f"https://www.instahyre.com/job-{source_id}-"
-        )
-        posted_raw = item.get("postedAt") or item.get("posted_at") or item.get("postedDate")
-        posted_at = parse_relative(str(posted_raw)) if posted_raw else None
-        jobs.append(normalize_job(
-            "instahyre", str(source_id),
-            str(item.get("companyName") or item.get("company") or ""),
-            str(item.get("title") or item.get("jobTitle") or ""),
-            str(item.get("location") or item.get("locations") or ""),
-            url, posted_at, "minute" if posted_at else "unknown",
-            str(item.get("description") or item.get("descriptionText") or ""),
-        ))
-    return jobs
+    location = _instahyre_search_location(config)
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    offset = 0
 
+    for _page_number in range(INSTAHYRE_MAX_PAGES_PER_SCAN):
+        params = {
+            "jobLocations": location,
+            "limit": INSTAHYRE_PAGE_SIZE,
+            "offset": offset,
+        }
+        try:
+            response = _tracked_source_get(
+                "instahyre",
+                endpoint,
+                params=params,
+                headers={**UA, "Referer": "https://www.instahyre.com/"},
+                timeout=25,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            next_page = None
+            if isinstance(payload, list):
+                items = payload
+            elif isinstance(payload, dict):
+                items = None
+                for key in ("objects", "jobs", "jobDetails", "results", "data", "job_details"):
+                    value = payload.get(key)
+                    if isinstance(value, list):
+                        items = value
+                        break
+                meta = payload.get("meta")
+                if isinstance(meta, dict):
+                    next_page = meta.get("next")
+                if items is None:
+                    raise ValueError("Instahyre response did not contain a jobs list")
+            else:
+                raise ValueError("Instahyre response was not a jobs list or object")
+        except Exception:
+            _record_source_page("instahyre", False)
+            raise
+
+        _record_source_page("instahyre", True)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            source_id = item.get("jobId") or item.get("id") or item.get("jobID")
+            if not source_id:
+                continue
+            source_id = str(source_id)
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+
+            employer = item.get("employer")
+            employer_name = (
+                employer.get("company_name") or employer.get("name") or ""
+                if isinstance(employer, dict)
+                else ""
+            )
+            url = str(
+                item.get("public_url") or item.get("url") or item.get("publicUrl")
+                or item.get("jobUrl")
+                or f"https://www.instahyre.com/job-{source_id}-"
+            )
+            posted_raw = item.get("postedAt") or item.get("posted_at") or item.get("postedDate")
+            posted_at = parse_relative(str(posted_raw)) if posted_raw else None
+
+            raw_location = item.get("location") or item.get("locations") or ""
+            if isinstance(raw_location, dict):
+                job_location = str(raw_location.get("name") or "")
+            elif isinstance(raw_location, list):
+                job_location = ", ".join(str(value) for value in raw_location if value)
+            else:
+                job_location = str(raw_location)
+
+            description = str(item.get("description") or item.get("descriptionText") or "")
+            if not description:
+                keywords = item.get("keywords")
+                if isinstance(keywords, list):
+                    keyword_values = [
+                        str(value).strip()
+                        for value in keywords
+                        if isinstance(value, (str, int, float)) and str(value).strip()
+                    ]
+                    if keyword_values:
+                        description = "Keywords: " + ", ".join(keyword_values)
+
+            jobs.append(normalize_job(
+                "instahyre",
+                source_id,
+                str(item.get("companyName") or item.get("company") or employer_name),
+                str(item.get("title") or item.get("jobTitle") or item.get("candidate_title") or ""),
+                job_location,
+                url,
+                posted_at,
+                "minute" if posted_at else "unknown",
+                description,
+            ))
+
+        if not items or not next_page:
+            break
+        next_offset = offset + INSTAHYRE_PAGE_SIZE
+        if isinstance(next_page, str):
+            match = re.search(r"(?:[?&])offset=(\d+)", next_page)
+            if match:
+                next_offset = int(match.group(1))
+        if next_offset <= offset:
+            break
+        offset = next_offset
+
+    return jobs
 
 
 def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
