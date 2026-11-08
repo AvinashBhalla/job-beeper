@@ -57,3 +57,8 @@ Inline browser captures were requested at 1536×900 for member/admin and 390×84
 4. Implement a minimal fix only after the stack/geometry identifies the cause. Add a regression test and rerun the 320px check as well as 390/375.
 5. For screenshots, use a Playwright runner with `page.screenshot({ path: ... })` or equivalent local export capability; validate the PNG files after writing.
 6. Keep PR #51 draft and do not promote to shared dev while the 320px interaction test is failing or the release gates remain unresolved.
+## Diagnostic correction — 2026-11-08
+
+The separate diagnostic report `docs/QA/desktop-320px-hit-test-diagnostics-2026-11-08.md` confirms actual element overlap at 320×740. Member target button is underneath `.feed-filter-toolbar`; admin center hit-test is intercepted by `.feed-status-strip`. Stale DOM, coordinate conversion, pointer-events and mobile navigation occlusion were ruled out. At 375×812 both roles pass. This defect is now understood but deferred per owner priority; no CSS fix is in scope while core real-data functionality is being validated.
+
+Screenshot export is still blocked; screenshot directory has no PNG files. The screenshot limitation is independent of the data-pipeline validation.
