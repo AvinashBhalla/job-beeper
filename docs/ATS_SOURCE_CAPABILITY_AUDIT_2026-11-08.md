@@ -47,6 +47,17 @@ No source should be enabled just because its adapter is merged. New sources stay
 An uncommitted candidate feature branch at `feat/darwinbox-keka-20261108` now contains dedicated Keka and Darwinbox V2 collectors, company-board discovery/probe support, admin activation mapping, opt-in config fields and focused regression tests. This changes the **candidate code status**, not the production status. The production container is still on build `7b1a80d`; Keka/Darwinbox are not in that image and are not production-enabled.
 
 - Keka public Bridgestone tenant: endpoint probe HTTP 200, 109 postings. Two `run_source` polls on a disposable SQLite DB gave 109 baseline jobs then 0 new; notifications disabled; integrity `ok`.
-- Darwinbox JG Summit candidate endpoint: endpoint probe HTTP 200, 18 postings. Two `run_source` polls gave 18 baseline jobs then 0 new; notifications disabled; integrity `ok`. This proves this employer endpoint only, not universal tenant coverage.
+- Historical Darwinbox JG Summit `.com` probe initially reported 18 postings, but repeat verification returned 403. That earlier result is superseded; see the correction below. No production activation is justified by that historical test.
 - Full local V2 suite on the candidate: 387 passed, 215.671s, zero failures. Python compile, config JSON and diff checks pass.
 - Remaining release gates: push the final worktree SHA, pass exact-SHA GitHub CI, do admin browser QA on an isolated feature environment, review redirect/SSRF behavior and measure live request latency. Both source switches remain false by default.
+
+### Darwinbox tenant verification correction — 2026-11-08
+
+A follow-up isolated QA check showed the earlier JG Summit example at `jgsummit.darwinbox.com` returns HTTP 403 from the candidate API and is not a supported Darwinbox public-board pattern. The initial 18-job record is superseded; do not use that tenant or claim it is verified. Career-Ops' current provider contract and public board examples constrain Darwinbox candidate sites to `*.darwinbox.in`. JobBeeper now applies that same host rule. A live public probe of `https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280` succeeded with 36 jobs. Other `.in` tenants can still return 403 (observed for the Airtel, LeadSquared and Sterling examples), so verification remains per employer.
+
+## 2026-11-08 QA verification update
+
+- The Workable discovery verifier has been aligned with the collector's actual public widget route, `https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true`. The old `www.workable.com/api/accounts/{slug}` route returned non-JSON to the QA probe. Current Hugging Face verification returns 6 jobs.
+- QA probes returned Greenhouse Coinbase 283, Graviton Research Capital 21, Zocdoc 64; Ashby OpenAI 816, PostHog 10; Workday NVIDIA first page 20; SmartRecruiters Bosch Group page 10; Workable Hugging Face 6; Keka Bridgestone 109; Darwinbox Arvind 36.
+- Arvind Darwinbox isolated two-poll run: 36 jobs inserted and baseline-marked on first poll, 0 new on second, both successful, no sent Telegram rows, SQLite integrity `ok`.
+- These results are one-shot public endpoint verification and do not authorize broad enabling without registry IDs and safe baseline handling. Airtel, LeadSquared, Sterling and the previous JG Summit `.com` Darwinbox routes returned 403 and should remain inactive.

@@ -284,6 +284,16 @@ Darwinbox is still not implemented. Its official Recruitment API requires employ
 
 ## 2026-11-08 follow-up — Keka/Darwinbox local candidate
 
-The isolated worktree `feat/darwinbox-keka-20261108` now has dedicated Keka and Darwinbox V2 collectors plus discovery/verification, admin activation, default-off config migrations, dashboard controls and regression tests. A two-poll disposable-DB run validated Bridgestone Keka (109 baseline rows, then zero new) and JG Summit Darwinbox (18 baseline rows, then zero new); no notifications sent and both SQLite integrity checks were `ok`. The full local V2 suite passed 387/387 in 215.671s; compileall, JSON and diff checks passed.
+The isolated worktree `feat/darwinbox-keka-20261108` now has dedicated Keka and Darwinbox V2 collectors plus discovery/verification, admin activation, default-off config migrations, dashboard controls and regression tests. A two-poll disposable-DB run validated Bridgestone Keka (109 baseline rows, then zero new). The then-reported JG Summit Darwinbox (18 rows) was later re-probed and returned 403; see the correction below. No notifications were sent in the original tests and SQLite integrity was `ok`. The full local V2 suite passed 387/387 in 215.671s; compileall, JSON and diff checks passed.
 
 This is **local candidate code**, not a GitHub CI-verified or deployed source. Production remains on image `job-radar-prod-canary:7b1a80d` and these connectors are not deployed/enabled. Next gates: push final feature branch, exact-SHA CI, isolated admin UI verification/activation, source telemetry and latency checks, then reviewed PR. Keep both source flags false by default. Darwinbox success is tenant-specific and must be re-verified for each employer; endpoint 403 is a source failure, not an empty board or rate-limit response.
+
+### Darwinbox live validation correction — 2026-11-08
+
+The previous JG Summit `*.darwinbox.com` candidate endpoint returned HTTP 403 on repeat verification and is not accepted by the current Career-Ops provider contract. Its earlier 18-job evidence is superseded. Darwinbox discovery now accepts only `*.darwinbox.in`. A fresh public probe for Arvind Group (`https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280`) returned 36 jobs; Airtel, LeadSquared and Sterling probes returned 403. Keep Darwinbox per-board verification mandatory and only activate the Arvind board in any production trial.
+
+## 2026-11-08 — Live verification sweep before rollout
+
+The isolated QA candidate now verifies the currently configured Greenhouse and Ashby boards and selected public examples: Coinbase GH 283, Graviton Research Capital GH 21, Zocdoc GH 64; OpenAI Ashby 816, PostHog Ashby 10; NVIDIA Workday 20 in the first page; Bosch Group SmartRecruiters 10 in the verification page; Hugging Face Workable 6; Bridgestone Keka 109; Arvind Darwinbox 36. The Workable probe now uses the same `apply.workable.com/api/v1/widget/accounts/{slug}` endpoint as its collector. Arvind Darwinbox two-poll ingestion inserts 36 and silently baselines on poll 1, inserts 0 on poll 2, sends no Telegram messages and retains SQLite integrity `ok`.
+
+Do not interpret one probe as universal ATS availability. Darwinbox `.com` and several `.in` tenant probes returned 403; detector is `.darwinbox.in` only and only Arvind is currently verified. No empty allowlist or unsupported provider should be enabled in production. Lever board allowlist is currently empty; the non-collector ATS families remain discovery-only until adapters are implemented.

@@ -3427,6 +3427,25 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Production: `job-radar-prod-canary:7b1a80d` on port 8000, health HTTP 200. Keka and Darwinbox are **not deployed**. Keep production config, SQLite volume and Telegram settings unchanged.
 - Research: `docs/REFERENCE_REPOSITORIES_RESEARCH_2026-11-08.md`, doc-only draft PR #52. Career-Ops is a high-value reference for provider contracts, bounded HTTP, validation, redirect safety and per-source tests. Career-Ops Extension is application form filling/answer learning with a manual submit checkpoint; it is not a source collector.
 - Connector candidate: `/tmp/job-radar-next`, branch `feat/darwinbox-keka-20261108`; new code adds Keka/Darwinbox discovery, verification and collectors, config v15 opt-in flags, admin controls, tests. Both flags default false.
-- Live integration evidence: Keka Bridgestone 109 postings and Darwinbox JG Summit 18 postings. For each, first poll was silent baseline, second poll zero new duplicates, no alert sends, DB integrity `ok`. Darwinbox proof is for one tenant only.
+- Historical live integration evidence: Keka Bridgestone 109 postings and the then-tested JG Summit Darwinbox `.com` endpoint 18 postings. The JG Summit result was later re-probed and returned 403; it is superseded by the 2026-11-08 Arvind Group `.in` 36-job verification below. The earlier two-poll run is not evidence for Arvind.
 - Local V2 suite: 387 tests pass in 215.671s; compileall/config JSON/diff checks pass. Exact-SHA GitHub CI and isolated browser QA are still outstanding. Feature branch is not yet pushed/deployed.
 - Next: review diff → push feature branch → exact-SHA CI → isolated admin browser QA → latency telemetry → reviewed promotion/canary. First production admin account also needs a user-supplied admin email; Google OAuth is currently disabled.
+
+
+## 2026-11-08 — Current CI and connector QA checkpoint
+
+- PR #51 now includes connector commit `07544e835212892a63e3f7e05d0f9ee0b6db3ab0`. Exact-SHA CI run `42505820970` passed (compile, dashboard syntax, focused and full suite); manual duplicate run `42505931091` was queued and must be checked.
+- QA app: loopback port 8010, isolated volume `job-radar-connectors-qa_qa-data`, health OK, config v15, all source flags false, notifications false, no bot or model keys, SQLite integrity `ok`; dashboard GET 200 and anonymous admin API 401.
+- Keka live probe: Bridgestone tenant 109 jobs.
+- Darwinbox correction: JG Summit `.com` endpoint gave 403 and is no longer considered verified. Career-Ops reference pattern is `.darwinbox.in` only. Arvind `.in` returned 36 jobs; Airtel, LeadSquared and Sterling `.in` examples gave 403. Detector/tests now being narrowed to `.in`, with Arvind as verified sample. No production Darwinbox activation until the correction's CI passes.
+- Production still runs image `job-radar-prod-canary:7b1a80d` on the existing persistent `v2_radar-data` volume. Runtime config remains v14: LinkedIn/Naukri enabled, Greenhouse/Ashby configured but off, and remaining provider allowlists empty. User wants all feasible connectors enabled; only individually verified sources with board IDs and silent initial-baseline handling may be activated.
+- First admin account is not yet provisioned. The user supplied `bawejaavichal01@gmail.com`; the CLI still requires a password at bootstrap. Obtain that password through the intended secure input path before claiming admin UI/per-user Telegram is ready.
+
+### 2026-11-08 — Verification correction and per-board canary results
+
+- The Darwinbox `.in` restriction and Arvind fixture are in the working candidate; prior JG Summit `.com` evidence is superseded (repeat probe was 403). Arvind board probe=36; isolated two-poll `run_source` test: first 36 ingested and baseline-suppressed, second 0 new, sent=0, both success, `PRAGMA integrity_check=ok`.
+- Workable probe mismatch fixed: it now uses the exact collector endpoint `https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true`, not the obsolete `www.workable.com/api/accounts` endpoint. Hugging Face current probe=6.
+- Latest bounded live board probes in isolated QA: Greenhouse Coinbase=283, Graviton=21, Zocdoc=64; Ashby OpenAI=816, PostHog=10; Workday NVIDIA first page=20; SmartRecruiters Bosch verification page=10; Workable Hugging Face=6; Keka Bridgestone=109; Darwinbox Arvind=36. These are verification response counts, not exact total active board inventory except where the endpoint response contract supports it.
+- Corrected local V2 full suite on Darwinbox host restriction passed 387 in 291.998s. After Workable probe change, 10 focused tests (Workable verification + Keka/Darwinbox class) pass; a complete exact-final-SHA CI run must cover all changes.
+- QA app is isolated on 127.0.0.1:8010 with volume `job-radar-connectors-qa_qa-data`, config v15, all sources off and notifications off. Health/dashboard 200; anonymous admin endpoint 401; DB integrity ok. No Chromium browser is installed on the VM, so full visual login/discovery UI testing is still pending.
+- No production changes. Production v14 source configuration remains unchanged. Do not enable empty/unverified boards; see detailed handover for exact prod config and per-source verification summary.

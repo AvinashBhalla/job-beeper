@@ -473,9 +473,12 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
         keka = board_discovery.detect_ats_board("https://bridgestone1.keka.com/careers")
         self.assertEqual((keka["provider"], keka["board_key"]), ("keka", "bridgestone1"))
         darwin = board_discovery.detect_ats_board(
-            "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+            "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280"
         )
-        self.assertEqual((darwin["provider"], darwin["board_key"]), ("darwinbox", "a6373b98b30596"))
+        self.assertEqual((darwin["provider"], darwin["board_key"]), ("darwinbox", "main"))
+        self.assertIsNone(board_discovery.detect_ats_board(
+            "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+        ))
 
     def test_keka_maps_public_embed_feed_with_stable_ids_and_publication_time(self):
         careers_html = '''<html><body>
@@ -572,7 +575,7 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
         def tracked(source, endpoint, **kwargs):
             calls.append((source, endpoint, kwargs))
             return self.Response(payload)
-        board = "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+        board = "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280"
         with patch.object(radar, "_tracked_source_post", side_effect=tracked):
             jobs = radar.darwinbox_collect({
                 "darwinbox_boards": [{
@@ -581,11 +584,11 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
             })
         self.assertEqual(len(jobs), 2)
         first = jobs[0]
-        self.assertEqual(first["source_job_id"], "darwinbox-jgsummit-a6373b98b30596-501")
+        self.assertEqual(first["source_job_id"], "darwinbox-arvind-main-501")
         self.assertEqual(first["posted_precision"], "minute")
         self.assertEqual(first["source_details"]["board_registry_id"], 91)
         self.assertIn("Python APIs", first["description"])
-        self.assertEqual(first["url"], "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/jobDetails/501")
+        self.assertEqual(first["url"], "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/501")
         self.assertEqual(calls[0][2]["json_body"]["limit"], 50)
         self.assertFalse(calls[0][2]["allow_redirects"])
 
@@ -597,7 +600,7 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "All configured Darwinbox boards failed"):
                 radar.darwinbox_collect({
                     "darwinbox_boards": [{
-                        "careers_url": "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs",
+                        "careers_url": "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280",
                         "company": "J G Summit",
                     }]
                 })
@@ -612,13 +615,14 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
             result = board_discovery.probe_public_board({"provider": "keka", "board_url": board})
         self.assertEqual(result["jobs_observed"], 1)
 
-        darwin = "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs"
+        darwin = "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280"
         with patch.object(
             board_discovery.requests, "post",
             return_value=self.Response({"status": "success", "data": [{"id": 1}]}),
-        ):
+        ) as darwin_post:
             result = board_discovery.probe_public_board({"provider": "darwinbox", "board_url": darwin})
         self.assertEqual(result["jobs_observed"], 1)
+        self.assertEqual(darwin_post.call_args.kwargs["headers"]["Referer"], darwin)
 
     def test_new_connectors_are_opt_in_and_config_migration_disables_them(self):
         base = radar._default_config()
@@ -629,7 +633,7 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
                 "company": "Bridgestone", "registry_id": 72,
             }],
             "darwinbox_boards": [{
-                "careers_url": "https://jgsummit.darwinbox.com/ms/candidatev2/a6373b98b30596/careers/allJobs",
+                "careers_url": "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280",
                 "company": "J G Summit", "registry_id": 91,
             }],
         })

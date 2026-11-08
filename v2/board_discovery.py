@@ -37,7 +37,7 @@ PROVIDER_PATTERNS = (
     ("smartrecruiters", re.compile(r"^(?:jobs|careers)\.smartrecruiters\.com$", re.I)),
     ("workable", re.compile(r"^(?:apply\.)?workable\.com$", re.I)),
     ("keka", re.compile(r"^(?P<slug>[a-z0-9-]+)\.keka\.com$", re.I)),
-    ("darwinbox", re.compile(r"^(?P<slug>[a-z0-9-]+)\.darwinbox\.(?:in|com)$", re.I)),
+    ("darwinbox", re.compile(r"^(?P<slug>[a-z0-9-]+)\.darwinbox\.in$", re.I)),
     ("recruitee", re.compile(r"^(?P<slug>[a-z0-9-]+)\.recruitee\.com$", re.I)),
     ("breezy", re.compile(r"^(?P<slug>[a-z0-9-]+)\.breezy\.hr$", re.I)),
     ("teamtailor", re.compile(r"^(?P<slug>[a-z0-9-]+)\.teamtailor\.com$", re.I)),
@@ -261,7 +261,7 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(jobs, list):
             raise ValueError("SmartRecruiters response did not contain public postings.")
     elif provider == "workable":
-        endpoint = f"https://www.workable.com/api/accounts/{candidate['board_key']}"
+        endpoint = f"https://apply.workable.com/api/v1/widget/accounts/{candidate['board_key']}"
         response = requests.get(
             endpoint, params={"details": "true"}, headers=headers,
             timeout=REQUEST_TIMEOUT_SECONDS, allow_redirects=False,
@@ -301,7 +301,7 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         response = requests.post(
             endpoint,
             json={"companyId": company_id, "page": 1, "sort_option": "new", "limit": 50},
-            headers={**headers, "Content-Type": "application/json"},
+            headers={**headers, "Content-Type": "application/json", "Referer": board_url},
             timeout=REQUEST_TIMEOUT_SECONDS,
             allow_redirects=False,
         )
