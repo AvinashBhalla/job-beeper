@@ -3106,3 +3106,8 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Redundant parser branch `fix/linkedin-experience-parser` was inspected; current V2 already includes `extract_linkedin_labeled_experience` plus its two regression tests, and the full 215-test CI covers them. Remove the stale branch, not the code.
 - PR/branch audit: `docs/PR_BRANCH_AUDIT_2026-11-08.md`. Cooldown evidence: `docs/LINKEDIN_429_DIAGNOSTIC_2026-11-08.md`. Persistent design/migration: `docs/LINKEDIN_COOLDOWN_PERSISTENCE_2026-11-08.md`.
 - Next task: investigate PR #46 preference-save error and surface useful server validation feedback. Keep PR #46 draft until preference persistence and per-user Telegram E2E are proven.
+## 2026-11-08 — Lever source integration readiness
+
+- Lever is the next source after Naukri relay / LinkedIn cooldown work. Official API reviewed: public v0 list GET with site slug and skip/limit pagination, global/EU hosts, published postings only, no API key; public fields include id/text/categories/descriptions/hostedUrl/workplaceType/salary. Timestamp semantics not guaranteed; keep posted_at unknown.
+- Adapter code and config v12 are on `feat/lever-source-adapter-20261108`; default-off, explicit empty board allowlist, 1800s interval, max 5×100 pages per board/run, request/page/board metrics, partial-failure retention, duplicate IDs, safe hosted URL validation and no apply POST.
+- 12 focused tests, 227 full V2 tests pass locally. GitHub CI not yet confirmed. No live board probe/enablement/deployment. See `docs/LEVER_SOURCE_ADAPTER.md`.

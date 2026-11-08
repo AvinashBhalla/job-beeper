@@ -4060,5 +4060,233 @@ class AshbyCollectorTests(unittest.TestCase):
             radar.validate_config({**BASE_CONFIG,"ashby_boards":[{"board":"../unsafe","company":"Bad"}]})
 
 
+
+class LeverCollectorTests(unittest.TestCase):
+    def _response(self, payload, status_code=200):
+        class Response:
+            def __init__(self, value, status):
+                self.value = value
+                self.status_code = status
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise radar.requests.HTTPError(f"HTTP {self.status_code}")
+
+            def json(self):
+                return self.value
+
+        return Response(payload, status_code)
+
+    def _job(self, **overrides):
+        item = {
+            "id": "posting-123",
+            "text": "Software Engineer",
+            "categories": {
+                "location": "Bengaluru, India",
+                "allLocations": ["Bengaluru, India", "Remote - India"],
+                "team": "Engineering",
+                "department": "Product",
+                "commitment": "Fulltime",
+                "level": "Mid-Level",
+            },
+            "hostedUrl": "https://jobs.lever.co/example/posting-123",
+            "applyUrl": "https://jobs.lever.co/example/posting-123/apply",
+            "descriptionPlain": "Build Python APIs and distributed systems.",
+            "workplaceType": "hybrid",
+            "salaryRange": {"currency": "INR", "min": 1000000, "max": 1800000},
+            "createdAt": 1790000000000,
+        }
+        item.update(overrides)
+        return item
+
+    def _collect_with_metrics(self, config, side_effect):
+        radar._begin_source_run_metrics("lever")
+        try:
+            with patch.object(radar.requests, "get", side_effect=side_effect) as request:
+                jobs = radar.lever_collect(config)
+            metrics = radar._finish_source_run_metrics("lever")
+            return jobs, metrics, request
+        except Exception:
+            radar._finish_source_run_metrics("lever")
+            raise
+
+    def test_public_global_board_normalizes_documented_fields_and_keeps_timestamp_unknown(self):
+        config = {"lever_boards": [{"site": "example", "company": "Example Labs"}]}
+        jobs, metrics, request = self._collect_with_metrics(
+            config,
+            lambda url, **kwargs: self._response([self._job()]),
+        )
+
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        self.assertEqual(job["source"], "lever")
+        self.assertEqual(job["source_job_id"], "lever-global-example-posting-123")
+        self.assertEqual(job["company"], "Example Labs")
+        self.assertEqual(job["title"], "Software Engineer")
+        self.assertEqual(job["location"], "Bengaluru, India")
+        self.assertEqual(job["url"], "https://jobs.lever.co/example/posting-123")
+        self.assertIn("Build Python APIs", job["description"])
+        self.assertIn("Team: Engineering", job["description"])
+        self.assertIn("Workplace type: hybrid", job["description"])
+        self.assertEqual(job["source_details"]["salary_range"]["currency"], "INR")
+        self.assertIsNone(job["source_posted_at"])
+        self.assertEqual(job["posted_precision"], "unknown")
+        self.assertIsNone(job["discovery_latency_seconds"])
+
+        args, kwargs = request.call_args
+        self.assertEqual(args[0], "https://api.lever.co/v0/postings/example")
+        self.assertEqual(kwargs["params"], {"mode": "json", "limit": 100, "skip": 0})
+        self.assertEqual(kwargs["timeout"], 20)
+        self.assertEqual(kwargs["headers"]["Accept"], "application/json")
+        self.assertNotIn("Authorization", kwargs["headers"])
+        self.assertEqual(metrics["pages_attempted"], 1)
+        self.assertEqual(metrics["pages_succeeded"], 1)
+        self.assertEqual(metrics["boards_attempted"], 1)
+        self.assertEqual(metrics["boards_succeeded"], 1)
+
+    def test_eu_instance_uses_eu_api_and_hosted_domain(self):
+        item = self._job(hostedUrl="https://jobs.eu.lever.co/example/posting-123")
+        jobs, _, request = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example EU", "instance": "eu"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(request.call_args.args[0], "https://api.eu.lever.co/v0/postings/example")
+        self.assertEqual(jobs[0]["source_job_id"], "lever-eu-example-posting-123")
+        self.assertEqual(jobs[0]["url"], "https://jobs.eu.lever.co/example/posting-123")
+
+    def test_paginates_until_a_short_page_and_deduplicates_ids(self):
+        first_page = [self._job(id=f"posting-{i}") for i in range(100)]
+        second_page = [self._job(id="posting-100"), self._job(id="posting-100")]
+        def get(url, **kwargs):
+            return self._response(first_page if kwargs["params"]["skip"] == 0 else second_page)
+
+        jobs, metrics, request = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            get,
+        )
+        self.assertEqual(len(jobs), 101)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["params"]["skip"] for call in request.call_args_list],
+            [0, 100],
+        )
+        self.assertEqual(metrics["pages_attempted"], 2)
+        self.assertEqual(metrics["pages_succeeded"], 2)
+        self.assertEqual(metrics["pages_failed"], 0)
+
+    def test_partial_page_failure_retains_previous_page_jobs_and_reports_page_failure(self):
+        first_page = [self._job(id=f"posting-{i}") for i in range(100)]
+        def get(url, **kwargs):
+            if kwargs["params"]["skip"] == 0:
+                return self._response(first_page)
+            raise radar.requests.Timeout("simulated page timeout")
+
+        jobs, metrics, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            get,
+        )
+        self.assertEqual(len(jobs), 100)
+        self.assertEqual(metrics["pages_attempted"], 2)
+        self.assertEqual(metrics["pages_succeeded"], 1)
+        self.assertEqual(metrics["pages_failed"], 1)
+        self.assertEqual(metrics["boards_succeeded"], 1)
+        self.assertEqual(metrics["boards_failed"], 0)
+
+    def test_failed_board_does_not_discard_successful_board(self):
+        def get(url, **kwargs):
+            if "/bad" in url:
+                raise radar.requests.HTTPError("404 board not found")
+            return self._response([self._job(id="good-posting")])
+
+        jobs, metrics, _ = self._collect_with_metrics(
+            {"lever_boards": [
+                {"site": "bad", "company": "Bad Board"},
+                {"site": "good", "company": "Good Board"},
+            ]},
+            get,
+        )
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["company"], "Good Board")
+        self.assertEqual(jobs[0]["source_job_id"], "lever-global-good-good-posting")
+        self.assertEqual(metrics["boards_attempted"], 2)
+        self.assertEqual(metrics["boards_succeeded"], 1)
+        self.assertEqual(metrics["boards_failed"], 1)
+
+    def test_rejects_malformed_response_when_all_boards_fail(self):
+        with self.assertRaisesRegex(RuntimeError, "All configured Lever boards failed"):
+            self._collect_with_metrics(
+                {"lever_boards": [{"site": "bad", "company": "Bad Board"}]},
+                lambda url, **kwargs: self._response({"jobs": []}),
+            )
+
+    def test_untrusted_hosted_url_is_replaced_with_canonical_lever_url(self):
+        item = self._job(hostedUrl="https://attacker.example/collect")
+        jobs, _, _ = self._collect_with_metrics(
+            {"lever_boards": [{"site": "example", "company": "Example Labs"}]},
+            lambda url, **kwargs: self._response([item]),
+        )
+        self.assertEqual(jobs[0]["url"], "https://jobs.lever.co/example/posting-123")
+
+    def test_no_public_boards_configured_is_a_clear_source_error(self):
+        with self.assertRaisesRegex(RuntimeError, "no public lever_boards"):
+            radar.lever_collect({"lever_boards": []})
+
+
+class LeverConfigTests(unittest.TestCase):
+    def test_v12_migration_forces_lever_off_even_if_old_config_enabled_it(self):
+        defaults = {
+            "config_version": 12,
+            "source_enabled": {"linkedin": True, "naukri": True, "instahyre": False,
+                               "greenhouse": False, "ashby": False, "lever": False},
+            "poll_seconds": {"linkedin": 180, "naukri": 300, "instahyre": 600,
+                             "greenhouse": 900, "ashby": 1800, "lever": 1800},
+            "lever_boards": [],
+        }
+        previous = {
+            "config_version": 11,
+            "source_enabled": {"linkedin": True, "naukri": True, "lever": True},
+            "poll_seconds": {"lever": 300},
+            "lever_boards": [{"site": "example", "company": "Example Labs"}],
+        }
+        merged = radar._merge_config(defaults, previous)
+        self.assertEqual(merged["config_version"], 12)
+        self.assertFalse(merged["source_enabled"]["lever"])
+        self.assertEqual(
+            merged["lever_boards"],
+            [{"site": "example", "company": "Example Labs"}],
+        )
+        self.assertEqual(merged["poll_seconds"]["lever"], 300)
+
+    def test_config_validation_accepts_allowlisted_global_and_eu_sites(self):
+        config = {**BASE_CONFIG, "lever_boards": [
+            {"site": "example-global", "company": "Example Global"},
+            {"site": "example-eu", "company": "Example EU", "instance": "eu"},
+        ]}
+        validated = radar.validate_config(config)
+        self.assertEqual(validated["lever_boards"][0]["instance"], "global")
+        self.assertEqual(validated["lever_boards"][1]["instance"], "eu")
+        self.assertFalse(validated["source_enabled"]["lever"])
+        self.assertEqual(validated["poll_seconds"]["lever"], 1800)
+
+    def test_config_validation_rejects_duplicate_sites_and_invalid_instance(self):
+        base = {**BASE_CONFIG, "lever_boards": [
+            {"site": "Example", "company": "Example A"},
+            {"site": "example", "company": "Example B"},
+        ]}
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config(base)
+        invalid_instance = {**BASE_CONFIG, "lever_boards": [
+            {"site": "example", "company": "Example", "instance": "unknown"},
+        ]}
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config(invalid_instance)
+
+    def test_config_validation_rejects_unsafe_site_name(self):
+        with self.assertRaises(radar.HTTPException):
+            radar.validate_config({**BASE_CONFIG, "lever_boards": [
+                {"site": "../unsafe", "company": "Bad"},
+            ]})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -233,3 +233,9 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - [CI #40651562286](https://github.com/AvinashBhalla/job-beeper/actions/runs/40651562286): focused tests 32 passed in 0.061 seconds; full V2 suite 134 passed in 17.009 seconds. This is CI evidence only, not VM or live-provider validation.
 - Keep LLM_ROUTER_ENABLED=false and LLM_ROUTER_MATCHER_ENABLED=false until a separate rollout is approved. Keep Telegram credentials blank and notifications disabled; no VM, DB, named volume or production-like service was changed.
 - Next: read-only inspect/fetch of /home/ubuntu/job-beeper-dev and explicit ahead/behind/path assessment before any fast-forward. Preserve local v2/config.json, .venv/, .env, and job-radar-dev_radar-dev-data.
+
+## Lever adapter implementation status — 2026-11-08
+
+- The current V2 branch now has a default-off Lever public Postings API adapter on feature branch `feat/lever-source-adapter-20261108`. Official public API contract: https://github.com/lever/postings-api; GET global/EU site endpoints; `skip`/`limit` pagination; published jobs only; stable ID/title/categories/plain/HTML descriptions/hostedUrl/workplaceType/optional salary.
+- Adapter supports explicit `lever_boards` allowlist, global/EU selection, max 20 boards, 5 pages × 100 items max per board/run, 20s timeout, metrics and partial-failure retention. It never submits applications. It only accepts valid Lever hosted URLs or constructs the canonical site URL. No documented publish timestamp; posted time remains unknown.
+- Config v12 keeps Lever disabled in both configs and forces old persisted configs off. 12 focused tests and full suite 227 passed locally; CI pending. No employer board configured, no live request or deployment.

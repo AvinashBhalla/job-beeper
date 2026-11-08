@@ -62,6 +62,9 @@ LINKEDIN_DEEP_SCAN_SECONDS = 1800
 LINKEDIN_DEEP_PAGE_BATCH = 1
 LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
+LEVER_PAGE_SIZE = 100
+LEVER_MAX_PAGES_PER_BOARD = 5
+LEVER_MAX_BOARDS = 20
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -178,6 +181,10 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     # Version 11 introduces Ashby; never enable a new source via migration.
     if current_version < 11 <= default_version:
         merged.setdefault("source_enabled", {})["ashby"] = False
+    # Version 12 introduces Lever's public postings API as an opt-in source.
+    # Existing runtimes must never start polling new employer boards implicitly.
+    if current_version < 12 <= default_version:
+        merged.setdefault("source_enabled", {})["lever"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -192,6 +199,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
             merged["source_enabled"]["greenhouse"] = False
         if current_version < 11 <= default_version:
             merged["source_enabled"]["ashby"] = False
+        if current_version < 12 <= default_version:
+            merged["source_enabled"]["lever"] = False
     return merged
 
 
@@ -297,6 +306,40 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_ashby_boards.append({"board": name, "company": company.strip()})
     config["ashby_boards"] = normalized_ashby_boards
 
+    lever_boards = config.get("lever_boards", [])
+    if not isinstance(lever_boards, list):
+        raise HTTPException(status_code=422, detail="lever_boards must be a list.")
+    if len(lever_boards) > LEVER_MAX_BOARDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"lever_boards cannot contain more than {LEVER_MAX_BOARDS} boards.",
+        )
+    normalized_lever_boards: list[dict[str, str]] = []
+    seen_lever_sites: set[tuple[str, str]] = set()
+    for board in lever_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Lever board must be an object.")
+        site = board.get("site")
+        company = board.get("company")
+        instance = str(board.get("instance") or "global").strip().lower()
+        if not isinstance(site, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", site.strip()):
+            raise HTTPException(status_code=422, detail="Each Lever board requires a valid public site name.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Lever board requires a company label of at most 120 characters.")
+        if instance not in {"global", "eu"}:
+            raise HTTPException(status_code=422, detail="Lever board instance must be 'global' or 'eu'.")
+        site = site.strip()
+        identity = (instance, site.lower())
+        if identity in seen_lever_sites:
+            raise HTTPException(status_code=422, detail=f"Duplicate Lever board site: {site} ({instance}).")
+        seen_lever_sites.add(identity)
+        normalized_lever_boards.append({
+            "site": site,
+            "company": company.strip(),
+            "instance": instance,
+        })
+    config["lever_boards"] = normalized_lever_boards
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -306,6 +349,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "instahyre": bool(source_enabled.get("instahyre", True)),
         "greenhouse": bool(source_enabled.get("greenhouse", False)),
         "ashby": bool(source_enabled.get("ashby", False)),
+        "lever": bool(source_enabled.get("lever", False)),
     }
 
     poll_seconds = config.get("poll_seconds", {})
@@ -319,6 +363,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "instahyre": 600,
             "greenhouse": 900,
             "ashby": 1800,
+            "lever": 1800,
         }.items()
     }
 
@@ -3384,12 +3429,262 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _lever_public_url(value: Any, *, site: str, instance: str, posting_id: str) -> str:
+    """Accept only a Lever-hosted posting URL; derive its canonical public URL otherwise."""
+    allowed_host = "jobs.eu.lever.co" if instance == "eu" else "jobs.lever.co"
+    if isinstance(value, str) and value.strip():
+        parsed = urlsplit(value.strip())
+        expected_prefix = f"/{site}/"
+        if (
+            parsed.scheme.lower() == "https"
+            and parsed.hostname
+            and parsed.hostname.lower() == allowed_host
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.path.startswith(expected_prefix)
+            and parsed.query == ""
+            and parsed.fragment == ""
+        ):
+            return value.strip()
+    return f"https://{allowed_host}/{site}/{posting_id}"
+
+
+def _normalize_lever_posting(
+    item: dict[str, Any],
+    *,
+    site: str,
+    company: str,
+    instance: str,
+) -> dict[str, Any] | None:
+    raw_id = item.get("id")
+    title = item.get("text")
+    if raw_id in (None, "") or not isinstance(title, str) or not title.strip():
+        return None
+
+    posting_id = str(raw_id).strip()
+    source_id = f"lever-{instance}-{site}-{posting_id}"
+    hosted_url = _lever_public_url(
+        item.get("hostedUrl"),
+        site=site,
+        instance=instance,
+        posting_id=posting_id,
+    )
+
+    categories = item.get("categories")
+    if not isinstance(categories, dict):
+        categories = {}
+    locations = categories.get("allLocations")
+    location_values = (
+        [value.strip() for value in locations if isinstance(value, str) and value.strip()]
+        if isinstance(locations, list)
+        else []
+    )
+    primary_location = categories.get("location")
+    location = (
+        primary_location.strip()
+        if isinstance(primary_location, str) and primary_location.strip()
+        else ", ".join(dict.fromkeys(location_values))
+    )
+
+    plain_description = item.get("descriptionPlain")
+    if isinstance(plain_description, str) and plain_description.strip():
+        description = plain_description.strip()
+    else:
+        html_description = item.get("description") or item.get("descriptionBody")
+        description = (
+            BeautifulSoup(
+                html_lib.unescape(html_description),
+                "html.parser",
+            ).get_text(" ", strip=True)
+            if isinstance(html_description, str)
+            else ""
+        )
+
+    extra_lines: list[str] = []
+    for field, label in (
+        ("team", "Team"),
+        ("department", "Department"),
+        ("commitment", "Commitment"),
+        ("level", "Level"),
+    ):
+        value = categories.get(field)
+        if isinstance(value, str) and value.strip():
+            extra_lines.append(f"{label}: {value.strip()}")
+
+    workplace_type = item.get("workplaceType")
+    if isinstance(workplace_type, str) and workplace_type.strip():
+        extra_lines.append(f"Workplace type: {workplace_type.strip()}")
+
+    sections = item.get("lists")
+    if isinstance(sections, list):
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            section_name = str(section.get("text") or "").strip()
+            section_html = section.get("content")
+            section_text = (
+                BeautifulSoup(
+                    html_lib.unescape(section_html),
+                    "html.parser",
+                ).get_text(" ", strip=True)
+                if isinstance(section_html, str)
+                else ""
+            )
+            if section_name or section_text:
+                extra_lines.append(f"{section_name}: {section_text}".strip(": "))
+
+    if extra_lines:
+        description = "\n".join(part for part in (description, *extra_lines) if part)
+
+    salary_range = item.get("salaryRange")
+    source_details = {
+        "lever_instance": instance,
+        "lever_site": site,
+        "team": categories.get("team"),
+        "department": categories.get("department"),
+        "commitment": categories.get("commitment"),
+        "level": categories.get("level"),
+        "workplace_type": workplace_type if isinstance(workplace_type, str) else None,
+        "salary_range": salary_range if isinstance(salary_range, dict) else None,
+    }
+    return normalize_job(
+        "lever",
+        source_id,
+        company,
+        title.strip(),
+        location,
+        hosted_url,
+        None,
+        "unknown",
+        description,
+        source_details=source_details,
+    )
+
+
+def lever_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect published postings from explicit Lever public-site allowlist entries.
+
+    The public Postings API uses skip/limit pagination. No authentication or
+    application endpoint is used. The v0 public field contract does not promise
+    a trustworthy publication timestamp, so source_posted_at stays unknown.
+    """
+    boards = config.get("lever_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Lever is enabled but no public lever_boards are configured")
+    if len(boards) > LEVER_MAX_BOARDS:
+        raise RuntimeError("Lever board allowlist exceeds the configured safety limit")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+
+    for board in boards:
+        site = str(board.get("site") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        instance = str(board.get("instance") or "global").strip().lower() if isinstance(board, dict) else "global"
+        if (
+            not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", site)
+            or not company
+            or len(company) > 120
+            or instance not in {"global", "eu"}
+        ):
+            _record_source_board("lever", False)
+            failures.append(f"{site or '<missing-site>'}: invalid board configuration")
+            continue
+
+        api_host = "api.eu.lever.co" if instance == "eu" else "api.lever.co"
+        endpoint = f"https://{api_host}/v0/postings/{site}"
+        successful_pages = 0
+
+        for page_number in range(LEVER_MAX_PAGES_PER_BOARD):
+            try:
+                response = _tracked_source_get(
+                    "lever",
+                    endpoint,
+                    params={
+                        "mode": "json",
+                        "limit": LEVER_PAGE_SIZE,
+                        "skip": page_number * LEVER_PAGE_SIZE,
+                    },
+                    headers={**UA, "Accept": "application/json"},
+                    timeout=20,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, list):
+                    raise ValueError("Lever response did not contain a postings list")
+            except Exception as exc:
+                _record_source_page("lever", False)
+                failures.append(
+                    f"{site} page {page_number + 1}: {type(exc).__name__}"
+                )
+                log.warning(
+                    "lever: site=%s page=%s failed error_type=%s",
+                    site,
+                    page_number + 1,
+                    type(exc).__name__,
+                )
+                break
+
+            _record_source_page("lever", True)
+            successful_pages += 1
+            for item in payload:
+                if not isinstance(item, dict):
+                    continue
+                job = _normalize_lever_posting(
+                    item,
+                    site=site,
+                    company=company,
+                    instance=instance,
+                )
+                if job and job["source_job_id"] not in seen_ids:
+                    seen_ids.add(job["source_job_id"])
+                    jobs.append(job)
+
+            if len(payload) < LEVER_PAGE_SIZE:
+                break
+            if page_number == LEVER_MAX_PAGES_PER_BOARD - 1:
+                log.warning(
+                    "lever: site=%s reached bounded pagination cap pages=%s page_size=%s",
+                    site,
+                    LEVER_MAX_PAGES_PER_BOARD,
+                    LEVER_PAGE_SIZE,
+                )
+
+        if successful_pages:
+            successful_boards += 1
+            _record_source_board("lever", True)
+        else:
+            _record_source_board("lever", False)
+
+    if successful_boards == 0:
+        details = "; ".join(failures) or "no valid boards configured"
+        raise RuntimeError(f"All configured Lever boards failed: {details}")
+    if failures:
+        log.warning(
+            "lever: partial board/page failures=%s successful_boards=%s",
+            len(failures),
+            successful_boards,
+        )
+    log.info(
+        "lever: boards=%s successful=%s failed=%s jobs=%s timestamped=0 pages_cap=%s",
+        len(boards),
+        successful_boards,
+        len(failures),
+        len(jobs),
+        LEVER_MAX_PAGES_PER_BOARD,
+    )
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
     "instahyre": instahyre_collect,
     "greenhouse": greenhouse_collect,
     "ashby": ashby_collect,
+    "lever": lever_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 

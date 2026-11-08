@@ -93,3 +93,10 @@ Review draft PR #47 and merge into `v2-live-radar` only after human review/appro
 - Neither merge was deployed. Production's legacy DB has no structured history for the prior 27 log-only 429s, so the first rollout starts with empty persisted breaker state; newly recorded 429s are durable across restarts.
 - Old parser branch was redundant: labelled-experience helper and regression tests already exist in V2; stale branch removed. Current LinkedIn code remains under conservative cooldown; no request-pressure or access-method change.
 - Next priority: diagnose and fix the preferences-save validation/UI issue on PR #46, then validate per-user Telegram link/opt-in/delivery/opt-out E2E. Keep #46 draft until those release gates pass.
+## 2026-11-08 — Lever adapter implementation
+
+- Added Lever as the next structured ATS adapter on `feat/lever-source-adapter-20261108`. Official Lever public Postings API uses unauthenticated HTTPS GET `/v0/postings/{SITE}` with explicit `skip`/`limit`; global and EU API hosts are documented. It only exposes published public postings.
+- Adapter is default-off with a version-12 migration, explicit safe site allowlist, 1800s polling, page size 100, at most 5 pages/500 postings per board per run, per-request/page/board telemetry, partial-failure retention, duplicate suppression, hosted URL validation/fallback and plain-description normalization.
+- No reliable published timestamp is documented, so Lever timestamps stay unknown even if sample payloads include a createdAt field. No application endpoint is called.
+- 12 focused tests passed; full V2 suite **227 passed** locally. GitHub CI pending after push. Both configs Lever off with empty allowlist; no live probe, DB write, notifications or deployment.
+- Next after CI: curated one/two-board GET-only two-snapshot canary, evaluate ID stability, fresh yield and India/remote relevance. Keep source disabled until separate review.
