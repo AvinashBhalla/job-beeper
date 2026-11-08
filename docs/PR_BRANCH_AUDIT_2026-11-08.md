@@ -93,3 +93,16 @@ Deleted: `feat/structured-naukri-details-20261106` (after #3 closure), `fix/rela
 - HTTP smoke verification: /health, /dashboard/, dashboard JS and CSS returned 200. Member login/feed/daily-summary returned 200; member /api/source-status/summary, /api/source-status and /api/latency-summary returned 403. Admin login and all three source-health GETs returned 200. No outbound source requests or Telegram sends were made.
 - The original port-8004 feature process still uses /tmp/job-radar-user-preferences and remains unchanged. Do not use it for post-fix verification. Ports 8000/8001 remain untouched.
 - Next: run Prompt 1 in docs/QA/NEXT_DESKTOP_TEST_PROMPTS_2026-11-08.md against port 18005. It must verify real 390×844/375×812/320×740 rendering and direct #sources member navigation, then admin access.
+
+## Follow-up integration review — per-user Lever baseline suppression
+
+During a code-level integration review, a remaining cross-source notification gap was found despite an earlier handover note claiming the member path was protected.
+
+- Lever initial-inventory suppression marks `notification_ledger.baseline_suppressed=1` at the canonical-opportunity level.
+- `user_notifications._queue_new_matches()` previously excluded only `jobs.source_initial_baseline=1`. A Lever row can be part of initial baseline while its canonical opportunity was first created by a different source; the job-row flag may therefore be 0 while the canonical flag is 1.
+- Fixed member queue creation, claim selection and final pre-send revalidation to also exclude any canonical opportunity with `notification_ledger.baseline_suppressed=1`.
+- Stale `queued`, `failed` or `sending` member rows for either job-level or canonical-level baseline items are cancelled as `initial_source_baseline`.
+- Added four tests around this: cross-source canonical suppression at enqueue, cancellation of a queued item at claim, final send revalidation if the canonical marker appears after claim, and the existing own-source baseline behavior.
+- All member notification tests: **17 passed**. Full integration V2 suite: **336 passed** in **194.322 seconds**. Python compile and `git diff --check` passed.
+- This is a verified source-level fix; no real Telegram message or outbound Telegram request occurred. Lever remains disabled, all candidate QA collector switches remain off, and production/shared-dev are untouched.
+- This correction supersedes the earlier wording that the member queue was fully protected before this change. The newly inspected code path was not covered by the prior test.
