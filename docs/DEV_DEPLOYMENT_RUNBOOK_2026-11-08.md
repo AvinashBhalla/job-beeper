@@ -95,3 +95,4 @@ Live health reads returned HTTP 200 on shared dev port 8001 and production port 
 Full execution record: `docs/QA/shared-dev-promotion-execution-2026-11-08.md`.
 
 **Handoff:** resume only from an existing Docker-authorized operator session. Take a fresh SQLite online backup from the live shared-dev volume immediately before promotion, preserve the current volume/compose/env/config/rollback image, keep Naukri-only ingestion and Telegram/Gemini off, recreate only shared dev, then verify and observe at least two Naukri cycles. Do not ask the user to paste credentials into chat.
+Additional check: the existing `job-radar-sqlite-snapshot.service` last succeeded at 02:45:43 UTC (dev snapshot integrity `ok`, 8,333 jobs then), which is too old for this promotion. A non-privileged `systemctl start --no-block` request was denied with `Interactive authentication required`; no new backup was created.
