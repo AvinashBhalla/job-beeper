@@ -30,3 +30,12 @@ Do not implement a six-hour release delay from a marketing claim alone. First di
 - https://jobbeeper.com/j/28718936-full-stack-developer-flexiple
 
 Research checkpoint only. No reference-site account/payment action, code change or runtime change occurred.
+
+
+## Follow-up public page inspection — 2026-11-08
+
+Additional public browse route inspection confirms `/browse/role/{slug}` exposes a location filter plus a search field described as searching title, company or location, with up to 200 displayed public results. This is a public browse interaction, not proof of authenticated preference or saved-search behavior.
+
+Public job detail inspection shows employer description content can include employer-hosted application instructions, recruitment privacy notices and EEO wording. This is consistent with rendering employer-provided descriptions and preserving the original apply route; it does not prove JobBeeper itself collects or submits an application.
+
+Landing-page claims remain marketing/public evidence: free browsing and application tracking; paid instant alerts across Telegram, browser and app; preferences for roles/locations/experience/companies; private subscriber delivery before selected public sharing; a claimed six-hour head start. Do not implement an exact delay or entitlement rule until Desktop Prompt 2 verifies routes, plan details and actual page behavior. No signup, account action, payment or application was performed.
