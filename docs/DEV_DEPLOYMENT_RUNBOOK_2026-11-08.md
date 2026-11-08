@@ -57,7 +57,23 @@ The preflight snapshot is evidence, not the final deployment backup. Take a fres
 - **Candidate code validation:** GitHub Actions V2 CI run `42468551208` completed successfully on `cf778c1f1da33c773f820cafea991fb084c58da8`, with 337 tests passed. Subsequent documentation-only commits must not be described as independently CI-verified until the current branch status is checked.
 - **Promotion status:** no shared-dev promotion, service restart, config edit, database migration, feature-flag change, or production action has occurred. PR #51 remains draft. The existing preflight database snapshot is not a substitute for a fresh backup immediately before a future promotion.
 
-## Next actions before promotion
+## Updated release blockers — final visual evidence follow-up
+
+- **320px interaction: FAIL for both roles.** At 320×740, member `Mark Applied` hit-testing returned the “Newest First” button; admin hit-testing returned `.feed-status-strip`. At 390×844 and 375×812, both roles passed. The target button rectangles are above the 56px bottom bar, whose top is y=684; exact overlay/cause is unconfirmed. See `docs/QA/desktop-final-visual-evidence-2026-11-08.md`.
+- **Screenshot export: BLOCKED.** In-memory browser screenshot bytes were returned but could not be written to the requested local screenshot directory. No PNG files exist. A local Playwright runner with `page.screenshot({path: ...})` or equivalent is required.
+- **QA-001 remains PASS** and responsive metric layout remains PASS. The new 320px failure is a separate hit-testing/accessibility issue and must not be conflated with the earlier layout result.
+- **Manual CSRF/session mutation: UNKNOWN** as previously recorded.
+
+## Required next actions before promotion
+
+1. Obtain exact 320px hit-test x/y, `elementsFromPoint()` stack, bounds and computed styles for the intended and returned elements in both roles. Confirm the target button remains connected and coordinates use viewport CSS pixels.
+2. Apply a minimal root-cause fix only after the diagnostic identifies the overlap or coordinate issue. Add a regression test covering the relevant DOM/CSS contract and recheck 320px, 375px and 390px.
+3. Use a capture-capable local Playwright runner to export and validate PNG screenshots.
+4. Decide how to close manual CSRF/session UNKNOWNs through isolated synthetic testing or owner/security acceptance.
+5. Re-check CI for the latest code head and obtain explicit owner approval before any shared-dev promotion. Take a fresh online SQLite backup immediately before promotion and follow the runbook above.
+
+Workday/SmartRecruiters remain legacy-only and Darwinbox is generic discovery only; they are not part of the six-source V2 release scope.
+
 
 1. Obtain screenshot files through a capture-capable harness and archive redacted desktop/member/admin-mobile evidence.
 2. Verify bottom-nav occlusion with stable geometry and hit-testing at the bottom of scrolled mobile content; retain actual measurements and screenshots.
