@@ -2,8 +2,8 @@
 
 # Job Radar — 36-platform source coverage and near-real-time delivery roadmap
 
-**Owner requirement recorded:** 2026-11-08  
-**Applies to:** V2 candidate / PR #51 and all future agents  
+**Owner requirement recorded:** 2026-11-08
+**Applies to:** V2 candidate / PR #51 and all future agents
 **Priority:** Product requirement, not optional future polish
 
 ## 1. Product expectation
@@ -69,7 +69,7 @@ Status legend:
 | 27 | SmartRecruiters | ATS | Research lead; not implemented in V2 | Official public postings endpoint by company identifier, with offset pagination (maximum 100 per page); public-only destination. |
 | 28 | SAP SuccessFactors | ATS / HCM | Not implemented in V2 | Career-site sitemap/search pages and tenant-specific public endpoints; do not assume authenticated OData HR endpoints are public. |
 | 29 | Oracle Taleo | ATS / legacy | Not implemented in V2 | Legacy hosted career pages, tenant-specific search and JobPosting JSON-LD where present. |
-| 30 | Teamtailor | ATS | Research lead; not implemented in V2 | Official API has a Public read permission for career-site-visible data but requires a board/client token; public RSS/XML patterns may be an alternative where terms permit. |
+| 30 | Teamtailor | ATS | **Default-off feature-branch adapter candidate**; official docs sample RSS returned 16 entries and parser accepted 16/16; nine focused tests pass; full V2 suite pending. | Official public `jobs.rss` careers-site feed exposes title, description, publication date, public job URL, remote status, global ID, location, department, role and division. Documented offset/per_page supports pagination. See `docs/TEAMTAILOR_SOURCE_ADAPTER.md`. |
 | 31 | UKG Pro / UltiPro | ATS / HCM | Not implemented in V2 | Customer career site / tenant-specific portal. Identify public job feed; do not use workforce/private HR endpoints. |
 | 32 | Wellfound | Job marketplace | Not implemented in V2 | Marketplace connector requires permitted public or partner access. Keep separate from employer ATS board polling. |
 | 33 | Workable | ATS | Research lead; not implemented in V2 | Public careers widget/account endpoint for public listings; distinguish it from authenticated customer API scopes. |
@@ -267,7 +267,7 @@ Darwinbox is still not implemented. Its official Recruitment API requires employ
 
 - Current candidate commit: `93f532c20b0dcf6b37429a65add18281c16c00f9`, attached to draft PR #51 (`integration/pr46-v2-rebase-20261108` → `v2-live-radar`). PR remains draft/open. GitHub Actions V2 CI run `42491830453` is running on this exact SHA; wait for its final result before merge consideration.
 - Added admin-first company/board discovery in `v2/board_discovery.py`: submit company name, website and optional careers URL; inspect a bounded number of public HTTPS pages, follow likely careers links, detect known ATS board patterns and persist multiple boards per company. This is not a per-employer hand-built JobBeeper page. The admin workflow is scan → inspect → endpoint verify → explicit activate. Discovery alone never enables polling.
-- Discovery recognises Workday, Greenhouse, Ashby, Lever, SmartRecruiters, Workable, Recruitee, Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Collector availability is distinct from detection: current V2 ATS collectors are Greenhouse, Ashby, Lever, Workday, SmartRecruiters and Workable. Recruitee/Breezy/Teamtailor/BambooHR/Rippling/Personio are discovery-only pending validated public endpoint adapters. Darwinbox is still not implemented; official recruitment APIs are employer-authenticated unless a specific public candidate endpoint is independently verified.
+- Discovery recognises Workday, Greenhouse, Ashby, Lever, SmartRecruiters, Workable, Recruitee, Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Collector availability is distinct from detection. Teamtailor has a default-off feature-branch RSS adapter candidate, not yet merged or deployed. Recruitee, Breezy HR, BambooHR, Rippling and Personio remain at their separately documented states; do not infer collector availability from provider detection. Darwinbox is still not implemented; official recruitment APIs are employer-authenticated unless a specific public candidate endpoint is independently verified.
 - Added SmartRecruiters public postings API and Workable public widget collectors. Config version 14; both source flags default false and allowlists are empty. SmartRecruiters uses bounded three-page scans (100 listings/page) and up to 20 detail lookups per board. Workable consumes the public published-jobs widget. Both include stable source IDs, descriptions where exposed, locations and publication metadata where supplied.
 - Activation requires a verified public endpoint and explicit admin click. It enables the collector and binds the registry board ID into source metadata. First successful poll marks only that board's first inventory as baseline and cancels unattempted queued alerts; it does not replay historic jobs to Telegram. A second board on an already active source does not re-baseline other employers.
 - Live public validation: Bosch Group SmartRecruiters returned 300 postings under the configured page cap (20 detailed descriptions); Hugging Face Workable returned 6 published jobs with descriptions. Each collector was run twice through `run_source` against a disposable SQLite database: first poll ingested 300/6 and marked all rows as baseline, second poll produced zero new rows; zero Telegram sends; `PRAGMA integrity_check=ok`.

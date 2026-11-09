@@ -103,3 +103,16 @@ GitHub audit: keep #35 as draft release gate; #46, #50 and #52 are stale/superse
 ## 2026-11-09 — Two-role Desktop QA ready
 
 Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` before browser testing. A fresh isolated synthetic QA app runs on VM loopback 8006 (local browser URL `http://localhost:18006/dashboard/`, tunnel `ssh -N -L 18006:127.0.0.1:8006 ubuntu@130.210.27.197`). Temporary accounts `qa-admin@local.test` (admin) and `qa-member@local.test` (normal user) were created and verified in that isolated DB; passwords were shared in chat only, never commit them. Four synthetic demo jobs; all collectors off, notifications off, Telegram/OAuth/LLM credentials blank. Member source-health APIs return 403; admin returns 200. Do not use old candidate 8005/18005, production 8000, shared dev 8001, experiment 8002 or connector QA 8010 for this test. Prompt and complete manual checklist are in the QA runbook. Owner and Desktop should test both roles; report gaps, do not modify code/runtime. Fix on dev first.
+
+
+## 2026-11-09 — Teamtailor public RSS connector candidate (not deployed)
+
+- Isolated branch `feat/teamtailor-public-rss-20261109` from `origin/v2-live-radar`. Adds a default-off RSS collector, provider discovery/probe, explicit admin board activation/deactivation, 300-second default interval, offset/per_page pagination (200 rows/page, cap 2,000 per board/run), Retry-After cooldown, and silent first-board baseline. Dashboard source toggle, source-health label and job-source filter are included.
+- Read-only GET to Teamtailor's official documentation sample returned HTTP 200 `application/rss+xml`, 16 items; parser accepted 16/16 with publication date, description, location and HTTPS job URL. This is format validation, not proof of a populated employer board.
+- Focused suite: 9/9 passed. Python compile, config JSON validation and `git diff --check` passed. Full V2 suite and exact-head GitHub CI pending.
+- Status: code/research only. Source remains disabled; no board activated, no DB ingestion, no Telegram, no shared-dev deployment and no production changes. Custom branded careers domains are not auto-detected in this initial branch.
+- See `docs/TEAMTAILOR_SOURCE_ADAPTER.md`.
+
+### Parallel connector merge ordering
+
+Recruitee PR #59, Personio PR #60 and this Teamtailor branch were independently cut from the same V2 baseline. Each source adds its own migration at config version 16 and must remain default-off. Do not merge all unchanged sequentially. After the first source merges, rebase each later PR and advance its config version/migration to the next version while preserving earlier source flags and tests. No connector should be merged or deployed solely because CI passes.

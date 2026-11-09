@@ -1,7 +1,7 @@
 # JobBeeper — Product Vision, Architecture and Delivery Roadmap
 
-**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.  
-**Last reviewed:** 2026-11-08 (Asia/Kolkata)  
+**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.
+**Last reviewed:** 2026-11-08 (Asia/Kolkata)
 **Status:** Living source of truth. This document supersedes conflicting feature-order recommendations in older roadmaps; those files remain useful for implementation detail and engineering history.
 
 ## 1. Product vision
@@ -119,7 +119,7 @@ Do not migrate to PostgreSQL, Redis, Kafka, Celery or microservices just because
 | Assisted apply | Design only | No answer bank or browser companion |
 | Auto-apply | Not implemented | Must remain off pending a separate permission/safety gate |
 
-ATS discovery can recognize providers that have no collectors. Current discovery-only families include Recruitee, Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
+ATS discovery can recognize providers that have no collectors. Current discovery-only families include Breezy HR, BambooHR, Rippling and Personio. Recruitee and Teamtailor have default-off public-feed adapter candidates on separate unmerged feature branches; neither is a live source. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
 
 ## 5. Prioritized delivery sequence
 
