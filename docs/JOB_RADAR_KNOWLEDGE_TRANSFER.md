@@ -3545,3 +3545,10 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Owner should log in at `https://130.210.27.197/dashboard/` and confirm `/api/auth/me` 200. Never ask for password in chat. Certbot timer is active; deploy hook reloads Nginx. Dry-run renewal was running with randomized ~341s delay; confirm result in certbot log. Remove unused staging lineage `130.210.27.197` after no certbot process active. Remove OCI port 8000 ingress later after HTTPS owner validation.
 
 - Follow-up: Certbot dry-run renewal for `jobbeeper-ip-prod` passed with `--no-random-sleep-on-renew`; snap renewal timer active and Nginx deploy hook installed. Removed staging-only lineage; only the production IP certificate remains. Latest source polls after HTTPS rollout are recorded in handover; LinkedIn remains 429-cooldown.
+
+
+## 2026-11-09 — Post-login production check
+
+- Owner confirmed HTTPS dashboard login succeeded. Production health 200; 22,862 jobs, 24,428 source runs, SQLite integrity ok, config v15, all nine configured connectors enabled. Recent polls: Greenhouse 368, Ashby 824, Workday 20, SmartRecruiters 300, Workable 6, Keka 109, Darwinbox 36, Naukri 290; LinkedIn in persisted 429 cooldown.
+- Global Telegram config exists; a one-off test message sent to the existing global destination was accepted by Telegram API (HTTP 200, `ok=true`). Ask owner to confirm receipt in Telegram. No credentials/destination values were logged.
+- Admin profile prefs preserved. Admin-specific per-user Telegram settings/link endpoints intentionally return 403; per-user tables empty. Global legacy notifier is separate. Future design decision: add explicit admin personal Telegram support or retain global destination; don't silently alter role/tenant isolation. Member Telegram linking is not fully configured because bot username/webhook secret env keys are absent. Details in `JOB_RADAR_HANDOVER.md`.
