@@ -1213,6 +1213,32 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_provider ON ats_board_registry(provider, review_status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_company ON ats_board_registry(company_id, provider)")
         conn.execute("""
+        CREATE TABLE IF NOT EXISTS ats_global_discovery_candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            board_key TEXT NOT NULL,
+            board_url TEXT NOT NULL,
+            candidate_host TEXT NOT NULL,
+            discovery_method TEXT NOT NULL,
+            source_reference TEXT NOT NULL,
+            source_captured_at TEXT,
+            first_discovered_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            confidence TEXT NOT NULL DEFAULT 'low',
+            review_status TEXT NOT NULL DEFAULT 'discovered',
+            linked_company_id INTEGER,
+            linked_board_registry_id INTEGER,
+            last_error_type TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(linked_company_id) REFERENCES employer_companies(id),
+            FOREIGN KEY(linked_board_registry_id) REFERENCES ats_board_registry(id),
+            UNIQUE(provider, candidate_host, board_key)
+        )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_global_candidate_status ON ats_global_discovery_candidates(review_status, last_seen_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_global_candidate_provider ON ats_global_discovery_candidates(provider, review_status)")
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS workday_board_poll_state (
             board_key TEXT PRIMARY KEY,
             next_inventory_offset INTEGER NOT NULL DEFAULT 20,
@@ -7306,6 +7332,337 @@ def latency_summary(hours: int = 24):
         }
 
     return {"hours": hours, "sources": summary}
+
+
+GLOBAL_DISCOVERY_METHODS = frozenset({
+    "commoncrawl_cdx", "commoncrawl_url_index", "sitemap", "career_link",
+    "licensed_seed", "manual",
+})
+GLOBAL_DISCOVERY_PROVIDERS = frozenset({"workday", "keka", "darwinbox"})
+
+
+def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
+    """Canonicalise a public Workday/Keka/Darwinbox capture to its board root."""
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 2048:
+        raise ValueError("A public ATS candidate URL of at most 2,048 characters is required.")
+    try:
+        parsed = urlsplit(value.strip())
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Candidate URL is malformed.") from exc
+    if (
+        parsed.scheme.lower() != "https" or not parsed.hostname
+        or parsed.username is not None or parsed.password is not None
+        or port not in (None, 443) or parsed.query or parsed.fragment
+    ):
+        raise ValueError("Candidate URL must be HTTPS without credentials, a custom port, query or fragment.")
+    host = parsed.hostname.lower().rstrip(".")
+    segments = [segment for segment in parsed.path.split("/") if segment]
+
+    if re.fullmatch(r"[a-z0-9-]{1,80}\.wd[0-9]{1,3}\.myworkdayjobs\.com", host):
+        if segments and re.fullmatch(r"[a-z]{2}-[A-Z]{2}", segments[0]):
+            segments = segments[1:]
+        if not segments or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", segments[0]):
+            raise ValueError("Workday URL does not contain a valid public career site.")
+        root_url = f"https://{host}/{segments[0]}"
+        detected = board_discovery.detect_ats_board(root_url)
+        if not detected or detected.get("provider") != "workday":
+            raise ValueError("Workday career site could not be resolved.")
+        parsed_board = _parse_workday_board_url(root_url)
+        if not parsed_board:
+            raise ValueError("Workday career site URL is not supported.")
+        return {
+            "provider": "workday", "board_key": f"{parsed_board['tenant']}:{parsed_board['site']}",
+            "board_url": parsed_board["url"], "candidate_host": host,
+        }
+
+    if host.endswith(".keka.com"):
+        if not segments or segments[0].casefold() != "careers" or len(segments) > 2:
+            if not segments or segments[0].casefold() != "careers":
+                raise ValueError("Keka candidate URL must be under /careers.")
+            portal = segments[1].casefold() if len(segments) > 1 else "default"
+            root_path = "/careers" if portal == "default" else f"/careers/{portal}"
+        else:
+            root_path = "/" + "/".join(segments)
+        root_url = f"https://{host}{root_path}"
+        detected = board_discovery.detect_ats_board(root_url)
+        if not detected or detected.get("provider") != "keka":
+            raise ValueError("Keka career portal URL is not supported.")
+        return {
+            "provider": "keka", "board_key": str(detected["board_key"]),
+            "board_url": str(detected["board_url"]), "candidate_host": host,
+        }
+
+    if host.endswith(".darwinbox.in"):
+        match = re.match(
+            r"^/ms/candidatev2/(?P<company_id>[A-Za-z0-9_-]{1,100})/careers(?:/|$)",
+            parsed.path, re.I,
+        )
+        host_match = re.fullmatch(r"[a-z0-9-]{1,80}\.darwinbox\.in", host)
+        if not match or not host_match:
+            raise ValueError("Darwinbox candidate URL must use a public candidate careers path.")
+        company_id = match.group("company_id")
+        root_url = f"https://{host}/ms/candidatev2/{company_id}/careers"
+        detected = board_discovery.detect_ats_board(root_url)
+        if not detected or detected.get("provider") != "darwinbox":
+            raise ValueError("Darwinbox candidate careers URL is not supported.")
+        return {
+            "provider": "darwinbox", "board_key": str(detected["board_key"]),
+            "board_url": root_url, "candidate_host": host,
+        }
+
+    raise ValueError("Only supported public Workday, Keka and Darwinbox candidate URLs are accepted.")
+
+
+def _normalise_global_capture_time(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or len(value.strip()) > 40:
+        raise ValueError("source_captured_at must be an ISO timestamp or Common Crawl 14-digit timestamp.")
+    raw = value.strip()
+    try:
+        if re.fullmatch(r"[0-9]{14}", raw):
+            parsed = dt.datetime.strptime(raw, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        else:
+            parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            parsed = parsed.astimezone(UTC)
+    except ValueError as exc:
+        raise ValueError("source_captured_at is not a valid ISO or Common Crawl timestamp.") from exc
+    if parsed > now() + dt.timedelta(days=1):
+        raise ValueError("source_captured_at cannot be in the future.")
+    return parsed.isoformat()
+
+
+@app.post("/api/discovery/global-candidates/import", dependencies=[Depends(require_admin)])
+def import_global_ats_candidates(payload: dict[str, Any]):
+    """Store unmatched public ATS URLs for review; never create employer records."""
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not 1 <= len(candidates) <= 200:
+        raise HTTPException(status_code=422, detail="candidates must contain between 1 and 200 items.")
+    timestamp = iso(now()) or ""
+    inserted = updated = preserved_terminal = skipped = 0
+    errors: list[dict[str, Any]] = []
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        for index, item in enumerate(candidates):
+            try:
+                if not isinstance(item, dict):
+                    raise ValueError("candidate must be an object")
+                board = _normalise_global_ats_candidate_url(item.get("board_url") or item.get("url"))
+                method = str(item.get("discovery_method") or "").strip().lower()
+                if method not in GLOBAL_DISCOVERY_METHODS:
+                    raise ValueError("discovery_method is not supported")
+                raw_reference = item.get("source_reference")
+                if not isinstance(raw_reference, str):
+                    raise ValueError("source_reference must be a string")
+                source_reference = raw_reference.strip()
+                if not source_reference or len(source_reference) > 2048:
+                    raise ValueError("source_reference is required and must be at most 2,048 characters")
+                captured_at = _normalise_global_capture_time(item.get("source_captured_at"))
+                existing = conn.execute(
+                    """SELECT id,review_status FROM ats_global_discovery_candidates
+                       WHERE provider=? AND candidate_host=? AND board_key=?""",
+                    (board["provider"], board["candidate_host"], board["board_key"]),
+                ).fetchone()
+                conn.execute(
+                    """INSERT INTO ats_global_discovery_candidates(
+                           provider,board_key,board_url,candidate_host,discovery_method,
+                           source_reference,source_captured_at,first_discovered_at,last_seen_at,
+                           confidence,review_status,created_at,updated_at
+                       ) VALUES(?,?,?,?,?,?,?,?,?,'low','discovered',?,?)
+                       ON CONFLICT(provider,candidate_host,board_key) DO UPDATE SET
+                           board_url=excluded.board_url,
+                           candidate_host=excluded.candidate_host,
+                           discovery_method=CASE
+                               WHEN ats_global_discovery_candidates.source_captured_at IS NULL
+                                 OR (excluded.source_captured_at IS NOT NULL AND excluded.source_captured_at >= ats_global_discovery_candidates.source_captured_at)
+                               THEN excluded.discovery_method ELSE ats_global_discovery_candidates.discovery_method END,
+                           source_reference=CASE
+                               WHEN ats_global_discovery_candidates.source_captured_at IS NULL
+                                 OR (excluded.source_captured_at IS NOT NULL AND excluded.source_captured_at >= ats_global_discovery_candidates.source_captured_at)
+                               THEN excluded.source_reference ELSE ats_global_discovery_candidates.source_reference END,
+                           source_captured_at=CASE
+                               WHEN ats_global_discovery_candidates.source_captured_at IS NULL
+                                 OR (excluded.source_captured_at IS NOT NULL AND excluded.source_captured_at >= ats_global_discovery_candidates.source_captured_at)
+                               THEN excluded.source_captured_at ELSE ats_global_discovery_candidates.source_captured_at END,
+                           last_seen_at=excluded.last_seen_at,
+                           review_status=CASE WHEN ats_global_discovery_candidates.review_status IN ('linked','rejected')
+                                              THEN ats_global_discovery_candidates.review_status ELSE 'discovered' END,
+                           updated_at=excluded.updated_at""",
+                    (
+                        board["provider"], board["board_key"], board["board_url"], board["candidate_host"],
+                        method, source_reference, captured_at, timestamp, timestamp, timestamp, timestamp,
+                    ),
+                )
+                if existing is None:
+                    inserted += 1
+                elif existing[1] in {"linked", "rejected"}:
+                    preserved_terminal += 1
+                else:
+                    updated += 1
+            except ValueError as exc:
+                skipped += 1
+                errors.append({"index": index, "reason": str(exc)[:200]})
+        conn.commit()
+    return {
+        "received": len(candidates), "inserted": inserted, "updated": updated,
+        "preserved_terminal": preserved_terminal, "skipped": skipped, "errors": errors,
+        "company_records_created": 0, "boards_linked": 0, "verified": 0, "activated": 0,
+    }
+
+
+@app.get("/api/discovery/global-candidates", dependencies=[Depends(require_admin)])
+def list_global_ats_candidates(status: str | None = None, provider: str | None = None, limit: int = 250):
+    limit = max(1, min(int(limit), 500))
+    if status and status not in {"discovered", "linked", "rejected", "stale"}:
+        raise HTTPException(status_code=422, detail="Unsupported candidate review status.")
+    if provider and provider not in GLOBAL_DISCOVERY_PROVIDERS:
+        raise HTTPException(status_code=422, detail="Unsupported global candidate provider.")
+    query = """SELECT g.id,g.provider,g.board_key,g.board_url,g.candidate_host,
+                      g.discovery_method,g.source_reference,g.source_captured_at,
+                      g.first_discovered_at,g.last_seen_at,g.confidence,g.review_status,
+                      g.linked_company_id,g.linked_board_registry_id,c.company_name,
+                      b.review_status AS board_review_status,
+                      g.created_at,g.updated_at
+               FROM ats_global_discovery_candidates g
+               LEFT JOIN employer_companies c ON c.id=g.linked_company_id
+               LEFT JOIN ats_board_registry b ON b.id=g.linked_board_registry_id"""
+    clauses: list[str] = []
+    values: list[Any] = []
+    if status:
+        clauses.append("g.review_status=?")
+        values.append(status)
+    if provider:
+        clauses.append("g.provider=?")
+        values.append(provider)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY g.last_seen_at DESC,g.id DESC LIMIT ?"
+    values.append(limit)
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(query, values).fetchall()
+    return {"candidates": [dict(row) for row in rows]}
+
+
+def _global_candidate_discovered_from(candidate: Any) -> str:
+    """Use a safe clickable HTTPS provenance URL or fall back to the public board root."""
+    board_url = str(candidate["board_url"])
+    reference = str(candidate["source_reference"] or "")
+    try:
+        parsed = urlsplit(reference)
+        if parsed.scheme.lower() == "https" and parsed.hostname and parsed.username is None and parsed.password is None:
+            return reference
+    except ValueError:
+        pass
+    return board_url
+
+
+@app.post("/api/discovery/global-candidates/{candidate_id}/link", dependencies=[Depends(require_admin)])
+def link_global_ats_candidate(candidate_id: int, payload: dict[str, Any]):
+    company_id = payload.get("company_id")
+    if isinstance(company_id, bool) or not isinstance(company_id, int) or company_id < 1:
+        raise HTTPException(status_code=422, detail="company_id must be a positive integer.")
+    timestamp = iso(now()) or ""
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        candidate = conn.execute(
+            "SELECT * FROM ats_global_discovery_candidates WHERE id=?", (candidate_id,)
+        ).fetchone()
+        if not candidate:
+            raise HTTPException(status_code=404, detail="ATS candidate was not found.")
+        if candidate["review_status"] == "rejected":
+            raise HTTPException(status_code=409, detail="Rejected ATS candidates cannot be linked.")
+        if candidate["review_status"] == "linked":
+            if candidate["linked_company_id"] == company_id:
+                linked_board = conn.execute(
+                    "SELECT review_status FROM ats_board_registry WHERE id=?",
+                    (candidate["linked_board_registry_id"],),
+                ).fetchone()
+                board_status = str(linked_board[0]) if linked_board else "unknown"
+                return {
+                    "candidate_id": candidate_id, "review_status": "linked",
+                    "board_registry_id": candidate["linked_board_registry_id"],
+                    "board_review_status": board_status,
+                    "verified": board_status in {"verified", "active"},
+                    "activated": board_status == "active",
+                }
+            raise HTTPException(status_code=409, detail="ATS candidate is already linked to another employer.")
+        company = conn.execute("SELECT id,company_name FROM employer_companies WHERE id=?", (company_id,)).fetchone()
+        if not company:
+            raise HTTPException(status_code=404, detail="Employer company was not found.")
+        existing = conn.execute(
+            """SELECT id,company_id,review_status FROM ats_board_registry
+               WHERE provider=? AND board_url=? ORDER BY id LIMIT 1""",
+            (candidate["provider"], candidate["board_url"]),
+        ).fetchone()
+        if existing and int(existing["company_id"]) != company_id:
+            raise HTTPException(status_code=409, detail="This ATS board URL is already associated with a different employer.")
+        key_conflict = conn.execute(
+            """SELECT id,board_url FROM ats_board_registry
+               WHERE company_id=? AND provider=? AND board_key=? ORDER BY id LIMIT 1""",
+            (company_id, candidate["provider"], candidate["board_key"]),
+        ).fetchone()
+        if key_conflict and not existing and str(key_conflict["board_url"]) != str(candidate["board_url"]):
+            raise HTTPException(status_code=409, detail="This employer already has a different board URL with the same ATS board key.")
+        if existing:
+            board_registry_id = int(existing["id"])
+            board_review_status = str(existing["review_status"])
+        else:
+            provider = str(candidate["provider"])
+            collector_source = board_discovery.COLLECTOR_SOURCES.get(provider)
+            collector_available = bool(collector_source)
+            cursor = conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,
+                       created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?, 'discovered',?,?,?)""",
+                (
+                    company_id, provider, candidate["board_key"], candidate["board_url"],
+                    _global_candidate_discovered_from(candidate),
+                    candidate["confidence"],
+                    collector_source, int(collector_available), timestamp, timestamp, timestamp,
+                ),
+            )
+            board_registry_id = int(cursor.lastrowid)
+            board_review_status = "discovered"
+        conn.execute(
+            """UPDATE ats_global_discovery_candidates
+               SET review_status='linked',linked_company_id=?,linked_board_registry_id=?,updated_at=?
+               WHERE id=?""",
+            (company_id, board_registry_id, timestamp, candidate_id),
+        )
+        conn.commit()
+    return {
+        "candidate_id": candidate_id, "company_id": company_id,
+        "company_name": company["company_name"], "board_registry_id": board_registry_id,
+        "review_status": "linked", "board_review_status": board_review_status,
+        "verified": board_review_status in {"verified", "active"},
+        "activated": board_review_status == "active",
+    }
+
+
+@app.post("/api/discovery/global-candidates/{candidate_id}/review", dependencies=[Depends(require_admin)])
+def review_global_ats_candidate(candidate_id: int, payload: dict[str, Any]):
+    status = str(payload.get("status") or "").strip().lower()
+    if status != "rejected":
+        raise HTTPException(status_code=422, detail="Only 'rejected' is supported for unmatched candidates.")
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT review_status FROM ats_global_discovery_candidates WHERE id=?", (candidate_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="ATS candidate was not found.")
+        if row[0] == "linked":
+            raise HTTPException(status_code=409, detail="Linked ATS candidates must be managed through the employer board registry.")
+        conn.execute(
+            "UPDATE ats_global_discovery_candidates SET review_status='rejected',updated_at=? WHERE id=?",
+            (iso(now()), candidate_id),
+        )
+        conn.commit()
+    return {"candidate_id": candidate_id, "review_status": "rejected", "activated": False}
 
 
 @app.post("/api/discovery/companies/scan", dependencies=[Depends(require_admin)])

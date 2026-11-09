@@ -379,15 +379,18 @@ Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2025_IST.md`. Facet desi
 
 New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.
 
+## Latest authoritative handover — 2026-11-09 21:11 IST
 
-## 2026-11-09 20:30 IST — Workday facet full regression complete
+Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md` first.
 
-The exact current worktree full V2 suite passed **444 tests in 346.385 seconds**, exit code 0 (job `3tjy6iwusp`, log `/tmp/job-radar-workday-facets-final-tests.log`). Focused Workday collector suite passed 22/22. The final admin `in_progress_incomplete` status test is included in the 444. Compileall, both config JSON files, HTML IDs/panel wiring and `git diff --check` passed. All Workday/Keka/Darwinbox/Hirebase source flags remain false.
+- Feature branch: `feat/global-ats-discovery-hirebase-guard-20261109`; PR #65 remains open/draft/unmerged.
+- Workday facet-aware inventory is pushed in `4d75138`; exact-head V2 CI #1435 passed; local V2 444 passed.
+- Keka multi-portal support is pushed in `afa177b`; exact-head V2 CI #1431 passed; local V2 439 passed.
+- Current unmatched ATS candidate staging API/UI/tests are implemented locally but uncommitted. Full V2 suite passed **451 tests in 501.840 seconds** (`lkscpl0ioe`); focused candidate API suite 11/11 passed. Compileall, JSON, HTML ID/panel checks and `git diff --check` passed.
+- Candidate staging does not create employer rows or normal ATS registry rows. Linking requires an existing employer and only creates/reuses a `discovered` board; verification/activation are separate.
+- Next: commit/push candidate staging, update PR body, verify exact-head GitHub V2 CI; then implement serialized Common Crawl CDX and sitemap/career-link candidate discovery, followed by safe live verification and a per-board scheduler.
+- Nothing required from user. Hirebase key absent; Workday/Keka/Darwinbox/Hirebase all disabled. No live ATS/Common Crawl/Hirebase requests, deployments or notifications.
 
-Current Workday facet code, dashboard UI and docs are still uncommitted on branch `feat/global-ats-discovery-hirebase-guard-20261109`. Next: inspect diff, commit/push, update PR #65, verify exact-head V2 CI #1432 or later. Keep PR draft; no deployment/source activation.
+Read `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md` for implementation detail and `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md` for the Common Crawl plan.
 
-Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. It recommends a separate unmatched ATS candidate table and polite Common Crawl indexing; no AWS credentials needed unless choosing the Parquet/Athena bulk path.
-
-## Latest verified handover — 2026-11-09 20:35 IST
-
-Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2035_IST.md` first. Workday facet inventory is committed/pushed as `4d75138`; exact-head GitHub V2 CI #1435 passed; full local V2 suite 444/444 passed. Next P0 is the unmatched ATS candidate staging table and admin link/reject workflow, followed by a serialized Common Crawl CDX candidate harvester. Do not insert Common Crawl tenant slugs as real employer records. See `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`.
+Latest authoritative checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`.

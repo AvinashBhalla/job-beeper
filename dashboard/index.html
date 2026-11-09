@@ -678,6 +678,43 @@
                 </table>
               </div>
             </div>
+            <div class="settings-block" id="globalCandidatesPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Unmatched global ATS candidates</span>
+              <p class="auth-description">Stage public Workday, Keka and Darwinbox URLs without inventing an employer record. Preserve the capture source, link a candidate to an existing employer after review, or reject it. Linking only adds a discovered board; verification and activation are separate steps.</p>
+              <form id="globalCandidateForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--space-8);align-items:end;">
+                <div class="form-field-group">
+                  <label class="form-field-label" for="globalCandidateUrl">Public ATS URL</label>
+                  <input id="globalCandidateUrl" class="number-field-input" type="url" placeholder="https://tenant.wd5.myworkdayjobs.com/site" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="globalCandidateMethod">Discovery method</label>
+                  <select id="globalCandidateMethod" class="number-field-input" required>
+                    <option value="manual">Manual review / external capture</option>
+                    <option value="commoncrawl_cdx">Common Crawl CDX</option>
+                    <option value="commoncrawl_url_index">Common Crawl URL Index</option>
+                    <option value="sitemap">Public sitemap</option>
+                    <option value="career_link">Employer careers link</option>
+                    <option value="licensed_seed">Licensed directory seed</option>
+                  </select>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="globalCandidateReference">Source reference</label>
+                  <input id="globalCandidateReference" class="number-field-input" type="text" maxlength="2048" placeholder="Crawl ID, capture URL, sitemap URL…" required>
+                </div>
+                <div class="form-field-group">
+                  <label class="form-field-label" for="globalCandidateCapturedAt">Source captured at (optional)</label>
+                  <input id="globalCandidateCapturedAt" class="number-field-input" type="datetime-local">
+                </div>
+                <button type="submit" class="btn-pill btn-pill-primary" id="importGlobalCandidateBtn">Stage candidate only</button>
+              </form>
+              <p id="globalCandidateStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">No unmatched ATS candidates loaded.</p>
+              <div class="data-table-container" style="margin-top:var(--space-6);">
+                <table class="table-dataset">
+                  <thead><tr><th>Provider</th><th>Board root</th><th>Discovered by / source</th><th>Captured at</th><th>Confidence / status</th><th>Employer association</th><th>Actions</th></tr></thead>
+                  <tbody id="globalCandidatesTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">No unmatched ATS candidates yet.</td></tr></tbody>
+                </table>
+              </div>
+            </div>
 
             <div class="data-table-container">
               <table class="table-dataset">

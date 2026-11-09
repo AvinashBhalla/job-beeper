@@ -446,3 +446,29 @@ Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md
 ## 2026-11-09 20:35 IST — Workday facet inventory verified on CI
 
 Workday facet implementation was pushed in `4d7513803031d1c32c02a19ac8452dfb221c02ad`; exact-head GitHub V2 CI #1435 (42640211533) passed, including modern dashboard JS syntax and full V2 tests. Local full V2 suite 444 passed in 346.385s; focused Workday tests 22 passed. Latest recovery checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2035_IST.md`. Next P0: unmatched ATS candidate staging table/admin review-link flow, then serialized Common Crawl candidate discovery; preserve provenance, do not fabricate employer IDs, and require current public live verification before linking/activation.
+
+
+## 2026-11-09 20:24 IST — unmatched ATS candidate staging implemented locally
+
+Added `ats_global_discovery_candidates`, separate from `ats_board_registry` because an unmatched tenant URL has no verified employer identity. Admin-only import/list/link/reject APIs and a Coverage & Health UI panel are implemented. The import path canonicalizes Workday/Keka/Darwinbox public roots, validates HTTPS/provider/method/provenance/capture timestamp, always assigns low confidence, and creates no employer or normal board registry row. Candidate identity includes provider+host+board key. Re-import updates last-seen and keeps newest capture provenance; linked/rejected decisions are preserved. Linking requires an existing company, reuses an exact provider+URL board row when present, otherwise creates a `discovered` board only. Verification and activation remain separate.
+
+The UI allows admins to stage a captured URL, choose method/source/capture time, associate with an existing employer, or reject it. It never creates a placeholder employer. Focused API suite: 11 passed. Full V2 regression job `a8icgcj402` is running; log `/tmp/job-radar-global-candidate-full-tests.log`. HTML candidate IDs and JS workflow wiring passed static checks.
+
+Details: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`. Next: finish full suite, commit/push and exact-head CI; then implement serialized Common Crawl CDX ingestion and current-live board verification. No Common Crawl requests have been made.
+
+
+## 2026-11-09 21:01 IST — final candidate-staging tree and regression run
+
+The candidate staging API/UI remains local and uncommitted. It includes the final refinements: strict source_reference type checking; latest capture timestamp/reference wins; older captures cannot replace newer provenance; discovered_from uses a safe HTTPS source URL or falls back to the canonical board URL; linked registry status is returned accurately; Darwinbox staging uniqueness includes candidate host, while registry board key stays compatible with normal detection. Focused candidate API suite: 11 passed. Final full V2 job `lkscpl0ioe` is running (log `/tmp/job-radar-global-candidate-final-tests.log`).
+
+Latest recovery checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2101_IST.md`. Candidate design: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.
+
+## 2026-11-09 21:11 IST — unmatched ATS candidate staging full regression passed
+
+Candidate staging code/UI/tests/docs now pass the final local V2 regression: **451 passed in 501.840 seconds**, exit code 0 (job `lkscpl0ioe`; log `/tmp/job-radar-global-candidate-final-tests.log`). Focused `GlobalDirectoryApiTests`: 11 passed. Compileall, both config JSON files, diff check, HTML unique-ID/panel checks and candidate/Workday dashboard wiring passed.
+
+Implemented locally but not yet committed/pushed: `ats_global_discovery_candidates` separate from employer and ATS registry; admin-only import/list/link/reject; strict Workday/Keka/Darwinbox canonicalization; provider+host+board-key dedup; capture provenance and terminal state preservation; existing-company-only association; normal board remains discovered/unverified/unactivated; Coverage & Health candidate UI. No placeholder companies.
+
+Next: commit/push to PR #65, update PR body, verify exact-head V2 CI (modern Node JS + full suite). Then serialized Common Crawl CDX worker and sitemap/career-link discovery. Do not run Common Crawl or live ATS calls in this increment.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`; implementation details: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.

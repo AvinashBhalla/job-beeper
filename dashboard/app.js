@@ -34,6 +34,8 @@
     userPreferences: null,
     sourceStatus: [],
     discoveredBoards: [],
+    globalCandidates: [],
+    discoveredCompanies: [],
     activeSection: 'jobsSection',
     filters: {
       search: '',
@@ -892,6 +894,8 @@
       } else if (target.id === 'sourcesSection') {
         renderSourceHealth();
         void loadSourceStatusTelemetry();
+        void loadGlobalDiscoveryCompanies();
+        void loadGlobalDiscoveryCandidates();
       }
 
       if (pushHash) {
@@ -2263,6 +2267,163 @@
     }
   }
 
+  async function loadGlobalDiscoveryCompanies() {
+    if (!state.isAdmin) return;
+    try {
+      const response = await authClient.request('/discovery/companies?limit=500', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Could not load employers (HTTP ${response.status}).`);
+      const data = await response.json();
+      state.discoveredCompanies = data.companies || [];
+      renderGlobalDiscoveryCandidates();
+    } catch (error) {
+      const target = $('globalCandidateStatus');
+      if (target) target.textContent = error.message || 'Employer list unavailable.';
+    }
+  }
+
+  async function loadGlobalDiscoveryCandidates() {
+    if (!state.isAdmin) return;
+    const tbody = $('globalCandidatesTableBody');
+    if (tbody && !state.globalCandidates.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">Loading unmatched ATS candidates…</td></tr>';
+    }
+    try {
+      const response = await authClient.request('/discovery/global-candidates?limit=500', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Could not load global candidates (HTTP ${response.status}).`);
+      const data = await response.json();
+      state.globalCandidates = data.candidates || [];
+      renderGlobalDiscoveryCandidates();
+    } catch (error) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:var(--status-error);padding:var(--space-10);">${esc(error.message || 'Candidate registry unavailable.')}</td></tr>`;
+    }
+  }
+
+  function renderGlobalDiscoveryCandidates() {
+    const tbody = $('globalCandidatesTableBody');
+    if (!tbody) return;
+    const candidates = state.globalCandidates || [];
+    if (!candidates.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">No unmatched ATS candidates yet. Add a captured public ATS URL above or wait for a discovery source.</td></tr>';
+      return;
+    }
+    const companies = state.discoveredCompanies || [];
+    tbody.innerHTML = candidates.map(candidate => {
+      const linked = candidate.review_status === 'linked';
+      const rejected = candidate.review_status === 'rejected';
+      const options = companies.map(company =>
+        `<option value="${esc(company.id)}">${esc(company.company_name)} (${esc(company.domain)})</option>`
+      ).join('');
+      const association = linked
+        ? `<span style="color:var(--status-success);">Linked to ${esc(candidate.company_name || `company ${candidate.linked_company_id}`)}</span>`
+        : rejected ? '<span style="color:var(--text-muted);">Rejected</span>'
+          : companies.length
+            ? `<select class="number-field-input global-candidate-company" data-candidate-id="${esc(candidate.id)}"><option value="">Choose existing employer…</option>${options}</select>`
+            : '<span style="color:var(--text-muted);">Add an employer using the form below before linking.</span>';
+      const linkedBoardStatus = candidate.board_review_status || 'unknown';
+      const actions = linked
+        ? `<span style="color:var(--text-muted);">Board status: ${esc(linkedBoardStatus)}</span>`
+        : rejected ? ''
+          : `${companies.length ? `<button type="button" class="btn-pill btn-pill-primary global-candidate-link" data-candidate-id="${esc(candidate.id)}">Link employer</button>` : ''}<button type="button" class="btn-pill btn-pill-secondary global-candidate-reject" data-candidate-id="${esc(candidate.id)}">Reject</button>`;
+      return `<tr>
+        <td>${esc(candidate.provider)}</td>
+        <td><a href="${esc(candidate.board_url)}" target="_blank" rel="noopener noreferrer">${esc(candidate.board_key)}</a><div style="font-size:11px;color:var(--text-muted);">${esc(candidate.candidate_host)}</div></td>
+        <td>${esc(candidate.discovery_method)}<div style="font-size:11px;color:var(--text-muted);">${esc(candidate.source_reference)}</div></td>
+        <td>${esc(candidate.source_captured_at || 'Not captured')}</td>
+        <td>${esc(candidate.confidence)} · ${esc(candidate.review_status)}</td>
+        <td>${association}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap;">${actions}</td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.global-candidate-link').forEach(button => {
+      button.addEventListener('click', () => {
+        const id = Number(button.dataset.candidateId);
+        const select = tbody.querySelector(`.global-candidate-company[data-candidate-id="${id}"]`);
+        const companyId = Number(select?.value || 0);
+        if (!companyId) {
+          const status = $('globalCandidateStatus');
+          if (status) status.textContent = 'Choose an existing employer before linking this candidate.';
+          return;
+        }
+        void linkGlobalDiscoveryCandidate(id, companyId, button);
+      });
+    });
+    tbody.querySelectorAll('.global-candidate-reject').forEach(button => {
+      button.addEventListener('click', () => void rejectGlobalDiscoveryCandidate(Number(button.dataset.candidateId), button));
+    });
+  }
+
+  async function importGlobalDiscoveryCandidate(event) {
+    event.preventDefault();
+    const button = $('importGlobalCandidateBtn');
+    const status = $('globalCandidateStatus');
+    const boardUrl = $('globalCandidateUrl')?.value.trim();
+    const method = $('globalCandidateMethod')?.value;
+    const sourceReference = $('globalCandidateReference')?.value.trim();
+    const capturedInput = $('globalCandidateCapturedAt')?.value;
+    if (!boardUrl || !sourceReference) {
+      if (status) status.textContent = 'Enter a public ATS URL and its discovery reference.';
+      return;
+    }
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Validating and staging the ATS candidate. No employer will be created.';
+    try {
+      const capturedAt = capturedInput ? new Date(capturedInput).toISOString() : null;
+      const response = await authClient.request('/discovery/global-candidates/import', {
+        method: 'POST',
+        body: { candidates: [{ board_url: boardUrl, discovery_method: method, source_reference: sourceReference, source_captured_at: capturedAt }] },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Candidate import failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `Staged ${data.inserted || 0} new candidate(s), refreshed ${data.updated || 0}, preserved ${data.preserved_terminal || 0} linked/rejected, skipped ${data.skipped || 0}. No employer was created, verified or activated.`;
+      if ($('globalCandidateUrl')) $('globalCandidateUrl').value = '';
+      if ($('globalCandidateReference')) $('globalCandidateReference').value = '';
+      if ($('globalCandidateCapturedAt')) $('globalCandidateCapturedAt').value = '';
+      await loadGlobalDiscoveryCandidates();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not stage ATS candidate.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function linkGlobalDiscoveryCandidate(candidateId, companyId, button) {
+    if (button) button.disabled = true;
+    const status = $('globalCandidateStatus');
+    if (status) status.textContent = `Linking candidate ${candidateId} to the selected existing employer…`;
+    try {
+      const response = await authClient.request(`/discovery/global-candidates/${encodeURIComponent(candidateId)}/link`, {
+        method: 'POST', body: { company_id: companyId },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Candidate link failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `Linked to ${data.company_name}. Board remains ${data.board_review_status}; verified=${data.verified}; activated=${data.activated}.`;
+      await Promise.all([loadGlobalDiscoveryCandidates(), loadDiscoveredBoards(), loadDirectoryCoverageSummary()]);
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not link ATS candidate.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function rejectGlobalDiscoveryCandidate(candidateId, button) {
+    if (!window.confirm('Reject this unmatched ATS candidate? Re-discovery will not revive a rejected candidate.')) return;
+    if (button) button.disabled = true;
+    const status = $('globalCandidateStatus');
+    try {
+      const response = await authClient.request(`/discovery/global-candidates/${encodeURIComponent(candidateId)}/review`, {
+        method: 'POST', body: { status: 'rejected' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Candidate rejection failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `Candidate ${candidateId} rejected. Future imports will preserve this decision.`;
+      await loadGlobalDiscoveryCandidates();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not reject ATS candidate.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   async function loadDiscoveredBoards() {
     if (!state.isAdmin) return;
     const tbody = $('discoveredBoardsTableBody');
@@ -2303,7 +2464,7 @@
       if ($('discoveryCompanyName')) $('discoveryCompanyName').value = '';
       if ($('discoveryWebsiteUrl')) $('discoveryWebsiteUrl').value = '';
       if ($('discoveryCareersUrl')) $('discoveryCareersUrl').value = '';
-      await loadDiscoveredBoards();
+      await Promise.all([loadDiscoveredBoards(), loadGlobalDiscoveryCompanies()]);
     } catch (error) {
       if (status) status.textContent = error.message || 'Company discovery failed.';
       showToast(error.message || 'Company discovery failed.', 'error', 7000);
@@ -2502,6 +2663,7 @@
       button.addEventListener('click', () => estimateHirebase(button.dataset.provider, button));
     });
     if ($('boardDiscoveryForm')) $('boardDiscoveryForm').addEventListener('submit', discoverCompanyBoards);
+    if ($('globalCandidateForm')) $('globalCandidateForm').addEventListener('submit', importGlobalDiscoveryCandidate);
 
     // Server-side job feed pagination.
     if ($('previousJobsPageBtn')) $('previousJobsPageBtn').addEventListener('click', () => {

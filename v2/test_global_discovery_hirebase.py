@@ -292,6 +292,273 @@ class GlobalDirectoryApiTests(unittest.TestCase):
         self.assertEqual(summary.json()["directory_seed_candidates"], 2)
         self.assertIsNone(summary.json()["market_coverage_percentage"])
 
+    def _global_candidate(self, url, source_reference="CC-MAIN-2026-43", captured_at="20261014123456", method="commoncrawl_cdx"):
+        return {
+            "board_url": url,
+            "discovery_method": method,
+            "source_reference": source_reference,
+            "source_captured_at": captured_at,
+        }
+
+    def _create_employer(self, name="NVIDIA", domain="nvidia.com"):
+        timestamp = radar.iso(radar.now())
+        with sqlite3.connect(self.db) as conn:
+            cursor = conn.execute(
+                """INSERT INTO employer_companies(
+                       company_name,domain,website_url,careers_url,country,discovery_status,
+                       pages_checked,last_discovered_at,error_count,created_at,updated_at
+                   ) VALUES(?,?,?,?,'India','scanned',1,?,0,?,?)""",
+                (name, domain, f"https://{domain}", f"https://{domain}/careers", timestamp, timestamp, timestamp),
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+
+    def test_global_candidate_import_stages_workday_keka_darwinbox_without_employer_rows(self):
+        response = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [
+                self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US-CA"),
+                self._global_candidate("https://universaled.keka.com/careers/ebenezerschool/jobdetails/101"),
+                self._global_candidate("https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448"),
+            ],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["inserted"], 3)
+        self.assertEqual(response.json()["company_records_created"], 0)
+        self.assertEqual(response.json()["boards_linked"], 0)
+        self.assertEqual(response.json()["verified"], 0)
+        self.assertEqual(response.json()["activated"], 0)
+        rows = self.client.get("/api/discovery/global-candidates?limit=20").json()["candidates"]
+        self.assertEqual({row["provider"] for row in rows}, {"workday", "keka", "darwinbox"})
+        by_provider = {row["provider"]: row for row in rows}
+        self.assertEqual(by_provider["workday"]["board_url"], "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")
+        self.assertEqual(by_provider["keka"]["board_url"], "https://universaled.keka.com/careers/ebenezerschool")
+        self.assertEqual(by_provider["darwinbox"]["board_url"], "https://arvind.darwinbox.in/ms/candidatev2/main/careers")
+        self.assertEqual(by_provider["workday"]["source_captured_at"], "2026-10-14T12:34:56+00:00")
+        self.assertTrue(all(row["review_status"] == "discovered" for row in rows))
+        self.assertTrue(all(row["confidence"] == "low" for row in rows))
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM employer_companies").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0], 0)
+
+    def test_global_candidate_import_deduplicates_and_preserves_rejected_and_linked_states(self):
+        candidates = [
+            self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", source_reference="CC-MAIN-2026-43"),
+            self._global_candidate("https://arvind.darwinbox.in/ms/candidatev2/main/careers", source_reference="crawl-1"),
+        ]
+        first = self.client.post("/api/discovery/global-candidates/import", json={"candidates": candidates}, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(first.status_code, 200, first.text)
+        rows = self.client.get("/api/discovery/global-candidates").json()["candidates"]
+        ids = {row["provider"]: row["id"] for row in rows}
+        with sqlite3.connect(self.db) as conn:
+            conn.execute("UPDATE ats_global_discovery_candidates SET review_status='rejected' WHERE id=?", (ids["workday"],))
+            conn.commit()
+        updated = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [
+                self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", source_reference="CC-MAIN-2026-44", captured_at="20261021123456"),
+                self._global_candidate("https://arvind.darwinbox.in/ms/candidatev2/main/careers", source_reference="crawl-2"),
+            ],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(updated.json()["inserted"], 0)
+        self.assertEqual(updated.json()["updated"], 1)
+        self.assertEqual(updated.json()["preserved_terminal"], 1)
+        self.assertEqual(len(self.client.get("/api/discovery/global-candidates").json()["candidates"]), 2)
+        by_provider = {row["provider"]: row for row in self.client.get("/api/discovery/global-candidates").json()["candidates"]}
+        self.assertEqual(by_provider["workday"]["review_status"], "rejected")
+        self.assertEqual(by_provider["workday"]["source_reference"], "CC-MAIN-2026-44")
+        older = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate(
+                "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                source_reference="older-capture", captured_at="20260901123456",
+            )],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(older.status_code, 200, older.text)
+        latest = next(row for row in self.client.get("/api/discovery/global-candidates").json()["candidates"] if row["provider"] == "workday")
+        self.assertEqual(latest["source_reference"], "CC-MAIN-2026-44")
+        self.assertEqual(latest["source_captured_at"], "2026-10-21T12:34:56+00:00")
+
+    def test_global_candidate_identity_includes_host_for_darwinbox_company_id(self):
+        response = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [
+                self._global_candidate("https://arvind.darwinbox.in/ms/candidatev2/main/careers"),
+                self._global_candidate("https://anotherco.darwinbox.in/ms/candidatev2/main/careers"),
+            ],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["inserted"], 2)
+        candidates = self.client.get("/api/discovery/global-candidates?provider=darwinbox").json()["candidates"]
+        self.assertEqual({row["board_key"] for row in candidates}, {"main"})
+        self.assertEqual({row["candidate_host"] for row in candidates}, {"arvind.darwinbox.in", "anotherco.darwinbox.in"})
+
+    def test_global_candidate_link_creates_only_discovered_board_and_never_activates(self):
+        company_id = self._create_employer()
+        imported = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(imported.status_code, 200, imported.text)
+        candidate = self.client.get("/api/discovery/global-candidates").json()["candidates"][0]
+        linked = self.client.post(
+            f"/api/discovery/global-candidates/{candidate['id']}/link",
+            json={"company_id": company_id}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(linked.status_code, 200, linked.text)
+        self.assertEqual(linked.json()["review_status"], "linked")
+        self.assertEqual(linked.json()["board_review_status"], "discovered")
+        self.assertFalse(linked.json()["verified"])
+        self.assertFalse(linked.json()["activated"])
+        boards = self.client.get("/api/discovery/boards?limit=10").json()["boards"]
+        self.assertEqual(len(boards), 1)
+        self.assertEqual(boards[0]["company_id"], company_id)
+        self.assertEqual(boards[0]["provider"], "workday")
+        self.assertEqual(boards[0]["review_status"], "discovered")
+        self.assertEqual(boards[0]["confidence"], "low")
+        self.assertEqual(boards[0]["discovered_from"], candidate["board_url"])
+        self.assertFalse(radar.get_config()["source_enabled"]["workday"])
+        candidate_again = self.client.post(
+            f"/api/discovery/global-candidates/{candidate['id']}/link",
+            json={"company_id": company_id}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(candidate_again.status_code, 200)
+        self.assertEqual(candidate_again.json()["board_registry_id"], linked.json()["board_registry_id"])
+        repeated_import = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", source_reference="CC-MAIN-2026-44")],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(repeated_import.status_code, 200, repeated_import.text)
+        self.assertEqual(repeated_import.json()["preserved_terminal"], 1)
+        candidate_status = self.client.get("/api/discovery/global-candidates").json()["candidates"][0]
+        self.assertEqual(candidate_status["review_status"], "linked")
+        self.assertEqual(self.client.post(
+            f"/api/discovery/global-candidates/{candidate['id']}/review",
+            json={"status": "rejected"}, headers={"X-CSRF-Token": self.csrf},
+        ).status_code, 409)
+
+    def test_global_candidate_link_reuses_existing_exact_board_and_reports_verified_status(self):
+        company_id = self._create_employer()
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        timestamp = radar.iso(radar.now())
+        with sqlite3.connect(self.db) as conn:
+            cursor = conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_verified_at,last_seen_at,created_at,updated_at
+                   ) VALUES(?,?,?,?,?,'medium','workday',1,'verified',?,?,?,?)""",
+                (company_id, "workday", "nvidia:NVIDIAExternalCareerSite", board_url, "manual-scan", timestamp, timestamp, timestamp, timestamp),
+            )
+            existing_id = int(cursor.lastrowid)
+            conn.commit()
+        imported = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate(board_url)],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(imported.status_code, 200)
+        candidate = self.client.get("/api/discovery/global-candidates").json()["candidates"][0]
+        linked = self.client.post(
+            f"/api/discovery/global-candidates/{candidate['id']}/link",
+            json={"company_id": company_id}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(linked.status_code, 200, linked.text)
+        self.assertEqual(linked.json()["board_registry_id"], existing_id)
+        self.assertEqual(linked.json()["board_review_status"], "verified")
+        self.assertTrue(linked.json()["verified"])
+        self.assertFalse(linked.json()["activated"])
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0], 1)
+
+    def test_global_candidate_reject_is_terminal_and_link_conflicts_do_not_reassign_board(self):
+        first_company = self._create_employer("NVIDIA", "nvidia.com")
+        second_company = self._create_employer("Other Employer", "other.example")
+        timestamp = radar.iso(radar.now())
+        with sqlite3.connect(self.db) as conn:
+            conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,created_at,updated_at
+                   ) VALUES(?,?,?,?,?,'low','workday',1,'discovered',?,?,?)""",
+                (first_company, "workday", "nvidia:NVIDIAExternalCareerSite", "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "seed", timestamp, timestamp, timestamp),
+            )
+            conn.commit()
+        imported = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(imported.status_code, 200)
+        candidate = self.client.get("/api/discovery/global-candidates").json()["candidates"][0]
+        conflict = self.client.post(
+            f"/api/discovery/global-candidates/{candidate['id']}/link",
+            json={"company_id": second_company}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(conflict.status_code, 409)
+        link = self.client.post(
+            f"/api/discovery/global-candidates/{candidate['id']}/link",
+            json={"company_id": first_company}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(link.status_code, 200, link.text)
+        # Rejection before a link is also terminal and survives another import.
+        rejected_import = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate("https://arvind.darwinbox.in/ms/candidatev2/main/careers")],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(rejected_import.status_code, 200)
+        darwin = next(row for row in self.client.get("/api/discovery/global-candidates").json()["candidates"] if row["provider"] == "darwinbox")
+        reject = self.client.post(
+            f"/api/discovery/global-candidates/{darwin['id']}/review",
+            json={"status": "rejected"}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(reject.status_code, 200, reject.text)
+        repeat = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate("https://arvind.darwinbox.in/ms/candidatev2/main/careers", source_reference="crawl-again")],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(repeat.status_code, 200)
+        status = next(row for row in self.client.get("/api/discovery/global-candidates").json()["candidates"] if row["provider"] == "darwinbox")
+        self.assertEqual(status["review_status"], "rejected")
+
+    def test_global_candidate_endpoints_are_admin_only_and_validate_batches(self):
+        member = TestClient(radar.app, base_url="https://testserver")
+        try:
+            login = member.post("/api/auth/login", json={
+                "email": "global-member@example.com", "password": "another sufficiently strong password",
+            })
+            self.assertEqual(login.status_code, 200)
+            self.assertEqual(member.get("/api/discovery/global-candidates").status_code, 403)
+            self.assertEqual(member.post("/api/discovery/global-candidates/import", json={"candidates": [self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")]}).status_code, 403)
+        finally:
+            member.close()
+        too_many = self.client.post("/api/discovery/global-candidates/import", json={"candidates": [{} for _ in range(201)]}, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(too_many.status_code, 422)
+        admin_import = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite")],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(admin_import.status_code, 200)
+        candidate_id = self.client.get("/api/discovery/global-candidates").json()["candidates"][0]["id"]
+        member = TestClient(radar.app, base_url="https://testserver")
+        try:
+            member.post("/api/auth/login", json={
+                "email": "global-member@example.com", "password": "another sufficiently strong password",
+            })
+            self.assertEqual(member.post(f"/api/discovery/global-candidates/{candidate_id}/link", json={"company_id": 1}).status_code, 403)
+            self.assertEqual(member.post(f"/api/discovery/global-candidates/{candidate_id}/review", json={"status": "rejected"}).status_code, 403)
+        finally:
+            member.close()
+        before_invalid = self.client.get("/api/discovery/global-candidates?provider=workday").json()["candidates"]
+        bad = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [
+                self._global_candidate("http://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"),
+                self._global_candidate("https://example.com/careers"),
+                self._global_candidate("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", method="unknown"),
+            ],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(bad.status_code, 200, bad.text)
+        self.assertEqual(bad.json()["inserted"], 0)
+        self.assertEqual(bad.json()["skipped"], 3)
+        self.assertEqual(bad.json()["company_records_created"], 0)
+        non_string_reference = self.client.post("/api/discovery/global-candidates/import", json={
+            "candidates": [{
+                "board_url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                "discovery_method": "manual", "source_reference": {"bad": "type"},
+            }],
+        }, headers={"X-CSRF-Token": self.csrf})
+        self.assertEqual(non_string_reference.status_code, 200)
+        self.assertEqual(non_string_reference.json()["skipped"], 1)
+        after_invalid = self.client.get("/api/discovery/global-candidates?provider=workday").json()["candidates"]
+        self.assertEqual(after_invalid, before_invalid)
+
     def test_workday_inventory_status_is_admin_only_and_reports_configured_board(self):
         member = TestClient(radar.app, base_url="https://testserver")
         try:
