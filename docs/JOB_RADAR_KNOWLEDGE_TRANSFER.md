@@ -315,7 +315,7 @@ Recommended implementation contract:
 4. Collect metrics: candidate count, model calls/skips, valid/invalid outputs, per-field agreement vs deterministic/source metadata, p50/p95 latency, failure/backoff counts and estimated cost. Do not log secrets or dump full JD content.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Latest user VM verification: 78 tests passed in 53.339s; dev health OK on 8001, config v10 has Naukri only and notifications off; source status matches; prod 8000 healthy. The LinkedIn experience parser patch can now move through reviewed release PR/merge and main CI (do not switch production checkout during promotion). User proposes an LLM for required skills/experience because deterministic parsing misses formats. No LLM code/provider added yet. Design a separate, disabled-by-default, schema-validated enrichment module; source-labeled deterministic metadata takes precedence, conflicts remain uncertain, LLM never assigns match scores or controls eligibility by itself. Add fixtures for ranges, required/preferred, skill-specific vs total experience, absent/conflicting metadata and prompt-injection text; shadow-mode in dev, cost/latency/error metrics, timeout/backoff/cache. Choose provider and secret/budget configuration before implementation. Do not alter production or enable dev notifications/LinkedIn; then continue Greenhouse one-board canary only after the current fix is promoted.” 
+“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Latest user VM verification: 78 tests passed in 53.339s; dev health OK on 8001, config v10 has Naukri only and notifications off; source status matches; prod 8000 healthy. The LinkedIn experience parser patch can now move through reviewed release PR/merge and main CI (do not switch production checkout during promotion). User proposes an LLM for required skills/experience because deterministic parsing misses formats. No LLM code/provider added yet. Design a separate, disabled-by-default, schema-validated enrichment module; source-labeled deterministic metadata takes precedence, conflicts remain uncertain, LLM never assigns match scores or controls eligibility by itself. Add fixtures for ranges, required/preferred, skill-specific vs total experience, absent/conflicting metadata and prompt-injection text; shadow-mode in dev, cost/latency/error metrics, timeout/backoff/cache. Choose provider and secret/budget configuration before implementation. Do not alter production or enable dev notifications/LinkedIn; then continue Greenhouse one-board canary only after the current fix is promoted.”
 
 
 ## Latest handoff — 2026-10-12: dev verification passed; LLM job-description enrichment proposal
@@ -348,7 +348,7 @@ User wants an LLM to extract JD skills and required experience because determini
 4. Resume source roadmap only after release gate: Greenhouse one-board dev canary, then Instahyre schema/freshness validation, then Ashby/Lever/SmartRecruiters. Preserve no historical alert replay and no LinkedIn limit evasion.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. User supplied successful dev verification: 78 tests pass in 53.339s; dev health OK at port 8001, config v10 is Naukri-only with notifications off, source status agrees, and production port 8000 remains healthy. The LinkedIn experience parser fix is ready for reviewed promotion to main; verify main CI, but do not switch the production VM checkout as part of promotion. User proposed an LLM to extract skills/experience from JDs. No LLM implementation/provider has been chosen. Design it as a separate disabled-by-default strict-schema extractor with local validation, deterministic/source-labelled metadata precedence, uncertainty on conflicts, prompt-injection isolation, cache by JD hash/schema, timeouts/backoff and hard spend caps. Shadow mode first with notifications off; evaluate required/preferred skills, year ranges, skill-specific vs total experience, missing/conflicting fields and malicious text. Select provider and secure budget/secrets before coding. No production change; then Greenhouse one-board dev canary and later Instahyre/ATS roadmap.” 
+“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. User supplied successful dev verification: 78 tests pass in 53.339s; dev health OK at port 8001, config v10 is Naukri-only with notifications off, source status agrees, and production port 8000 remains healthy. The LinkedIn experience parser fix is ready for reviewed promotion to main; verify main CI, but do not switch the production VM checkout as part of promotion. User proposed an LLM to extract skills/experience from JDs. No LLM implementation/provider has been chosen. Design it as a separate disabled-by-default strict-schema extractor with local validation, deterministic/source-labelled metadata precedence, uncertainty on conflicts, prompt-injection isolation, cache by JD hash/schema, timeouts/backoff and hard spend caps. Shadow mode first with notifications off; evaluate required/preferred skills, year ranges, skill-specific vs total experience, missing/conflicting fields and malicious text. Select provider and secure budget/secrets before coding. No production change; then Greenhouse one-board dev canary and later Instahyre/ATS roadmap.”
 
 
 ## 2026-10-12 — Gemini JD extraction implemented in dev branch (not yet VM-verified)
@@ -844,7 +844,7 @@ Use Gemini for job-description extraction; the user will enter the API key direc
 - No fetch, pull, reset, checkout, merge, deploy, Docker action, restart, backup, or database change was performed. No VM commands were executed by the assistant. Production runtime/container/volume identity remains unverified, and Docker socket access remains blocked for `ubuntu`.
 - Next step: keep both checkouts untouched. Obtain authorized Docker visibility through OCI-supported console/recovery or an existing administrator. After runtime identity and a verified backup are established, separately plan Git synchronization; first review the 8 commits on `main` not in v2 and resolve the intended release/merge strategy. Do not merge/deploy v2 into production merely because its branch has a higher commit count.
 - Keep PR #36 merge commit `58fdff19aa6c4e5c53c402fc0af8d2642ceb467d` as the known green CI baseline (78/78). No production deployment has been performed or verified. Greenhouse canary remains a later isolated dev task with notifications off; dev LinkedIn and Gemini shadow stay disabled.
-- Continuation prompt: “Read the latest dated sections of both handover docs. Live refs: main=`58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, v2-live-radar=`816946c27248e0002df6aaacab7dd1caff56db79`. GitHub says the branches diverged: v2 is 160 ahead / 8 behind main, merge base `cefc185a58387ebc21544e1d3b2e1a9ac07f654b`. Local prod/dev HEADs are ancestors of live v2, but local origin refs are stale. Do not fetch/sync/merge/deploy. First restore authorized Docker visibility and identify actual runtime/mounts with a verified backup plan; review the 8 main-only commits before choosing any release strategy.” 
+- Continuation prompt: “Read the latest dated sections of both handover docs. Live refs: main=`58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, v2-live-radar=`816946c27248e0002df6aaacab7dd1caff56db79`. GitHub says the branches diverged: v2 is 160 ahead / 8 behind main, merge base `cefc185a58387ebc21544e1d3b2e1a9ac07f654b`. Local prod/dev HEADs are ancestors of live v2, but local origin refs are stale. Do not fetch/sync/merge/deploy. First restore authorized Docker visibility and identify actual runtime/mounts with a verified backup plan; review the 8 main-only commits before choosing any release strategy.”
 
 
 ## Execution preference and next action clarified — 2026-10-12
@@ -2015,7 +2015,7 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 - User's actual output confirms VM fast-forward from bcb8cfc to b427bab and `v2.test_gemini_experience_diagnostic` passed: 4 tests in 0.336s, OK. Fixtures exercise fresh exact hash plus trusted experience, reject mismatched description hash, expired cache and skill-specific scope. This does not establish that a qualifying current job is present in the live database.
 - No live DB diagnostic has run yet. Preserve any local `M v2/config.json` and `?? .venv/`; do not stage/reset/clean/overwrite them.
 - Next run the checked-out diagnostic source within the already-running container:
-  
+
       cd ~/job-beeper-dev
       sudo docker exec -i -w /app job-radar-dev python - < v2/gemini_experience_diagnostic.py
 
@@ -2064,7 +2064,7 @@ Continue existing Job Radar V2 Gemini experience-matcher task in `AvinashBhalla/
 
 - Current-state correction: the first health connection reset was subsequently shown to be transient. Latest follow-up output includes a successful bounded health check and live persisted bounds/reason verification; rely on the latest 2026-10-15 handoff, not the superseded pending-diagnosis note in the earlier chronological entry.
 
- 
+
 ## 2026-10-16 — Claude Code/orchestrator handoff and review queue
 
 - Verified acceptance state: the user's latest output confirms the dev matcher end-to-end experience evaluation for one current-hash job. Health recovered; matcher/extraction true, notification credentials absent/notifications disabled, LinkedIn disabled, existing dev volume retained. Live `job_evaluations` now has min=3.0/max=5.0 and an experience reason. The diagnostic was read-only and made zero Gemini API calls or notifications. Provenance is transient (`jd_experience_source=gemini_verified`); schema does not persist this marker. This does not establish end-to-end Telegram delivery, intentionally not tested.
@@ -2243,7 +2243,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Safe next VM step, after reviewing current status: read-only `git status --short`, branch, HEAD and fetch for `origin/v2-live-radar` from `/home/ubuntu/job-beeper-dev`. Preserve VM-local modified `v2/config.json`, untracked `.venv/`, ignored `.env`, and named volume `job-radar-dev_radar-dev-data`. Do not reset/clean/stash blindly or touch the separate production-ish Compose project. Only use `git pull --ff-only` if the tree/branch/ahead-behind state proves it is safe.
 - Do not ask the user to paste keys in chat. Do not enable the router, run job-processing endpoints, trigger Gemini/provider requests, rebuild/restart containers, change DB/volume state, enable matcher use, or send notifications until test results and an explicit staged rollout are agreed. If safe to proceed after tests, give exact VM-local secret-entry steps and verify only allowlisted booleans/provider names/model IDs, never secret values.
 
- 
+
 ## 2026-10-28 — Multi-provider router hardening and test verification
 
 - Fixed a log/error redaction edge case in v2/llm_router.py: arbitrary ValueError strings that merely started with invalid_ are no longer treated as safe codes. An explicit allowlist is used; unexpected validator messages become invalid_result.
@@ -2572,7 +2572,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - DOM retains 200 job cards (`data-filter-item`); 199 are hidden and only one is visible: Engineering Manager — Cognizant — Bengaluru, Karnataka, India (Hybrid).
 - Dynamic count reports `1 role`; page's base result count remains `200 found`.
 - Strong evidence that search filters the 200 preloaded cards in the browser. Since capture starts after interaction, a 1-second empty network window is not proof that no request happened during the keypress.
- 
+
 ### What is known vs unknown
 - Known public delivery: Hiring-this-week page exposes Latest 20; role page exposes up to 200 preloaded results, local search, a location form, public HTML, and common static scripts. Backend HTML HAR included public cache headers: `Cache-Control: public, max-age=3600` and `X-Cache-Status: MISS`.
 - Not known: JobBeeper's private source scheduler, crawl topology, worker count, queues, database/index, provider credentials, access agreements, polling cadence, rate limits, retry strategy or exact upstream fetch methods. Public browser evidence cannot establish these.
@@ -2654,7 +2654,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Docker CLI without sudo returned permission denied; read-only inspect succeeded with sudo. A YAML `volumes:` snippet was accidentally entered as shell input and returned command-not-found; YAML belongs in the Compose file, not the terminal.
 - No app/config/database/volume mutation, image build, container recreation, source enablement, provider call or Telegram send occurred. Runtime is still the old image; Ashby absence is consistent with this, not a regression in tested source.
 - **Next:** ask whether `/home/ubuntu/job-beeper` / port 8000 is the live/production service or intended dev. Then, read-only in that directory, check `git status --short`, branch, HEAD, remotes, `git fetch origin v2-live-radar`, and `git rev-list --left-right --count HEAD...origin/v2-live-radar`. Do not pull, checkout, build or recreate until release target, exact volume and rollback are confirmed. If a separate dev runtime is needed, it must use a distinct Compose project, loopback-only port and separate volume. Never expose secrets or modify production without explicit approval.
-- Detailed chronology and exact commands: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`. **Next-chat prompt:** “Read all three Job Radar docs first. Do not deploy. Clarify the role of `/home/ubuntu/job-beeper` (port 8000). The tested `job-beeper-dev` checkout is at `7ebc38b`, with 136 tests passing and local config/env files to preserve. The running container is from the original checkout path, old image created Oct 12, mounted volume `v2_radar-data:/data`; original checkout is at `61d8271`. First do read-only git status/fetch/compare and decide release target. No volume deletion, production change, or notifications.” 
+- Detailed chronology and exact commands: `docs/JOB_RADAR_HANDOVER.md`. Architecture guardrails: `docs/JOBBEEPER_REFERENCE.md`. **Next-chat prompt:** “Read all three Job Radar docs first. Do not deploy. Clarify the role of `/home/ubuntu/job-beeper` (port 8000). The tested `job-beeper-dev` checkout is at `7ebc38b`, with 136 tests passing and local config/env files to preserve. The running container is from the original checkout path, old image created Oct 12, mounted volume `v2_radar-data:/data`; original checkout is at `61d8271`. First do read-only git status/fetch/compare and decide release target. No volume deletion, production change, or notifications.”
 
 
 ## User clarification — 2026-11-06 — port 8000 is production/live
@@ -3583,3 +3583,99 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Smoke verified: dashboard/health 200; both login + `/api/auth/me` + `/api/preferences` 200; admin telemetry endpoints 200; member telemetry endpoints 403.
 - Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` for complete Desktop prompt, manual checklist, safety boundaries, test matrix and report template.
 - Owner is to run manual testing and Desktop AI testing. After feedback, reproduce on feature branch, tests + exact SHA CI, shared dev first, owner approval, then production. No production changes.
+
+## 2026-11-09 — Owner priority order, global ATS discovery and source-health redesign
+
+### Owner-approved feature priorities
+
+The owner confirmed this priority sequence from the product-priority screenshot. It is now authoritative over earlier conflicting orderings:
+
+1. **P0:** Reliable notifications and better matching.
+2. **P0:** Source health, latency and rate-limit handling.
+3. **P1:** Job legitimacy, stale posting and repost detection.
+4. **P1:** Explainable job-fit scoring.
+5. **P1:** Resume vault and job-specific resume customisation.
+6. **P1:** Reusable application answer bank.
+7. **P2:** Referral discovery and outreach drafts.
+8. **P2:** Browser-assisted application filling.
+9. **P2:** Application tracking, interview follow-ups and outcome learning.
+
+Auto-apply stays human-approved. Prepare and fill are allowed only with user review; do not submit a consequential application without explicit per-application approval.
+
+### QA report — Desktop two-role run, 2026-11-09
+
+- Uploaded report: `jobbeeper-two-role-desktop-qa-2026-11-09.md`.
+- Target: isolated `http://localhost:18006/dashboard/`, build `e6181d93682d6c09cd462c18b13b20996ce99057` only.
+- Report summary: **3 PASS, 1 FAIL, 16 BLOCKED, 9 UNKNOWN**. This is not an authenticated release acceptance.
+- The synthetic passwords were absent from that Desktop execution context, so it did not log in as either role. No guessing and no real-account fallback.
+- Confirmed PASS: login shell rendered; unauthenticated `/api/auth/me`, `/api/source-status`, `/api/source-status/summary`, `/api/latency-summary` all returned 401.
+- The report's 16 authenticated items remain blocked (admin/member flows, jobs, source UI, preferences, application tracker, etc.). Requested viewport widths could not be set; browser remained approximately 714px. Mobile findings are therefore not a reliable application verdict.
+- **Report inconsistency:** its executive table counts one FAIL, but the detailed body only presents two PASS items, one BLOCKED responsive-control item and one UNKNOWN responsive-overflow item. No detailed FAIL ID, expected/actual evidence or severity is provided. Reconcile this on the rerun; do not invent the missing defect.
+- No POST/PUT/PATCH/DELETE, external services, collectors, notifications, OAuth, account or application changes were triggered.
+- Next QA: use two independent contexts and the synthetic QA credentials through the approved secure channel; never include passwords in a report, prompt output, screenshot or Git. If still unavailable, stop at login and label remaining tests BLOCKED/UNKNOWN. Confirm admin 200 vs member 403, tenant isolation, jobs/feed, match explanations, application tracker, preferences, session persistence, logout, browser console/network, and real viewport sizes 1440x900, 1280x800, 768x1024, 390x844, 375x812, 320x740. Use only port 18006. No production/shared-dev writes or external jobs/Telegram activity.
+
+### User requirement — company-agnostic ATS discovery (new P0)
+
+The owner explicitly does not want to configure individual employer companies one by one. JobBeeper should continuously discover public employers/boards using Workday, Darwinbox, Keka and the other supported ATS platforms; verify their public candidate-facing feeds; register new boards; and poll them automatically. The manual company form is an exception/correction tool, not the primary coverage model.
+
+Reality check: the provider adapters are employer/tenant-scoped. Workday public CXS pages require tenant/cluster/site identifiers and some employers can opt out of search-engine indexing. Darwinbox's official Recruitment API job-list V3 requires employer-issued API credentials; public candidate career sites are a separate per-employer interface. Keka's official HRMS API uses OAuth/client credentials; some employer career sites expose anonymous candidate-facing feeds, but those are tenant-specific and must be verified. Private/internal vacancies and auth-only interfaces are outside anonymous crawling.
+
+Required architecture: compliant search-index discovery + employer sitemap/career-link crawler + ATS-specific URL/tenant resolvers + verified global employer/board registry + per-board due scheduler with jitter, bounded concurrency, cursors, persisted Retry-After/cooldown, status-specific handling and dedupe. High-confidence public boards can be auto-activated after bounded verification and a silent baseline; medium-confidence candidates are retried/reviewed; auth-required, blocked, low-confidence or unsafe boards stay inactive. Report discovered/verified/active/blocked coverage; never claim universal market coverage without a defensible denominator.
+
+Shared pipeline: global discovery → board registry → poll → normalize → dedupe → job legitimacy/stale/repost checks → shared jobs store → per-user match evaluation → per-user notification. One fetch serves all users; user preferences must not be used to discover source boards or sent to the crawler.
+
+See `docs/GLOBAL_ATS_DISCOVERY_AND_COVERAGE_ARCHITECTURE_2026-11-09.md` for complete design and evidence.
+
+### Production Source Health page — explanation and redesign
+
+The shipped page is titled “Source Health & Ingestion Telemetry”. It currently mixes operational provider metrics with a manual per-company board discovery form. The 12 telemetry columns mean:
+- Source: provider adapter, not one employer.
+- Status: enabled/running/partial/error/disabled; ACTIVE does not mean all employers are covered.
+- Jobs Seen (Latest): listings returned by latest run.
+- New Jobs (Latest): new local records created in latest run, not total new postings in 24h.
+- Measured Runs (24h): runs with request telemetry versus all run records; “Not measured” means old historical records lack metrics, not zero requests.
+- Requests (24h): HTTP request attempts.
+- HTTP 429: rate-limit responses.
+- Retries: request retry attempts, not guaranteed successful retries.
+- Avg Request: average individual HTTP request duration, not posting-to-alert latency.
+- Page / Board Failures: failed pages and failed employer boards against attempted totals.
+- Last Success: latest successful source run timestamp.
+- Diagnostics: last error/partial warning; Naukri includes relay snapshot age/freshness.
+
+There is no user-facing Source Confidence score in this table. Three different concepts must remain distinct: (1) board discovery confidence, (2) source operational health, and (3) per-job legitimacy/freshness confidence.
+
+Recommended redesign: rename to “Coverage & Health”; top summary for monitored boards, new boards discovered, sources needing attention and unique jobs captured; Coverage tab per provider with discovered/verified/active/pending/blocked boards; Freshness tab with board-level last attempt/last success/next due/overdue age; Reliability tab with requests/429/retries/latency/page and board failures/cooldowns; Job Quality tab per listing with employer URL, apply link, posted-time evidence, still-open checks, stale/repost/duplicate evidence. Put technical metrics behind expandable details and add plain-English explanations and “not measured” states. Do not infer a market-coverage percentage without a denominator.
+
+See `docs/SOURCE_HEALTH_EXPLAINED_AND_UX_REDESIGN_2026-11-09.md`.
+
+### Connector engineering completed in parallel — all default-off
+
+These were developed in isolated worktrees; none is merged, deployed or activated. All were cut from the same V2 base, so config-migration ordering must be reconciled before sequential merges.
+
+- **Recruitee:** draft PR #59, branch `feat/recruitee-public-feed-20261109`; 10 focused tests; full V2 suite 409/409. Public `bunq` XML feed HTTP 200, 23/23 offers parsed. `<credentials>` excluded. GitHub exact-head CI passed at the last check.
+- **Personio:** draft PR #60, branch `feat/personio-public-feed-20261109`; 8 focused tests; full V2 suite 408/408. Docs example tenant returned HTTP 200 and `workzag-jobs` root but zero jobs; populated employer feed still unverified. GitHub exact-head CI passed at last check.
+- **Teamtailor:** draft PR #61, branch `feat/teamtailor-public-rss-20261109`; 9 focused tests; full V2 suite 409/409. Official docs sample feed HTTP 200, 16/16 items parsed. Exact-head workflow run not observed at last check.
+- **Breezy HR:** local branch `feat/breezy-public-json-20261109`; 12 focused tests; full V2 suite 411/411. One observed public employer feed returned HTTP 200 and 905 records; same-board JobPosting JSON-LD supplied description/date/salary/location. This endpoint is observed but undocumented and must be verified per employer. Branch not yet pushed/PR opened.
+
+Each source's feature branch independently creates a config v15→v16 migration forcing its new flag off. Do not merge all branches unchanged. After the first source lands, rebase later branches and advance the migration version sequentially while preserving the already-added source settings. Keep all candidate sources off until exact-head CI, security review, populated employer-board pilot, two-poll baseline/dedupe and shared-dev UAT pass.
+
+### Immediate order of work
+
+1. Complete and commit the global discovery + source-health docs/handovers.
+2. Build a source-health plain-language UI prototype on the modern integration UI branch; keep prod untouched.
+3. Prototype discovery channels for Workday/Keka/Darwinbox: compliant search API and public sitemap/career-link crawling. Measure discovery recall against a held-out company sample; do not guess tenants or brute-force hostnames.
+4. Design board-level registry scheduling and automatic high-confidence activation. Add per-board next_poll/last_success/cooldown and bounded concurrency; keep manual scan as fallback.
+5. Finish authenticated two-role QA on the isolated 18006 environment; reconcile the missing detailed FAIL entry.
+6. Keep P0 notification/matching and source reliability above the P1/P2 feature work. Connector adapters remain a parallel track and must not displace P0 reliability.
+
+Release boundary: no direct production modifications. Feature branch → exact-SHA CI → review → shared-dev QA → owner UAT → separate explicit production approval.
+
+## 2026-11-09 — Hirebase global ATS index lead (POC only; no integration yet)
+
+A new vendor index may accelerate the owner's company-agnostic discovery goal. Hirebase currently quantifies Workday at 1,154,129 live jobs / 6,917 companies and lists Keka and Darwinbox under “Also indexed” without separate counts; its broader marketing claims 80+ ATSs and 640k+ career pages. These are vendor-stated and dynamic, not guaranteed coverage. Its data is reported refreshed hourly, so it cannot alone deliver a 2-minute freshness target.
+
+- API requires a key; docs advertise a 500-jobs / 50-companies monthly free tier. Starter: $99/month for 25,000 jobs / 10,000 companies; Growth: $249/month for 250,000 jobs / 50,000 companies. Count returned rows; broad scans may exceed the free allowance rapidly.
+- Hirebase ToS permits use/display/cache/integration in the customer's own app subject to plan but prohibits raw dataset redistribution, bulk user export, and building a competing job-data product/database. It says commercial use requires an API plan. Before integration, get written confirmation that a commercial curated JobBeeper job-search product fits the licence and whether merged direct-source records/caching are allowed. Do not expose bulk export.
+- Proposed POC: use the free tier only after owner obtains a key and stores it in an isolated dev secret/environment. Query Workday, Keka and Darwinbox separately, compare to a held-out set of known employer boards (especially India), inspect original employer URLs, freshness/date precision, closed/repost quality, dedupe, missing fields, pagination and consumed quota. No signup or API key has been created by this agent.
+- If quality/terms pass, use Hirebase as one coverage accelerator/backfill source, while direct public board polling remains the freshness/verification path for high-priority employers. Do not replace all direct connectors prematurely.
+- References: https://www.hirebase.org/ats ; https://www.hirebase.org/docs ; https://www.hirebase.org/pricing ; https://www.hirebase.org/terms

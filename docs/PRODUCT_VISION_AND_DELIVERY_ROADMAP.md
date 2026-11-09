@@ -1,7 +1,7 @@
 # JobBeeper — Product Vision, Architecture and Delivery Roadmap
 
-**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.  
-**Last reviewed:** 2026-11-08 (Asia/Kolkata)  
+**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.
+**Last reviewed:** 2026-11-09 (Asia/Kolkata)
 **Status:** Living source of truth. This document supersedes conflicting feature-order recommendations in older roadmaps; those files remain useful for implementation detail and engineering history.
 
 ## 1. Product vision
@@ -95,7 +95,7 @@ Every user-owned query must scope by authenticated session user ID. Never trust 
 |---|---|---|
 | Job collection | Shared collectors; one fetch serves all users | Not changed for user growth alone |
 | ATS integrations | Explicit provider registry + provider-specific adapters/tests | A real second use justifies a shared helper |
-| Employer discovery | Admin-assisted scan → verify → activate allowlist | Automate after false-positive control is measured |
+| Employer discovery | Global automated public-board discovery and provider-specific verification; manual scan is an exception tool | Improve recall without violating access controls or misrepresenting coverage |
 | Runtime | Existing FastAPI application | Split only for demonstrated independent scaling/deployment needs |
 | Database | SQLite WAL, serialized writes and busy timeout for single-host beta | PostgreSQL before lock contention, multi-instance deployment or recovery needs exceed SQLite's safe envelope |
 | Browser automation | Optional companion, separate from collectors | After server-side answer-bank/application APIs exist |
@@ -114,98 +114,88 @@ Do not migrate to PostgreSQL, Redis, Kafka, Celery or microservices just because
 | Authentication | Cookie sessions, Argon2id, roles, CSRF, login limits | Production admin bootstrap and real two-user test remain |
 | Telegram | Per-user linking and notification ledger exist in candidate | Real production link/delivery test remains |
 | Resume parsing | PDF/DOCX parser returns conservative preference suggestions | No resume vault or tailored-CV generation |
-| Application tracker | Applied status, notes and status controls exist | Browser localStorage only; not server-owned/cross-device |
+| Application tracker | Basic server-owned per-user application records and CRUD released 2026-11-09 | Richer interview stages, follow-ups, reminders and outcome learning remain P2 |
 | Referrals | Design only | Contact discovery/provenance, drafts and follow-ups not implemented |
 | Assisted apply | Design only | No answer bank or browser companion |
 | Auto-apply | Not implemented | Must remain off pending a separate permission/safety gate |
 
-ATS discovery can recognize providers that have no collectors. Current discovery-only families include Recruitee, Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
+The mainline V2 collector registry includes 11 sources: LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Workable, Keka and Darwinbox. Per-employer board verification and recurring coverage remain separate from having a provider adapter. Recruitee (draft PR #59), Personio (draft PR #60), Teamtailor (draft PR #61) and Breezy HR (local feature branch) have default-off candidate adapters, not mainline/deployed integrations. BambooHR and Rippling remain discovery-only. See the global discovery design and source-health guide linked in the documents section below.
 
-## 5. Prioritized delivery sequence
+## 5. Owner-approved priorities — 2026-11-09
 
-Priorities are revisable. New blockers, reference patterns and user test results can move work up or down.
+This priority order was explicitly confirmed by the owner from the product-priority screenshot on 2026-11-09. It supersedes conflicting ordering in older notes. Work should be parallelized where independent, but a P1/P2 feature must not displace unresolved P0 reliability and discovery work.
 
-### P0 — Reliable production job radar (release now)
+| Priority | Feature | Intended outcome |
+|---|---|---|
+| P0 | Reliable notifications and better matching | Fresh, relevant notifications delivered only to the matching user; robust no-backlog and per-user isolation. |
+| P0 | Source health, latency and rate-limit handling | Explainable operational health, board-level freshness, persisted cooldown and visible coverage gaps. |
+| P1 | Job legitimacy, stale posting and repost detection | Verify employer/public posting evidence, recheck open/closed state, detect reposts and suppress stale/duplicate opportunities. |
+| P1 | Explainable job-fit scoring | Show hard blockers, evidence-based fit factors, sources and uncertainty instead of an unexplained percentage. |
+| P1 | Resume vault and job-specific resume customisation | Private user-owned source resumes, fact provenance and truthful reviewed tailored versions. |
+| P1 | Reusable application answer bank | Per-user answers with source, confirmation, confidence and correction history; inferred/sensitive answers require review. |
+| P2 | Referral discovery and outreach drafts | Evidence-backed contact relevance and editable drafts; no fabricated identity/contact details or automatic sending. |
+| P2 | Browser-assisted application filling | Fill only supported fields on a user-authorized page, show preview and stop before Submit. |
+| P2 | Application tracking, interview follow-ups and outcome learning | Track applications, stages, notes, reminders and outcomes; learn only from user-authorized feedback. |
 
-- Finish release review, backups, migration canary and rollback.
-- Enable only individually verified boards; current examples are a controlled seed set, not broad platform coverage.
-- Keep initial inventory silent; only post-baseline discoveries can alert.
-- Verify production scheduler, last-success, request/new-job counts and notification delivery.
-- Measure posting → discovery → alert where source timestamps support defensible precision. Never invent exact times from date labels.
-- Preserve LinkedIn's 429 breaker/cooldown; do not increase request rate to chase unrealistic latency.
-- Run 24–72 hour source/DB soak and record errors, duplicates, false matches and alert delivery.
+**Auto-apply remains human-approved initially.** The system may prepare and fill, but each application must be reviewed and explicitly approved by the user before submission. It must never bypass CAPTCHA, login/access controls, employer constraints or rate limits, and must not submit legal, visa, salary or demographic declarations without direct review.
 
-**Acceptance:** each enabled source has a verified board, at least two successful polls, correct dedupe, silent first inventory, intact DB and an observable per-user test alert. Empty allowlists/unverified tenants cannot be enabled.
+### P0 — Reliable notifications, matching and source operations
 
-### P0.5 — Server-owned application tracker (before wider multi-user beta)
+- Prove the complete source → normalized job → canonical dedupe → per-user evaluation → per-user notification path with two independent user contexts.
+- Preserve the silent first-inventory baseline. Never replay old jobs after enabling a board or a user's notification opt-in.
+- Verify match explanations, hard exclusions, profile changes, notification idempotency, retry safety and no cross-user leakage.
+- Measure publication-to-discovery, discovery-to-match and match-to-notification separately. Only calculate posting latency where the provider supplies a defensible published timestamp; keep first-seen and update timestamps distinct.
+- Move to global public employer-board discovery so new companies are found without manual company-by-company configuration. Keep manual add/correct as a fallback only.
+- Schedule verified boards independently with jitter, bounded concurrency, host budgets, persisted next-poll/cooldown and provider-specific retry handling.
+- Preserve 429 handling and never increase request volume to chase an arbitrary two-minute target. Show overdue/blocked boards explicitly.
+- Run a 24–72 hour source/DB soak and record errors, duplicates, false matches, coverage and delivery.
 
-The dashboard tracker is currently in localStorage. It is user-keyed in that browser, but does not sync across devices and can be lost when browser data is cleared.
+**P0 acceptance:** every active board has provenance, verification evidence, a silent first poll, at least two successful deduplicating polls, observable freshness and rate-limit state. A user can confirm they receive only their own matching notification in a dedicated test channel. The dashboard reports coverage limits rather than implying complete platform-wide coverage.
 
-- Persist applications per user and canonical opportunity.
-- Store applied time, status, notes and timestamps.
-- Enforce owner-scoped API reads/updates/deletes; never accept client user ID.
-- Keep jobs shared; do not duplicate job descriptions per application.
-- Prevent duplicate application records for the same canonical opportunity.
-- Move dashboard from localStorage to authenticated API calls; decide whether a one-time legacy local-data import is needed.
-- Keep schema minimal; add a full activity timeline when reminders require it.
+### P1 — Trustworthy jobs and explainable decisions
 
-**Acceptance:** two users can track the same job independently; one cannot read/mutate the other's record; changes survive relogin and a second browser; canonical duplicates do not duplicate applications.
+**Job legitimacy, stale and repost detection**
+- Retain original employer/ATS source URL and discovery evidence.
+- Recheck that the public board still lists a job; distinguish closed, stale, temporarily inaccessible and removed listings.
+- Compare title/company/location/description/posting identity and dates to identify edits, duplicates and reposts.
+- Never call a listing legitimate solely because an HTTP request succeeded. Record the evidence and last verification time.
 
-### P1 — Resume vault and truthful tailoring
+**Explainable job-fit scoring**
+- Separate hard blockers from weighted evidence.
+- Explain JD-stated requirements versus inferred criteria; preserve provenance and confidence.
+- Show why the role matches or fails the saved profile and allow user feedback without hiding the underlying evidence.
 
-- Add user-owned resume documents and structured candidate facts.
-- Extract experience, skills, education, employers, projects and metrics with provenance.
-- Let users correct/confirm facts; preserve the original.
-- Generate tailored ATS-readable versions from JD + confirmed facts.
-- Show a change summary and missing requirements.
-- Reject/flag unsupported claims; never silently overwrite the base resume.
-- Save versions per application and export PDF/DOCX after user review.
-- Enforce private storage, per-user access, export/deletion, retention and encryption at rest.
+**Resume vault and truthful job-specific customisation**
+- Add private per-user source resume documents and structured candidate facts.
+- Extract employers, titles, dates, education, skills, projects and quantified achievements with provenance.
+- Let the user correct/confirm facts without overwriting the original.
+- Generate ATS-readable versions from the job description and confirmed facts; show a change summary and unsupported/missing requirements.
+- Save reviewed versions against the relevant application and support export/deletion, private storage and retention controls.
 
-The current parser is an onboarding suggestion extractor, not a resume-tailoring engine.
+**Reusable answer bank**
+- Store canonical questions, answers, type, confidence, evidence/source, confirmation date and use history per user.
+- User corrections override earlier answers. Inferred values remain unconfirmed until approved.
+- Keep company/job-specific answers separate from generic reusable facts.
+- Unknown answers remain blank. Sensitive/legal questions require direct confirmation.
 
-### P1 — Application Answer Bank and assisted form preparation
+### P2 — Application progress, referrals and assisted applications
 
-- Create per-user canonical question/answer bank (work authorization, notice period, location, salary expectations, portfolio).
-- Track answer type, confidence, source, confirmation date and usage.
-- Corrections override prior answers; inferred answers need confirmation.
-- Exclude company/job-specific text from reusable generic answers.
-- Build a companion extension only after APIs stabilize.
-- Fill supported fields on pages the user opened and authorized; show field-to-answer preview/confidence.
-- Capture pre-submit snapshot for review; user submits in initial release.
+- Extend the server-owned application tracker with interview stages, status history, notes, dates, outcomes and follow-up tasks.
+- Identify public professional contacts with role, employer, evidence URL, source, confidence and last-checked timestamp.
+- Draft referral and follow-up messages; user edits and sends. Add email OAuth only with explicit consent and minimal scopes; start with drafts, not send actions.
+- Build browser assistance after application and answer-bank APIs are stable. Fill the user's active, authorized form and preview every field; never click Submit in the initial release.
+- Learn from user-confirmed corrections and outcomes with a transparent purpose and consent.
 
-**Acceptance:** no cross-user leakage; unknown answers stay blank; low-confidence/sensitive answers require review; extension never clicks Submit.
+### Existing application tracker status
 
-### P2 — Application lifecycle, referrals and follow-ups
-
-- Add status history, interview stages, notes, dates and outcomes.
-- Add user-created follow-up tasks/reminders grounded in user actions, not guessed response windows.
-- Identify public professional contacts with role, employer, evidence URL, source, confidence and last-checked time.
-- Rank contacts with explainable relevance; never fabricate identity, affiliation or email.
-- Draft referral requests/follow-ups; keep editable.
-- Add Gmail/Outlook OAuth only with explicit consent/minimal scopes; start by creating drafts, not sending.
-- Record user approval, send/response status and follow-up history; respect privacy/deletion/opt-outs.
-
-### P3 — Interview and search coach
-
-Maintain a user-approved STAR story bank grounded in real experience; create job-specific practice; track application funnel; identify repeated skill gaps; use outcomes/feedback only with transparent purpose and consent.
-
-### P4 — Carefully gated automation
-
-1. **Prepare:** generate CV, cover letter and answers.
-2. **Assist:** populate supported form fields in the user's open session.
-3. **Review:** show full payload and unanswered/sensitive declarations.
-4. **Approve:** user explicitly approves each application.
-5. **Submit:** only via supported/permitted interfaces with per-application confirmation and audit record.
-
-Never bypass CAPTCHA, login walls, rate limits, employer controls or terms. Never submit legal, salary/visa or demographic declarations without direct review. Automatic submission stays off until a separate risk/consent/permission/reliability review passes.
+The basic server-owned application tracker (per-user application records and browser API migration) was previously released according to the 2026-11-09 P0.5 release note below. The owner's P2 priority refers to the broader lifecycle: interview follow-ups, outcome learning and a richer history, not a reason to rebuild the basic CRUD feature.
 
 ## 6. Suggested data model evolution
 
 - Existing shared layer: jobs, canonical opportunities, source runs/board registry.
 - Existing identity/profile layer: users, sessions, user_preferences, user_job_evaluations.
 - Existing alerts: user_notification_settings, user_notification_ledger, Telegram link tables.
-- P0.5 implementation branch: `user_applications(user_id, canonical_opportunity_id, job_id, applied_at, status, notes, created_at, updated_at)`. It is in active implementation/testing, not yet merged/deployed. Canonical ID is reconciled through retained job_id after a dedupe rebuild; unique user+canonical key prevents duplicate app rows.
+- Released basic application table: `user_applications(user_id, canonical_opportunity_id, job_id, applied_at, status, notes, created_at, updated_at)`. Richer lifecycle history, interview follow-ups and outcome learning remain future work. Canonical ID is reconciled through retained job_id after a dedupe rebuild; unique user+canonical key prevents duplicate app rows.
 - Later: user_resumes, resume_facts, resume_versions, application_answer_bank, answer_learning_events.
 - Later: followup_tasks, contacts, application_contacts, outreach_drafts, outreach_events, email_integrations.
 
@@ -217,7 +207,13 @@ Track source success/429/cooldown; unique jobs per successful poll; duplicate/ca
 
 Report sample size and timestamp precision. A source returning 1,000 old jobs is not necessarily better than one returning 20 new, relevant jobs.
 
-## 8. Engineering and release rules
+## 8. Supporting architecture and operational guides
+
+- [Global ATS discovery and coverage architecture](GLOBAL_ATS_DISCOVERY_AND_COVERAGE_ARCHITECTURE_2026-11-09.md) — removes routine per-company board configuration while documenting real public-feed limitations.
+- [Source Health explained and UX redesign](SOURCE_HEALTH_EXPLAINED_AND_UX_REDESIGN_2026-11-09.md) — plain-English explanation of the existing metrics and proposed coverage/health separation.
+- [36-platform source coverage roadmap](ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md) — provider-by-provider implementation and evidence.
+
+## 9. Engineering and release rules
 
 - Keep the current integration branch as source of truth until reviewed merge/deploy.
 - Commit one coherent feature/fix at a time; keep worktree clean after pushes.
@@ -230,7 +226,7 @@ Report sample size and timestamp precision. A source returning 1,000 old jobs is
 - Avoid speculative factories, generic frameworks, extra packages, duplicate job stores, per-user scrapers and premature infrastructure.
 - Update this roadmap and both handover files whenever plans/status change.
 
-## 9. Current next actions (reviewed 2026-11-08)
+## 10. Current next actions (historical checkpoint, reviewed 2026-11-08)
 
 1. Production release is deployed: config v15, seven added ATS sources active across 10 verified boards, silent initial baseline complete, and notifications restored. Continue a measured source/DB soak; preserve provider rate limits.
 2. Provision the first production admin interactively using `python -m v2.auth_admin create-admin --email bawejaavichal01@gmail.com` inside the live container. This copies the existing global candidate preferences exactly once. Do not store the password in shell history or docs.
@@ -270,3 +266,12 @@ The production NVIDIA Workday connector currently ingests one 20-job page per 12
 ### 2026-11-09 — HTTPS authentication transport fixed
 
 Production now has a Let's Encrypt IP certificate for `130.210.27.197`, Nginx HTTPS reverse proxy, HTTP-to-HTTPS redirect, secure cookies retained, and app port 8000 bound to loopback. Health/dashboard return 200; owner login must be confirmed over `https://130.210.27.197/dashboard/`. Certbot auto-renew timer and Nginx deploy hook are installed. Operational details in `JOB_RADAR_HANDOVER.md`.
+
+
+## 2026-11-09 — Owner priority confirmation and global ATS discovery requirement
+
+The owner explicitly confirmed the priority table in Section 5. The earlier P0.5 application tracker sequence is historical and must not overrule the 2026-11-09 table. Basic server-owned application tracking has a prior release note; richer interview/follow-up/outcome capabilities remain P2.
+
+The owner also rejected routine company-by-company ATS configuration. JobBeeper must continuously discover public employer boards across supported ATS platforms, including new companies that appear later. Global discovery, board verification and per-board polling are now P0 source architecture. The manual company form is a fallback/admin correction path, not the normal way to add coverage. Do not claim all employers can be found: search-index exclusion, private portals and employer-authenticated recruitment APIs create known coverage gaps. See GLOBAL_ATS_DISCOVERY_AND_COVERAGE_ARCHITECTURE_2026-11-09.md.
+
+The production Source Health page is a technical telemetry table with a manual company discovery form; it is not a source-confidence model. See SOURCE_HEALTH_EXPLAINED_AND_UX_REDESIGN_2026-11-09.md before redesigning the page.

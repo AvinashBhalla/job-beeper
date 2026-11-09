@@ -2,8 +2,8 @@
 
 # Job Radar — 36-platform source coverage and near-real-time delivery roadmap
 
-**Owner requirement recorded:** 2026-11-08  
-**Applies to:** V2 candidate / PR #51 and all future agents  
+**Owner requirement recorded:** 2026-11-08; global company-agnostic discovery requirement reaffirmed 2026-11-09
+**Applies to:** V2 candidate / PR #51 and all future agents
 **Priority:** Product requirement, not optional future polish
 
 ## 1. Product expectation
@@ -20,9 +20,10 @@ Target is near-real-time after a vacancy becomes publicly visible:
 
 The list mixes ATS/recruiting platforms used by individual employers (e.g. Workday, Darwinbox, Greenhouse, iCIMS, Oracle Recruiting) and job marketplaces/aggregators (e.g. Cutshort, Hirist, LinkedIn, Naukri, Instahyre, Wellfound, Y Combinator / Work at a Startup).
 
-There is no single API that returns every employer using all 36 systems. Most ATS connectors need the individual employer's career URL, tenant, site, board slug/token or company identifier first. Job Radar therefore needs company/board discovery, not just 36 HTTP functions.
+There is no single API that returns every employer using all 36 systems. Most ATS connectors need the individual employer's career URL, tenant, site, board slug/token or company identifier first. JobBeeper therefore needs a global company/board discovery engine, not just 36 HTTP functions. The owner explicitly does not want routine per-company manual setup; manual board addition is an exception path only.
 
 Required discovery behaviour:
+- Discover new public employer boards on a recurring schedule, without requiring the owner to submit the company name/URL one company at a time.
 - Maintain a company registry: employer name, company domain, known careers URL, country/region, enabled state and discovery provenance.
 - Discover career links from employer websites and sitemaps; follow public links and detect ATS patterns/domains.
 - Resolve ATS-specific board identifiers (Workday tenant + cluster + site; Greenhouse board token; Ashby board name; Lever site; SmartRecruiters company identifier; etc.).
@@ -43,7 +44,7 @@ Status legend:
 | 1 | Ashby | ATS | **V2 code exists; recurring scheduler disabled**; 2 boards live-tested | Public Job Postings API, board name from jobs.ashbyhq.com/{board}; published jobs only. |
 | 2 | Avature | ATS | Research lead; not implemented in V2 | Tenant-specific public career site; parse server-rendered listing/detail pages and JobPosting JSON-LD where present. Templates vary by employer. |
 | 3 | BambooHR | ATS | Research lead; not implemented in V2 | Public careers list/detail pages may be available per tenant. Distinguish the public careers feed from the authenticated BambooHR customer API; do not use employee/applicant endpoints. |
-| 4 | Breezy HR | ATS | Research lead; not implemented in V2 | Employer subdomain career board; a public JSON board route has been observed by third parties, but verify response/terms per tenant and handle non-existent boards separately from throttling. |
+| 4 | Breezy HR | ATS | **Default-off feature-branch candidate**; one observed employer portal `/json` returned 905 listings; 12 focused tests and full V2 suite 411/411 pass; branch unmerged. | Observed but undocumented public list route plus same-board JobPosting JSON-LD enrichment. Global cap 20 detail pages per source run; per-tenant schema/terms verification required. See `docs/BREEZY_SOURCE_ADAPTER.md` on branch `feat/breezy-public-json-20261109`. |
 | 5 | Cutshort | Job marketplace | Not implemented in V2 | Marketplace connector requires a documented/authorized feed or permitted public listing access; do not assume it is an ATS. |
 | 6 | Darwinbox | ATS / HRMS | **Top priority requested by owner**; official Recruitment API research indicates employer API key required; no V2 connector | Tenant-specific candidate career site. Community research identifies a possible candidate-facing JSON endpoint, but this is not treated as a vendor-guaranteed API. Validate tenant/company ID and response contract before use. |
 | 7 | Eightfold AI | ATS / talent platform | Research lead; not implemented in V2 | Tenant-specific public career site and job-search interface; verify pagination and domain scoping. Do not use authenticated recruiter APIs. |
@@ -64,12 +65,12 @@ Status legend:
 | 22 | Paycom | ATS / HR platform | Not implemented in V2 | Employer career pages; determine if public structured listing is available or parse public HTML/JSON-LD. |
 | 23 | PeopleStrong | ATS / HRMS | Not implemented in V2 | Employer/tenant-specific candidate career site; no universal public contract assumed. |
 | 24 | Phenom People | Career-site platform | Research lead; not implemented in V2 | Tenant-specific career-site search/widget endpoints. Confirm public access, pagination and job-detail schema for each deployment. |
-| 25 | Recruitee | ATS | Research lead; not implemented in V2 | Prefer published jobs XML feed / careers-site interface. Official Careers Site API documentation states an authorization token will be required for calls without the header from 2027-02-10; do not build a future dependency on the currently unauthenticated API. |
+| 25 | Recruitee | ATS | **Default-off feature branch; draft PR #59**; public `bunq` feed returned 23/23 offers; 10 focused tests; full V2 suite 409/409; exact-head CI passed. | Published-offers XML feed, credentials subtree excluded. Separate from Careers Site JSON API token change. Not merged/deployed/activated. |
 | 26 | Rippling ATS | ATS | Research lead; not implemented in V2 | Employer-specific public career board / jobs endpoint; verify endpoint version and pagination against actual tenant. |
 | 27 | SmartRecruiters | ATS | Research lead; not implemented in V2 | Official public postings endpoint by company identifier, with offset pagination (maximum 100 per page); public-only destination. |
 | 28 | SAP SuccessFactors | ATS / HCM | Not implemented in V2 | Career-site sitemap/search pages and tenant-specific public endpoints; do not assume authenticated OData HR endpoints are public. |
 | 29 | Oracle Taleo | ATS / legacy | Not implemented in V2 | Legacy hosted career pages, tenant-specific search and JobPosting JSON-LD where present. |
-| 30 | Teamtailor | ATS | Research lead; not implemented in V2 | Official API has a Public read permission for career-site-visible data but requires a board/client token; public RSS/XML patterns may be an alternative where terms permit. |
+| 30 | Teamtailor | ATS | **Default-off feature branch; draft PR #61**; official docs example returned 16/16 RSS items; 9 focused tests; full V2 suite 409/409; exact-head CI still to confirm. | Public `jobs.rss` feed; offset pagination. Not merged/deployed/activated; only docs sample has been live-checked. |
 | 31 | UKG Pro / UltiPro | ATS / HCM | Not implemented in V2 | Customer career site / tenant-specific portal. Identify public job feed; do not use workforce/private HR endpoints. |
 | 32 | Wellfound | Job marketplace | Not implemented in V2 | Marketplace connector requires permitted public or partner access. Keep separate from employer ATS board polling. |
 | 33 | Workable | ATS | Research lead; not implemented in V2 | Public careers widget/account endpoint for public listings; distinguish it from authenticated customer API scopes. |
@@ -77,7 +78,21 @@ Status legend:
 | 35 | Y Combinator | Job marketplace | Not implemented in V2 | Work at a Startup / YC company job marketplace; partner/public listing access must be verified. |
 | 36 | Zoho Recruit | ATS | Research lead; not implemented in V2 | Candidate-facing career portal per employer; distinguish public careers pages from authenticated Zoho Recruit APIs. |
 
-**Checkpoint truth:** the V2 runtime collector registry currently contains only linkedin, naukri, instahyre, greenhouse, ashby, and lever. Only Naukri is enabled for recurring shared-dev polling. Four additional sources plus LinkedIn were exercised as controlled one-off pipelines. The remaining named systems are product requirements, not completed integrations.
+**Checkpoint truth at 2026-11-09:** mainline V2 code registers eleven source adapters: LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Workable, Keka and Darwinbox. A provider adapter and enabled flag do not mean all employers using that provider are covered; Workday/Keka/Darwinbox remain tied to verified employer board identifiers. Recruitee (#59), Personio (#60), Teamtailor (#61) and Breezy have separate default-off feature-branch candidates, not mainline/deployed sources. Only Naukri is confirmed as recurring-enabled in refreshed shared development at the documented checkpoint. Check the current deployment record before treating any other source as active.
+
+## 3A. 2026-11-09 owner requirement — global company-agnostic discovery
+
+The owner explicitly rejects routine per-employer configuration. The system must discover public employer boards on Workday, Darwinbox, Keka and other supported ATS platforms continuously. A new company should be discovered from public web evidence and added to the registry without the owner having to know its ATS URL or paste its name into the dashboard.
+
+This is a discovery problem in addition to an ingestion problem. No adapter should be represented as “all Workday jobs” unless it has a documented global provider feed, which has not been established for these enterprise ATS platforms. Workday public career sites are per-employer tenant/site and can be excluded from search indexing. Darwinbox's official Recruitment API requires employer-issued API credentials for job-list V3; a public candidate-facing career page, where one exists, is a different interface. Keka's official HRMS APIs use OAuth/client credentials; some employer careers portals may expose a public candidate-facing feed, but must be discovered and verified per tenant. Private/internal vacancies are not public crawl targets.
+
+Implementation architecture, discovery channels, board schema, confidence levels, scheduler and phased acceptance are in [GLOBAL_ATS_DISCOVERY_AND_COVERAGE_ARCHITECTURE_2026-11-09.md](GLOBAL_ATS_DISCOVERY_AND_COVERAGE_ARCHITECTURE_2026-11-09.md). Do not make the admin's manual company form the primary discovery mechanism.
+
+## 3B. Additional provider work beyond the original inventory
+
+| Provider | Candidate status at 2026-11-09 | Evidence / limitation |
+|---|---|---|
+| Personio | **Default-off feature branch; draft PR #60**; 8 focused tests; full V2 suite 408/408; exact-head CI passed. | Employer must enable the public XML feed. Documentation example returned HTTP 200 and valid XML root but zero positions; no populated employer tenant verified yet. Not merged/deployed/activated. |
 
 ## 4. Evidence-based connector research
 
@@ -97,6 +112,8 @@ Vendor documentation / primary references:
 - [Career-ops source/provider catalogue (research lead, not vendor authority)](https://github.com/nathanaelhub/career-ops/blob/main/docs/SUPPORTED_JOB_BOARDS.md) includes discovery patterns for Avature, BambooHR, Darwinbox and other tenants. Verify every endpoint independently.
 
 ## 5. Near-real-time source scheduler
+
+The current production telemetry screen and a plain-English metric glossary are documented in [SOURCE_HEALTH_EXPLAINED_AND_UX_REDESIGN_2026-11-09.md](SOURCE_HEALTH_EXPLAINED_AND_UX_REDESIGN_2026-11-09.md).
 
 A connector alone is not enough. Implement a shared scheduler around board state.
 
