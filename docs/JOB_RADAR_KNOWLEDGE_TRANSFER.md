@@ -3583,3 +3583,12 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Smoke verified: dashboard/health 200; both login + `/api/auth/me` + `/api/preferences` 200; admin telemetry endpoints 200; member telemetry endpoints 403.
 - Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` for complete Desktop prompt, manual checklist, safety boundaries, test matrix and report template.
 - Owner is to run manual testing and Desktop AI testing. After feedback, reproduce on feature branch, tests + exact SHA CI, shared dev first, owner approval, then production. No production changes.
+
+
+## 2026-11-09 — Recruitee public XML connector candidate (not deployed)
+
+- Isolated branch `feat/recruitee-public-feed-20261109` from `origin/v2-live-radar`. It adds a default-off Recruitee public XML feed collector, discovery/probe mapping, explicit admin board activation/deactivation, 120-second default interval, Retry-After cooldown, and first-board silent baseline. Dashboard admin source toggle, source-health label and job-source filter are included.
+- Live read-only sample: `https://bunq.recruitee.com/api/feeds/offers.xml` returned HTTP 200 and 23 `<offer>` records; final parser accepted 23/23. Employer-branded external HTTPS job/apply links are retained but never fetched. Non-HTTPS, localhost, IP-literal, credentialed, fragment and nonstandard-port URLs are rejected. `<credentials>` and other unknown feed fields are not traversed or persisted.
+- Focused suite: 10/10 passed. Full V2 suite: **409/409 passed**. Python compile, config JSON validation and `git diff --check` passed. Exact-head GitHub CI/PR review still required.
+- Status: code/research only. Source remains disabled; no real employer board activated, no app database ingestion, no Telegram, no shared-dev deployment and no production change.
+- See `docs/RECRUITEE_SOURCE_ADAPTER.md`.

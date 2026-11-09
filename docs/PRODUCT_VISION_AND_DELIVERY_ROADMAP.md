@@ -107,7 +107,7 @@ Do not migrate to PostgreSQL, Redis, Kafka, Celery or microservices just because
 
 | Area | Status | Gap |
 |---|---|---|
-| Ingestion | LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Workable, Keka and Darwinbox collectors exist in integration candidate | Per-employer boards still need verification/activation; availability is not universal |
+| Ingestion | Main integration candidate includes LinkedIn, Naukri, Instahyre, Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Workable, Keka and Darwinbox. A Recruitee XML adapter is being added on a separate default-off feature branch. | Per-employer boards still need verification/activation; Recruitee is not yet merged/deployed; availability is not universal |
 | Employer discovery | Public careers scan, ATS detection, board registry, verify/review/activate | Some discovered ATS families have no collector |
 | Source safety | Request budgets, rate limits, dedupe, telemetry, first-board baseline | Production yield/latency soak remains |
 | Matching | Deterministic match + per-user preferences/evaluations | Improve role taxonomy, hard blockers, explainability and calibrated confidence |
@@ -119,7 +119,7 @@ Do not migrate to PostgreSQL, Redis, Kafka, Celery or microservices just because
 | Assisted apply | Design only | No answer bank or browser companion |
 | Auto-apply | Not implemented | Must remain off pending a separate permission/safety gate |
 
-ATS discovery can recognize providers that have no collectors. Current discovery-only families include Recruitee, Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
+ATS discovery can recognize providers that have no collectors. Current discovery-only families include Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Recruitee has a candidate XML adapter on an unmerged, default-off feature branch; do not describe it as an active source. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
 
 ## 5. Prioritized delivery sequence
 

@@ -103,3 +103,12 @@ GitHub audit: keep #35 as draft release gate; #46, #50 and #52 are stale/superse
 ## 2026-11-09 — Two-role Desktop QA ready
 
 Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` before browser testing. A fresh isolated synthetic QA app runs on VM loopback 8006 (local browser URL `http://localhost:18006/dashboard/`, tunnel `ssh -N -L 18006:127.0.0.1:8006 ubuntu@130.210.27.197`). Temporary accounts `qa-admin@local.test` (admin) and `qa-member@local.test` (normal user) were created and verified in that isolated DB; passwords were shared in chat only, never commit them. Four synthetic demo jobs; all collectors off, notifications off, Telegram/OAuth/LLM credentials blank. Member source-health APIs return 403; admin returns 200. Do not use old candidate 8005/18005, production 8000, shared dev 8001, experiment 8002 or connector QA 8010 for this test. Prompt and complete manual checklist are in the QA runbook. Owner and Desktop should test both roles; report gaps, do not modify code/runtime. Fix on dev first.
+
+
+## 2026-11-09 — Recruitee public XML connector candidate (not deployed)
+
+- Isolated branch `feat/recruitee-public-feed-20261109` from `origin/v2-live-radar`. It adds a default-off Recruitee public XML feed collector, discovery/probe mapping, explicit admin board activation/deactivation, 120-second default interval, Retry-After cooldown, and first-board silent baseline. Dashboard admin source toggle, source-health label and job-source filter are included.
+- Live read-only sample: `https://bunq.recruitee.com/api/feeds/offers.xml` returned HTTP 200 and 23 `<offer>` records; final parser accepted 23/23. Employer-branded external HTTPS job/apply links are retained but never fetched. Non-HTTPS, localhost, IP-literal, credentialed, fragment and nonstandard-port URLs are rejected. `<credentials>` and other unknown feed fields are not traversed or persisted.
+- Focused suite: 10/10 passed. Full V2 suite: **409/409 passed**. Python compile, config JSON validation and `git diff --check` passed. Exact-head GitHub CI/PR review still required.
+- Status: code/research only. Source remains disabled; no real employer board activated, no app database ingestion, no Telegram, no shared-dev deployment and no production change.
+- See `docs/RECRUITEE_SOURCE_ADAPTER.md`.
