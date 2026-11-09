@@ -1581,7 +1581,7 @@
   }
 
   // =========================================================================
-  // 12. Source Health Matrix Controller
+  // 12. Coverage and Health Workspace Controller
   // =========================================================================
   function renderSourceHealth() {
     const tbody = $('sourceHealthTableBody');
