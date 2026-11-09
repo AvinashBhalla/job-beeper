@@ -415,3 +415,8 @@ Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md` first.
 Read `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md` for implementation detail and `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md` for the Common Crawl plan.
 
 Latest authoritative checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`.
+
+
+## 2026-11-09 — connector QA autonomous cadence checkpoint
+
+The next autonomous 60-minute connector-QA run was observed at 17:05:04 UTC, following the initial scheduled run at 16:05:03 UTC. Eight of eight sources succeeded: 1,879 seen, 25 new, 55 HTTP 200 responses, zero 429/request/page/board failures. QA DB: 1,916 jobs, 24 source_runs, canonical/evaluation/notification-ledger rows 1,916, integrity `ok`, sent notifications 0, users/preferences 0. The autonomous-cycle gate is complete for one interval. Next owner action: create QA-only admin/member accounts interactively and execute role/tenant-isolation UAT on port 8010. Detailed per-source counts are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/REPOSITORY_CLEANUP_2026-11-09.md`.

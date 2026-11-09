@@ -118,3 +118,24 @@ Do not delete the seven preserved non-PR65 refs based only on their PRs being cl
 - Final remote inventory: 16 branches; open PR inventory: seven (#59–#65); local inventory: 28 branch refs and 13 linked worktrees. Stale remote-tracking refs were pruned in the clean dev-refresh worktree.
 - Final health probes: dev 8001 = 200, connector QA 8010 = 200, synthetic QA 8006 = 200, production HTTPS = 200. Dev and QA still use identical `243da9c` image SHA; production remains `6e5becb`, all restart counts 0.
 - The port-8002 preferences experiment bind-mounts `v2/config.feature.json` from `/tmp/job-radar-user-preferences`. Do not remove this worktree or its config while that experiment is running.
+
+
+## 2026-11-09 — autonomous connector-QA scheduler cycle observed
+
+The pending autonomous 60-minute cadence check is now **complete for one follow-on cycle**. QA's initial scheduled full pass started at `2026-11-09T16:05:03Z`; a controlled/manual verification batch followed around 16:48Z; the next scheduled batch started at `2026-11-09T17:05:04Z`, approximately 60 minutes after the first. This confirms one autonomous scheduler interval, not a long-term uptime/SLA guarantee.
+
+| Source | Jobs seen | New rows | HTTP requests | Pages succeeded | Boards succeeded | Outcome |
+|---|---:|---:|---:|---:|---:|---|
+| Naukri | 195 | 2 | 1 | 1/1 | n/a | success |
+| Greenhouse | 370 | 0 | 3 | n/a | 3/3 | success |
+| Ashby | 823 | 0 | 2 | n/a | 2/2 | success |
+| Workday | 40 | 20 | 22 | 2/2 | 1/1 | success |
+| SmartRecruiters | 300 | 3 | 23 | 3/3 | 1/1 | success |
+| Workable | 6 | 0 | 1 | 1/1 | 1/1 | success |
+| Keka | 109 | 0 | 2 | 1/1 | 1/1 | success |
+| Darwinbox | 36 | 0 | 1 | 1/1 | 1/1 | success |
+| **Total** | **1,879** | **25** | **55** | **No failures** | **No failures** | **8/8 success** |
+
+All 55 responses were HTTP 200; HTTP 429 = 0, request exceptions = 0, page failures = 0, board failures = 0. Workday's facet queue remains bounded and persisted. The read-only QA DB check returned `PRAGMA integrity_check=ok`; totals after the run: jobs 1,916; source_runs 24; canonical opportunities 1,916; evaluations 1,916; notification-ledger rows 1,916; sent notifications 0; users 0; preferences 0. The container health endpoint returned 200.
+
+**Disposition:** autonomous-cycle P0 gate closed for this observation. Continue normal monitoring during owner UAT, but do not block the next step on repeating a manual ingestion pass. The remaining live-QA blocker is owner provisioning of QA-only admin/member accounts, followed by role/tenant-isolation browser checks.
