@@ -6720,3 +6720,10 @@ Oracle's Security List/NSG workflow: https://docs.oracle.com/en-us/iaas/Content/
 
 - Use `https://130.210.27.197/dashboard/` (not `http://130.210.27.197:8000`). Sign in with the existing admin account `bawejaavichal01@gmail.com`. No password was read or changed. If successful, check `/api/auth/me` returns 200 and then verify Preferences, Sources, Applied, and admin board controls.
 - Since the password was previously entered over plaintext HTTP, change it after successful HTTPS login if a password-change mechanism is available; never send it to ChatGPT.
+
+### HTTPS renewal verification update — 2026-11-09
+
+- `sudo certbot renew --dry-run --cert-name jobbeeper-ip-prod --no-random-sleep-on-renew` completed successfully: “all simulated renewals succeeded”. Snap Certbot renewal timer is active (`snap.certbot.renew.timer`); deploy hook reloads Nginx.
+- Deleted the unused staging-only certificate lineage `130.210.27.197`; only production lineage `jobbeeper-ip-prod` remains. Production certificate expiry is 2026-11-15 21:07 UTC.
+- Latest post-HTTPS source checks: Greenhouse 368 success; Ashby 824 success; Workday 20 success; SmartRecruiters 300 success (2 new); Workable 6 success; Keka 109 success; Darwinbox 36 success; Naukri 287 success. LinkedIn remains HTTP 429 / persisted rate limit; no forced retry. Notifications enabled, config v15, SQLite integrity ok, one admin user, no application rows yet.
+- External HTTPS health 200, dashboard 200, HTTP redirect 301, public TCP/8000 unreachable. The OCI security list still contains port 8000, but VM binding is loopback-only; remove that OCI ingress rule after owner confirms successful HTTPS access.
