@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import ats_directory, auth, board_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, board_scheduler, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -1371,6 +1371,7 @@ def init_db() -> None:
     telegram_linking.init_schema(DB_PATH)
     user_notifications.init_schema(DB_PATH)
     user_applications.init_schema(DB_PATH)
+    board_scheduler.init_schema(str(DB_PATH))
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
@@ -1996,6 +1997,74 @@ def suppress_initial_source_snapshot_alerts(
                 (timestamp, reasons, int(row["canonical_opportunity_id"])),
             )
             suppressed += max(0, cursor.rowcount)
+        conn.commit()
+    return suppressed
+
+
+def suppress_initial_board_snapshot_alerts(
+    source: str,
+    board_key: str,
+) -> int:
+    """Silence unattempted inventory for one newly scheduled/reactivated board."""
+    if not board_key:
+        return 0
+    timestamp = iso(now())
+    reasons = json.dumps([
+        "initial employer-board inventory baseline",
+        "board was newly added to the persistent per-board scheduler",
+        "existing vacancies are retained in the feed but are not new-job alerts",
+    ], ensure_ascii=False)
+    suppressed = 0
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id,canonical_opportunity_id,first_seen_at,source_details_json FROM jobs WHERE source=?",
+            (source,),
+        ).fetchall()
+        for row in rows:
+            try:
+                details = json.loads(row["source_details_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                details = {}
+            if not isinstance(details, dict) or str(details.get("board_key") or "").lower() != board_key.lower():
+                continue
+            job_id = int(row["id"])
+            conn.execute("UPDATE jobs SET source_initial_baseline=1 WHERE id=?", (job_id,))
+            canonical_id = row["canonical_opportunity_id"]
+            if canonical_id is not None:
+                ledger = conn.execute(
+                    "SELECT candidate_job_id FROM notification_ledger WHERE canonical_opportunity_id=?",
+                    (int(canonical_id),),
+                ).fetchone()
+                earlier_observation = conn.execute(
+                    """SELECT 1 FROM jobs WHERE canonical_opportunity_id=? AND id<>?
+                       AND (first_seen_at<? OR (first_seen_at=? AND id<?)) LIMIT 1""",
+                    (int(canonical_id), job_id, row["first_seen_at"], row["first_seen_at"], job_id),
+                ).fetchone()
+                safe_to_suppress = bool(
+                    ledger is not None and (
+                        ledger["candidate_job_id"] == job_id
+                        or (ledger["candidate_job_id"] is None and earlier_observation is None)
+                    )
+                )
+                if safe_to_suppress:
+                    conn.execute(
+                        """UPDATE notification_ledger SET status='suppressed',candidate_job_id=NULL,
+                               baseline_suppressed=1,next_attempt_at=NULL,claimed_at=NULL,updated_at=?,
+                               decision_reason_json=? WHERE canonical_opportunity_id=?
+                               AND (candidate_job_id IS NULL OR candidate_job_id=?)
+                               AND baseline_suppressed=0 AND status IN ('pending','queued','suppressed')
+                               AND attempt_count=0 AND sent_at IS NULL""",
+                        (timestamp, reasons, int(canonical_id), job_id),
+                    )
+            conn.execute(
+                """UPDATE user_notification_ledger SET status='cancelled',claimed_at=NULL,
+                   next_attempt_at=NULL,last_error='initial_employer_board_baseline',updated_at=?
+                   WHERE candidate_job_id=? AND status IN ('queued','failed','sending')
+                   AND attempt_count=0 AND sent_at IS NULL""",
+                (timestamp, job_id),
+            )
+            suppressed += 1
         conn.commit()
     return suppressed
 
@@ -4429,7 +4498,7 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 published_at,
                 posted_precision,
                 description,
-                source_details={"board_registry_id": board.get("registry_id")},
+                source_details={"board_registry_id": board.get("registry_id"), "board_key": token.lower()},
             ))
 
     if successful_boards == 0:
@@ -4547,7 +4616,7 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 jobs.append(normalize_job(
                     "ashby", source_id, company, title.strip(), location,
                     direct_url, published_at, posted_precision, description,
-                    source_details={"board_registry_id": board.get("registry_id")},
+                    source_details={"board_registry_id": board.get("registry_id"), "board_key": name.lower()},
                 ))
             except (TypeError, ValueError) as exc:
                 log.warning("ashby: board=%s skipped malformed job error_type=%s", name, type(exc).__name__)
@@ -4684,6 +4753,7 @@ def _normalize_lever_posting(
     source_details = {
         "lever_instance": instance,
         "lever_site": site,
+        "board_key": f"{instance}:{site}".lower(),
         "board_registry_id": registry_id,
         "team": categories.get("team"),
         "department": categories.get("department"),
@@ -5362,6 +5432,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     "workday_tenant": tenant,
                     "workday_cluster": parsed_board["cluster"],
                     "workday_site": site,
+                    "board_key": board_key.lower(),
                     "board_registry_id": board.get("registry_id"),
                     "requisition_id": requisition_id,
                     "job_posting_id": detail_info.get("jobPostingId"),
@@ -5670,6 +5741,7 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     posting_url = f"https://jobs.smartrecruiters.com/{identifier}/{raw_id}"
                 details = {
                     "company_identifier": identifier, "posting_id": str(raw_id),
+                    "board_key": identifier.lower(),
                     "board_registry_id": board.get("registry_id"),
                     "job_ad_id": item.get("jobAdId"), "ref_number": item.get("refNumber"),
                     "department": department, "function": function,
@@ -5792,6 +5864,7 @@ def workable_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 posting_url = f"https://apply.workable.com/{account}/"
             details = {
                 "account": account, "shortcode": shortcode,
+                "board_key": account.lower(),
                 "board_registry_id": board.get("registry_id"),
                 "employment_type": item.get("employment_type"),
                 "department": item.get("department"), "function": item.get("function"),
@@ -5957,6 +6030,7 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             details = {
                 "tenant": tenant,
                 "portal": portal,
+                "board_key": str(detected.get("board_key") or f"{tenant}:{portal}").lower(),
                 "board_registry_id": board.get("registry_id"),
                 "job_number": item.get("jobNumber"),
                 "department_id": item.get("departmentIdentifier"),
@@ -6079,6 +6153,7 @@ def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 details = {
                     "tenant": tenant,
                     "company_id": company_id,
+                    "board_key": str(detected.get("board_key") or company_id).lower(),
                     "board_registry_id": board.get("registry_id"),
                     "internal_job_code": item.get("internal_job_code"),
                     "experience": item.get("experience"),
@@ -6448,7 +6523,11 @@ def _legacy_notifications_enabled(
     return bool(credentials_available and config.get("notifications_enabled", True))
 
 
-def run_source(source: str, config: dict[str, Any]) -> None:
+def run_source(
+    source: str,
+    config: dict[str, Any],
+    scheduled_board: dict[str, Any] | None = None,
+) -> None:
     if source_state.get(source, {}).get("running"):
         log.warning("%s: previous run still active; skipping this cycle", source)
         return
@@ -6524,6 +6603,16 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             source,
             started_at,
         )
+        if scheduled_board and scheduled_board.get("baseline_pending"):
+            board_baseline_suppressed = suppress_initial_board_snapshot_alerts(
+                source,
+                str(scheduled_board.get("board_key") or ""),
+            )
+            if board_baseline_suppressed:
+                log.info(
+                    "source=%s board=%s initial inventory baseline suppressed jobs=%s",
+                    source, scheduled_board.get("board_key"), board_baseline_suppressed,
+                )
         if baseline_suppressed:
             log.info(
                 "source=%s initial inventory baseline suppressed canonical_opportunities=%s",
@@ -6776,15 +6865,80 @@ async def notification_worker() -> None:
             pass
 
 
+async def _run_scheduled_board(
+    claim: dict[str, Any],
+    config: dict[str, Any],
+) -> None:
+    """Run exactly one allowlisted employer board and persist its scheduler result."""
+    source = str(claim["source"])
+    previous_run_id = source_state.get(source, {}).get("run_id")
+    scoped_config = dict(config)
+    scoped_config[str(claim["config_key"])] = [dict(claim["board_config"])]
+    scoped_config.setdefault("source_enabled", {})[source] = True
+    scheduled_metadata = {
+        "board_key": claim["board_key"],
+        "baseline_pending": bool(claim.get("baseline_pending")),
+    }
+    try:
+        await asyncio.to_thread(run_source, source, scoped_config, scheduled_metadata)
+        runtime = dict(source_state.get(source, {}))
+        current_run_id = runtime.get("run_id")
+        if not current_run_id or current_run_id == previous_run_id:
+            # run_source skipped because another manual/source execution already
+            # owned this provider. Release the claim; the due time is unchanged.
+            board_scheduler.release_claim(str(DB_PATH), claim)
+            return
+        outcome = str(runtime.get("last_run_outcome") or "failed")
+        error_type = None
+        if outcome in {"rate_limited", "partial_rate_limited"}:
+            error_type = "HTTPError"
+        elif outcome in {"failed", "partial_failed"}:
+            error_type = "CollectorError"
+        result = board_scheduler.finish_poll(
+            str(DB_PATH),
+            claim,
+            outcome=outcome,
+            jobs_seen=int(runtime.get("jobs_seen") or 0),
+            jobs_new=int(runtime.get("new_jobs") or 0),
+            duration_seconds=runtime.get("last_run_duration_seconds"),
+            error_type=error_type,
+            cooldown_seconds=runtime.get("cooldown_seconds"),
+        )
+        log.info(
+            "board scheduler: source=%s board=%s host=%s outcome=%s next_due_at=%s failures=%s",
+            source, claim["board_key"], claim["host_key"], outcome,
+            result["next_due_at"], result["consecutive_failures"],
+        )
+    except Exception:
+        log.exception(
+            "board scheduler task failed source=%s board=%s",
+            source, claim.get("board_key"),
+        )
+        try:
+            board_scheduler.finish_poll(
+                str(DB_PATH), claim, outcome="failed", error_type="SchedulerTaskError",
+            )
+        except Exception:
+            log.exception("unable to persist board scheduler failure")
+            board_scheduler.release_claim(str(DB_PATH), claim)
+
+
 async def scheduler() -> None:
+    """Run global sources on their source cadence and ATS boards on durable due times."""
     next_run = {name: 0.0 for name in COLLECTORS}
+    active_board_tasks: dict[str, asyncio.Task] = {}
+    config_signature: str | None = None
     while not stop_event.is_set():
         config = get_config()
         current = time.monotonic()
         intervals = config.get("poll_seconds", {})
         enabled = config.get("source_enabled", {})
 
+        # Keep the legacy provider-level scheduler for marketplaces/global
+        # collectors. Employer ATS providers are exclusively scheduled below.
         for name in COLLECTORS:
+            if name in board_scheduler.BOARD_CONFIG_KEYS:
+                continue
             if not enabled.get(name, True):
                 continue
             if name == "linkedin" and _linkedin_cooldown_remaining() > 0:
@@ -6800,10 +6954,65 @@ async def scheduler() -> None:
                 next_run[name] = current + interval
                 asyncio.create_task(asyncio.to_thread(run_source, name, config))
 
+        # A signature change syncs the persistent schedule. Ordinary loops do
+        # not rewrite due times or reset board history.
+        board_config_view = {
+            "source_enabled": config.get("source_enabled", {}),
+            "poll_seconds": config.get("poll_seconds", {}),
+            **{
+                key: config.get(key, [])
+                for key in board_scheduler.BOARD_CONFIG_KEYS.values()
+            },
+        }
+        signature = json.dumps(board_config_view, sort_keys=True, separators=(",", ":"))
+        if signature != config_signature:
+            configured_count = await asyncio.to_thread(
+                board_scheduler.sync_config, str(DB_PATH), config
+            )
+            config_signature = signature
+            log.info(
+                "board scheduler: synchronized configured boards=%s",
+                configured_count,
+            )
+
+        # One poll per provider at a time (source_state is provider-scoped), one
+        # active board per host (SQLite host lease), and a conservative global
+        # cap across different hosts. A failing board backs off independently.
+        excluded_board_sources = set(active_board_tasks)
+        excluded_board_sources.update(
+            source for source in board_scheduler.BOARD_CONFIG_KEYS
+            if source_state.get(source, {}).get("running")
+        )
+        # Board cooldowns are host-scoped in ats_board_host_poll_state. Do not
+        # let an unrelated tenant on another host inherit a provider-wide 429.
+        # Legacy provider cooldowns remain in source telemetry for diagnostics.
+        while len(active_board_tasks) < board_scheduler.BOARD_SCHEDULER_MAX_CONCURRENT_HOSTS:
+            claim = await asyncio.to_thread(
+                board_scheduler.claim_due_board,
+                str(DB_PATH),
+                excluded_board_sources,
+            )
+            if claim is None:
+                break
+            source = str(claim["source"])
+            task = asyncio.create_task(_run_scheduled_board(claim, config))
+            active_board_tasks[source] = task
+            excluded_board_sources.add(source)
+
+            def _remove_finished(done: asyncio.Task, source_name: str = source) -> None:
+                if active_board_tasks.get(source_name) is done:
+                    active_board_tasks.pop(source_name, None)
+
+            task.add_done_callback(_remove_finished)
+
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=2)
         except asyncio.TimeoutError:
             pass
+
+    # Let already claimed polls finish and persist their outcomes before shutdown.
+    if active_board_tasks:
+        await asyncio.gather(*list(active_board_tasks.values()), return_exceptions=True)
 
 
 @app.on_event("startup")
@@ -7992,6 +8201,12 @@ def get_workday_inventory_status():
     }
 
 
+@app.get("/api/discovery/scheduler/status", dependencies=[Depends(require_admin)])
+def board_scheduler_status():
+    """Expose persistent per-board due times and shared host budgets to admins."""
+    return board_scheduler.status(str(DB_PATH))
+
+
 @app.get("/api/discovery/boards", dependencies=[Depends(require_admin)])
 def list_discovered_boards(status: str | None = None, limit: int = 250):
     limit = max(1, min(int(limit), 1000))
@@ -8194,6 +8409,7 @@ def activate_discovered_board(board_id: int):
             (timestamp, timestamp, timestamp, board_id),
         )
         conn.commit()
+    board_scheduler.sync_config(str(DB_PATH), saved)
     refresh_job_evaluations(saved)
     refresh_notification_decisions(saved)
     refresh_configured_user_evaluations()
@@ -8261,6 +8477,7 @@ def deactivate_discovered_board(board_id: int):
             (timestamp, board_id),
         )
         conn.commit()
+    board_scheduler.sync_config(str(DB_PATH), saved)
     return {
         "board_id": board_id,
         "review_status": "verified",

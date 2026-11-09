@@ -33,6 +33,7 @@
     isAdmin: false,
     userPreferences: null,
     sourceStatus: [],
+    boardSchedulerStatus: null,
     discoveredBoards: [],
     globalCandidates: [],
     discoveredCompanies: [],
@@ -1668,6 +1669,87 @@
     }).join('');
   }
 
+  function renderBoardSchedulerStatus() {
+    const summary = $('boardSchedulerSummary');
+    const tbody = $('boardSchedulerTableBody');
+    const hostBody = $('boardSchedulerHostTableBody');
+    if (!summary || !tbody || !hostBody) return;
+    const data = state.boardSchedulerStatus;
+    if (!data) {
+      summary.textContent = 'Persistent board scheduler status is not available yet.';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">No scheduler data.</td></tr>';
+      hostBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">No host budget data.</td></tr>';
+      return;
+    }
+    const boards = Array.isArray(data.boards) ? data.boards : [];
+    const hosts = Array.isArray(data.hosts) ? data.hosts : [];
+    const active = Number(data.active_boards || 0);
+    const inactive = Number(data.inactive_boards || 0);
+    summary.textContent = `${active} active employer boards · ${inactive} inactive history records · up to ${Number(data.max_concurrent_hosts || 0)} concurrent API hosts · one active board per host · ${Number(data.host_min_interval_seconds || 0)}s minimum host spacing. ${boards.length ? 'All due times and outcomes are persisted in SQLite.' : 'No explicitly configured ATS employer boards are currently scheduled.'}`;
+
+    const providerLabels = {
+      greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
+      smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka', darwinbox: 'Darwinbox',
+    };
+    tbody.innerHTML = boards.length ? boards.map(board => {
+      const isActive = Boolean(board.is_active);
+      const leased = Boolean(board.lease_until);
+      const outcome = board.last_outcome || 'Not run yet';
+      const outcomeClass = ['success'].includes(outcome) ? 'signal-success'
+        : ['rate_limited', 'partial_rate_limited', 'partial_failed'].includes(outcome) ? 'signal-warning'
+          : ['failed'].includes(outcome) ? 'signal-warning' : '';
+      const result = leased
+        ? `<span class="signal-pill signal-warning">RUNNING</span><div class="auth-description">Lease until ${esc(fmtTimestamp(board.lease_until, 'minute'))}</div>`
+        : `<span class="signal-pill ${outcomeClass}">${esc(outcome.toUpperCase())}</span>`;
+      const due = isActive ? fmtTimestamp(board.next_due_at, 'minute') : 'Inactive';
+      const baseline = board.baseline_pending
+        ? '<span class="signal-pill signal-warning">PENDING</span>'
+        : '<span class="signal-pill signal-success">CLEAR</span>';
+      return `<tr>
+        <td><b>${esc(providerLabels[board.source] || board.source)}</b></td>
+        <td>${esc(board.company_name || 'Unknown employer')}</td>
+        <td class="meta-mono">${esc(board.board_key)}</td>
+        <td class="meta-mono">${esc(board.host_key)}</td>
+        <td class="meta-mono">${esc(board.poll_interval_seconds)}s</td>
+        <td class="meta-mono">${esc(due || '—')}</td>
+        <td>${result}${board.last_error_type ? `<div class="auth-description">${esc(board.last_error_type)}</div>` : ''}</td>
+        <td class="meta-mono">${esc(board.last_jobs_seen ?? 0)} / ${esc(board.last_jobs_new ?? 0)}</td>
+        <td class="meta-mono">${esc(board.consecutive_failures ?? 0)}</td>
+        <td>${baseline}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">No enabled, explicitly configured ATS employer boards.</td></tr>';
+
+    hostBody.innerHTML = hosts.length ? hosts.map(host => {
+      const leased = Boolean(host.lease_until);
+      const cooldown = host.cooldown_until && Date.parse(host.cooldown_until) > Date.now();
+      const leaseLabel = leased ? `${esc(host.lease_source || '')} · ${esc(host.lease_board_key || '')}` : 'Idle';
+      const result = host.last_outcome ? esc(host.last_outcome.toUpperCase()) : 'Not run yet';
+      return `<tr>
+        <td class="meta-mono">${esc(host.host_key)}</td>
+        <td>${leased ? '<span class="signal-pill signal-warning">IN USE</span>' : 'Idle'}<div class="auth-description">${leaseLabel}</div></td>
+        <td class="meta-mono">${esc(fmtTimestamp(host.next_allowed_at, 'minute') || 'Now')}</td>
+        <td class="meta-mono">${cooldown ? `<span class="signal-pill signal-warning">${esc(fmtTimestamp(host.cooldown_until, 'minute'))}</span>` : 'None active'}</td>
+        <td class="meta-mono">${esc(host.http_429_count ?? 0)}</td>
+        <td>${result}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">No API-host budgets have been recorded.</td></tr>';
+  }
+
+  async function loadBoardSchedulerStatus() {
+    if (!state.isAdmin) return;
+    try {
+      const response = await authClient.request('/discovery/scheduler/status', { cache: 'no-store' });
+      if (response.status === 401) { window.location.reload(); return; }
+      if (!response.ok) throw new Error(`Persistent scheduler status unavailable (HTTP ${response.status}).`);
+      state.boardSchedulerStatus = await response.json();
+    } catch (error) {
+      state.boardSchedulerStatus = null;
+      const summary = $('boardSchedulerSummary');
+      if (summary) summary.textContent = error.message || 'Persistent scheduler status unavailable.';
+    }
+    renderBoardSchedulerStatus();
+  }
+
   // =========================================================================
   // 13. Configuration & Preferences Management
   // =========================================================================
@@ -2106,6 +2188,7 @@
       void loadDirectoryCoverageSummary();
       void loadHirebaseBudgetStatus();
       void loadWorkdayInventoryStatus();
+      void loadBoardSchedulerStatus();
     }
   }
 

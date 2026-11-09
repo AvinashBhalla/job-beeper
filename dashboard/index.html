@@ -716,6 +716,25 @@
               </div>
             </div>
 
+            <div class="settings-block" id="boardSchedulerPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Persistent employer-board scheduler</span>
+              <p class="auth-description">Each explicitly activated employer board has its own persisted due time and outcome. API-host budgets allow one active board poll per host, apply a small request spacing interval, and retain cooldowns after HTTP 429. Discovered or merely verified boards are never scheduled.</p>
+              <div id="boardSchedulerSummary" class="auth-description" role="status" aria-live="polite">Loading persistent board schedules…</div>
+              <div class="data-table-container" style="margin-top:var(--space-6);">
+                <table class="table-dataset">
+                  <thead><tr><th>Provider</th><th>Employer</th><th>Board key</th><th>API host</th><th>Cadence</th><th>Next due (IST)</th><th>Last result</th><th>Jobs seen / new</th><th>Failures</th><th>Baseline</th></tr></thead>
+                  <tbody id="boardSchedulerTableBody"><tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">Loading board schedules…</td></tr></tbody>
+                </table>
+              </div>
+              <div style="margin-top:var(--space-8);font-weight:600;color:var(--text-primary);">Shared API-host budgets</div>
+              <div class="data-table-container" style="margin-top:var(--space-4);">
+                <table class="table-dataset">
+                  <thead><tr><th>API host</th><th>Active lease</th><th>Next request allowed</th><th>Cooldown until</th><th>HTTP 429 count</th><th>Last result</th></tr></thead>
+                  <tbody id="boardSchedulerHostTableBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">Loading host budgets…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+
             <div class="data-table-container">
               <table class="table-dataset">
                 <thead>

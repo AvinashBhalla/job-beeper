@@ -7144,3 +7144,9 @@ Owner requested removal of extra PR/branch clutter. See `docs/REPOSITORY_CLEANUP
 ## 2026-11-09 — connector QA autonomous cadence checkpoint
 
 The next autonomous 60-minute connector-QA run was observed at 17:05:04 UTC, following the initial scheduled run at 16:05:03 UTC. Eight of eight sources succeeded: 1,879 seen, 25 new, 55 HTTP 200 responses, zero 429/request/page/board failures. QA DB: 1,916 jobs, 24 source_runs, canonical/evaluation/notification-ledger rows 1,916, integrity `ok`, sent notifications 0, users/preferences 0. The autonomous-cycle gate is complete for one interval. Next owner action: create QA-only admin/member accounts interactively and execute role/tenant-isolation UAT on port 8010. Detailed per-source counts are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/REPOSITORY_CLEANUP_2026-11-09.md`.
+
+## 2026-11-09 — persistent per-board scheduler in progress
+
+A stacked feature branch `feat/per-board-scheduler-20261109` is being developed in `/tmp/job-radar-board-scheduler` on top of global ATS discovery. See `docs/PER_BOARD_SCHEDULER_2026-11-09.md` for schema, host scheduling policy, board-level baseline safety, admin API/UI, tests and next steps. No live containers were changed. Final full V2 test/CI and isolated Desktop browser QA are still required before PR merge or deployment.
+
+Candidate scheduler smoke test (2026-11-09): 10/10 boards across 8 providers succeeded; 1,660 jobs, 53 HTTP 2xx, 0 rate limits/exceptions/page failures/board failures, SQLite integrity ok, 0 sent notifications. Candidate is isolated at loopback port 18011 with a fresh volume; dev/QA/prod unchanged. Read `docs/CANDIDATE_QA_SMOKE_2026-11-09.md`; Desktop visual/role QA and exact-head CI are the remaining gates.
