@@ -643,6 +643,11 @@
               <div id="directoryCoverageSummary" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Loading current registry coverage…</div>
               <p id="lastRoundDirectoryStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Directory has not been imported in this session.</p>
             </div>
+            <div class="settings-block" id="workdayInventoryPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Workday board inventory progress</span>
+              <p class="auth-description">The newest page is checked on the normal source cadence. A separate inventory cursor adds at most one more page per configured board every 15 minutes. A board with a reported 2,000-result cap is explicitly marked incomplete until facet partitioning is available.</p>
+              <div id="workdayInventoryStatus" class="auth-description" role="status" aria-live="polite">Loading Workday inventory cursors…</div>
+            </div>
             <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">
               <span class="settings-block-title">Employer &amp; Career Board Discovery</span>
               <p class="auth-description">Enter a company's normal website or careers URL. Job Beeper checks public careers links, identifies supported ATS board patterns and adds candidates to this review queue. Discovery does not enable a collector or send Telegram alerts.</p>

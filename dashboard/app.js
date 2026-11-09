@@ -2101,6 +2101,7 @@
       void loadDiscoveredBoards();
       void loadDirectoryCoverageSummary();
       void loadHirebaseBudgetStatus();
+      void loadWorkdayInventoryStatus();
     }
   }
 
@@ -2119,6 +2120,32 @@
       target.textContent = `${Number(data.employer_boards_known || 0).toLocaleString()} employer boards in the registry (${Number(data.directory_seed_candidates || 0).toLocaleString()} directory candidates). ${providers.join(' | ') || 'No boards yet.'} Market coverage percentage is not estimated.`;
     } catch (error) {
       target.textContent = error.message || 'Registry coverage summary unavailable.';
+    }
+  }
+
+  async function loadWorkdayInventoryStatus() {
+    if (!state.isAdmin) return;
+    const target = $('workdayInventoryStatus');
+    if (!target) return;
+    try {
+      const response = await authClient.request('/workday/inventory-status', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Workday inventory status unavailable (HTTP ${response.status}).`);
+      const data = await response.json();
+      const boards = data.boards || [];
+      target.textContent = boards.length
+        ? boards.map(board => {
+          const progress = board.status === 'truncated'
+            ? `INCOMPLETE: ${board.truncated_reason || 'facet partition required'}`
+            : board.status === 'complete'
+              ? `Inventory completed; next weekly refresh ${board.next_inventory_due_at || 'not scheduled'}`
+              : board.status === 'in_progress'
+                ? `Next inventory offset ${Number(board.next_inventory_offset || 0).toLocaleString()} · next page after ${board.next_inventory_due_at || 'the throttle window'}`
+                : 'Inventory scan not started';
+          return `${board.company} (${board.board_key}): ${progress} · reported total ${board.reported_total ?? 'unknown'} · facets ${Number(board.facets_available || 0)}`;
+        }).join(' | ')
+        : 'No Workday employer boards are configured.';
+    } catch (error) {
+      target.textContent = error.message || 'Workday inventory progress unavailable.';
     }
   }
 

@@ -3747,3 +3747,70 @@ Next implementation order is now more precise:
 6. Benchmark completeness, p50/p95, 429s and first-seen delay before raising concurrency.
 
 This addendum is static code review and does not change collectors, activate sources, contact ATS providers or spend Hirebase credits.
+---
+
+## 2026-11-09 — Workday inventory implementation checkpoint
+
+**Branch:** feat/global-ats-discovery-hirebase-guard-20261109
+**Worktree:** /tmp/job-radar-global-discovery
+**Current code:** Workday incremental inventory implementation is in the worktree and under full regression testing. It has not been deployed.
+
+### Completed in this work session
+
+1. Added durable SQLite table workday_board_poll_state, keyed by normalized tenant:site, with next inventory offset, last attempt, last full inventory, reported total, provider facets metadata, completion state and truncation reason.
+2. Preserved the fast first Workday page on the existing source poll interval (default 120 seconds).
+3. Added one optional inventory page per board no more often than every 15 minutes. The first pass starts at offset 20; subsequent attempts resume the saved cursor.
+4. Kept detail page requests limited to the fast freshness page. The slower inventory page adds only one list request and derives basic location from listing fields if detail data is absent.
+5. Inventory cursor state is held pending and committed only after upsert_jobs succeeds. A failed inventory page does not advance its offset; its attempt timestamp is persisted so a 120-second source cycle does not hammer the failed page.
+6. Existing Workday 429 Retry-After/cooldown behaviour remains in force.
+7. A short final page or a reached reported total below 2,000 marks a sweep complete; completed sweeps are rechecked weekly.
+8. A response at the 2,000-result ceiling, an early empty page inconsistent with that ceiling, or the local 2,000 offset safety cap is marked truncated/incomplete. The code does not claim full inventory. Facet subdivision remains the next Workday completeness task.
+9. Added admin-only GET /api/workday/inventory-status and Coverage & Health panel UI that shows board, status, reported total, facet count, next offset and truncation reason.
+10. Added tests for persisted cursor commit, first-page cadence, inventory throttling, advancing offsets, failed-page retry throttling, weekly refresh, 2,000-cap truncation and admin-only status.
+
+### Current validation
+
+- Focused tests: 31 passed across Workday collector and global discovery/Hirebase suites.
+- Full V2 test suite is currently running; do not report a final count until job completion.
+- Python compilation and git diff --check passed on the current implementation.
+- VM Node is v12 and cannot parse the dashboard's existing optional chaining/nullish-coalescing syntax. Use exact-head GitHub V2 CI for dashboard JS syntax.
+- No production/shared-dev changes, service restarts, source activation or Hirebase requests occurred.
+
+### Next implementation priorities (updated)
+
+**P0**
+1. Workday facet-aware full inventory. The current cursor paginates up to the 2,000 reported-result ceiling and surfaces truncation; it does not yet partition jobFamilyGroup, timeType, locations or workerSubType.
+2. Keka actual portal slug resolution. Current collector still hardcodes default in /careers/api/embedjobs/default/active/{id}. Implement safe path parsing, optional portal-info call and matching portal-specific embed endpoint; test at least two non-default public boards.
+3. Independent Workday/Keka/Darwinbox employer/tenant discovery. The seed directory in PR #65 only covers Greenhouse/Lever/Ashby; Hirebase is not a complete tenant directory.
+4. Per-board scheduling: due queue, host budget, jitter, persistent cooldown, independent retry/page state and queue-age visibility. Current source-wide scheduler remains a limitation.
+
+**P1**
+5. Darwinbox per-board 403/429/5xx classification and re-verification. Keep blocked 403 visible. No Cloudflare/TLS impersonation or anti-bot bypass.
+6. Benchmark p50/p95 HTTP latency, 429 rate, pages attempted/completed, jobs available vs fetched, first-seen delay and user-feed lag on verified canary boards.
+7. Extend freshness/stale/repost and job legitimacy checks once collection completeness and telemetry are reliable.
+
+**P2**
+8. Broader ATS adapters only after the provider registry, scheduler and health contracts are in place.
+9. Hirebase estimate-only development experiment only after the user adds the key to the dedicated server-side file and explicitly approves testing. Do not use Hirebase for a commercial multi-user product without vendor permission.
+
+### Required from the user
+
+Nothing is required right now. Do not ask for credentials in chat. The Hirebase key remains absent; the server-side development env file is an empty placeholder. Only request the key be added securely when estimate-only validation is actually ready and the user approves it.
+
+### Safe continuation
+
+After the full suite completes, fix any regression, commit the Workday code + tests + UI, push the same PR #65 branch, update the PR description and this handover, and verify exact-head GitHub CI. Keep PR #65 draft until the Workday/Keka/global-discovery milestones have received their own review. Do not merge/deploy solely because CI passes.
+## Next adapter implementation note
+
+After Workday full-suite validation, continue with `docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md`. It contains the exact default/non-default portal behavior, safe URL rules, reference adapter findings and required tests.\n
+## 2026-11-09 19:37 IST — Workday inventory implementation verified locally
+
+Workday now preserves offset 0 on the existing 120-second freshness poll and adds a durable per-board cursor that fetches at most one extra page every 15 minutes. Cursor advances only after upsert; failed pages are throttled without advancing; boards at the 2,000-result cap are explicitly marked incomplete. An admin-only inventory-status API and Coverage & Health panel expose progress. This is not facet-aware full inventory.
+
+Validation: full V2 suite 436 passed in 398.870s (exit code 0); focused Workday/global discovery tests 31 passed. Python compileall, JSON config validation, git diff check and HTML panel wiring passed. Exact-head GitHub CI remains required after push.
+
+Next priorities: Workday facet subdivision; Keka non-default portal slug support; independent public Workday/Keka/Darwinbox employer discovery; per-board scheduler/host budgets; controlled p50/p95 and 429 benchmarks. Darwinbox 403 must remain blocked, with no Cloudflare/TLS bypass.
+
+User action: nothing required now. Hirebase key remains absent and source flags remain off.
+
+Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n

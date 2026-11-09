@@ -67,8 +67,11 @@ LEVER_PAGE_SIZE = 100
 LEVER_MAX_PAGES_PER_BOARD = 5
 LEVER_MAX_BOARDS = 20
 WORKDAY_PAGE_SIZE = 20
-WORKDAY_MAX_PAGES_PER_BOARD = 1
+WORKDAY_MAX_PAGES_PER_BOARD = 2  # Freshness page plus at most one inventory page.
 WORKDAY_MAX_DETAILS_PER_BOARD = 20
+WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS = 15 * 60
+WORKDAY_FULL_INVENTORY_REFRESH_SECONDS = 7 * 24 * 60 * 60
+WORKDAY_INVENTORY_MAX_OFFSET = 2000
 WORKDAY_MAX_BOARDS = 20
 WORKDAY_DETAIL_DELAY_SECONDS = 0.1
 WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
@@ -1206,6 +1209,19 @@ def init_db() -> None:
         _ensure_column(conn, "ats_board_registry", "directory_last_crawled", "TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_provider ON ats_board_registry(provider, review_status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_company ON ats_board_registry(company_id, provider)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS workday_board_poll_state (
+            board_key TEXT PRIMARY KEY,
+            next_inventory_offset INTEGER NOT NULL DEFAULT 20,
+            last_inventory_attempt_at TEXT,
+            last_full_inventory_at TEXT,
+            reported_total INTEGER,
+            facets_json TEXT NOT NULL DEFAULT '[]',
+            inventory_complete INTEGER NOT NULL DEFAULT 0,
+            truncated_reason TEXT,
+            updated_at TEXT NOT NULL
+        )
+        """)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS hirebase_usage_ledger (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4769,6 +4785,114 @@ def lever_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _workday_get_board_poll_state(board_key: str) -> dict[str, Any]:
+    with connect_sqlite(DB_PATH) as conn:
+        row = conn.execute(
+            """SELECT next_inventory_offset,last_inventory_attempt_at,
+                      last_full_inventory_at,reported_total,facets_json,
+                      inventory_complete,truncated_reason
+               FROM workday_board_poll_state WHERE board_key=?""",
+            (board_key,),
+        ).fetchone()
+    if not row:
+        return {
+            "next_inventory_offset": WORKDAY_PAGE_SIZE,
+            "last_inventory_attempt_at": None,
+            "last_full_inventory_at": None,
+            "reported_total": None,
+            "facets": [],
+            "inventory_complete": False,
+            "truncated_reason": None,
+        }
+    try:
+        facets = json.loads(row[4] or "[]")
+        if not isinstance(facets, (list, dict)):
+            facets = []
+    except (TypeError, ValueError):
+        facets = []
+    return {
+        "next_inventory_offset": max(0, int(row[0] or 0)),
+        "last_inventory_attempt_at": row[1],
+        "last_full_inventory_at": row[2],
+        "reported_total": row[3],
+        "facets": facets,
+        "inventory_complete": bool(row[5]),
+        "truncated_reason": row[6],
+    }
+
+
+def _workday_set_board_poll_state(board_key: str, state: dict[str, Any]) -> None:
+    facets = state.get("facets")
+    if not isinstance(facets, (list, dict)):
+        facets = []
+    facets_json = json.dumps(facets, ensure_ascii=False, separators=(",", ":"))[:16_000]
+    reported_total = state.get("reported_total")
+    if isinstance(reported_total, bool) or not isinstance(reported_total, int) or reported_total < 0:
+        reported_total = None
+    next_offset = state.get("next_inventory_offset", WORKDAY_PAGE_SIZE)
+    if isinstance(next_offset, bool) or not isinstance(next_offset, int) or next_offset < 0:
+        next_offset = WORKDAY_PAGE_SIZE
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO workday_board_poll_state(
+                   board_key,next_inventory_offset,last_inventory_attempt_at,
+                   last_full_inventory_at,reported_total,facets_json,
+                   inventory_complete,truncated_reason,updated_at
+               ) VALUES(?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(board_key) DO UPDATE SET
+                   next_inventory_offset=excluded.next_inventory_offset,
+                   last_inventory_attempt_at=excluded.last_inventory_attempt_at,
+                   last_full_inventory_at=excluded.last_full_inventory_at,
+                   reported_total=excluded.reported_total,
+                   facets_json=excluded.facets_json,
+                   inventory_complete=excluded.inventory_complete,
+                   truncated_reason=excluded.truncated_reason,
+                   updated_at=excluded.updated_at""",
+            (
+                board_key, next_offset, state.get("last_inventory_attempt_at"),
+                state.get("last_full_inventory_at"), reported_total, facets_json,
+                int(bool(state.get("inventory_complete"))),
+                state.get("truncated_reason"), iso(now()),
+            ),
+        )
+        conn.commit()
+
+
+def _workday_commit_pending_board_states() -> None:
+    pending = source_state.setdefault("workday", {}).pop("pending_board_states", {})
+    if not isinstance(pending, dict):
+        return
+    for board_key, state in pending.items():
+        if isinstance(board_key, str) and isinstance(state, dict):
+            _workday_set_board_poll_state(board_key, state)
+
+
+def _workday_inventory_is_due(state: dict[str, Any], current: dt.datetime) -> bool:
+    if state.get("truncated_reason"):
+        return False
+    last_attempt = state.get("last_inventory_attempt_at")
+    if state.get("inventory_complete"):
+        last_full = state.get("last_full_inventory_at")
+        if not last_full:
+            return False
+        try:
+            parsed = dt.datetime.fromisoformat(str(last_full).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+        except ValueError:
+            parsed = current - dt.timedelta(seconds=WORKDAY_FULL_INVENTORY_REFRESH_SECONDS)
+        return (current - parsed).total_seconds() >= WORKDAY_FULL_INVENTORY_REFRESH_SECONDS
+    if not last_attempt:
+        return True
+    try:
+        parsed = dt.datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+    except ValueError:
+        return True
+    return (current - parsed).total_seconds() >= WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS
+
+
 def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     """Collect a bounded set of public Workday career-site postings.
 
@@ -4808,9 +4932,21 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         details_fetched = 0
         board_jobs: list[dict[str, Any]] = []
         rate_limited = False
+        board_key = f"{tenant}:{site}"
+        poll_state = _workday_get_board_poll_state(board_key)
+        inventory_due = _workday_inventory_is_due(poll_state, now())
+        inventory_offset = int(poll_state.get("next_inventory_offset") or WORKDAY_PAGE_SIZE)
+        if poll_state.get("inventory_complete") and inventory_due:
+            inventory_offset = WORKDAY_PAGE_SIZE
+        page_specs = [(0, True)]
+        if inventory_due and inventory_offset > 0 and WORKDAY_MAX_PAGES_PER_BOARD > 1:
+            page_specs.append((inventory_offset, False))
+        reported_total = poll_state.get("reported_total")
+        facets = poll_state.get("facets", [])
+        inventory_state_update: dict[str, Any] | None = None
+        inventory_attempt_at = iso(now()) or ""
 
-        for page_number in range(WORKDAY_MAX_PAGES_PER_BOARD):
-            offset = page_number * WORKDAY_PAGE_SIZE
+        for page_number, (offset, freshness_page) in enumerate(page_specs):
             payload = {
                 "appliedFacets": {},
                 "limit": WORKDAY_PAGE_SIZE,
@@ -4826,18 +4962,37 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 postings = data.get("jobPostings") if isinstance(data, dict) else None
                 if not isinstance(postings, list):
                     raise ValueError("Workday response did not contain jobPostings")
+                if isinstance(data, dict):
+                    raw_total = data.get("total")
+                    if isinstance(raw_total, int) and not isinstance(raw_total, bool) and raw_total >= 0:
+                        reported_total = raw_total
+                    raw_facets = data.get("facets")
+                    if isinstance(raw_facets, list):
+                        facets = raw_facets[:100]
+                    elif isinstance(raw_facets, dict):
+                        facets = dict(list(raw_facets.items())[:100])
                 successful_pages += 1
                 _record_source_page("workday", True)
             except Exception as exc:
                 _record_source_page("workday", False)
                 failed_response = getattr(exc, "response", None)
+                if not freshness_page:
+                    # Failed inventory pages are throttled too. Keep the offset
+                    # unchanged so the page is retried after the inventory cadence.
+                    inventory_state_update = {
+                        **poll_state,
+                        "next_inventory_offset": inventory_offset,
+                        "last_inventory_attempt_at": inventory_attempt_at,
+                        "reported_total": reported_total,
+                        "facets": facets,
+                    }
                 if getattr(failed_response, "status_code", None) == 429:
                     _set_workday_rate_limit(failed_response)
                     rate_limited = True
                     failures.append(f"{tenant}/{site} list rate limited")
                 else:
                     failures.append(
-                        f"{tenant}/{site} page {page_number + 1}: {type(exc).__name__}"
+                        f"{tenant}/{site} page offset {offset}: {type(exc).__name__}"
                     )
                 log.warning(
                     "workday: tenant=%s site=%s page=%s failed error_type=%s",
@@ -4876,7 +5031,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 detail_info: dict[str, Any] = {}
                 # Detail retrieval does not depend on the administrator's role or
                 # location filters; per-user evaluation happens after ingestion.
-                if details_attempted < WORKDAY_MAX_DETAILS_PER_BOARD:
+                if freshness_page and details_attempted < WORKDAY_MAX_DETAILS_PER_BOARD:
                     try:
                         if details_attempted:
                             time.sleep(WORKDAY_DETAIL_DELAY_SECONDS)
@@ -4929,6 +5084,8 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 primary_location = (
                     detail_info.get("location")
                     or detail_info.get("jobRequisitionLocation")
+                    or (safe_bullet_fields[1] if len(safe_bullet_fields) > 1 else None)
+                    or item.get("locationsText")
                 )
                 if isinstance(primary_location, dict):
                     primary_location = (
@@ -4982,13 +5139,54 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     source_details=details,
                 ))
 
-            if rate_limited or len(postings) < WORKDAY_PAGE_SIZE:
+            if not freshness_page:
+                next_offset = offset + WORKDAY_PAGE_SIZE
+                truncated_reason = None
+                inventory_complete = False
+                last_full_inventory_at = poll_state.get("last_full_inventory_at")
+                if len(postings) < WORKDAY_PAGE_SIZE:
+                    if isinstance(reported_total, int) and reported_total >= WORKDAY_INVENTORY_MAX_OFFSET:
+                        truncated_reason = "empty_page_before_reported_total_cap_requires_review"
+                        next_offset = 0
+                    else:
+                        inventory_complete = True
+                        last_full_inventory_at = inventory_attempt_at
+                        next_offset = 0
+                elif next_offset >= WORKDAY_INVENTORY_MAX_OFFSET:
+                    if isinstance(reported_total, int) and reported_total >= WORKDAY_INVENTORY_MAX_OFFSET:
+                        truncated_reason = "reported_total_capped_at_2000_requires_facet_partition"
+                    else:
+                        truncated_reason = "inventory_safety_offset_cap_reached"
+                    next_offset = 0
+                elif isinstance(reported_total, int) and reported_total < WORKDAY_INVENTORY_MAX_OFFSET and next_offset >= reported_total:
+                    inventory_complete = True
+                    last_full_inventory_at = inventory_attempt_at
+                    next_offset = 0
+                inventory_state_update = {
+                    **poll_state,
+                    "next_inventory_offset": next_offset,
+                    "last_inventory_attempt_at": inventory_attempt_at,
+                    "last_full_inventory_at": last_full_inventory_at,
+                    "reported_total": reported_total,
+                    "facets": facets,
+                    "inventory_complete": inventory_complete,
+                    "truncated_reason": truncated_reason,
+                }
+                if truncated_reason:
+                    log.warning(
+                        "workday: tenant=%s site=%s inventory incomplete offset=%s total=%s reason=%s",
+                        tenant, site, offset, reported_total, truncated_reason,
+                    )
+                elif inventory_complete:
+                    log.info(
+                        "workday: tenant=%s site=%s inventory sweep complete reported_total=%s",
+                        tenant, site, reported_total,
+                    )
+            if rate_limited:
                 break
-            if page_number == WORKDAY_MAX_PAGES_PER_BOARD - 1:
-                log.warning(
-                    "workday: tenant=%s site=%s reached bounded pagination cap pages=%s page_size=%s",
-                    tenant, site, WORKDAY_MAX_PAGES_PER_BOARD, WORKDAY_PAGE_SIZE,
-                )
+
+        if inventory_state_update is not None:
+            source_state.setdefault("workday", {}).setdefault("pending_board_states", {})[board_key] = inventory_state_update
 
         if successful_pages:
             successful_boards += 1
@@ -5920,6 +6118,8 @@ def run_source(source: str, config: dict[str, Any]) -> None:
     runtime_at_start = source_state.setdefault(source, {})
     if source == "hirebase":
         runtime_at_start.pop("pending_watermarks", None)
+    elif source == "workday":
+        runtime_at_start.pop("pending_board_states", None)
     runtime_at_start["running"] = True
     runtime_at_start["current_run_id"] = run_id
     jobs: list[dict[str, Any]] = []
@@ -5968,6 +6168,8 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         )
         if source == "hirebase":
             _hirebase_commit_pending_watermarks()
+        elif source == "workday":
+            _workday_commit_pending_board_states()
         board_baseline_suppressed = suppress_activated_board_inventory(source)
         if board_baseline_suppressed:
             log.info(
@@ -7028,6 +7230,71 @@ def get_discovery_coverage_summary():
         "providers": providers,
         "market_coverage_percentage": None,
         "coverage_note": "Registry coverage is not total market coverage. Candidate directories are not verified boards; private and non-indexed employers may be absent.",
+    }
+
+
+@app.get("/api/workday/inventory-status", dependencies=[Depends(require_admin)])
+def get_workday_inventory_status():
+    """Explain per-board Workday inventory progress without implying full coverage."""
+    config = get_config()
+    configured = config.get("workday_boards", [])
+    boards: list[dict[str, Any]] = []
+    for board in configured if isinstance(configured, list) else []:
+        if not isinstance(board, dict):
+            continue
+        parsed = _parse_workday_board_url(board.get("url"))
+        if not parsed:
+            continue
+        board_key = f"{parsed['tenant']}:{parsed['site']}"
+        state = _workday_get_board_poll_state(board_key)
+        if state.get("truncated_reason"):
+            status = "truncated"
+            next_due_at = None
+        elif state.get("inventory_complete"):
+            status = "complete"
+            last_full = state.get("last_full_inventory_at")
+            next_due_at = None
+            if last_full:
+                try:
+                    last_dt = dt.datetime.fromisoformat(str(last_full).replace("Z", "+00:00"))
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=UTC)
+                    next_due_at = iso(last_dt + dt.timedelta(seconds=WORKDAY_FULL_INVENTORY_REFRESH_SECONDS))
+                except ValueError:
+                    next_due_at = None
+        elif state.get("last_inventory_attempt_at"):
+            status = "in_progress"
+            try:
+                last_dt = dt.datetime.fromisoformat(str(state["last_inventory_attempt_at"]).replace("Z", "+00:00"))
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=UTC)
+                next_due_at = iso(last_dt + dt.timedelta(seconds=WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS))
+            except ValueError:
+                next_due_at = None
+        else:
+            status = "not_started"
+            next_due_at = iso(now())
+        boards.append({
+            "company": str(board.get("company") or "Unknown employer"),
+            "board_key": board_key,
+            "url": parsed["url"],
+            "status": status,
+            "freshness_poll_seconds": int(config.get("poll_seconds", {}).get("workday", 120)),
+            "inventory_page_interval_seconds": WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS,
+            "next_inventory_offset": state.get("next_inventory_offset"),
+            "reported_total": state.get("reported_total"),
+            "facets_available": len(state.get("facets") or []),
+            "last_inventory_attempt_at": state.get("last_inventory_attempt_at"),
+            "last_full_inventory_at": state.get("last_full_inventory_at"),
+            "next_inventory_due_at": next_due_at,
+            "truncated_reason": state.get("truncated_reason"),
+            "inventory_complete": bool(state.get("inventory_complete")),
+        })
+    return {
+        "boards_configured": len(boards),
+        "boards": boards,
+        "freshness_poll_note": "The first page is polled on the source cadence. At most one extra inventory page per board is requested every 15 minutes.",
+        "coverage_note": "A full inventory is not guaranteed when Workday reports its 2,000-result cap. Such boards are marked truncated until facet-aware partitioning is implemented.",
     }
 
 

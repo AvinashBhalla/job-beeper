@@ -292,6 +292,33 @@ class GlobalDirectoryApiTests(unittest.TestCase):
         self.assertEqual(summary.json()["directory_seed_candidates"], 2)
         self.assertIsNone(summary.json()["market_coverage_percentage"])
 
+    def test_workday_inventory_status_is_admin_only_and_reports_configured_board(self):
+        member = TestClient(radar.app, base_url="https://testserver")
+        try:
+            login = member.post("/api/auth/login", json={
+                "email": "global-member@example.com", "password": "another sufficiently strong password",
+            })
+            self.assertEqual(login.status_code, 200)
+            self.assertEqual(member.get("/api/workday/inventory-status").status_code, 403)
+        finally:
+            member.close()
+        config = {
+            "poll_seconds": {"workday": 120},
+            "workday_boards": [{
+                "url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+                "company": "NVIDIA",
+            }],
+        }
+        with patch.object(radar, "get_config", return_value=config):
+            response = self.client.get("/api/workday/inventory-status")
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["boards_configured"], 1)
+        self.assertEqual(body["boards"][0]["status"], "not_started")
+        self.assertEqual(body["boards"][0]["freshness_poll_seconds"], 120)
+        self.assertIsNone(body["boards"][0]["truncated_reason"])
+        self.assertIn("2,000-result cap", body["coverage_note"])
+
     def test_directory_import_is_admin_only_and_hirebase_status_never_exposes_key(self):
         member = TestClient(radar.app, base_url="https://testserver")
         try:
