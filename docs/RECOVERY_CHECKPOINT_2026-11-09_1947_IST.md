@@ -56,7 +56,7 @@
 ## Next priorities
 
 ### P0
-1. Commit/push current Keka changes on PR #65; verify exact-head CI.
+1. Verify exact-head V2 CI #1431 for commit afa177b; fix any failures.
 2. Implement Workday facet-aware partitions (`jobFamilyGroup`, `timeType`, `locations`, `workerSubType`) with bounded recursion, per-facet cursors, dedup and explicit completeness.
 3. Build independent public employer/tenant discovery for Workday/Keka/Darwinbox from career links, sitemaps, Common Crawl CDX and licensed seeds, with provenance/confidence and candidate-only state.
 4. Implement persistent per-board scheduler: `next_due_at`, per-host budgets, jitter, Retry-After, cooldowns, checkpoints, backpressure and queue-age visibility.
@@ -80,4 +80,4 @@ Nothing right now. Do not request the Hirebase key in chat. It remains absent; t
 - No production/shared-dev changes or service restarts.
 - No live ATS requests from the tests; Keka HTTP is mocked.
 - No Hirebase requests, no source activation, no live directory import and no notification dispatch.
-- After Keka full tests passed: commit/push, update PR body, verify exact-head V2 CI, update this checkpoint and keep PR draft until reviewed.
+- Keka full tests passed; code is pushed, PR body is updated, and exact-head V2 CI #1431 is in progress. Verify CI, update this checkpoint and keep PR draft until reviewed.
