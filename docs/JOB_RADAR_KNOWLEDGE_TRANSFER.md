@@ -3572,3 +3572,14 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Dev now: health 200, SQLite WAL/integrity ok, 9,562 jobs, 8,087 runs, config v12, Naukri only, notifications off, Telegram absent, Gemini/LLM false, zero sent; `user_applications` created empty. Latest Naukri 293 seen/0 new. Production untouched (same image `6e5becb`, health 200).
 - PR #56 merged to `v2-live-radar`; exact head CI `42573822254` and merge push CI `42573997642` passed. Full runbook/evidence in `DEVELOPMENT_RELEASE_POLICY_AND_REPO_CLEANUP_2026-11-09.md`.
 - Owner is testing production. Reproduce/fix issues in refreshed dev only; never direct patch prod.
+
+
+## 2026-11-09 — Admin/member Desktop QA environment and credentials
+
+- Fresh isolated QA instance: `job-radar-browser-qa`, loopback 8006; local URL `http://localhost:18006/dashboard/`; SSH tunnel `ssh -N -L 18006:127.0.0.1:8006 ubuntu@130.210.27.197`.
+- Built from current V2 integration SHA `e6181d93682d6c09cd462c18b13b20996ce99057` / image `job-radar-dev-multitenant:e6181d9`. Separate fresh DB `/tmp/job-radar-browser-qa-20261109/data/jobs.db`, four synthetic demo jobs, no copied production/shared-dev data.
+- QA accounts/passwords shared in chat only: `qa-admin@local.test` (admin) and `qa-member@local.test` (user). Both credential pairs verified. Never commit passwords.
+- Safety: all collectors off, notifications off, Telegram token/chat blank, no OAuth, Gemini/LLM off. Do not test external actions or use any other port. Old 8005 is stale PR46 QA and not the target. Test only 18006.
+- Smoke verified: dashboard/health 200; both login + `/api/auth/me` + `/api/preferences` 200; admin telemetry endpoints 200; member telemetry endpoints 403.
+- Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` for complete Desktop prompt, manual checklist, safety boundaries, test matrix and report template.
+- Owner is to run manual testing and Desktop AI testing. After feedback, reproduce on feature branch, tests + exact SHA CI, shared dev first, owner approval, then production. No production changes.
