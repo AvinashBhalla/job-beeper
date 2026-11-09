@@ -2,8 +2,8 @@
 
 # Job Radar — 36-platform source coverage and near-real-time delivery roadmap
 
-**Owner requirement recorded:** 2026-11-08  
-**Applies to:** V2 candidate / PR #51 and all future agents  
+**Owner requirement recorded:** 2026-11-08
+**Applies to:** V2 candidate / PR #51 and all future agents
 **Priority:** Product requirement, not optional future polish
 
 ## 1. Product expectation
@@ -299,3 +299,9 @@ The previous JG Summit `*.darwinbox.com` candidate endpoint returned HTTP 403 on
 The isolated QA candidate now verifies the currently configured Greenhouse and Ashby boards and selected public examples: Coinbase GH 283, Graviton Research Capital GH 21, Zocdoc GH 64; OpenAI Ashby 816, PostHog Ashby 10; NVIDIA Workday 20 in the first page; Bosch Group SmartRecruiters 10 in the verification page; Hugging Face Workable 6; Bridgestone Keka 109; Arvind Darwinbox 36. The Workable probe now uses the same `apply.workable.com/api/v1/widget/accounts/{slug}` endpoint as its collector. Arvind Darwinbox two-poll ingestion inserts 36 and silently baselines on poll 1, inserts 0 on poll 2, sends no Telegram messages and retains SQLite integrity `ok`.
 
 Do not interpret one probe as universal ATS availability. Darwinbox `.com` and several `.in` tenant probes returned 403; detector is `.darwinbox.in` only and only Arvind is currently verified. No empty allowlist or unsupported provider should be enabled in production. Lever board allowlist is currently empty; the non-collector ATS families remain discovery-only until adapters are implemented.
+
+## 2026-11-09 — independent discovery seeds + Hirebase guard (feature branch only)
+
+Branch `feat/global-ats-discovery-hirebase-guard-20261109` adds a CC BY 4.0 LastRound AI August 2026 candidate seed directory for 9,935 Greenhouse/Lever/Ashby board slugs, and an optional Hirebase sample collector for Workday/Keka/Darwinbox. Hirebase is disabled by default, daily, estimate-first, limited to 4 rows per platform/day, 12/day total and 400 per billing period. It has an SQLite reservation ledger and fail-closed uncertain-request handling. No key has been added and no Hirebase API request has been made. The directory import only creates low-confidence unverified candidates; no ATS source is activated. This is not yet global automatic discovery for Workday/Keka/Darwinbox. See `GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md`.
+
+Open-source architecture research is in `OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md`: Freehire for one-shot provider workers/outboxes, Career-Ops for reverse discovery and per-host concurrency, ats-scrapers for Python adapter contracts. Do not use CC BY-NC company datasets from Feashliaa/Riley aggregator in commercial JobBeeper.

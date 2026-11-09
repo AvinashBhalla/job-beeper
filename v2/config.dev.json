@@ -5,7 +5,8 @@
     "instahyre": 600,
     "greenhouse": 900,
     "ashby": 1800,
-    "lever": 1800
+    "lever": 1800,
+    "hirebase": 86400
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -108,9 +109,10 @@
     "instahyre": false,
     "greenhouse": false,
     "ashby": false,
-    "lever": false
+    "lever": false,
+    "hirebase": false
   },
-  "config_version": 12,
+  "config_version": 17,
   "greenhouse_boards": [
     {
       "token": "coinbase",

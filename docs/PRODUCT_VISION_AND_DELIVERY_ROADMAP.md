@@ -1,7 +1,7 @@
 # JobBeeper — Product Vision, Architecture and Delivery Roadmap
 
-**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.  
-**Last reviewed:** 2026-11-08 (Asia/Kolkata)  
+**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.
+**Last reviewed:** 2026-11-08 (Asia/Kolkata)
 **Status:** Living source of truth. This document supersedes conflicting feature-order recommendations in older roadmaps; those files remain useful for implementation detail and engineering history.
 
 ## 1. Product vision
@@ -270,3 +270,7 @@ The production NVIDIA Workday connector currently ingests one 20-job page per 12
 ### 2026-11-09 — HTTPS authentication transport fixed
 
 Production now has a Let's Encrypt IP certificate for `130.210.27.197`, Nginx HTTPS reverse proxy, HTTP-to-HTTPS redirect, secure cookies retained, and app port 8000 bound to loopback. Health/dashboard return 200; owner login must be confirmed over `https://130.210.27.197/dashboard/`. Certbot auto-renew timer and Nginx deploy hook are installed. Operational details in `JOB_RADAR_HANDOVER.md`.
+
+## 2026-11-09 — global discovery engineering checkpoint
+
+The feature branch `feat/global-ats-discovery-hirebase-guard-20261109` provides a quota-guarded optional Hirebase sampler and a low-confidence CC BY 4.0 seed import for Greenhouse/Lever/Ashby. It is not the completed Workday/Keka/Darwinbox global discovery engine. Continue first-party company/tenant discovery, public board verification and board-level scheduled polling as P0 source-health work. The Hirebase free API must remain optional and should not be used in commercial multi-user production before written vendor permission. See `GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md`.

@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -86,8 +86,12 @@ DARWINBOX_MAX_BOARDS = 50
 DARWINBOX_PAGE_SIZE = 50
 DARWINBOX_MAX_PAGES_PER_BOARD = 5
 DARWINBOX_PAGE_DELAY_SECONDS = 0.2
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox"})
-INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
+HIREBASE_PROVIDER_LIMIT = 4
+HIREBASE_MAX_MONTHLY_JOBS = 400
+HIREBASE_MAX_DAILY_JOBS = 12
+HIREBASE_PROVIDER_DAILY_JOBS = 4
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "hirebase"})
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "hirebase"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -217,6 +221,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     if current_version < 15 <= default_version:
         merged.setdefault("source_enabled", {})["keka"] = False
         merged.setdefault("source_enabled", {})["darwinbox"] = False
+    if current_version < 17 <= default_version:
+        merged.setdefault("source_enabled", {})["hirebase"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -241,6 +247,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         if current_version < 15 <= default_version:
             merged["source_enabled"]["keka"] = False
             merged["source_enabled"]["darwinbox"] = False
+        if current_version < 17 <= default_version:
+            merged["source_enabled"]["hirebase"] = False
     return merged
 
 
@@ -584,7 +592,10 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "workable": bool(source_enabled.get("workable", False)),
         "keka": bool(source_enabled.get("keka", False)),
         "darwinbox": bool(source_enabled.get("darwinbox", False)),
+        "hirebase": bool(source_enabled.get("hirebase", False)),
     }
+    if config["source_enabled"]["hirebase"] and not hirebase.api_key_configured():
+        raise HTTPException(status_code=422, detail="Configure HIREBASE_API_KEY in the isolated server environment before enabling Hirebase.")
     if config["source_enabled"]["workday"] and not normalized_workday_boards:
         raise HTTPException(
             status_code=422,
@@ -616,6 +627,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "workable": 120,
             "keka": 120,
             "darwinbox": 120,
+            "hirebase": 86400,
         }.items()
     }
 
@@ -1191,8 +1203,37 @@ def init_db() -> None:
         )
         """)
         _ensure_column(conn, "ats_board_registry", "baseline_pending", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "ats_board_registry", "directory_last_crawled", "TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_provider ON ats_board_registry(provider, review_status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_company ON ats_board_registry(company_id, provider)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS hirebase_usage_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            estimated_jobs INTEGER NOT NULL,
+            returned_jobs INTEGER,
+            reserved_jobs INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL,
+            included_used INTEGER,
+            included_remaining INTEGER,
+            response_verified INTEGER NOT NULL DEFAULT 0
+        )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hirebase_usage_period ON hirebase_usage_ledger(period_start, created_at, provider)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS hirebase_provider_state (
+            provider TEXT PRIMARY KEY,
+            last_polled_at TEXT NOT NULL,
+            window_start TEXT NOT NULL,
+            next_page INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        _ensure_column(conn, "hirebase_provider_state", "window_start", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(conn, "hirebase_provider_state", "next_page", "INTEGER NOT NULL DEFAULT 1")
         conn.execute("""
         CREATE TABLE IF NOT EXISTS canonical_opportunities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5524,6 +5565,323 @@ def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _tracked_hirebase_request(method: str, endpoint: str, **kwargs):
+    """Record safe Hirebase request metrics without logging its key or query payload."""
+    started_monotonic = time.monotonic()
+    try:
+        response = requests.request(method, endpoint, **kwargs)
+    except Exception:
+        _record_source_request(
+            "hirebase", status_code=None,
+            duration_ms=(time.monotonic() - started_monotonic) * 1000,
+            exception=True,
+        )
+        raise
+    _record_source_request(
+        "hirebase", status_code=getattr(response, "status_code", None),
+        duration_ms=(time.monotonic() - started_monotonic) * 1000,
+    )
+    return response
+
+
+def _hirebase_local_usage(conn: sqlite3.Connection, period_start: str, today_start: str, provider: str) -> tuple[int, int, int]:
+    row = conn.execute(
+        """SELECT
+             COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                               THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0),
+             COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                               THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0),
+             COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                               THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+           FROM hirebase_usage_ledger
+           WHERE period_start=? AND status IN ('reserved','unknown','complete_unverified','complete')
+             AND created_at>=?""",
+        (period_start, today_start),
+    ).fetchone()
+    daily_total = int(row[0] or 0) if row else 0
+    provider_row = conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                    THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+           FROM hirebase_usage_ledger
+           WHERE period_start=? AND created_at>=? AND provider=?
+             AND status IN ('reserved','unknown','complete_unverified','complete')""",
+        (period_start, today_start, provider),
+    ).fetchone()
+    monthly_row = conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                    THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+           FROM hirebase_usage_ledger
+           WHERE period_start=? AND status IN ('reserved','unknown','complete_unverified','complete')""",
+        (period_start,),
+    ).fetchone()
+    return int(monthly_row[0] or 0), daily_total, int(provider_row[0] or 0)
+
+
+def _hirebase_reserve(provider: str, estimated_jobs: int, usage: dict[str, Any], *, reserve_jobs: int | None = None) -> int | None:
+    today_start = iso(current_day_start_utc()) or iso(now())
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        monthly_used, daily_used, provider_daily_used = _hirebase_local_usage(
+            conn, str(usage["period_start"]), str(today_start), provider
+        )
+        allowed = hirebase.provider_allowance(
+            usage,
+            local_monthly_used=monthly_used,
+            local_daily_used=daily_used,
+            provider_daily_used=provider_daily_used,
+            monthly_cap=HIREBASE_MAX_MONTHLY_JOBS,
+            daily_cap=HIREBASE_MAX_DAILY_JOBS,
+            provider_daily_cap=HIREBASE_PROVIDER_DAILY_JOBS,
+        )
+        reservation_size = estimated_jobs if reserve_jobs is None else reserve_jobs
+        if reservation_size > allowed or estimated_jobs <= 0 or reservation_size <= 0:
+            return None
+        cursor = conn.execute(
+            """INSERT INTO hirebase_usage_ledger(
+                   provider,created_at,period_start,period_end,estimated_jobs,
+                   returned_jobs,reserved_jobs,status
+               ) VALUES(?,?,?,?,?,NULL,?,'reserved')""",
+            (provider, iso(now()), usage["period_start"], usage["period_end"],
+             estimated_jobs, reservation_size),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def _hirebase_finish_reservation(reservation_id: int, *, jobs_returned: int | None,
+                                 usage_headers: dict[str, Any] | None,
+                                 uncertain: bool = False) -> None:
+    if uncertain:
+        status = "unknown"
+        returned = None
+        reserved = None
+    elif jobs_returned is None:
+        status = "failed"
+        returned = None
+        reserved = 0
+    elif usage_headers is None:
+        # Keep the full estimate reserved until a later usage-summary reconciliation.
+        status = "complete_unverified"
+        returned = jobs_returned
+        reserved = None
+    else:
+        status = "complete"
+        returned = jobs_returned
+        reserved = 0
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """UPDATE hirebase_usage_ledger
+               SET status=?,returned_jobs=?,reserved_jobs=COALESCE(?,reserved_jobs),
+                   included_used=?,included_remaining=?,response_verified=?
+               WHERE id=?""",
+            (status, returned, reserved,
+             usage_headers.get("included_used") if usage_headers else None,
+             usage_headers.get("included_remaining") if usage_headers else None,
+             int(bool(usage_headers)), reservation_id),
+        )
+        conn.commit()
+
+
+def _hirebase_get_window(provider: str) -> dict[str, Any] | None:
+    with connect_sqlite(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT last_polled_at,window_start,next_page FROM hirebase_provider_state WHERE provider=?",
+            (provider,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "last_polled_at": str(row[0]),
+        "window_start": str(row[1]),
+        "next_page": max(1, int(row[2] or 1)),
+    }
+
+
+def _hirebase_set_window(provider: str, *, last_polled_at: str,
+                         window_start: str, next_page: int) -> None:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO hirebase_provider_state(
+                   provider,last_polled_at,window_start,next_page,updated_at
+               ) VALUES(?,?,?,?,?) ON CONFLICT(provider) DO UPDATE SET
+                   last_polled_at=excluded.last_polled_at,
+                   window_start=excluded.window_start,
+                   next_page=excluded.next_page,
+                   updated_at=excluded.updated_at""",
+            (provider, last_polled_at, window_start, next_page, iso(now())),
+        )
+        conn.commit()
+
+
+def _hirebase_commit_pending_watermarks() -> None:
+    pending = source_state.setdefault("hirebase", {}).pop("pending_watermarks", {})
+    if not isinstance(pending, dict):
+        return
+    for provider, cursor in pending.items():
+        if provider not in hirebase.ALLOWED_PROVIDERS or not isinstance(cursor, dict):
+            continue
+        last_polled_at = cursor.get("last_polled_at")
+        window_start = cursor.get("window_start")
+        next_page = cursor.get("next_page")
+        if (isinstance(last_polled_at, str) and isinstance(window_start, str)
+                and isinstance(next_page, int) and not isinstance(next_page, bool) and next_page >= 1):
+            _hirebase_set_window(
+                provider, last_polled_at=last_polled_at,
+                window_start=window_start, next_page=next_page,
+            )
+
+
+def hirebase_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Optional daily Hirebase sampler with estimate-first, persisted hard budgets.
+
+    This is disabled by default, fetches only 4 jobs per provider/day, caps local
+    use at 400 jobs per Hirebase billing period (100 below the free allowance),
+    and never uses a user's preferences to constrain global collection.
+    """
+    if not hirebase.api_key_configured():
+        raise RuntimeError("Hirebase source enabled but HIREBASE_API_KEY is not configured")
+    try:
+        usage = hirebase.usage_summary(requester=_tracked_hirebase_request)
+    except hirebase.HirebaseError as exc:
+        response = getattr(exc, "response", None)
+        if getattr(response, "status_code", None) == 429:
+            _set_source_rate_limit("hirebase", response, default_seconds=300, maximum_seconds=3600)
+        raise RuntimeError(f"Hirebase usage preflight failed: {exc}") from exc
+
+    jobs: list[dict[str, Any]] = []
+    spent_this_run = 0
+    pending_watermarks: dict[str, dict[str, Any]] = {}
+    for provider in ("workday", "keka", "darwinbox"):
+        poll_started_at = iso(now()) or ""
+        cursor = _hirebase_get_window(provider)
+        if cursor:
+            window_start = cursor["window_start"]
+            page_number = cursor["next_page"]
+        else:
+            # First sample only starts with a seven-day discovery window. Pages
+            # are drained oldest-first before the cursor advances to fresh data.
+            initial_start = now() - dt.timedelta(days=7)
+            window_start = iso(initial_start) or poll_started_at
+            page_number = 1
+        payload = hirebase.provider_query(
+            provider, limit=HIREBASE_PROVIDER_LIMIT,
+            ingested_after=window_start, page=page_number,
+        )
+        try:
+            estimated = hirebase.estimate(payload, requester=_tracked_hirebase_request)
+        except hirebase.HirebaseError as exc:
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+            if status_code == 429:
+                _set_source_rate_limit("hirebase", response, default_seconds=300, maximum_seconds=3600)
+                _record_source_board("hirebase", False)
+                log.warning("hirebase: provider=%s estimate rate-limited; remaining estimates stopped", provider)
+                break
+            if status_code in {401, 403}:
+                _record_source_board("hirebase", False)
+                raise RuntimeError(f"Hirebase estimate preflight failed: {exc}") from exc
+            _record_source_board("hirebase", False)
+            log.warning("hirebase: provider=%s estimate failed error=%s", provider, str(exc))
+            continue
+        _record_source_page("hirebase", True)
+        if estimated == 0:
+            # The current page is empty, so drain is complete. Resume from the
+            # poll start minus two hours to catch late-indexed rows next cycle.
+            next_window = iso(now() - dt.timedelta(hours=2)) or poll_started_at
+            _hirebase_set_window(
+                provider, last_polled_at=poll_started_at,
+                window_start=next_window, next_page=1,
+            )
+            _record_source_board("hirebase", True)
+            continue
+        if estimated > HIREBASE_PROVIDER_LIMIT:
+            _record_source_board("hirebase", False)
+            log.warning("hirebase: provider=%s estimate exceeded hard per-query cap", provider)
+            continue
+
+        # Preserve the fixed page size so page boundaries do not shift when an
+        # estimate returns fewer than four rows. Reserve the full requested limit
+        # because Hirebase's hard-cap check holds the requested limit atomically.
+        payload["limit"] = HIREBASE_PROVIDER_LIMIT
+        reservation_id = _hirebase_reserve(
+            provider, estimated, usage, reserve_jobs=HIREBASE_PROVIDER_LIMIT
+        )
+        if reservation_id is None:
+            log.info("hirebase: provider=%s skipped; local or provider allowance would be exceeded", provider)
+            _record_source_board("hirebase", True)
+            continue
+        try:
+            raw_jobs, meter_headers, pagination = hirebase.search(
+                payload, requester=_tracked_hirebase_request
+            )
+        except hirebase.HirebaseError as exc:
+            message = str(exc)
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+            uncertain = response is None or status_code >= 500 if status_code is not None else True
+            # A successful HTTP response with invalid JSON/shape may already have
+            # consumed credits; retain the reservation until usage reconciliation.
+            if status_code == 200:
+                uncertain = True
+            _hirebase_finish_reservation(
+                reservation_id, jobs_returned=None, usage_headers=None, uncertain=uncertain
+            )
+            _record_source_page("hirebase", False)
+            if status_code == 429:
+                _set_source_rate_limit(
+                    "hirebase", response,
+                    default_seconds=300, maximum_seconds=3600,
+                )
+                _record_source_board("hirebase", False)
+                log.warning("hirebase: provider=%s rate limited; remaining provider searches stopped", provider)
+                break
+            _record_source_board("hirebase", False)
+            log.warning("hirebase: provider=%s search failed error=%s", provider, message)
+            if status_code in {401, 403}:
+                raise RuntimeError(f"Hirebase search rejected authentication/authorization: {message}") from exc
+            continue
+
+        normalized: list[dict[str, Any]] = []
+        for item in raw_jobs:
+            parsed = hirebase.normalize_provider_job(item)
+            if not parsed:
+                continue
+            normalized.append(normalize_job(
+                "hirebase", parsed["source_job_id"], parsed["company"],
+                parsed["title"], parsed["location"], parsed["url"],
+                parsed["posted_at"], parsed["posted_precision"],
+                parsed["description"], source_details=parsed["source_details"],
+            ))
+        _hirebase_finish_reservation(
+            reservation_id, jobs_returned=len(raw_jobs), usage_headers=meter_headers
+        )
+        _record_source_page("hirebase", True)
+        _record_source_board("hirebase", True)
+        if pagination["page"] < pagination["total_pages"]:
+            next_window = window_start
+            next_page = pagination["page"] + 1
+        else:
+            next_window = iso(dt.datetime.fromisoformat(poll_started_at) - dt.timedelta(hours=2)) or poll_started_at
+            next_page = 1
+        pending_watermarks[provider] = {
+            "last_polled_at": poll_started_at,
+            "window_start": next_window,
+            "next_page": next_page,
+        }
+        jobs.extend(normalized)
+        spent_this_run += len(raw_jobs)
+        if meter_headers:
+            usage["remaining"] = meter_headers["included_remaining"]
+        else:
+            # No metering confirmation: stop after this search rather than risk a second request.
+            usage["remaining"] = 0
+            break
+        if spent_this_run >= HIREBASE_MAX_DAILY_JOBS:
+            break
+    if pending_watermarks:
+        source_state.setdefault("hirebase", {})["pending_watermarks"] = pending_watermarks
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -5536,6 +5894,7 @@ COLLECTORS = {
     "workable": workable_collect,
     "keka": keka_collect,
     "darwinbox": darwinbox_collect,
+    "hirebase": hirebase_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -5559,6 +5918,8 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         linkedin_rate_limit_generation if source == "linkedin" else None
     )
     runtime_at_start = source_state.setdefault(source, {})
+    if source == "hirebase":
+        runtime_at_start.pop("pending_watermarks", None)
     runtime_at_start["running"] = True
     runtime_at_start["current_run_id"] = run_id
     jobs: list[dict[str, Any]] = []
@@ -5605,6 +5966,8 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             config,
             source_run_started_at=started_at,
         )
+        if source == "hirebase":
+            _hirebase_commit_pending_watermarks()
         board_baseline_suppressed = suppress_activated_board_inventory(source)
         if board_baseline_suppressed:
             log.info(
@@ -5906,6 +6269,7 @@ async def startup() -> None:
     restore_source_rate_limit_state("workable")
     restore_source_rate_limit_state("keka")
     restore_source_rate_limit_state("darwinbox")
+    restore_source_rate_limit_state("hirebase")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -6520,6 +6884,105 @@ def discover_company_boards(payload: dict[str, Any]):
     }
 
 
+@app.post("/api/discovery/directories/last-round/import", dependencies=[Depends(require_admin)])
+def import_last_round_ats_directory():
+    """Import the attributed CC BY 4.0 ATS directory as unverified candidates only."""
+    directory_path = ROOT / "data" / "lastroundai-ats-company-directory-2026-08.csv"
+    try:
+        candidates = ats_directory.load_directory(directory_path)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"ATS directory could not be read ({type(exc).__name__}).") from exc
+    timestamp = iso(now()) or ""
+    inserted_companies = 0
+    inserted_boards = 0
+    updated_boards = 0
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        for board in candidates:
+            provider = board["provider"]
+            slug = board["board_key"]
+            company_name = board["company_name"]
+            # Reuse a previously discovered board instead of creating a duplicate
+            # company row with a synthetic directory domain.
+            existing_any = conn.execute(
+                """SELECT id,company_id FROM ats_board_registry
+                   WHERE provider=? AND board_key=?
+                   ORDER BY CASE review_status WHEN 'active' THEN 0 WHEN 'verified' THEN 1 ELSE 2 END,id
+                   LIMIT 1""",
+                (provider, slug),
+            ).fetchone()
+            if existing_any:
+                conn.execute(
+                    "UPDATE ats_board_registry SET directory_last_crawled=?,last_seen_at=?,updated_at=? WHERE id=?",
+                    (board["last_crawled"], timestamp, timestamp, int(existing_any[0])),
+                )
+                updated_boards += 1
+                continue
+            domain = ats_directory.synthetic_domain(provider, slug)
+            before = conn.total_changes
+            conn.execute(
+                """INSERT INTO employer_companies(
+                       company_name,domain,website_url,careers_url,country,discovery_status,
+                       pages_checked,last_discovered_at,error_count,created_at,updated_at
+                   ) VALUES(?,?,?,?,NULL,'seeded_directory',0,?,0,?,?)
+                   ON CONFLICT(domain) DO UPDATE SET
+                       company_name=excluded.company_name,
+                       website_url=excluded.website_url,
+                       careers_url=excluded.careers_url,
+                       discovery_status=CASE WHEN employer_companies.discovery_status IN ('scanned','boards_found')
+                                             THEN employer_companies.discovery_status ELSE 'seeded_directory' END,
+                       last_discovered_at=excluded.last_discovered_at,
+                       updated_at=excluded.updated_at""",
+                (company_name, domain, board["board_url"], board["board_url"], timestamp, timestamp, timestamp),
+            )
+            if conn.total_changes > before:
+                inserted_companies += 1
+            company = conn.execute("SELECT id FROM employer_companies WHERE domain=?", (domain,)).fetchone()
+            if not company:
+                continue
+            existing = conn.execute(
+                "SELECT id,review_status FROM ats_board_registry WHERE company_id=? AND provider=? AND board_key=?",
+                (int(company[0]), provider, slug),
+            ).fetchone()
+            conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,
+                       created_at,updated_at,directory_last_crawled
+                   ) VALUES(?,?,?,?,?,'low',?,1,'discovered',?,?,?,?)
+                   ON CONFLICT(company_id,provider,board_key) DO UPDATE SET
+                       board_url=excluded.board_url,
+                       discovered_from=excluded.discovered_from,
+                       collector_source=excluded.collector_source,
+                       collector_available=1,
+                       directory_last_crawled=excluded.directory_last_crawled,
+                       last_seen_at=excluded.last_seen_at,
+                       review_status=CASE WHEN ats_board_registry.review_status IN ('active','rejected','verified','reviewed')
+                                          THEN ats_board_registry.review_status ELSE 'discovered' END,
+                       updated_at=excluded.updated_at""",
+                (int(company[0]), provider, slug, board["board_url"], ats_directory.DATASET_URL,
+                 provider, timestamp, timestamp, timestamp, board["last_crawled"]),
+            )
+            if existing is None:
+                inserted_boards += 1
+            elif existing[1] not in {"active", "rejected", "verified", "reviewed"}:
+                updated_boards += 1
+        conn.commit()
+    return {
+        "dataset": ats_directory.DATASET_NAME,
+        "snapshot": ats_directory.DATASET_SNAPSHOT,
+        "license": ats_directory.DATASET_LICENSE,
+        "attribution": ats_directory.DATASET_ATTRIBUTION,
+        "source_url": ats_directory.DATASET_URL,
+        "companies_in_snapshot": len(candidates),
+        "companies_added_or_refreshed": inserted_companies,
+        "boards_added": inserted_boards,
+        "unverified_boards_refreshed": updated_boards,
+        "review_status": "discovered",
+        "activation": "none; imported candidates are not verified or scheduled",
+        "coverage_limit": "Greenhouse, Lever and Ashby only; Workday, Keka and Darwinbox are not in this dataset",
+    }
+
+
 @app.get("/api/discovery/companies", dependencies=[Depends(require_admin)])
 def list_discovered_companies(limit: int = 100):
     limit = max(1, min(int(limit), 500))
@@ -6536,13 +6999,45 @@ def list_discovered_companies(limit: int = 100):
     return {"companies": [dict(row) for row in rows]}
 
 
+@app.get("/api/discovery/coverage-summary", dependencies=[Depends(require_admin)])
+def get_discovery_coverage_summary():
+    """Return registry counts by provider and review state; never imply total market coverage."""
+    with connect_sqlite(DB_PATH) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0]
+        directory_seeded = conn.execute(
+            "SELECT COUNT(*) FROM ats_board_registry WHERE directory_last_crawled IS NOT NULL"
+        ).fetchone()[0]
+        rows = conn.execute(
+            """SELECT provider,review_status,COUNT(*),
+                      SUM(CASE WHEN collector_available=1 THEN 1 ELSE 0 END),
+                      SUM(CASE WHEN directory_last_crawled IS NOT NULL THEN 1 ELSE 0 END)
+               FROM ats_board_registry GROUP BY provider,review_status ORDER BY provider,review_status"""
+        ).fetchall()
+    providers: dict[str, Any] = {}
+    for provider, status, count, available, seeded in rows:
+        entry = providers.setdefault(provider, {
+            "total": 0, "collector_available": 0, "directory_seeded": 0, "by_status": {}
+        })
+        entry["by_status"][status] = int(count or 0)
+        entry["total"] += int(count or 0)
+        entry["collector_available"] += int(available or 0)
+        entry["directory_seeded"] += int(seeded or 0)
+    return {
+        "employer_boards_known": int(total or 0),
+        "directory_seed_candidates": int(directory_seeded or 0),
+        "providers": providers,
+        "market_coverage_percentage": None,
+        "coverage_note": "Registry coverage is not total market coverage. Candidate directories are not verified boards; private and non-indexed employers may be absent.",
+    }
+
+
 @app.get("/api/discovery/boards", dependencies=[Depends(require_admin)])
 def list_discovered_boards(status: str | None = None, limit: int = 250):
     limit = max(1, min(int(limit), 1000))
     query = """SELECT b.id,b.company_id,c.company_name,c.domain,b.provider,b.board_key,
                       b.board_url,b.discovered_from,b.confidence,b.collector_source,
                       b.collector_available,b.review_status,b.baseline_pending,b.last_verified_at,
-                      b.last_seen_at,b.last_error_type
+                      b.last_seen_at,b.last_error_type,b.directory_last_crawled
                FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id"""
     values: list[Any] = []
     if status:
@@ -6812,6 +7307,76 @@ def deactivate_discovered_board(board_id: int):
         "source_enabled": bool(saved.get("source_enabled", {}).get(source)),
         "remaining_boards": len(remaining),
         "takes_effect_next_poll": True,
+    }
+
+
+@app.get("/api/hirebase/status", dependencies=[Depends(require_admin)])
+def hirebase_status():
+    """Show safe Hirebase configuration and local budget state; never returns the key."""
+    config = get_config()
+    cutoff = iso(current_day_start_utc()) or iso(now())
+    with connect_sqlite(DB_PATH) as conn:
+        monthly = conn.execute(
+            """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                        THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0),
+                      COUNT(*),MAX(created_at),MAX(period_end),MAX(included_remaining)
+               FROM hirebase_usage_ledger
+               WHERE period_start=(SELECT period_start FROM hirebase_usage_ledger
+                                   ORDER BY created_at DESC,id DESC LIMIT 1)"""
+        ).fetchone()
+        daily = conn.execute(
+            """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                        THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+               FROM hirebase_usage_ledger WHERE created_at>=?""", (cutoff,)
+        ).fetchone()
+        providers = conn.execute(
+            """SELECT provider,COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                                  THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+               FROM hirebase_usage_ledger WHERE created_at>=? GROUP BY provider""", (cutoff,)
+        ).fetchall()
+    local_monthly = int(monthly[0] or 0)
+    return {
+        "api_key_configured": hirebase.api_key_configured(),
+        "source_enabled": bool(config.get("source_enabled", {}).get("hirebase", False)),
+        "poll_seconds": int(config.get("poll_seconds", {}).get("hirebase", 86400)),
+        "budget": {
+            "monthly_hard_cap": HIREBASE_MAX_MONTHLY_JOBS,
+            "daily_hard_cap": HIREBASE_MAX_DAILY_JOBS,
+            "per_provider_daily_cap": HIREBASE_PROVIDER_DAILY_JOBS,
+            "free_plan_monthly_allowance": 500,
+            "safety_buffer": 100,
+            "locally_counted_period_jobs": local_monthly,
+            "locally_counted_today_jobs": int(daily[0] or 0),
+            "remaining_local_monthly_budget": max(0, HIREBASE_MAX_MONTHLY_JOBS - local_monthly),
+            "remaining_local_daily_budget": max(0, HIREBASE_MAX_DAILY_JOBS - int(daily[0] or 0)),
+            "provider_today": {str(row[0]): int(row[1] or 0) for row in providers},
+            "last_query_at": monthly[2],
+            "last_metered_remaining": monthly[4],
+            "ledger_rows": int(monthly[1] or 0),
+        },
+        "note": "Hirebase remains optional and disabled by default. Usage counts include reserved/uncertain requests until reconciled.",
+    }
+
+
+@app.post("/api/hirebase/estimate", dependencies=[Depends(require_admin)])
+def hirebase_estimate(payload: dict[str, Any]):
+    """Estimate one small provider query without spending job-result credits."""
+    provider = str(payload.get("provider") or "").strip().lower()
+    limit = payload.get("limit", HIREBASE_PROVIDER_LIMIT)
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= HIREBASE_PROVIDER_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {HIREBASE_PROVIDER_LIMIT}.")
+    try:
+        query = hirebase.provider_query(provider, limit=limit)
+        cost = hirebase.estimate(query)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except hirebase.HirebaseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "provider": provider, "estimated_job_credits": cost,
+        "result_limit": limit, "estimate_costs_job_credits": 0,
+        "query_scope": "public employer postings in India; global ingestion, no user profile filters",
+        "search_spends_credits": True,
     }
 
 

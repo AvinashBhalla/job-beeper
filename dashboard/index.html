@@ -481,7 +481,7 @@
             <!-- Matching Criteria Group -->
             <div class="settings-block">
               <span class="settings-block-title">Matching Criteria</span>
-              
+
               <div class="form-field-group">
                 <label class="form-field-label" for="rolesInput">
                   <span>Target Roles</span>
@@ -574,7 +574,9 @@
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="workable"> Workable</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="keka"> Keka</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="darwinbox"> Darwinbox</label>
+                  <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="hirebase"> Hirebase (optional, budgeted)</label>
                 </div>
+                <p class="auth-description" style="margin:0;">Hirebase is an optional external job index. It stays off by default, estimates every query before spending, and is capped locally at 400 results per billing period / 12 per day / 4 per ATS. Its key is server-side only. Commercial product use requires vendor licence approval.</p>
                 <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
                   <label class="form-field-label" for="cfgWorkdayBoards">Workday public career boards (JSON)</label>
                   <textarea id="cfgWorkdayBoards" rows="4" spellcheck="false" placeholder='[{"url":"https://company.wd5.myworkdayjobs.com/CareerSite","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
@@ -623,6 +625,24 @@
               <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
             </div>
 
+            <div class="settings-block" id="hirebaseBudgetPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Optional global job index — Hirebase</span>
+              <p class="auth-description">Use the Free API only as a small coverage sample. JobBeeper estimates before any paid-result search, reserves credits before requests and caps local use at 400 per billing period, 12/day and 4 per ATS. This preserves 100 credits below the published 500-job Free allowance. The key is read from the development server environment only; it is never shown here.</p>
+              <div id="hirebaseBudgetStatus" class="auth-description" role="status" aria-live="polite">Loading Hirebase configuration and local budget…</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:var(--space-6);">
+                <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="workday">Estimate Workday (free)</button>
+                <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="keka">Estimate Keka (free)</button>
+                <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="darwinbox">Estimate Darwinbox (free)</button>
+              </div>
+              <div id="hirebaseEstimateResults" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Estimates do not consume job-result credits. Searches do.</div>
+            </div>
+            <div class="settings-block" id="lastRoundDirectoryPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Global ATS directory seed</span>
+              <p class="auth-description">Import an attributed LastRound AI August 2026 snapshot of 9,935 Greenhouse, Lever and Ashby boards. These are candidate URLs, not verified live boards; they will not be activated or polled by this import. This snapshot does not cover Workday, Keka or Darwinbox.</p>
+              <button type="button" class="btn-pill btn-pill-secondary" id="importLastRoundDirectoryBtn">Import 9,935 candidate boards</button>
+              <div id="directoryCoverageSummary" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Loading current registry coverage…</div>
+              <p id="lastRoundDirectoryStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Directory has not been imported in this session.</p>
+            </div>
             <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">
               <span class="settings-block-title">Employer &amp; Career Board Discovery</span>
               <p class="auth-description">Enter a company's normal website or careers URL. Job Beeper checks public careers links, identifies supported ATS board patterns and adds candidates to this review queue. Discovery does not enable a collector or send Telegram alerts.</p>
@@ -716,7 +736,7 @@
     </a>
     <a href="#sources" class="mobile-tab-btn admin-only-navigation" data-section="sourcesSection" hidden>
       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-      <span>Health</span>
+      <span>Coverage</span>
     </a>
     <a href="#preferences" class="mobile-tab-btn" data-section="preferencesSection">
       <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>

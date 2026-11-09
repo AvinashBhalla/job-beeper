@@ -883,7 +883,7 @@
           target.id === 'jobsSection' ? 'Jobs Feed' :
           target.id === 'appliedSection' ? 'Applied Jobs' :
           target.id === 'preferencesSection' ? 'Matching Preferences' :
-          target.id === 'sourcesSection' ? 'Source Health' :
+          target.id === 'sourcesSection' ? 'Coverage & Health' :
           target.id === 'accessSection' ? 'Account' : 'Jobs Feed';
       }
 
@@ -891,6 +891,7 @@
         renderAppliedTable();
       } else if (target.id === 'sourcesSection') {
         renderSourceHealth();
+        void loadSourceStatusTelemetry();
       }
 
       if (pushHash) {
@@ -1067,7 +1068,7 @@
 
       const reasons = job.match_reasons || [];
       const skills = job.skills_detected || [];
-      
+
       const signalsList = [];
       skills.slice(0, 3).forEach(s => {
         signalsList.push(`<span class="signal-pill signal-skill">${esc(s)}</span>`);
@@ -1627,6 +1628,7 @@
         workable: 'Workable',
         keka: 'Keka',
         darwinbox: 'Darwinbox',
+        hirebase: 'Hirebase (budgeted index)',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
@@ -2086,10 +2088,6 @@
       if (!res.ok) throw new Error();
       const data = await res.json();
       state.sourceStatus = data.sources || [];
-      if (state.activeSection === 'sourcesSection') {
-        renderSourceHealth();
-        void loadDiscoveredBoards();
-      }
     } catch (e) {
       state.sourceStatus = [
         { source: 'linkedin', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
@@ -2097,9 +2095,74 @@
         { source: 'greenhouse', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
         { source: 'instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
       ];
-      if (state.activeSection === 'sourcesSection') {
-        renderSourceHealth();
-      }
+    }
+    if (state.activeSection === 'sourcesSection') {
+      renderSourceHealth();
+      void loadDiscoveredBoards();
+      void loadDirectoryCoverageSummary();
+      void loadHirebaseBudgetStatus();
+    }
+  }
+
+  async function loadDirectoryCoverageSummary() {
+    if (!state.isAdmin) return;
+    const target = $('directoryCoverageSummary');
+    if (!target) return;
+    try {
+      const response = await authClient.request('/discovery/coverage-summary', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Coverage summary unavailable (HTTP ${response.status}).`);
+      const data = await response.json();
+      const providers = Object.entries(data.providers || {}).map(([provider, item]) => {
+        const statuses = item.by_status || {};
+        return `${provider}: ${Number(item.total || 0).toLocaleString()} known · ${Number(statuses.active || 0)} monitoring · ${Number(statuses.verified || 0)} verified · ${Number(statuses.discovered || 0) + Number(statuses.reviewed || 0)} candidates`;
+      });
+      target.textContent = `${Number(data.employer_boards_known || 0).toLocaleString()} employer boards in the registry (${Number(data.directory_seed_candidates || 0).toLocaleString()} directory candidates). ${providers.join(' | ') || 'No boards yet.'} Market coverage percentage is not estimated.`;
+    } catch (error) {
+      target.textContent = error.message || 'Registry coverage summary unavailable.';
+    }
+  }
+
+  async function loadHirebaseBudgetStatus() {
+    if (!state.isAdmin) return;
+    const target = $('hirebaseBudgetStatus');
+    if (!target) return;
+    try {
+      const response = await authClient.request('/hirebase/status', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Budget status unavailable (HTTP ${response.status}).`);
+      const data = await response.json();
+      const budget = data.budget || {};
+      const usage = Number(budget.locally_counted_period_jobs || 0);
+      const today = Number(budget.locally_counted_today_jobs || 0);
+      const provider = budget.provider_today || {};
+      document.querySelectorAll('.hirebase-estimate-btn').forEach(button => {
+        button.disabled = !data.api_key_configured;
+        button.title = data.api_key_configured ? 'Run a zero-job-credit estimate.' : 'Add HIREBASE_API_KEY to the isolated development server environment first.';
+      });
+      target.textContent = `API key: ${data.api_key_configured ? 'configured on server' : 'not configured'} · Source: ${data.source_enabled ? 'enabled' : 'disabled'} · Local budget: ${usage}/${budget.monthly_hard_cap || 400} this billing period · ${today}/${budget.daily_hard_cap || 12} today · per ATS: ${budget.per_provider_daily_cap || 4}/day (Workday ${provider.workday || 0}, Keka ${provider.keka || 0}, Darwinbox ${provider.darwinbox || 0}). Uncertain requests remain reserved.`;
+    } catch (error) {
+      target.textContent = error.message || 'Hirebase budget status unavailable.';
+    }
+  }
+
+  async function estimateHirebase(provider, button) {
+    const results = $('hirebaseEstimateResults');
+    if (!button || !results) return;
+    button.disabled = true;
+    results.textContent = `Estimating ${provider} results. This endpoint does not spend job credits…`;
+    try {
+      const response = await authClient.request('/hirebase/estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, limit: 4 }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || `Estimate failed (HTTP ${response.status}).`);
+      results.textContent = `${provider}: estimated ${Number(data.estimated_job_credits || 0)} result credits for a maximum ${data.result_limit} result query. Estimate cost: ${data.estimate_costs_job_credits}. Run is not started.`;
+      await loadHirebaseBudgetStatus();
+    } catch (error) {
+      results.textContent = error.message || `${provider} estimate failed.`;
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -2128,7 +2191,7 @@
       return `<tr>
         <td><b>${esc(board.company_name)}</b><div style="font-size:11px;color:var(--text-muted);">${esc(board.domain)}</div></td>
         <td>${esc(board.provider)}</td>
-        <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a></td>
+        <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a>${board.directory_last_crawled ? `<div style="font-size:11px;color:var(--text-muted);">Directory snapshot: ${esc(board.directory_last_crawled)}</div>` : ''}</td>
         <td>${collector}</td>
         <td>${review}</td>
         <td><a href="${esc(board.discovered_from)}" target="_blank" rel="noopener noreferrer">Open page</a></td>
@@ -2151,6 +2214,25 @@
     });
   }
 
+  async function importLastRoundDirectory(button) {
+    const status = $('lastRoundDirectoryStatus');
+    if (!button) return;
+    button.disabled = true;
+    if (status) status.textContent = 'Importing the local CC BY 4.0 directory snapshot…';
+    try {
+      const response = await authClient.request('/discovery/directories/last-round/import', { method: 'POST' });
+      if (!response.ok) throw new Error(`Directory import failed (HTTP ${response.status}).`);
+      const result = await response.json();
+      if (status) status.textContent = `Snapshot rows: ${Number(result.companies_in_snapshot || 0).toLocaleString()}. New board records: ${Number(result.boards_added || 0).toLocaleString()}. None are verified or activated. Attribution: LastRound AI (CC BY 4.0).`;
+      await loadDiscoveredBoards();
+      await loadDirectoryCoverageSummary();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Directory import failed.';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async function loadDiscoveredBoards() {
     if (!state.isAdmin) return;
     const tbody = $('discoveredBoardsTableBody');
@@ -2158,7 +2240,7 @@
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading discovered boards…</td></tr>';
     }
     try {
-      const response = await authClient.request('/discovery/boards?limit=500', { cache: 'no-store' });
+      const response = await authClient.request('/discovery/boards?limit=1000', { cache: 'no-store' });
       if (!response.ok) throw new Error(`Could not load boards (HTTP ${response.status}).`);
       const data = await response.json();
       state.discoveredBoards = data.boards || [];
@@ -2293,6 +2375,7 @@
       { value: 'workable', label: 'Workable' },
       { value: 'keka', label: 'Keka' },
       { value: 'darwinbox', label: 'Darwinbox' },
+      { value: 'hirebase', label: 'Hirebase' },
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';
@@ -2376,6 +2459,18 @@
     // Refresh buttons
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
     if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
+    if ($('importLastRoundDirectoryBtn')) $('importLastRoundDirectoryBtn').addEventListener('click', (event) => importLastRoundDirectory(event.currentTarget));
+    const hirebaseSourceToggle = document.querySelector('#cfgSourcesWrap input[data-source="hirebase"]');
+    if (hirebaseSourceToggle) hirebaseSourceToggle.addEventListener('change', () => {
+      if (hirebaseSourceToggle.checked && !window.confirm(
+        'Enable the optional Hirebase daily sampler in this environment? It may spend up to 12 job credits per day and 400 per billing period. Every query is estimated first. The source remains disabled until you save configuration.'
+      )) {
+        hirebaseSourceToggle.checked = false;
+      }
+    });
+    document.querySelectorAll('.hirebase-estimate-btn').forEach(button => {
+      button.addEventListener('click', () => estimateHirebase(button.dataset.provider, button));
+    });
     if ($('boardDiscoveryForm')) $('boardDiscoveryForm').addEventListener('submit', discoverCompanyBoards);
 
     // Server-side job feed pagination.
