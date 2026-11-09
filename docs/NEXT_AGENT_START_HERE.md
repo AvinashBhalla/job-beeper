@@ -387,3 +387,7 @@ The exact current worktree full V2 suite passed **444 tests in 346.385 seconds**
 Current Workday facet code, dashboard UI and docs are still uncommitted on branch `feat/global-ats-discovery-hirebase-guard-20261109`. Next: inspect diff, commit/push, update PR #65, verify exact-head V2 CI #1432 or later. Keep PR draft; no deployment/source activation.
 
 Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. It recommends a separate unmatched ATS candidate table and polite Common Crawl indexing; no AWS credentials needed unless choosing the Parquet/Athena bulk path.
+
+## Latest verified handover — 2026-11-09 20:35 IST
+
+Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2035_IST.md` first. Workday facet inventory is committed/pushed as `4d75138`; exact-head GitHub V2 CI #1435 passed; full local V2 suite 444/444 passed. Next P0 is the unmatched ATS candidate staging table and admin link/reject workflow, followed by a serialized Common Crawl CDX candidate harvester. Do not insert Common Crawl tenant slugs as real employer records. See `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`.
