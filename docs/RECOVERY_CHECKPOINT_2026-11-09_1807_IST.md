@@ -70,3 +70,12 @@ Hirebase incremental ingestion is now being changed to avoid repeatedly spending
 ### Open-source shortlist
 
 See docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md for details. Leading references: Freehire (ingestion architecture), Career-Ops (reverse discovery and per-host concurrency; dataset is CC BY-NC), ats-scrapers (Python adapters), Job Board Aggregator (Common Crawl and anomaly monitoring; bundled dataset CC BY-NC), JobSpy (non-ATS board adapters), JobNavigator (product UX). Stars are popularity, not latency/rate-limit proof.
+
+## PR and commit checkpoint — 2026-11-09 18:50 IST
+
+- Commit: 533c889574bb6daddece8121c66f208c6fcec8de (`feat: add guarded global ATS discovery foundation`).
+- Branch pushed: `feat/global-ats-discovery-hirebase-guard-20261109`.
+- Draft PR: https://github.com/AvinashBhalla/job-beeper/pull/65 (base `v2-live-radar`).
+- Full V2 regression: 430 tests passed in 385.001 seconds; background job `bjo6lrjfig` exit code 0. Focused discovery/Hirebase suite: 30 passed. Python compile, JSON, Compose config and diff checks passed.
+- GitHub connector returned no PR-triggered workflow runs for this SHA at the time of handover; verify checks on PR #65 before review/merge.
+- PR remains draft/open, unmerged. No deployment or Hirebase requests/activation.

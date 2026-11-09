@@ -106,3 +106,12 @@ Feature branch and draft PR only. No production deployment, no shared-developmen
 The Hirebase sampler is being changed from a repeated rolling seven-day search to per-provider incremental polling. First run remains bounded to seven days; subsequent runs use ingested_after with first_ingested ascending and a two-hour overlap. SQLite provider state stores the watermark and pagination continuation. The watermark is committed only after normalized jobs are upserted, to avoid skipping records after a DB failure. The implementation has focused test coverage: 30 Hirebase/directory tests pass, including a continuation page and cursor commit helper. The full V2 suite completed successfully on this working tree: 430 tests passed in 385.001 seconds (job bjo6lrjfig, exit code 0). GitHub CI on the pushed commit is the remaining validation gate.
 
 The user encountered a ChatGPT UI connection interruption (“Connection interrupted. Waiting for the complete answer”). This is not a JobBeeper outage. The earlier full-suite job ipu4poub1j was stopped because it predated the latest cursor changes; its output is not a final test result. The replacement full-suite job bjo6lrjfig started at 12:41:37 UTC and finished with exit code 0: 430 tests passed in 385.001 seconds. Previously, before cursor/pagination work, 426 V2 tests passed in 416.2 seconds and 30 focused tests passed on the current working tree. A fresh exact-working-tree full-suite run completed successfully as job bjo6lrjfig: 430 tests in 385.001 seconds, exit code 0. This is pre-commit local validation; GitHub CI is still required after push. See docs/RECOVERY_CHECKPOINT_2026-11-09_1807_IST.md for ordered next steps.
+
+## PR and commit checkpoint — 2026-11-09 18:50 IST
+
+- Commit: 533c889574bb6daddece8121c66f208c6fcec8de (`feat: add guarded global ATS discovery foundation`).
+- Branch pushed: `feat/global-ats-discovery-hirebase-guard-20261109`.
+- Draft PR: https://github.com/AvinashBhalla/job-beeper/pull/65 (base `v2-live-radar`).
+- Full V2 regression: 430 tests passed in 385.001 seconds; background job `bjo6lrjfig` exit code 0. Focused discovery/Hirebase suite: 30 passed. Python compile, JSON, Compose config and diff checks passed.
+- GitHub connector returned no PR-triggered workflow runs for this SHA at the time of handover; verify checks on PR #65 before review/merge.
+- PR remains draft/open, unmerged. No deployment or Hirebase requests/activation.
