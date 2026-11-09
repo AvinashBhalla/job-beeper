@@ -50,8 +50,9 @@ The new `v2/test_breezy.py` covers:
 9. Retry-After and stop-after-429 behavior.
 10. Default-off config, provider detection and public feed verification.
 11. Admin discover → verify → activate → deactivate lifecycle.
+12. Detail-page 429 handling stops remaining boards while preserving successful-board results.
 
-All 11 focused tests pass. Full V2 suite, exact-head GitHub Actions CI and code review remain gates before merge consideration.
+All 12 focused tests pass. The full V2 suite passed **411 tests**. Exact-head GitHub Actions CI and code review remain gates before merge consideration.
 
 ## Live sample evidence
 
