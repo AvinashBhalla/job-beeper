@@ -16,6 +16,8 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import requests
 from bs4 import BeautifulSoup
 
+from v2 import breezy
+
 USER_AGENT = "JobBeeper-BoardDiscovery/1.0 (+public-careers-discovery)"
 MAX_HTML_BYTES = 1_500_000
 MAX_PAGES_PER_SCAN = 6
@@ -55,6 +57,7 @@ COLLECTOR_SOURCES = {
     "workable": "workable",
     "keka": "keka",
     "darwinbox": "darwinbox",
+    "breezy": "breezy",
 }
 
 
@@ -294,6 +297,19 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         jobs = response.json()
         if not isinstance(jobs, list):
             raise ValueError("Keka public career feed did not return a jobs list.")
+    elif provider == "breezy":
+        endpoint = f"https://{candidate['board_key']}.breezy.hr/json"
+        response = requests.get(
+            endpoint, headers={**headers, "Accept": "application/json"},
+            timeout=REQUEST_TIMEOUT_SECONDS, allow_redirects=False,
+        )
+        response.raise_for_status()
+        if int(response.status_code) != 200:
+            raise ValueError("Breezy public jobs feed did not return HTTP 200 without redirects.")
+        content = response.content
+        if not isinstance(content, bytes) or len(content) > breezy.MAX_FEED_BYTES:
+            raise ValueError("Breezy public jobs feed exceeded the configured size limit.")
+        jobs = breezy.parse_public_jobs(response.json(), tenant=candidate["board_key"], company=str(board.get("company") or candidate["board_key"]))
     elif provider == "darwinbox":
         parsed = urlsplit(board_url)
         company_id = candidate["board_key"]

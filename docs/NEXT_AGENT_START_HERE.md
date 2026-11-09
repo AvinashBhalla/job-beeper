@@ -103,3 +103,17 @@ GitHub audit: keep #35 as draft release gate; #46, #50 and #52 are stale/superse
 ## 2026-11-09 — Two-role Desktop QA ready
 
 Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` before browser testing. A fresh isolated synthetic QA app runs on VM loopback 8006 (local browser URL `http://localhost:18006/dashboard/`, tunnel `ssh -N -L 18006:127.0.0.1:8006 ubuntu@130.210.27.197`). Temporary accounts `qa-admin@local.test` (admin) and `qa-member@local.test` (normal user) were created and verified in that isolated DB; passwords were shared in chat only, never commit them. Four synthetic demo jobs; all collectors off, notifications off, Telegram/OAuth/LLM credentials blank. Member source-health APIs return 403; admin returns 200. Do not use old candidate 8005/18005, production 8000, shared dev 8001, experiment 8002 or connector QA 8010 for this test. Prompt and complete manual checklist are in the QA runbook. Owner and Desktop should test both roles; report gaps, do not modify code/runtime. Fix on dev first.
+
+
+## 2026-11-09 — Breezy HR public portal adapter candidate (not deployed)
+
+- Isolated branch `feat/breezy-public-json-20261109` from `origin/v2-live-radar`. Adds default-off public `/json` list collector and same-board JobPosting JSON-LD detail hydration, board discovery/probe, explicit admin activation/deactivation, 300-second poll setting, Retry-After cooldown and silent first-board baseline. Dashboard toggle, source-health label and job-feed filter included.
+- Evidence from one public employer: `/json` HTTP 200, 783,244 bytes, 905 rows with structured list metadata. One same-board job detail HTTP 200 contained a JobPosting JSON-LD description (3,120 characters in sample), datePosted, salary and location. Endpoint is observed but undocumented; schema is not guaranteed across tenants. Only hosted `{slug}.breezy.hr` supported.
+- Enrichment cap: **20 detail-page attempts globally per source run across all boards**, up to 10 prioritized for existing rows missing descriptions. Same-board HTTPS only, redirects disabled, 0.2-second delay. Unknown/raw detail fields are ignored.
+- Focused tests: 11/11 pass, including parser, bounded enrichment, missing-description backlog, global multi-board budget, 429, config, discovery and admin activation lifecycle. Full V2 suite and exact-head CI pending.
+- Status: code/research only. Source remains disabled; no employer boards enabled, no DB ingestion, no Telegram, no shared-dev deploy and no production changes.
+- See `docs/BREEZY_SOURCE_ADAPTER.md`.
+
+### Parallel connector merge ordering
+
+Recruitee PR #59, Personio PR #60, Teamtailor PR #61 and Breezy branch were independently cut from the same V2 baseline. Each independently introduces a v16 migration and must remain default-off. Do not merge them unchanged in sequence. After one source merges, rebase the next PR and advance its migration to the next config version, preserving all existing flags and disabled defaults.

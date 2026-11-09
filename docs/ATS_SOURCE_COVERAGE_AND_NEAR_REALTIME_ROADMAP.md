@@ -2,8 +2,8 @@
 
 # Job Radar — 36-platform source coverage and near-real-time delivery roadmap
 
-**Owner requirement recorded:** 2026-11-08  
-**Applies to:** V2 candidate / PR #51 and all future agents  
+**Owner requirement recorded:** 2026-11-08
+**Applies to:** V2 candidate / PR #51 and all future agents
 **Priority:** Product requirement, not optional future polish
 
 ## 1. Product expectation
@@ -43,7 +43,7 @@ Status legend:
 | 1 | Ashby | ATS | **V2 code exists; recurring scheduler disabled**; 2 boards live-tested | Public Job Postings API, board name from jobs.ashbyhq.com/{board}; published jobs only. |
 | 2 | Avature | ATS | Research lead; not implemented in V2 | Tenant-specific public career site; parse server-rendered listing/detail pages and JobPosting JSON-LD where present. Templates vary by employer. |
 | 3 | BambooHR | ATS | Research lead; not implemented in V2 | Public careers list/detail pages may be available per tenant. Distinguish the public careers feed from the authenticated BambooHR customer API; do not use employee/applicant endpoints. |
-| 4 | Breezy HR | ATS | Research lead; not implemented in V2 | Employer subdomain career board; a public JSON board route has been observed by third parties, but verify response/terms per tenant and handle non-existent boards separately from throttling. |
+| 4 | Breezy HR | ATS | **Default-off feature-branch adapter candidate**; observed public employer portal `/json` returned 905 rows, same-board detail page exposed JobPosting JSON-LD; 11 focused tests pass; full suite pending. | Observed portal list endpoint plus bounded same-board JSON-LD detail enrichment. This is not a documented/guaranteed API contract; board-by-board verify before activation. Global 20 detail-page attempt cap/source run and 10-slot missing-description backfill. See `docs/BREEZY_SOURCE_ADAPTER.md`. |
 | 5 | Cutshort | Job marketplace | Not implemented in V2 | Marketplace connector requires a documented/authorized feed or permitted public listing access; do not assume it is an ATS. |
 | 6 | Darwinbox | ATS / HRMS | **Top priority requested by owner**; official Recruitment API research indicates employer API key required; no V2 connector | Tenant-specific candidate career site. Community research identifies a possible candidate-facing JSON endpoint, but this is not treated as a vendor-guaranteed API. Validate tenant/company ID and response contract before use. |
 | 7 | Eightfold AI | ATS / talent platform | Research lead; not implemented in V2 | Tenant-specific public career site and job-search interface; verify pagination and domain scoping. Do not use authenticated recruiter APIs. |
@@ -64,12 +64,12 @@ Status legend:
 | 22 | Paycom | ATS / HR platform | Not implemented in V2 | Employer career pages; determine if public structured listing is available or parse public HTML/JSON-LD. |
 | 23 | PeopleStrong | ATS / HRMS | Not implemented in V2 | Employer/tenant-specific candidate career site; no universal public contract assumed. |
 | 24 | Phenom People | Career-site platform | Research lead; not implemented in V2 | Tenant-specific career-site search/widget endpoints. Confirm public access, pagination and job-detail schema for each deployment. |
-| 25 | Recruitee | ATS | Research lead; not implemented in V2 | Prefer published jobs XML feed / careers-site interface. Official Careers Site API documentation states an authorization token will be required for calls without the header from 2027-02-10; do not build a future dependency on the currently unauthenticated API. |
+| 25 | Recruitee | ATS | **Default-off feature-branch adapter candidate**; populated public tenant feed parsed 23/23 offers; 10 focused tests; full V2 suite 409/409 passed. | Published-offers XML parser supports observed and documented variants; excludes partner credentials. See `docs/RECRUITEE_SOURCE_ADAPTER.md`. |
 | 26 | Rippling ATS | ATS | Research lead; not implemented in V2 | Employer-specific public career board / jobs endpoint; verify endpoint version and pagination against actual tenant. |
 | 27 | SmartRecruiters | ATS | Research lead; not implemented in V2 | Official public postings endpoint by company identifier, with offset pagination (maximum 100 per page); public-only destination. |
 | 28 | SAP SuccessFactors | ATS / HCM | Not implemented in V2 | Career-site sitemap/search pages and tenant-specific public endpoints; do not assume authenticated OData HR endpoints are public. |
 | 29 | Oracle Taleo | ATS / legacy | Not implemented in V2 | Legacy hosted career pages, tenant-specific search and JobPosting JSON-LD where present. |
-| 30 | Teamtailor | ATS | Research lead; not implemented in V2 | Official API has a Public read permission for career-site-visible data but requires a board/client token; public RSS/XML patterns may be an alternative where terms permit. |
+| 30 | Teamtailor | ATS | **Default-off feature-branch adapter candidate**; vendor docs sample returned 16/16 RSS entries; nine focused tests; full V2 suite 409/409 passed. | Public `jobs.rss` careers feed, supported offset pagination, publication dates and descriptions. See `docs/TEAMTAILOR_SOURCE_ADAPTER.md`. |
 | 31 | UKG Pro / UltiPro | ATS / HCM | Not implemented in V2 | Customer career site / tenant-specific portal. Identify public job feed; do not use workforce/private HR endpoints. |
 | 32 | Wellfound | Job marketplace | Not implemented in V2 | Marketplace connector requires permitted public or partner access. Keep separate from employer ATS board polling. |
 | 33 | Workable | ATS | Research lead; not implemented in V2 | Public careers widget/account endpoint for public listings; distinguish it from authenticated customer API scopes. |

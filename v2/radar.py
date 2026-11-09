@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import auth, board_discovery, breezy, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -86,7 +86,13 @@ DARWINBOX_MAX_BOARDS = 50
 DARWINBOX_PAGE_SIZE = 50
 DARWINBOX_MAX_PAGES_PER_BOARD = 5
 DARWINBOX_PAGE_DELAY_SECONDS = 0.2
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox"})
+BREEZY_MAX_BOARDS = 50
+BREEZY_DETAIL_FETCH_LIMIT = 20
+BREEZY_DETAIL_BACKLOG_QUOTA = 10
+BREEZY_DETAIL_DELAY_SECONDS = 0.2
+BREEZY_DEFAULT_429_COOLDOWN_SECONDS = 300
+BREEZY_MAX_429_COOLDOWN_SECONDS = 3600
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "breezy"})
 INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
@@ -217,6 +223,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     if current_version < 15 <= default_version:
         merged.setdefault("source_enabled", {})["keka"] = False
         merged.setdefault("source_enabled", {})["darwinbox"] = False
+    if current_version < 16 <= default_version:
+        merged.setdefault("source_enabled", {})["breezy"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -241,6 +249,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         if current_version < 15 <= default_version:
             merged["source_enabled"]["keka"] = False
             merged["source_enabled"]["darwinbox"] = False
+        if current_version < 16 <= default_version:
+            merged["source_enabled"]["breezy"] = False
     return merged
 
 
@@ -569,6 +579,32 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_darwinbox.append(entry)
     config["darwinbox_boards"] = normalized_darwinbox
 
+    breezy_boards = config.get("breezy_boards", [])
+    if not isinstance(breezy_boards, list) or len(breezy_boards) > BREEZY_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"breezy_boards must be a list with at most {BREEZY_MAX_BOARDS} entries.")
+    normalized_breezy: list[dict[str, Any]] = []
+    seen_breezy: set[str] = set()
+    for board in breezy_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Breezy board must be an object.")
+        careers_url = board.get("careers_url") or board.get("url")
+        detected = board_discovery.detect_ats_board(careers_url) if isinstance(careers_url, str) else None
+        company = board.get("company")
+        if not detected or detected.get("provider") != "breezy":
+            raise HTTPException(status_code=422, detail="Each Breezy board requires a public HTTPS https://<slug>.breezy.hr careers URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Breezy board requires a company label of at most 120 characters.")
+        slug = str(detected["board_key"]).lower()
+        if slug in seen_breezy:
+            raise HTTPException(status_code=422, detail=f"Duplicate Breezy board: {slug}.")
+        seen_breezy.add(slug)
+        entry = {"careers_url": detected["board_url"], "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Breezy")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_breezy.append(entry)
+    config["breezy_boards"] = normalized_breezy
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -584,6 +620,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "workable": bool(source_enabled.get("workable", False)),
         "keka": bool(source_enabled.get("keka", False)),
         "darwinbox": bool(source_enabled.get("darwinbox", False)),
+        "breezy": bool(source_enabled.get("breezy", False)),
     }
     if config["source_enabled"]["workday"] and not normalized_workday_boards:
         raise HTTPException(
@@ -595,6 +632,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         ("workable", normalized_workable),
         ("keka", normalized_keka),
         ("darwinbox", normalized_darwinbox),
+        ("breezy", normalized_breezy),
     ):
         if config["source_enabled"][source] and not configured_boards:
             raise HTTPException(status_code=422, detail=f"Add at least one verified {source.title()} public career board before enabling {source.title()}.")
@@ -616,6 +654,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "workable": 120,
             "keka": 120,
             "darwinbox": 120,
+            "breezy": 300,
         }.items()
     }
 
@@ -5524,6 +5563,173 @@ def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def breezy_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Read Breezy's public /json board list and enrich a bounded set of details.
+
+    /json is an observed public careers-portal endpoint, not a documented or
+    authenticated Breezy API. No credentials, private application APIs, or
+    third-party apply endpoints are used.
+    """
+    boards = config.get("breezy_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Breezy is enabled but no breezy_boards are configured")
+    if len(boards) > BREEZY_MAX_BOARDS:
+        raise RuntimeError("Breezy board allowlist exceeds the configured safety limit")
+
+    jobs: list[dict[str, Any]] = []
+    successful_boards = 0
+    failures: list[str] = []
+    detail_fetches_used = 0
+    backlog_detail_fetches_used = 0
+    for board in boards:
+        careers_url = str(board.get("careers_url") or board.get("url") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        detected = board_discovery.detect_ats_board(careers_url)
+        if not detected or detected.get("provider") != "breezy" or not company:
+            _record_source_board("breezy", False)
+            failures.append("invalid Breezy public board configuration")
+            continue
+        slug = str(detected["board_key"]).lower()
+        endpoint = f"https://{slug}.breezy.hr/json"
+        try:
+            response = _tracked_source_get(
+                "breezy", endpoint,
+                headers={**UA, "Accept": "application/json"},
+                timeout=20, allow_redirects=False,
+            )
+            response.raise_for_status()
+            if int(getattr(response, "status_code", 0)) != 200:
+                raise ValueError("Breezy public job feed did not return HTTP 200 without redirects")
+            raw_content = getattr(response, "content", b"")
+            if not isinstance(raw_content, bytes) or len(raw_content) > breezy.MAX_FEED_BYTES:
+                raise ValueError("Breezy public job feed was not bytes or exceeded the size limit")
+            payload = json.loads(raw_content)
+            rows = breezy.parse_public_jobs(payload, tenant=slug, company=company)
+            _record_source_page("breezy", True)
+        except Exception as exc:
+            _record_source_page("breezy", False)
+            failed_response = getattr(exc, "response", None)
+            if getattr(failed_response, "status_code", None) == 429:
+                _set_source_rate_limit(
+                    "breezy", failed_response,
+                    default_seconds=BREEZY_DEFAULT_429_COOLDOWN_SECONDS,
+                    maximum_seconds=BREEZY_MAX_429_COOLDOWN_SECONDS,
+                )
+                failures.append(f"{slug}: rate limited")
+                break
+            status = getattr(failed_response, "status_code", None)
+            failures.append(f"{slug}: {type(exc).__name__}" + (f" HTTP {status}" if status else ""))
+            log.warning("breezy: slug=%s feed failed error_type=%s", slug, type(exc).__name__)
+            _record_source_board("breezy", False)
+            continue
+
+        source_ids = [f"breezy-{slug}-{item['reference']}" for item in rows]
+        described_ids: set[str] = set()
+        pending_ids: list[str] = []
+        if DB_PATH.exists() and source_ids:
+            with db_lock, connect_sqlite(DB_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                existing = conn.execute(
+                    "SELECT source_job_id FROM jobs WHERE source='breezy' AND description<>''"
+                ).fetchall()
+                described_ids = {str(row["source_job_id"]) for row in existing}
+                placeholders = ",".join("?" for _ in source_ids)
+                pending = conn.execute(
+                    f"""SELECT source_job_id FROM jobs
+                        WHERE source='breezy' AND COALESCE(description,'')=''
+                          AND source_job_id IN ({placeholders})
+                        ORDER BY first_seen_at ASC LIMIT 200""",
+                    tuple(source_ids),
+                ).fetchall()
+                pending_ids = [str(row["source_job_id"]) for row in pending]
+
+        by_source_id = dict(zip(source_ids, rows))
+        remaining_details = max(0, BREEZY_DETAIL_FETCH_LIMIT - detail_fetches_used)
+        remaining_backlog = max(0, BREEZY_DETAIL_BACKLOG_QUOTA - backlog_detail_fetches_used)
+        backlog_targets = [key for key in pending_ids if key not in described_ids][:min(remaining_backlog, remaining_details)]
+        selected = list(backlog_targets)
+        if remaining_details > len(selected):
+            for source_id in source_ids:
+                if source_id in described_ids or source_id in selected:
+                    continue
+                selected.append(source_id)
+                if len(selected) >= remaining_details:
+                    break
+        details_by_id: dict[str, dict[str, Any]] = {}
+        for index, source_id in enumerate(selected):
+            detail_fetches_used += 1
+            if source_id in backlog_targets:
+                backlog_detail_fetches_used += 1
+            item = by_source_id[source_id]
+            detail_url = item["url"]
+            try:
+                detail_response = _tracked_source_get(
+                    "breezy", detail_url,
+                    headers={**UA, "Accept": "text/html,application/xhtml+xml;q=0.9"},
+                    timeout=20, allow_redirects=False,
+                )
+                detail_response.raise_for_status()
+                if int(getattr(detail_response, "status_code", 0)) != 200:
+                    raise ValueError("Breezy job detail did not return HTTP 200 without redirects")
+                detail_content = getattr(detail_response, "content", b"")
+                detail = breezy.parse_public_job_detail(detail_content)
+                if detail:
+                    details_by_id[source_id] = detail
+            except Exception as exc:
+                failed_response = getattr(exc, "response", None)
+                if getattr(failed_response, "status_code", None) == 429:
+                    _set_source_rate_limit(
+                        "breezy", failed_response,
+                        default_seconds=BREEZY_DEFAULT_429_COOLDOWN_SECONDS,
+                        maximum_seconds=BREEZY_MAX_429_COOLDOWN_SECONDS,
+                    )
+                    failures.append(f"{slug}: detail rate limited")
+                    break
+                status = getattr(failed_response, "status_code", None)
+                log.warning("breezy: slug=%s detail failed error_type=%s%s", slug, type(exc).__name__, f" HTTP {status}" if status else "")
+            if index + 1 < len(selected):
+                time.sleep(BREEZY_DETAIL_DELAY_SECONDS)
+
+        for source_id in source_ids:
+            item = by_source_id[source_id]
+            detail = details_by_id.get(source_id, {})
+            posted_raw = detail.get("date_posted") or item.get("posted")
+            posted_at = parse_relative(posted_raw) if posted_raw else None
+            precision = (
+                "minute" if posted_at and isinstance(posted_raw, str)
+                and re.search(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", posted_raw)
+                else "date" if posted_at else "unknown"
+            )
+            details = {
+                "tenant": slug,
+                "board_registry_id": board.get("registry_id"),
+                "friendly_id": item.get("friendly_id"),
+                "department": item.get("department"),
+                "salary_label": item.get("salary"),
+                "employment_type": item.get("employment_type"),
+                "is_remote": item.get("remote"),
+                "jsonld_salary": detail.get("salary_json"),
+                "details_fetched": bool(detail.get("description")),
+            }
+            jobs.append(normalize_job(
+                "breezy", source_id, item.get("company") or company,
+                item["title"], item["location"], item["url"],
+                posted_at, precision, detail.get("description") or "",
+                source_details=details,
+            ))
+        successful_boards += 1
+        _record_source_board("breezy", True)
+        if _source_cooldown_remaining("breezy") > 0:
+            break
+
+    if successful_boards == 0:
+        raise RuntimeError("All configured Breezy boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("breezy: partial failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("breezy: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -5536,6 +5742,7 @@ COLLECTORS = {
     "workable": workable_collect,
     "keka": keka_collect,
     "darwinbox": darwinbox_collect,
+    "breezy": breezy_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -5906,6 +6113,7 @@ async def startup() -> None:
     restore_source_rate_limit_state("workable")
     restore_source_rate_limit_state("keka")
     restore_source_rate_limit_state("darwinbox")
+    restore_source_rate_limit_state("breezy")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -6674,6 +6882,9 @@ def activate_discovered_board(board_id: int):
     elif provider == "darwinbox":
         config_key = "darwinbox_boards"
         registry_entry = {"careers_url": board["board_url"], "company": company}
+    elif provider == "breezy":
+        config_key = "breezy_boards"
+        registry_entry = {"careers_url": board["board_url"], "company": company}
     else:
         raise HTTPException(status_code=409, detail="This board provider has no activation mapping.")
 
@@ -6700,7 +6911,7 @@ def activate_discovered_board(board_id: int):
         if provider == "workday":
             parsed = _parse_workday_board_url(item.get("url"))
             return bool(parsed and f"{parsed['tenant']}:{parsed['site']}".lower() == key.lower())
-        if provider in {"keka", "darwinbox"}:
+        if provider in {"keka", "darwinbox", "breezy"}:
             value = item.get("careers_url") or item.get("url")
             detected = board_discovery.detect_ats_board(value) if isinstance(value, str) else None
             return bool(detected and detected.get("provider") == provider and str(detected.get("board_key", "")).lower() == key.lower())
@@ -6775,6 +6986,7 @@ def deactivate_discovered_board(board_id: int):
         "workable": "workable_boards",
         "keka": "keka_boards",
         "darwinbox": "darwinbox_boards",
+        "breezy": "breezy_boards",
     }.get(str(board["provider"]))
     if not source or not config_key:
         raise HTTPException(status_code=409, detail="This board has no supported collector configuration.")

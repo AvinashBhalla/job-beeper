@@ -1,7 +1,7 @@
 # JobBeeper — Product Vision, Architecture and Delivery Roadmap
 
-**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.  
-**Last reviewed:** 2026-11-08 (Asia/Kolkata)  
+**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.
+**Last reviewed:** 2026-11-08 (Asia/Kolkata)
 **Status:** Living source of truth. This document supersedes conflicting feature-order recommendations in older roadmaps; those files remain useful for implementation detail and engineering history.
 
 ## 1. Product vision
