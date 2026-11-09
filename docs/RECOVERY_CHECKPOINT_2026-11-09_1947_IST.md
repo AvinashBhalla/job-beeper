@@ -8,7 +8,7 @@
 - Latest pushed implementation commit: `6197446b2f4e6d270a3bf0967d9a39a82ddad904` (Workday incremental inventory).
 - Exact-head GitHub Actions V2 CI run #1430 (`42632005997`) **passed**, including Python compilation, dashboard JavaScript syntax, focused tests and full V2 unittest suite.
 - Workday local full suite: 436 passed in 398.870 seconds; exact-head CI passed for that commit.
-- Keka portal implementation is currently in the worktree but not yet pushed. Full V2 regression completed: 439 tests passed in 359.301 seconds, exit code 0. Focused board-discovery suite: 37 passed.
+- Keka portal implementation was pushed as afa177b032a06b9757e304006f9050d247712cf0. Full V2 regression completed: 439 tests passed in 359.301 seconds, exit code 0. Focused board-discovery suite: 37 passed.
 - The docs have been restored to normal Markdown after detecting and correcting a newline-encoding mistake before commit. Verify line counts and `git diff --check` before pushing.
 
 ## Completed work in PR #65
@@ -80,4 +80,4 @@ Nothing right now. Do not request the Hirebase key in chat. It remains absent; t
 - No production/shared-dev changes or service restarts.
 - No live ATS requests from the tests; Keka HTTP is mocked.
 - No Hirebase requests, no source activation, no live directory import and no notification dispatch.
-- Keka full tests passed; code is pushed, PR body is updated, and exact-head V2 CI #1431 is in progress. Verify CI, update this checkpoint and keep PR draft until reviewed.
+- Keka full tests passed; code is pushed, PR body is updated, and exact-head V2 CI #1431 passed. Verify CI, update this checkpoint and keep PR draft until reviewed.
