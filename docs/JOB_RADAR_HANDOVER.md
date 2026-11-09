@@ -6761,3 +6761,16 @@ Oracle's Security List/NSG workflow: https://docs.oracle.com/en-us/iaas/Content/
 - Production was not changed: container remains image `job-radar-prod-canary:6e5becb`, same image ID, running/restart count 0; HTTPS health 200.
 - PR #56 docs policy merged to V2 as `e6181d93682d6c09cd462c18b13b20996ce99057`; PR head CI `42573822254` and V2 push CI `42573997642` passed.
 - Next: let owner continue production UAT. Reproduce any bug in refreshed shared dev, branch from latest V2, run exact-head CI, verify on dev, then ask for separate production approval. Do not change production.
+
+
+## 2026-11-09 — Isolated two-role Desktop QA provisioned
+
+- Owner requested normal-user credentials and a Desktop prompt to test both admin/member experiences, using manual + AI testing, with documentation durable for the next model.
+- Created a fresh isolated browser QA app from current V2 source `e6181d93682d6c09cd462c18b13b20996ce99057` / image `job-radar-dev-multitenant:e6181d9` on VM loopback `127.0.0.1:8006` (container `job-radar-browser-qa`). Local URL through SSH tunnel: `http://localhost:18006/dashboard/`; command `ssh -N -L 18006:127.0.0.1:8006 ubuntu@130.210.27.197`.
+- Fresh independent DB `/tmp/job-radar-browser-qa-20261109/data/jobs.db`; no prod/shared-dev DB copied. Four synthetic demo job listings only, all source collectors disabled, notifications false, Telegram token/chat blank, Google OAuth absent, Gemini/LLM disabled. Loopback-only listener.
+- Created and verified disposable credentials in this QA DB: `qa-admin@local.test` role admin; `qa-member@local.test` role user. Passwords are shared in chat only; do not write them into docs/Git/screenshots. These accounts are for this test environment only.
+- Baseline smoke: dashboard and health 200. Both logins 200, `/api/auth/me` 200, `/api/preferences` 200. Admin source-status, summary, latency endpoints all 200; member receives 403 on all three. Both accounts have separate preference records. Credentials verified via app's Argon2 auth.
+- Old process on port 8005 is a stale PR46 experiment and is not the target. Do not stop/change it in this task. Use 18006 only.
+- Full Desktop AI prompt, manual checklist, allowed synthetic writes, prohibited external actions, test coverage, reporting format and baseline results are in `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md`.
+- No production or shared-dev runtime was modified by this QA provisioning. No collectors or notifications were run.
+- Next: owner manually tests both accounts and runs the Desktop prompt against localhost:18006. Collect the report/screenshots, triage confirmed defects, reproduce on a feature branch, add tests, pass CI, verify on shared dev, and only then request production approval.
