@@ -222,3 +222,48 @@ Next priorities: Workday facet subdivision; Keka non-default portal slug support
 User action: nothing required now. Hirebase key remains absent and source flags remain off.
 
 Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n
+
+## 2026-11-09 20:10 IST — Workday facet-aware inventory in progress
+
+The next P0 implementation is now in the worktree. JobBeeper reads Workday facet metadata using the upstream response shape (`facetParameter`, `values[].id`, `values[].count`) and schedules partitions in the order jobFamilyGroup → timeType → locations → workerSubType. It does not copy the upstream library's concurrent fan-out: JobBeeper keeps one inventory page per board per 15-minute interval, a maximum facet depth of 4 and a queue budget of 500.
+
+State is persisted per tenant:site in SQLite (`facet_queue_json`, `active_facets_json`, depth, active-query flag and partition-started flag), with migration helpers for existing tables. The fast 120-second offset-0 poll and detail cap remain unchanged. Stable external IDs + idempotent upsert deduplicate overlapping multi-tag partitions. Incomplete leaves (2,000 cap with no safe next facet, depth limit, no usable facet or queue-budget overflow) remain incomplete.
+
+Admin status/UI adds pending partition count and active filters. Focused Workday collector suite: 21 passed. Full V2 regression job `4c646ih8lj` is running; log `/tmp/job-radar-workday-facets-full-tests.log`. This code is not yet committed/pushed. Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2010_IST.md` for exact continuation instructions.
+
+## 2026-11-09 20:10 IST — facet-aware Workday implementation (in progress)
+
+The earlier statement that facet partitioning was outstanding is superseded by this work-in-progress. The current code reads Workday `facets[].facetParameter` and `values[].id/count`, then queues bounded partitions in the order `jobFamilyGroup`, `timeType`, `locations`, `workerSubType`. This adapts the upstream strategy from `kalil0321/ats-scrapers` commit `6b44a1badc9bfbf5cf176f75265cc5729e520e99`, but does not copy its concurrent fan-out: JobBeeper runs at most one inventory page per board every 15 minutes. Queue, active filters and recursion depth are persisted with migration-safe SQLite columns. Depth is limited to 4 and queued partitions to 500; unresolved leaves/overflow remain incomplete. Stable Workday source IDs and idempotent upsert deduplicate overlapping partitions.
+
+Focused Workday suite: 22 passed. Full V2 regression job `4c646ih8lj` is running; see `/tmp/job-radar-workday-facets-full-tests.log`. The worktree is uncommitted and not deployed. See `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md` for the design.
+
+## 2026-11-09 20:10 IST — Workday facet partitions supersede the earlier outstanding note
+
+The previous note that Workday facet partitioning remained outstanding is now historical. Current worktree implements it: pinned upstream response shape, bounded facet selector, persisted FIFO child queue, recursive partitions, active filters/cursor, and admin status. Limits are depth 4, 500 queued child queries and one inventory page per board every 15 minutes; it deliberately avoids parallel fan-out. Unresolved leaves/overflow remain incomplete. Full local regression job `4c646ih8lj` is running; focused Workday tests passed 22. See `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`.
+
+
+## 2026-11-09 20:18 IST — Workday facet partitioning implemented locally
+
+The Workday collector now builds a persisted FIFO facet queue when an unfiltered query hits the 2,000 cap and exposes `jobFamilyGroup`, `timeType`, `locations`, `workerSubType` partitions in priority order. Capped child queries recursively subdivide on an unused facet. It is deliberately sequential (one extra inventory page per board per 15 minutes), with depth cap 4 and queue cap 500. Incomplete leaves/overflow remain incomplete. Queue/active filters are migration-safe SQLite state and commit after upsert. Admin API/UI show pending partitions and active filters.
+
+Validation: focused Workday tests 22 passed; full V2 suite 443 passed in 402.776s; compileall, JSON, diff check and dashboard HTML/panel checks passed. Exact-head CI remains required after push. No live ATS calls; actual tenant facet shapes still require an approved canary. Details: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`; latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2018_IST.md`.
+
+
+## 2026-11-09 20:25 IST — exact final Workday facet tree
+
+The current uncommitted Workday facet implementation now includes the final admin status distinction for `in_progress_incomplete` versus terminal `truncated`. Focused Workday tests are 22/22. The earlier full V2 run passed 443 tests in 402.776s but began before the final status test was added. A second full-suite job `3tjy6iwusp` is running against the exact final tree; see `/tmp/job-radar-workday-facets-final-tests.log`. Run exact-head GitHub CI after push for modern dashboard JS and final full-suite validation.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2025_IST.md`. Facet design: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`.
+
+## Next company-agnostic discovery design (2026-11-09)
+
+New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.
+
+
+## 2026-11-09 20:30 IST — Workday facet full regression complete
+
+The exact current worktree full V2 suite passed **444 tests in 346.385 seconds**, exit code 0 (job `3tjy6iwusp`, log `/tmp/job-radar-workday-facets-final-tests.log`). Focused Workday collector suite passed 22/22. The final admin `in_progress_incomplete` status test is included in the 444. Compileall, both config JSON files, HTML IDs/panel wiring and `git diff --check` passed. All Workday/Keka/Darwinbox/Hirebase source flags remain false.
+
+Current Workday facet code, dashboard UI and docs are still uncommitted on branch `feat/global-ats-discovery-hirebase-guard-20261109`. Next: inspect diff, commit/push, update PR #65, verify exact-head V2 CI #1432 or later. Keep PR draft; no deployment/source activation.
+
+Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. It recommends a separate unmatched ATS candidate table and polite Common Crawl indexing; no AWS credentials needed unless choosing the Parquet/Athena bulk path.

@@ -645,7 +645,7 @@
             </div>
             <div class="settings-block" id="workdayInventoryPanel" style="margin-top:var(--space-10);">
               <span class="settings-block-title">Workday board inventory progress</span>
-              <p class="auth-description">The newest page is checked on the normal source cadence. A separate inventory cursor adds at most one more page per configured board every 15 minutes. A board with a reported 2,000-result cap is explicitly marked incomplete until facet partitioning is available.</p>
+              <p class="auth-description">The newest page is checked on the normal source cadence. A separate inventory cursor adds at most one more page per configured board every 15 minutes. Boards reporting the 2,000-result cap are subdivided by available Workday facets over time; leaves that cannot be safely subdivided remain explicitly incomplete.</p>
               <div id="workdayInventoryStatus" class="auth-description" role="status" aria-live="polite">Loading Workday inventory cursors…</div>
             </div>
             <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">

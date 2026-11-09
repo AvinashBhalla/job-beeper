@@ -36,15 +36,17 @@ The current constants are:
 
 **Current behaviour:** offset 0 is polled on the existing 120-second source interval. A separate per-tenant:site SQLite cursor fetches at most one additional page every 15 minutes, starting at offset 20. Cursor progress is committed only after job upsert; failed inventory pages retain their offset and are throttled. Detail calls remain limited to the freshness page. Completed non-truncated sweeps are rechecked weekly. An admin-only status endpoint and Coverage & Health panel expose cursor and truncation state.
 
-**Remaining limitation:** there is still no facet partitioning by job family, time type, location or worker subtype. When Workday reports the 2,000-result cap, or the local offset safety cap is reached, the board is explicitly marked incomplete. This is gradual pagination, not full large-board coverage.
+**Current facet-aware state:** a bounded, persisted Workday facet queue is now implemented in the continuation dated 2026-11-09 20:10 IST. Root queries capped at 2,000 enqueue child queries using `jobFamilyGroup`, then `timeType`, `locations`, and `workerSubType`. Each child is paged and resumed over time. The queue is persisted by tenant:site and committed only after job upsert. It uses a 4-level recursion bound, 500-task queue budget, and one inventory page per board every 15 minutes. Overlapping `workerSubType` results are deduplicated through stable source IDs/upsert.
+
+**Remaining limitation:** facet availability and depth do not guarantee complete inventory. Any leaf that reaches the 2,000 cap without another safe facet, depth/queue-budget overflow, or inconsistent response is explicitly incomplete. The queue is sequential and conservative; it does not copy the upstream concurrent fan-out. Verify actual public facet shapes on a low-volume approved canary before changing cadence or declaring market coverage.
 
 **Research comparison:** kalil0321/ats-scrapers documents that Workday limits page size to 20 and can report a capped total of 2,000 even when a tenant has far more openings. It partitions by jobFamilyGroup, then timeType, locations and workerSubType, and deduplicates overlapping results. Source: https://github.com/kalil0321/ats-scrapers/blob/main/src/ats_scrapers/scrapers/workday.py.
 
 **Work needed:**
 1. retain the low-cost first-page poll for freshness (implemented);
 2. keep the separate inventory cursor and checkpoint (implemented);
-3. add facet-aware partitioning and per-facet checkpoints for jobFamilyGroup, timeType, locations and workerSubType;
-4. detect the 2,000-result cap and deduplicate overlapping facet partitions;
+3. facet-aware partitioning using jobFamilyGroup, timeType, locations and workerSubType (implemented in current worktree; full regression/CI pending);
+4. keep bounded per-facet page cursors, stable-ID deduplication and explicit incomplete-leaf reporting (implemented; verify exact-head CI);
 5. preserve Retry-After cooldown, per-tenant pacing and request telemetry (existing behaviour retained);
 6. make per-board completeness, last full inventory and truncation visible in registry/health (admin status endpoint added; registry-level persistence remains future work).
 
@@ -273,3 +275,51 @@ Next priorities: Workday facet subdivision; Keka non-default portal slug support
 User action: nothing required now. Hirebase key remains absent and source flags remain off.
 
 Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.
+
+## 2026-11-09 20:10 IST — Workday facet-aware inventory in progress
+
+The next P0 implementation is now in the worktree. JobBeeper reads Workday facet metadata using the upstream response shape (`facetParameter`, `values[].id`, `values[].count`) and schedules partitions in the order jobFamilyGroup → timeType → locations → workerSubType. It does not copy the upstream library's concurrent fan-out: JobBeeper keeps one inventory page per board per 15-minute interval, a maximum facet depth of 4 and a queue budget of 500.
+
+State is persisted per tenant:site in SQLite (`facet_queue_json`, `active_facets_json`, depth, active-query flag and partition-started flag), with migration helpers for existing tables. The fast 120-second offset-0 poll and detail cap remain unchanged. Stable external IDs + idempotent upsert deduplicate overlapping multi-tag partitions. Incomplete leaves (2,000 cap with no safe next facet, depth limit, no usable facet or queue-budget overflow) remain incomplete.
+
+Admin status/UI adds pending partition count and active filters. Focused Workday collector suite: 21 passed. Full V2 regression job `4c646ih8lj` is running; log `/tmp/job-radar-workday-facets-full-tests.log`. This code is not yet committed/pushed. Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2010_IST.md` for exact continuation instructions.
+
+## 2026-11-09 20:10 IST — facet-aware Workday implementation (in progress)
+
+The earlier statement that facet partitioning was outstanding is superseded by this work-in-progress. The current code reads Workday `facets[].facetParameter` and `values[].id/count`, then queues bounded partitions in the order `jobFamilyGroup`, `timeType`, `locations`, `workerSubType`. This adapts the upstream strategy from `kalil0321/ats-scrapers` commit `6b44a1badc9bfbf5cf176f75265cc5729e520e99`, but does not copy its concurrent fan-out: JobBeeper runs at most one inventory page per board every 15 minutes. Queue, active filters and recursion depth are persisted with migration-safe SQLite columns. Depth is limited to 4 and queued partitions to 500; unresolved leaves/overflow remain incomplete. Stable Workday source IDs and idempotent upsert deduplicate overlapping partitions.
+
+Focused Workday suite: 22 passed. Full V2 regression job `4c646ih8lj` is running; see `/tmp/job-radar-workday-facets-full-tests.log`. The worktree is uncommitted and not deployed. See `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md` for the design.
+
+
+## 2026-11-09 20:18 IST — Workday facet partitioning implemented locally
+
+The Workday collector now builds a persisted FIFO facet queue when an unfiltered query hits the 2,000 cap and exposes `jobFamilyGroup`, `timeType`, `locations`, `workerSubType` partitions in priority order. Capped child queries recursively subdivide on an unused facet. It is deliberately sequential (one extra inventory page per board per 15 minutes), with depth cap 4 and queue cap 500. Incomplete leaves/overflow remain incomplete. Queue/active filters are migration-safe SQLite state and commit after upsert. Admin API/UI show pending partitions and active filters.
+
+Validation: focused Workday tests 22 passed; full V2 suite 443 passed in 402.776s; compileall, JSON, diff check and dashboard HTML/panel checks passed. Exact-head CI remains required after push. No live ATS calls; actual tenant facet shapes still require an approved canary. Details: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`; latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2018_IST.md`.
+
+
+## 2026-11-09 20:25 IST — exact final Workday facet tree
+
+The current uncommitted Workday facet implementation now includes the final admin status distinction for `in_progress_incomplete` versus terminal `truncated`. Focused Workday tests are 22/22. The earlier full V2 run passed 443 tests in 402.776s but began before the final status test was added. A second full-suite job `3tjy6iwusp` is running against the exact final tree; see `/tmp/job-radar-workday-facets-final-tests.log`. Run exact-head GitHub CI after push for modern dashboard JS and final full-suite validation.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2025_IST.md`. Facet design: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`.
+
+
+## Common Crawl discovery implementation note — 2026-11-09
+
+Use Common Crawl as a scheduled candidate source, not a live job source. Its CDX API is heavily rate-limited: serialize requests, sleep between them, avoid proxies, and stop for 24 hours on an IP block/503. For bulk filtering use the Parquet URL Index through Athena/Spark/Polars/DuckDB. See `docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md` for official references and the detailed decision.
+
+The first implementation should be one provider query at a time, a pinned crawl ID, capped response rows, latest-capture provenance, candidate-only registry state and current-live verification. Do not ingest archived postings as current jobs or claim complete global coverage from a sampled crawl.
+
+## Next company-agnostic discovery design (2026-11-09)
+
+New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.
+
+
+## 2026-11-09 20:30 IST — Workday facet full regression complete
+
+The exact current worktree full V2 suite passed **444 tests in 346.385 seconds**, exit code 0 (job `3tjy6iwusp`, log `/tmp/job-radar-workday-facets-final-tests.log`). Focused Workday collector suite passed 22/22. The final admin `in_progress_incomplete` status test is included in the 444. Compileall, both config JSON files, HTML IDs/panel wiring and `git diff --check` passed. All Workday/Keka/Darwinbox/Hirebase source flags remain false.
+
+Current Workday facet code, dashboard UI and docs are still uncommitted on branch `feat/global-ats-discovery-hirebase-guard-20261109`. Next: inspect diff, commit/push, update PR #65, verify exact-head V2 CI #1432 or later. Keep PR draft; no deployment/source activation.
+
+Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. It recommends a separate unmatched ATS candidate table and polite Common Crawl indexing; no AWS credentials needed unless choosing the Parquet/Athena bulk path.

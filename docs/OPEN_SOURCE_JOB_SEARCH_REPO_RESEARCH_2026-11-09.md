@@ -218,3 +218,46 @@ A provider showing fewer 429s but repeatedly omitting pages is not healthier. A 
 ## Mapping research to current JobBeeper code
 
 See `docs/ATS_PROVIDER_GAP_ANALYSIS_2026-11-09.md` for the concrete Workday/Keka/Darwinbox differences in the current collector implementation and the sequenced engineering plan.
+
+
+## 2026-11-09 — Common Crawl discovery feasibility and rate-limit decision
+
+### Official source findings (reviewed 2026-11-09)
+
+- The current Common Crawl collection list (`https://index.commoncrawl.org/collinfo.json`) reports `CC-MAIN-2026-43` as the October 2026 index, with crawl window 2026-10-05 through 2026-10-18. The index server exposes one CDX API endpoint per crawl.
+- The CDX API supports wildcard/domain matching and filters, which can identify historical public career-board URL patterns under `*.myworkdayjobs.com`, `*.keka.com` and `*.darwinbox.in`.
+- Common Crawl's own FAQ says its CDX API is heavily rate-limited. HTTP 503 is a signal to slow down; an IP temporarily blocked by the service should wait 24 hours. It explicitly says use HTTPS, sleep between API calls, do not run multiple threads against the same IP, and do not use proxy networks.
+- For broad/high-volume filtering, Common Crawl recommends its Parquet URL Index rather than a large CDX API sweep. The URL Index is partitioned by crawl and WARC subset and can be queried with Athena, Spark, Polars or DuckDB. Athena requires an AWS account and is paid; the published 300 GB / approximately USD 1.50 per monthly crawl figure is only an upper-bound estimate stated by Common Crawl as of September 2025, not a current quote.
+- Common Crawl describes its crawl as a sample of the web, not a complete archive of every site. It respects robots.txt and may not have captured every page or employer.
+
+Official references:
+- `https://index.commoncrawl.org/collinfo.json`
+- `https://index.commoncrawl.org/` (CDX index server)
+- `https://commoncrawl.org/faq` (CDX 503, 24-hour block, no parallel requests/proxies)
+- `https://commoncrawl.org/url-index` (Parquet URL Index / Athena / Spark / DuckDB guidance)
+- `https://commoncrawl.org/cdxj-index` (CDXJ index format)
+- `https://pywb.readthedocs.io/en/latest/manual/cdxserver_api.html` (wildcard, filters, limits and conditional pagination support)
+
+### JobBeeper design decision
+
+Do **not** make CDX queries part of every source poll or launch three parallel provider-wide wildcard sweeps. That would risk an IP block and produce stale/duplicate candidate records. Use Common Crawl as a slow candidate-discovery signal only:
+
+1. Refresh `collinfo.json` metadata infrequently and pin the chosen crawl ID in a discovery run record.
+2. Process exactly one provider query at a time under a global host budget, with a descriptive User-Agent and a persisted next-allowed-request timestamp. On 503, stop the entire Common Crawl queue and set a 24-hour cooldown; do not retry through proxies or alternate IPs.
+3. Request only recent captures and HTML/200 results, collapse duplicate URL keys where supported, and cap response rows. If a response is capped/truncated, mark the discovery run incomplete rather than claiming exhaustion.
+4. Use CDX only for bounded provider-specific host patterns. For broad multi-crawl analysis, prefer the Parquet URL Index / Athena or an offline export rather than flooding the CDX endpoint.
+5. Parse URLs into provider-specific *candidate* board roots only: Workday `*.wdN.myworkdayjobs.com/{site}`, Keka `/careers` or `/careers/{portal}`, Darwinbox `/ms/candidatev2/{company_id}/careers`. Record crawl ID, capture timestamp, original captured URL, discovery method and confidence.
+6. Never ingest archived job-page content as current jobs. The archived URL is a lead, not proof the employer board is still live. Run a low-concurrency current public-careers verification later and keep the board in `discovered` review state; do not activate automatically.
+7. Deduplicate by normalized provider + tenant/site/portal key and retain latest capture provenance.
+
+### Important product constraint
+
+Common Crawl improves the chance of discovering companies absent from a hand-curated directory, but it cannot guarantee all Workday/Keka/Darwinbox employers. Its sample and robots-based exclusions make it a discovery input, not a global source-of-truth registry. The per-board scheduler and live verification stage remain necessary.
+
+### User dependency
+
+No user input is needed to implement a conservative CDX-based candidate-only experiment. If the team later chooses the Parquet URL Index + Athena route for broad monthly extraction, an AWS account, a controlled query-results location and an explicit spend budget will be required. Do not assume Athena is free.
+
+## Next company-agnostic discovery design (2026-11-09)
+
+New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.

@@ -2134,14 +2134,17 @@
       const boards = data.boards || [];
       target.textContent = boards.length
         ? boards.map(board => {
-          const progress = board.status === 'truncated'
-            ? `INCOMPLETE: ${board.truncated_reason || 'facet partition required'}`
+          const progress = ['truncated', 'in_progress_incomplete'].includes(board.status)
+            ? `INCOMPLETE${board.status === 'in_progress_incomplete' ? ' · remaining partitions still processing' : ''}: ${board.truncated_reason || 'facet partition required'}`
             : board.status === 'complete'
               ? `Inventory completed; next weekly refresh ${board.next_inventory_due_at || 'not scheduled'}`
               : board.status === 'in_progress'
                 ? `Next inventory offset ${Number(board.next_inventory_offset || 0).toLocaleString()} · next page after ${board.next_inventory_due_at || 'the throttle window'}`
                 : 'Inventory scan not started';
-          return `${board.company} (${board.board_key}): ${progress} · reported total ${board.reported_total ?? 'unknown'} · facets ${Number(board.facets_available || 0)}`;
+          const partitions = board.facet_partitioned
+            ? ` · facet partitions pending ${Number(board.pending_facet_partitions || 0)}${board.active_facet_query ? ` · active ${JSON.stringify(board.active_applied_facets || {})}` : ''}`
+            : '';
+          return `${board.company} (${board.board_key}): ${progress} · reported total ${board.reported_total ?? 'unknown'} · facets ${Number(board.facets_available || 0)}${partitions}`;
         }).join(' | ')
         : 'No Workday employer boards are configured.';
     } catch (error) {

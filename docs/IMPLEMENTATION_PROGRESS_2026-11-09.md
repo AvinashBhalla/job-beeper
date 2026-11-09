@@ -2,33 +2,41 @@
 
 ## Start here
 
-1. docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md — latest complete state, tests, release boundary, priorities and user actions.
-2. docs/WORKDAY_INCREMENTAL_INVENTORY_2026-11-09.md — Workday design and acceptance notes.
-3. docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md — immediate next connector task.
-4. docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md — repository research.
-5. docs/ATS_PROVIDER_GAP_ANALYSIS_2026-11-09.md — actual JobBeeper collector gaps.
+1. `docs/RECOVERY_CHECKPOINT_2026-11-09_2025_IST.md` — exact current state, tests, CI and priorities.
+2. `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md` — facet algorithm and bounded-state details.
+3. `docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md` — source repository findings.
+4. `docs/ATS_PROVIDER_GAP_ANALYSIS_2026-11-09.md` — direct JobBeeper connector gaps.
+5. `docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md` — completed Keka portal implementation.
 
-## Current milestone
+## Completed in PR #65 before current uncommitted increment
 
-Workday incremental inventory code, tests and admin progress UI are implemented locally. Full V2 regression passed 436/436 in 398.870s. Focused Workday/global discovery tests passed 31/31. The Workday code is locally tested and ready to commit/push on the current branch; verify exact-head GitHub CI before extending it. PR #65 remains draft and unmerged.
+- Optional Hirebase estimate-first sampler, disabled; key absent.
+- LastRound AI CC BY 4.0 directory seed import (9,935 Greenhouse/Lever/Ashby candidates), candidate-only.
+- Workday incremental inventory (commit 6197446; CI #1430 passed).
+- Keka multi-portal URL/collector/verifier support (commit afa177b; CI #1431 passed).
+- Detailed open-source research and handover.
 
-## Next milestones
+## Current uncommitted Workday facet increment
 
-P0: Workday facet-aware inventory; Keka non-default portal resolution; company-agnostic public Workday/Keka/Darwinbox employer discovery; per-board scheduler with host rate budgets.
+- Persisted Workday facet queue, active filters and depth; migration-safe SQLite columns.
+- Facet selection order: jobFamilyGroup → timeType → locations → workerSubType.
+- Root/child 2,000-cap queries are subdivided across scheduled runs. One inventory page per board every 15 minutes; no concurrent fan-out.
+- Depth cap 4; queue cap 500; unresolvable leaves/overflow remain incomplete.
+- Admin API/UI show active filters, pending queue and incomplete-vs-terminal status.
+- Focused Workday suite: 22 passed. Previous full V2 suite: 443 passed in 402.776s, but that full run predated the final extra status test. Final full suite job `3tjy6iwusp` is running; check `/tmp/job-radar-workday-facets-final-tests.log` before committing.
 
-P1: Darwinbox blocked-state correctness; p50/p95, 429, completeness and first-seen latency benchmarks; stale/repost detection.
+## Next work
 
-P2: more ATS connectors after discovery/scheduling contracts, then optional Hirebase estimate-only dev test with user approval.
+P0: exact-head CI; reviewed Workday canary; company-agnostic public employer discovery for Workday/Keka/Darwinbox; per-board scheduler/host rate budgets.
 
-## User input needed
+P1: Darwinbox 403 handling; p50/p95, 429, completeness, first-seen latency; stale/repost/legitimacy signals.
 
-Nothing right now. Do not request the Hirebase key in chat. It remains absent and all four related source flags remain off.
+P2: additional ATS adapters once scheduler/discovery contracts are stable; Hirebase estimate-only after explicit approval.
 
-## Current continuation — 2026-11-09 19:47 IST
+## User input
 
-- Workday incremental inventory + admin progress UI: pushed as `6197446`; exact-head GitHub V2 CI #1430 passed; local full V2 suite 436 passed.
-- Keka portal resolver/collector/verifier: implemented in current worktree. Default portal remains compatible; non-default portal slug is part of board/job identity; same-tenant multiple portals supported; unsafe URLs rejected; portal-specific endpoint used by collector and verifier.
-- Keka focused board-discovery suite: 37 passed. Full V2 regression: **439 passed in 359.301s**, exit code 0.
-- Keka changes were pushed as afa177b. PR #65 body is updated; exact-head GitHub V2 CI #1431 passed (syntax, dashboard JavaScript, focused tests and full V2 suite). Do not merge/deploy; PR remains draft.
-- Next P0 after Keka CI: Workday facet-aware inventory, global public employer discovery for Workday/Keka/Darwinbox, persistent per-board scheduling/host budgets.
-- User action: none. Do not request Hirebase key in chat; it remains absent and all sources remain disabled.
+Nothing now. Hirebase key is absent. All four source flags remain disabled.
+
+## Next company-agnostic discovery design (2026-11-09)
+
+New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.

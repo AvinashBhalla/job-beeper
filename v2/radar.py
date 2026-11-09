@@ -72,6 +72,9 @@ WORKDAY_MAX_DETAILS_PER_BOARD = 20
 WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS = 15 * 60
 WORKDAY_FULL_INVENTORY_REFRESH_SECONDS = 7 * 24 * 60 * 60
 WORKDAY_INVENTORY_MAX_OFFSET = 2000
+WORKDAY_MAX_FACET_DEPTH = 4
+WORKDAY_MAX_FACET_PARTITIONS = 500
+WORKDAY_SUBDIVISION_FACETS = ("jobFamilyGroup", "timeType", "locations", "workerSubType")
 WORKDAY_MAX_BOARDS = 20
 WORKDAY_DETAIL_DELAY_SECONDS = 0.1
 WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
@@ -1219,9 +1222,19 @@ def init_db() -> None:
             facets_json TEXT NOT NULL DEFAULT '[]',
             inventory_complete INTEGER NOT NULL DEFAULT 0,
             truncated_reason TEXT,
+            facet_queue_json TEXT NOT NULL DEFAULT '[]',
+            active_facets_json TEXT NOT NULL DEFAULT '{}',
+            active_facet_depth INTEGER NOT NULL DEFAULT 0,
+            active_facet_query INTEGER NOT NULL DEFAULT 0,
+            facet_partition_started INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
         )
         """)
+        _ensure_column(conn, "workday_board_poll_state", "facet_queue_json", "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(conn, "workday_board_poll_state", "active_facets_json", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(conn, "workday_board_poll_state", "active_facet_depth", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "workday_board_poll_state", "active_facet_query", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "workday_board_poll_state", "facet_partition_started", "INTEGER NOT NULL DEFAULT 0")
         conn.execute("""
         CREATE TABLE IF NOT EXISTS hirebase_usage_ledger (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4790,7 +4803,9 @@ def _workday_get_board_poll_state(board_key: str) -> dict[str, Any]:
         row = conn.execute(
             """SELECT next_inventory_offset,last_inventory_attempt_at,
                       last_full_inventory_at,reported_total,facets_json,
-                      inventory_complete,truncated_reason
+                      inventory_complete,truncated_reason,facet_queue_json,
+                      active_facets_json,active_facet_depth,active_facet_query,
+                      facet_partition_started
                FROM workday_board_poll_state WHERE board_key=?""",
             (board_key,),
         ).fetchone()
@@ -4803,6 +4818,11 @@ def _workday_get_board_poll_state(board_key: str) -> dict[str, Any]:
             "facets": [],
             "inventory_complete": False,
             "truncated_reason": None,
+            "facet_queue": [],
+            "active_facets": {},
+            "active_facet_depth": 0,
+            "active_facet_query": False,
+            "facet_partition_started": False,
         }
     try:
         facets = json.loads(row[4] or "[]")
@@ -4810,6 +4830,18 @@ def _workday_get_board_poll_state(board_key: str) -> dict[str, Any]:
             facets = []
     except (TypeError, ValueError):
         facets = []
+    try:
+        facet_queue = json.loads(row[7] or "[]")
+        if not isinstance(facet_queue, list):
+            facet_queue = []
+    except (TypeError, ValueError):
+        facet_queue = []
+    try:
+        active_facets = json.loads(row[8] or "{}")
+        if not isinstance(active_facets, dict):
+            active_facets = {}
+    except (TypeError, ValueError):
+        active_facets = {}
     return {
         "next_inventory_offset": max(0, int(row[0] or 0)),
         "last_inventory_attempt_at": row[1],
@@ -4818,6 +4850,11 @@ def _workday_get_board_poll_state(board_key: str) -> dict[str, Any]:
         "facets": facets,
         "inventory_complete": bool(row[5]),
         "truncated_reason": row[6],
+        "facet_queue": facet_queue,
+        "active_facets": active_facets,
+        "active_facet_depth": max(0, int(row[9] or 0)),
+        "active_facet_query": bool(row[10]),
+        "facet_partition_started": bool(row[11]),
     }
 
 
@@ -4826,6 +4863,16 @@ def _workday_set_board_poll_state(board_key: str, state: dict[str, Any]) -> None
     if not isinstance(facets, (list, dict)):
         facets = []
     facets_json = json.dumps(facets, ensure_ascii=False, separators=(",", ":"))[:16_000]
+    facet_queue = state.get("facet_queue")
+    if not isinstance(facet_queue, list):
+        facet_queue = []
+    facet_queue_json = json.dumps(facet_queue[:WORKDAY_MAX_FACET_PARTITIONS], ensure_ascii=False, separators=(",", ":"))
+    if len(facet_queue_json) > 1_000_000:
+        raise ValueError("Workday facet queue exceeded the persisted state size limit")
+    active_facets = state.get("active_facets")
+    if not isinstance(active_facets, dict):
+        active_facets = {}
+    active_facets_json = json.dumps(active_facets, ensure_ascii=False, separators=(",", ":"))[:16_000]
     reported_total = state.get("reported_total")
     if isinstance(reported_total, bool) or not isinstance(reported_total, int) or reported_total < 0:
         reported_total = None
@@ -4837,8 +4884,10 @@ def _workday_set_board_poll_state(board_key: str, state: dict[str, Any]) -> None
             """INSERT INTO workday_board_poll_state(
                    board_key,next_inventory_offset,last_inventory_attempt_at,
                    last_full_inventory_at,reported_total,facets_json,
-                   inventory_complete,truncated_reason,updated_at
-               ) VALUES(?,?,?,?,?,?,?,?,?)
+                   inventory_complete,truncated_reason,facet_queue_json,
+                   active_facets_json,active_facet_depth,active_facet_query,
+                   facet_partition_started,updated_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(board_key) DO UPDATE SET
                    next_inventory_offset=excluded.next_inventory_offset,
                    last_inventory_attempt_at=excluded.last_inventory_attempt_at,
@@ -4847,12 +4896,20 @@ def _workday_set_board_poll_state(board_key: str, state: dict[str, Any]) -> None
                    facets_json=excluded.facets_json,
                    inventory_complete=excluded.inventory_complete,
                    truncated_reason=excluded.truncated_reason,
+                   facet_queue_json=excluded.facet_queue_json,
+                   active_facets_json=excluded.active_facets_json,
+                   active_facet_depth=excluded.active_facet_depth,
+                   active_facet_query=excluded.active_facet_query,
+                   facet_partition_started=excluded.facet_partition_started,
                    updated_at=excluded.updated_at""",
             (
                 board_key, next_offset, state.get("last_inventory_attempt_at"),
                 state.get("last_full_inventory_at"), reported_total, facets_json,
                 int(bool(state.get("inventory_complete"))),
-                state.get("truncated_reason"), iso(now()),
+                state.get("truncated_reason"), facet_queue_json, active_facets_json,
+                max(0, min(int(state.get("active_facet_depth") or 0), WORKDAY_MAX_FACET_DEPTH)),
+                int(bool(state.get("active_facet_query"))),
+                int(bool(state.get("facet_partition_started"))), iso(now()),
             ),
         )
         conn.commit()
@@ -4867,8 +4924,82 @@ def _workday_commit_pending_board_states() -> None:
             _workday_set_board_poll_state(board_key, state)
 
 
+def _workday_pick_subdivision_facet(
+    facets: Any, *, already_applied: set[str]
+) -> tuple[str, list[tuple[str, int]]] | None:
+    """Choose a Workday subdivision facet from the public response metadata."""
+    if not isinstance(facets, list):
+        return None
+    by_param: dict[str, list[tuple[str, int]]] = {}
+    for facet in facets[:100]:
+        if not isinstance(facet, dict):
+            continue
+        param = facet.get("facetParameter")
+        values = facet.get("values")
+        if (
+            not isinstance(param, str) or param not in WORKDAY_SUBDIVISION_FACETS
+            or param in already_applied or not isinstance(values, list)
+        ):
+            continue
+        seen: set[str] = set()
+        items: list[tuple[str, int]] = []
+        for value in values[:WORKDAY_MAX_FACET_PARTITIONS]:
+            if not isinstance(value, dict):
+                continue
+            value_id = value.get("id")
+            count = value.get("count")
+            if isinstance(count, bool):
+                continue
+            try:
+                parsed_count = int(count)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if (
+                not isinstance(value_id, str) or not value_id.strip()
+                or len(value_id) > 200 or value_id in seen or parsed_count <= 0
+            ):
+                continue
+            seen.add(value_id)
+            items.append((value_id, parsed_count))
+        if len(items) > 1:
+            by_param[param] = items
+    for preferred in WORKDAY_SUBDIVISION_FACETS:
+        if preferred in by_param:
+            return preferred, by_param[preferred]
+    if by_param:
+        return max(by_param.items(), key=lambda entry: len(entry[1]))
+    return None
+
+
+def _workday_facet_children(
+    applied_facets: dict[str, list[str]], depth: int, facets: Any,
+    queue_size: int,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Build bounded child queries for one capped Workday query."""
+    if depth >= WORKDAY_MAX_FACET_DEPTH:
+        return [], "workday_facet_depth_limit_reached"
+    selected = _workday_pick_subdivision_facet(
+        facets, already_applied=set(applied_facets)
+    )
+    if selected is None:
+        return [], "workday_no_usable_subdivision_facet"
+    param, values = selected
+    remaining = WORKDAY_MAX_FACET_PARTITIONS - queue_size
+    if remaining <= 0:
+        return [], "workday_facet_partition_budget_reached"
+    children = [
+        {"applied_facets": {**applied_facets, param: [value_id]}, "depth": depth + 1}
+        for value_id, _count in values[:remaining]
+    ]
+    overflow_reason = (
+        "workday_facet_partition_budget_reached"
+        if len(children) < len(values) else None
+    )
+    return children, overflow_reason
+
+
 def _workday_inventory_is_due(state: dict[str, Any], current: dt.datetime) -> bool:
-    if state.get("truncated_reason"):
+    if state.get("truncated_reason") and not state.get("facet_queue") and not state.get("active_facet_query"):
         return False
     last_attempt = state.get("last_inventory_attempt_at")
     if state.get("inventory_complete"):
@@ -4935,20 +5066,60 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         board_key = f"{tenant}:{site}"
         poll_state = _workday_get_board_poll_state(board_key)
         inventory_due = _workday_inventory_is_due(poll_state, now())
-        inventory_offset = int(poll_state.get("next_inventory_offset") or WORKDAY_PAGE_SIZE)
+        inventory_offset = int(poll_state.get("next_inventory_offset") or 0)
+        facet_queue = list(poll_state.get("facet_queue") or [])
+        active_facets = dict(poll_state.get("active_facets") or {})
+        active_facet_depth = int(poll_state.get("active_facet_depth") or 0)
+        active_facet_query = bool(poll_state.get("active_facet_query"))
+        facet_partition_started = bool(poll_state.get("facet_partition_started"))
         if poll_state.get("inventory_complete") and inventory_due:
+            # Weekly refresh starts a new root sweep; the freshness request below
+            # will decide whether it remains linear or needs facet partitions.
             inventory_offset = WORKDAY_PAGE_SIZE
-        page_specs = [(0, True)]
-        if inventory_due and inventory_offset > 0 and WORKDAY_MAX_PAGES_PER_BOARD > 1:
-            page_specs.append((inventory_offset, False))
+            facet_queue = []
+            active_facets = {}
+            active_facet_depth = 0
+            active_facet_query = False
+            facet_partition_started = False
+            poll_state = {
+                **poll_state,
+                "inventory_complete": False,
+                "truncated_reason": None,
+                "facet_queue": [],
+                "active_facets": {},
+                "active_facet_depth": 0,
+                "active_facet_query": False,
+                "facet_partition_started": False,
+            }
+        # Resume a queued partition only when its throttle window is due.
+        if inventory_due and facet_partition_started and not active_facet_query and facet_queue:
+            task = facet_queue.pop(0)
+            task_filters = task.get("applied_facets") if isinstance(task, dict) else None
+            task_depth = task.get("depth") if isinstance(task, dict) else None
+            if isinstance(task_filters, dict) and all(
+                isinstance(key, str) and isinstance(value, list)
+                and all(isinstance(item, str) for item in value)
+                for key, value in task_filters.items()
+            ):
+                active_facets = task_filters
+                active_facet_depth = max(1, min(int(task_depth or 1), WORKDAY_MAX_FACET_DEPTH))
+                active_facet_query = True
+                inventory_offset = 0
+            else:
+                poll_state = {**poll_state, "truncated_reason": "workday_invalid_facet_queue_entry"}
+        page_specs = [(0, True, {})]
+        inventory_spec_added = False
+        if inventory_due and active_facet_query and WORKDAY_MAX_PAGES_PER_BOARD > 1:
+            page_specs.append((inventory_offset, False, active_facets))
+            inventory_spec_added = True
         reported_total = poll_state.get("reported_total")
         facets = poll_state.get("facets", [])
         inventory_state_update: dict[str, Any] | None = None
         inventory_attempt_at = iso(now()) or ""
 
-        for page_number, (offset, freshness_page) in enumerate(page_specs):
+        for page_number, (offset, freshness_page, request_facets) in enumerate(page_specs):
             payload = {
-                "appliedFacets": {},
+                "appliedFacets": request_facets,
                 "limit": WORKDAY_PAGE_SIZE,
                 "offset": offset,
                 "searchText": "",
@@ -4973,6 +5144,53 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                         facets = dict(list(raw_facets.items())[:100])
                 successful_pages += 1
                 _record_source_page("workday", True)
+
+                if freshness_page and inventory_due and not facet_partition_started:
+                    if reported_total == WORKDAY_INVENTORY_MAX_OFFSET:
+                        children, partition_error = _workday_facet_children(
+                            {}, 0, facets, len(facet_queue)
+                        )
+                        if children:
+                            facet_queue.extend(children)
+                            facet_partition_started = True
+                            active_facets = {}
+                            active_facet_depth = 0
+                            active_facet_query = False
+                            inventory_offset = 0
+                            inventory_state_update = {
+                                **poll_state,
+                                "next_inventory_offset": 0,
+                                "last_inventory_attempt_at": inventory_attempt_at,
+                                "reported_total": reported_total,
+                                "facets": facets,
+                                "facet_queue": facet_queue,
+                                "active_facets": {},
+                                "active_facet_depth": 0,
+                                "active_facet_query": False,
+                                "facet_partition_started": True,
+                                "inventory_complete": False,
+                                "truncated_reason": partition_error,
+                            }
+                            log.info(
+                                "workday: tenant=%s site=%s capped total=%s; queued %s facet partitions",
+                                tenant, site, reported_total, len(facet_queue),
+                            )
+                            # Do not waste this cycle paginating the capped root
+                            # query. The next scheduled inventory request starts
+                            # at the first child partition.
+                            inventory_spec_added = True
+                        elif partition_error:
+                            log.warning(
+                                "workday: tenant=%s site=%s cannot subdivide capped root query reason=%s",
+                                tenant, site, partition_error,
+                            )
+                    if (
+                        not inventory_spec_added
+                        and not facet_partition_started
+                        and WORKDAY_MAX_PAGES_PER_BOARD > 1
+                    ):
+                        page_specs.append((max(WORKDAY_PAGE_SIZE, inventory_offset), False, {}))
+                        inventory_spec_added = True
             except Exception as exc:
                 _record_source_page("workday", False)
                 failed_response = getattr(exc, "response", None)
@@ -4985,6 +5203,11 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                         "last_inventory_attempt_at": inventory_attempt_at,
                         "reported_total": reported_total,
                         "facets": facets,
+                        "facet_queue": facet_queue,
+                        "active_facets": active_facets,
+                        "active_facet_depth": active_facet_depth,
+                        "active_facet_query": active_facet_query,
+                        "facet_partition_started": facet_partition_started,
                     }
                 if getattr(failed_response, "status_code", None) == 429:
                     _set_workday_rate_limit(failed_response)
@@ -5141,27 +5364,114 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
 
             if not freshness_page:
                 next_offset = offset + WORKDAY_PAGE_SIZE
-                truncated_reason = None
+                truncated_reason = poll_state.get("truncated_reason")
                 inventory_complete = False
                 last_full_inventory_at = poll_state.get("last_full_inventory_at")
-                if len(postings) < WORKDAY_PAGE_SIZE:
-                    if isinstance(reported_total, int) and reported_total >= WORKDAY_INVENTORY_MAX_OFFSET:
-                        truncated_reason = "empty_page_before_reported_total_cap_requires_review"
+                next_active = active_facet_query
+                next_active_facets = active_facets
+                next_active_depth = active_facet_depth
+                next_partition_started = facet_partition_started
+                next_queue = list(facet_queue)
+
+                # A capped filtered query may be subdivided again using a
+                # different facet. Keep the request budget bounded: one page
+                # every 15 minutes, no fan-out.
+                if (
+                    reported_total == WORKDAY_INVENTORY_MAX_OFFSET
+                    and next_active
+                ):
+                    children, partition_error = _workday_facet_children(
+                        next_active_facets,
+                        next_active_depth,
+                        facets,
+                        len(next_queue),
+                    )
+                    if children:
+                        next_queue.extend(children)
+                        next_active = False
+                        next_active_facets = {}
+                        next_active_depth = 0
+                        next_offset = 0
+                        if partition_error:
+                            truncated_reason = partition_error
+                        log.info(
+                            "workday: tenant=%s site=%s query facets=%s capped; queued %s child partitions",
+                            tenant, site, sorted(active_facets), len(children),
+                        )
+                    elif partition_error:
+                        truncated_reason = partition_error
+                        # No more safe facets are available. Continue this leaf
+                        # query to its 2,000-result ceiling, then leave the
+                        # board explicitly truncated.
+                        if offset >= WORKDAY_INVENTORY_MAX_OFFSET - WORKDAY_PAGE_SIZE:
+                            next_active = False
+                            next_offset = 0
+                        else:
+                            next_offset = offset + WORKDAY_PAGE_SIZE
+
+                elif (
+                    not next_partition_started
+                    and reported_total == WORKDAY_INVENTORY_MAX_OFFSET
+                    and not next_active
+                ):
+                    # Root query had no usable facets. An empty page before the
+                    # reported cap is inconsistent and should stop conservatively.
+                    if len(postings) < WORKDAY_PAGE_SIZE:
+                        truncated_reason = truncated_reason or "empty_page_before_reported_total_cap_requires_review"
+                        next_offset = 0
+                    elif offset >= WORKDAY_INVENTORY_MAX_OFFSET - WORKDAY_PAGE_SIZE:
+                        truncated_reason = truncated_reason or "workday_no_usable_subdivision_facet"
                         next_offset = 0
                     else:
+                        next_offset = offset + WORKDAY_PAGE_SIZE
+
+                elif len(postings) < WORKDAY_PAGE_SIZE:
+                    if next_active:
+                        next_active = False
+                        next_active_facets = {}
+                        next_active_depth = 0
+                        next_offset = 0
+                    elif not next_partition_started:
+                        next_offset = 0
                         inventory_complete = True
                         last_full_inventory_at = inventory_attempt_at
-                        next_offset = 0
-                elif next_offset >= WORKDAY_INVENTORY_MAX_OFFSET:
-                    if isinstance(reported_total, int) and reported_total >= WORKDAY_INVENTORY_MAX_OFFSET:
-                        truncated_reason = "reported_total_capped_at_2000_requires_facet_partition"
                     else:
-                        truncated_reason = "inventory_safety_offset_cap_reached"
-                    next_offset = 0
+                        next_offset = 0
+
                 elif isinstance(reported_total, int) and reported_total < WORKDAY_INVENTORY_MAX_OFFSET and next_offset >= reported_total:
-                    inventory_complete = True
-                    last_full_inventory_at = inventory_attempt_at
+                    if next_active:
+                        next_active = False
+                        next_active_facets = {}
+                        next_active_depth = 0
+                    elif not next_partition_started:
+                        inventory_complete = True
+                        last_full_inventory_at = inventory_attempt_at
                     next_offset = 0
+
+                elif (
+                    not next_partition_started
+                    and isinstance(reported_total, int)
+                    and reported_total < WORKDAY_INVENTORY_MAX_OFFSET
+                    and next_offset < reported_total
+                ):
+                    # Continue the ordinary unfiltered inventory query.
+                    pass
+
+                elif next_offset >= WORKDAY_INVENTORY_MAX_OFFSET:
+                    truncated_reason = truncated_reason or "inventory_safety_offset_cap_reached"
+                    next_offset = 0
+                    next_active = False
+                    next_active_facets = {}
+                    next_active_depth = 0
+
+                # If the last facet task completed successfully, mark the
+                # overall sweep complete. A prior truncation always wins.
+                if next_partition_started and not next_active and not next_queue:
+                    if not truncated_reason:
+                        inventory_complete = True
+                        last_full_inventory_at = inventory_attempt_at
+                    next_partition_started = False if inventory_complete else True
+
                 inventory_state_update = {
                     **poll_state,
                     "next_inventory_offset": next_offset,
@@ -5171,6 +5481,11 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     "facets": facets,
                     "inventory_complete": inventory_complete,
                     "truncated_reason": truncated_reason,
+                    "facet_queue": next_queue,
+                    "active_facets": next_active_facets,
+                    "active_facet_depth": next_active_depth,
+                    "active_facet_query": next_active,
+                    "facet_partition_started": next_partition_started,
                 }
                 if truncated_reason:
                     log.warning(
@@ -7250,7 +7565,22 @@ def get_workday_inventory_status():
             continue
         board_key = f"{parsed['tenant']}:{parsed['site']}"
         state = _workday_get_board_poll_state(board_key)
-        if state.get("truncated_reason"):
+        facet_work_remaining = bool(
+            state.get("facet_queue") or state.get("active_facet_query")
+        )
+        if state.get("truncated_reason") and facet_work_remaining:
+            status = "in_progress_incomplete"
+            last_attempt = state.get("last_inventory_attempt_at")
+            next_due_at = None
+            if last_attempt:
+                try:
+                    last_dt = dt.datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00"))
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=UTC)
+                    next_due_at = iso(last_dt + dt.timedelta(seconds=WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS))
+                except ValueError:
+                    next_due_at = None
+        elif state.get("truncated_reason"):
             status = "truncated"
             next_due_at = None
         elif state.get("inventory_complete"):
@@ -7287,6 +7617,10 @@ def get_workday_inventory_status():
             "next_inventory_offset": state.get("next_inventory_offset"),
             "reported_total": state.get("reported_total"),
             "facets_available": len(state.get("facets") or []),
+            "facet_partitioned": bool(state.get("facet_partition_started")),
+            "pending_facet_partitions": len(state.get("facet_queue") or []),
+            "active_facet_query": bool(state.get("active_facet_query")),
+            "active_applied_facets": state.get("active_facets") or {},
             "last_inventory_attempt_at": state.get("last_inventory_attempt_at"),
             "last_full_inventory_at": state.get("last_full_inventory_at"),
             "next_inventory_due_at": next_due_at,
@@ -7297,7 +7631,7 @@ def get_workday_inventory_status():
         "boards_configured": len(boards),
         "boards": boards,
         "freshness_poll_note": "The first page is polled on the source cadence. At most one extra inventory page per board is requested every 15 minutes.",
-        "coverage_note": "A full inventory is not guaranteed when Workday reports its 2,000-result cap. Such boards are marked truncated until facet-aware partitioning is implemented.",
+        "coverage_note": "Queries reporting the 2,000-result cap are subdivided using available jobFamilyGroup, timeType, locations and workerSubType facets. Any leaf that cannot be safely subdivided remains explicitly incomplete.",
     }
 
 
