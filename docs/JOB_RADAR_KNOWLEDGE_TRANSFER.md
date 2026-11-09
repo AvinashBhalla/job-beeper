@@ -3562,3 +3562,13 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - PRs: #35 keep draft as V2→main release gate. #46 stale/conflicted; current V2 contains per-user features and preference-save tests. #50 stale; Lever adapter is already in current V2 and default-off. #52 stale 89-file / 28,707-addition PR against main; its tree removes newer user applications and product roadmap. Do not merge #46/#50/#52; close as superseded after verifying all useful unique code/docs/tests are represented. Do not mass-delete branches/worktrees; archive SHAs and verify reachability first.
 - Career-Ops: adopt selected patterns only (job legitimacy/repost verification, explainable evidence-weighted fit, truthful resume tailoring, answer bank with provenance/correction events, contact/referral research and user-approved drafts, browser-assisted fill with human submit checkpoint). Do not port local-first runtime or copy code without license review. No autonomous application submit or outreach.
 - Production not modified in this task. Owner feedback must be reproduced/fixed on dev, then released through explicit approval.
+
+
+## 2026-11-09 — Cleanup + shared dev refresh
+
+- PR #46/#50/#52 closed as superseded (no merge); #35 remains only open PR, draft release gate. Branches retained pending equivalence/archive review; no bulk deletion.
+- Dev refreshed from exact V2 head `e6181d93682d6c09cd462c18b13b20996ce99057` in clean worktree `/tmp/job-radar-dev-refresh`; image `job-radar-dev-multitenant:e6181d9`, container `job-radar-dev` at loopback 8001, restart count 0. Existing external data volume preserved; old image tagged rollback.
+- Pre-refresh online DB backup: `/var/backups/job-radar-daily/dev-pre-v2-refresh-20261109T063814Z.sqlite3`, SHA-256 `e0f7cbdacd54acba246792dd97f6f1a43f5b772de7ba6e3ba4376c46ddefceb6`, integrity ok.
+- Dev now: health 200, SQLite WAL/integrity ok, 9,562 jobs, 8,087 runs, config v12, Naukri only, notifications off, Telegram absent, Gemini/LLM false, zero sent; `user_applications` created empty. Latest Naukri 293 seen/0 new. Production untouched (same image `6e5becb`, health 200).
+- PR #56 merged to `v2-live-radar`; exact head CI `42573822254` and merge push CI `42573997642` passed. Full runbook/evidence in `DEVELOPMENT_RELEASE_POLICY_AND_REPO_CLEANUP_2026-11-09.md`.
+- Owner is testing production. Reproduce/fix issues in refreshed dev only; never direct patch prod.
