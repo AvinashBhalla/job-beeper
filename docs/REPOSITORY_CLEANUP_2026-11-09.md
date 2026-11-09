@@ -11,7 +11,7 @@
 - Open PRs reduced from **8 to 7**. Stale release placeholder PR **#35 was closed unmerged** because GitHub reported it dirty/conflicted (688 commits, 94 files). `main` and `v2-live-radar` were not modified.
 - Seven open PRs #59–#65 remain, each for a distinct feature or documentation change and each with a successful exact-head V2 CI run at the audited head. They remain drafts pending owner UAT/review; do not merge them as a batch.
 - Two clean inactive local worktrees were removed (`/tmp/job-radar-lever-adapter`, `/tmp/job-radar-pr46-integration`). The corresponding branch refs were retained. `/tmp/job-radar-next` was removed after verifying its QA runbook is byte-identical to the copy on PR #65.
-- `/tmp/job-radar-user-preferences` was clean but the worktree removal command returned `Permission denied`; it was left untouched. No branch, data or files from that worktree were deleted.
+- `/tmp/job-radar-user-preferences` was clean but the worktree removal command returned `Permission denied` because it contains root-owned generated `v2/__pycache__` files. More importantly, `job-radar-user-preferences` on loopback port 8002 has a read-only bind mount sourced from `/tmp/job-radar-user-preferences/v2/config.feature.json`; the worktree is therefore intentionally retained so the running experiment can still restart with its config. No branch, data or files from that worktree were deleted.
 - Local checkout `/home/ubuntu/job-beeper-dev`, dirty source-observability worktree, deployment/rollback branches, Docker volumes, backups and all runtime containers were preserved.
 
 ## PR inventory and disposition
@@ -110,3 +110,11 @@ Do not delete the seven preserved non-PR65 refs based only on their PRs being cl
 - All engineering goes to feature branches from the latest `v2-live-radar`, then exact-head CI, isolated dev/QA, owner UAT and a separate explicit production approval.
 - Never deploy, restart, alter config, change source flags, touch DBs, send test Telegram messages or run migrations on production as part of this task.
 - Preserve existing volumes, backups, owner-local files, and rollback images. No destructive `git clean`, `reset --hard`, force-push, branch deletion or container recreation without a documented equivalence/backup gate.
+
+
+## Final handoff verification — 2026-11-09
+
+- Cleanup/handoff commit `b67acb6f0c4d59183f3ddb2e1241c4971aea5d13` was pushed to PR #65. Exact-head GitHub Actions V2 CI #1441 / run `42662623211` completed successfully. PR #65 remains open/draft and its head was verified to match this commit.
+- Final remote inventory: 16 branches; open PR inventory: seven (#59–#65); local inventory: 28 branch refs and 13 linked worktrees. Stale remote-tracking refs were pruned in the clean dev-refresh worktree.
+- Final health probes: dev 8001 = 200, connector QA 8010 = 200, synthetic QA 8006 = 200, production HTTPS = 200. Dev and QA still use identical `243da9c` image SHA; production remains `6e5becb`, all restart counts 0.
+- The port-8002 preferences experiment bind-mounts `v2/config.feature.json` from `/tmp/job-radar-user-preferences`. Do not remove this worktree or its config while that experiment is running.
