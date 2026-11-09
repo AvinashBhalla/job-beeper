@@ -104,3 +104,28 @@ When the owner reports a bug, capture: page/route, account role (never password)
 - Detailed operational history: `docs/JOB_RADAR_HANDOVER.md`.
 - Compact next-agent state: `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/NEXT_AGENT_START_HERE.md`.
 - This policy supersedes older handover statements that imply direct changes on `v2-live-radar` or production. Feature branches target `v2-live-radar`; shared dev is the first deployment target; production requires owner UAT and explicit approval.
+
+## 8. Executed cleanup and shared-dev refresh — 2026-11-09
+
+### GitHub PR cleanup completed
+
+- Closed PR #46 (superseded preferences branch), #50 (superseded Lever branch) and #52 (stale Career-Ops branch against `main`) with explanatory comments. No code was merged from these PRs.
+- PR #35 remains the only open PR and remains draft as the V2→main release gate.
+- The documentation policy was merged through PR #56 into `v2-live-radar` (merge commit `e6181d93682d6c09cd462c18b13b20996ce99057`). Exact branch-head CI run `42573822254` passed, including Python compile, dashboard JavaScript syntax, focused router/extractor tests and full V2 unittest suite. The merge commit's push CI run `42573997642` also passed the same checks.
+- Branch heads for #46/#50/#52 are intentionally retained temporarily. Their commits are not all ancestors of current V2 because work was integrated/rebased; do not delete branches until a final path-level equivalence/archive review is complete. No mass branch/worktree deletion was performed.
+
+### Shared dev refreshed safely to current V2 integration head
+
+- Clean source worktree: `/tmp/job-radar-dev-refresh`, detached at exact `e6181d93682d6c09cd462c18b13b20996ce99057` (`v2-live-radar`). The dirty `/home/ubuntu/job-beeper-dev` checkout was not modified.
+- Fresh online SQLite backup taken before recreation: `/var/backups/job-radar-daily/dev-pre-v2-refresh-20261109T063814Z.sqlite3`; 51,990,528 bytes; SHA-256 `e0f7cbdacd54acba246792dd97f6f1a43f5b772de7ba6e3ba4376c46ddefceb6`; `PRAGMA integrity_check=ok`; counts before deploy: 9,562 jobs, 8,086 source_runs, 1 user, 1 preference row, 9,562 user evaluations, 9,562 global notification rows, 0 member notification rows.
+- Existing dev image preserved as `job-radar-dev-multitenant:rollback-c441737-20261109` (original `c441737` tag also retained).
+- Built image `job-radar-dev-multitenant:e6181d9`, image ID `sha256:1e57c7ac3acae83f99bbc230f1980bfec14bb52d7c0fa8456526b09a3c8aa651` from that exact source SHA.
+- Recreated only `job-radar-dev` on loopback `127.0.0.1:8001`, using the existing external volume `job-radar-dev_radar-dev-data` and a read-only config bind from the clean worktree. A dedicated `/tmp/job-radar-dev-refresh.yml` was used with Telegram credentials blank and Gemini/LLM flags explicitly false; no `.env` secrets were copied into the new container.
+- Initial health probe during startup briefly reset while startup evaluation refresh was running. Logs later showed `Application startup complete`; health returned 200. Do not immediately restart a slow-starting dev container: check logs/process and retry health first.
+- Post-refresh: container running, restart count 0; `/health` HTTP 200; SQLite WAL mode, integrity `ok`; config version 12; notifications false; only Naukri enabled; Telegram token/chat absent; Gemini extraction/matcher and LLM router/matcher all false.
+- Additive application-tracker schema initialized successfully: `user_applications` now exists with 0 rows. Jobs remained 9,562; source_runs 8,087; user/evaluation/notification history preserved. Global and per-user sent counts both 0. Latest Naukri poll succeeded: 293 seen, 0 new.
+- Production was not recreated, modified or reconfigured. Production image remains `job-radar-prod-canary:6e5becb`, image ID `sha256:6786502548d98fbc5d92d4d2670bd20022acaa0c5f70e940f7020bd24d72a9c5`, running with restart count 0; HTTPS health returned 200.
+
+### Current boundary
+
+Shared dev now runs the current V2 integration code and is safe for development/UAT of code paths with notifications disabled and Naukri as the only scheduled source. It is not a copy of production config: the dev preset intentionally remains Naukri-only and notification-off. Production continues serving the owner's manual UAT. Any reported production issue must be reproduced against this refreshed dev runtime first.
