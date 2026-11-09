@@ -45,6 +45,22 @@ class ATSBoardPatternTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertIsNone(board_discovery.detect_ats_board(url))
 
+    def test_keka_portal_resolver_rejects_unsafe_and_ambiguous_paths(self):
+        for url in (
+            "http://universaled.keka.com/careers/ebenezerschool",
+            "https://user@universaled.keka.com/careers/ebenezerschool",
+            "https://universaled.keka.com:8443/careers/ebenezerschool",
+            "https://universaled.keka.com/careers/ebenezerschool?preview=1",
+            "https://universaled.keka.com/careers/ebenezerschool#apply",
+            "https://universaled.keka.com/careers/ebenezerschool/jobs",
+            "https://universaled.keka.com/careers/api",
+            "https://universaled.keka.com/careers/applyjob",
+            "https://universaled.keka.com/careers/jobdetails",
+            "https://universaled.keka.com/careers/bad%2Fslug",
+        ):
+            with self.subTest(url=url):
+                self.assertIsNone(board_discovery.detect_ats_board(url))
+
     def test_direct_ats_careers_url_is_registered_even_without_outbound_link(self):
         board_url = "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite"
         html = "<html><body>Public career portal</body></html>"
@@ -608,7 +624,15 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
 
     def test_discovery_recognises_keka_and_darwinbox_board_paths(self):
         keka = board_discovery.detect_ats_board("https://bridgestone1.keka.com/careers")
-        self.assertEqual((keka["provider"], keka["board_key"]), ("keka", "bridgestone1"))
+        self.assertEqual((keka["provider"], keka["board_key"], keka["portal"]), ("keka", "bridgestone1", "default"))
+        custom_keka = board_discovery.detect_ats_board(
+            "https://universaled.keka.com/careers/ebenezerschool"
+        )
+        self.assertEqual(custom_keka["provider"], "keka")
+        self.assertEqual(custom_keka["board_key"], "universaled:ebenezerschool")
+        self.assertEqual(custom_keka["tenant"], "universaled")
+        self.assertEqual(custom_keka["portal"], "ebenezerschool")
+        self.assertEqual(custom_keka["board_url"], "https://universaled.keka.com/careers/ebenezerschool")
         darwin = board_discovery.detect_ats_board(
             "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280"
         )
@@ -664,6 +688,39 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertFalse(calls[0][2]["allow_redirects"])
         self.assertFalse(calls[1][2]["allow_redirects"])
+
+    def test_keka_collects_multiple_non_default_portals_on_one_tenant(self):
+        identifier = "af8a241d-4ca4-4c8e-8e85-df4ccf00ea56"
+        careers_html = f'<script src="/ats/documents/{identifier}/careerportal/main.js"></script>'
+        urls = [
+            "https://universaled.keka.com/careers/ebenezerschool",
+            "https://universaled.keka.com/careers/anotheracademy",
+        ]
+        calls = []
+        def tracked(source, endpoint, **kwargs):
+            calls.append(endpoint)
+            if endpoint in urls:
+                return self.Response(text=careers_html, headers={"Content-Type": "text/html"})
+            if endpoint.endswith("/careers/api/embedjobs/ebenezerschool/active/" + identifier):
+                return self.Response([{"id": 101, "title": "School Engineer", "description": "<p>School platform</p>"}])
+            if endpoint.endswith("/careers/api/embedjobs/anotheracademy/active/" + identifier):
+                return self.Response([{"id": 202, "title": "Academy Engineer", "description": "<p>Academy platform</p>"}])
+            self.fail(f"Unexpected Keka endpoint: {endpoint}")
+        config = {"keka_boards": [
+            {"careers_url": urls[0], "company": "Universal Education"},
+            {"careers_url": urls[1], "company": "Universal Education"},
+        ]}
+        with patch.object(radar, "_tracked_source_get", side_effect=tracked):
+            jobs = radar.keka_collect(config)
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(jobs[0]["source_job_id"], "keka-universaled-ebenezerschool-101")
+        self.assertEqual(jobs[1]["source_job_id"], "keka-universaled-anotheracademy-202")
+        self.assertEqual(jobs[0]["source_details"]["portal"], "ebenezerschool")
+        self.assertEqual(jobs[1]["source_details"]["portal"], "anotheracademy")
+        self.assertEqual(jobs[0]["url"], urls[0] + "/jobdetails/101")
+        self.assertEqual(jobs[1]["url"], urls[1] + "/jobdetails/202")
+        self.assertIn("/careers/api/embedjobs/ebenezerschool/active/", calls[1])
+        self.assertIn("/careers/api/embedjobs/anotheracademy/active/", calls[3])
 
     def test_keka_rejects_feed_missing_from_careers_page(self):
         html = "<html><body>Careers page without public feed</body></html>"
@@ -752,6 +809,14 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
             result = board_discovery.probe_public_board({"provider": "keka", "board_url": board})
         self.assertEqual(result["jobs_observed"], 1)
 
+        custom_portal = "https://universaled.keka.com/careers/ebenezerschool"
+        with patch.object(board_discovery, "_safe_fetch", return_value=(custom_portal, html)), patch.object(
+            board_discovery.requests, "get", return_value=self.Response([{"id": 2}])
+        ) as keka_get:
+            result = board_discovery.probe_public_board({"provider": "keka", "board_url": custom_portal})
+        self.assertEqual(result["jobs_observed"], 1)
+        self.assertIn("/careers/api/embedjobs/ebenezerschool/active/", keka_get.call_args.args[0])
+
         darwin = "https://arvind.darwinbox.in/ms/candidatev2/main/careers/jobDetails/a6a67448e9a280"
         with patch.object(
             board_discovery.requests, "post",
@@ -760,6 +825,32 @@ class KekaDarwinboxCollectorTests(unittest.TestCase):
             result = board_discovery.probe_public_board({"provider": "darwinbox", "board_url": darwin})
         self.assertEqual(result["jobs_observed"], 1)
         self.assertEqual(darwin_post.call_args.kwargs["headers"]["Referer"], darwin)
+
+    def test_keka_config_allows_distinct_portals_for_the_same_tenant(self):
+        base = radar._default_config()
+        validated = radar.validate_config({
+            **base,
+            "keka_boards": [
+                {"careers_url": "https://universaled.keka.com/careers/ebenezerschool", "company": "Universal Education"},
+                {"careers_url": "https://universaled.keka.com/careers/anotheracademy", "company": "Universal Education"},
+            ],
+        })
+        self.assertEqual(len(validated["keka_boards"]), 2)
+        self.assertEqual(
+            [entry["careers_url"] for entry in validated["keka_boards"]],
+            [
+                "https://universaled.keka.com/careers/ebenezerschool",
+                "https://universaled.keka.com/careers/anotheracademy",
+            ],
+        )
+        with self.assertRaisesRegex(radar.HTTPException, "Duplicate Keka public portal"):
+            radar.validate_config({
+                **base,
+                "keka_boards": [
+                    {"careers_url": "https://universaled.keka.com/careers/ebenezerschool", "company": "Universal Education"},
+                    {"careers_url": "https://universaled.keka.com/careers/ebenezerschool", "company": "Universal Education"},
+                ],
+            })
 
     def test_new_connectors_are_opt_in_and_config_migration_disables_them(self):
         base = radar._default_config()

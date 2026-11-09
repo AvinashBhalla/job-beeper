@@ -543,10 +543,10 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             raise HTTPException(status_code=422, detail="Each Keka board requires a public HTTPS https://<tenant>.keka.com/careers URL.")
         if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
             raise HTTPException(status_code=422, detail="Each Keka board requires a company label of at most 120 characters.")
-        tenant = str(detected["board_key"]).lower()
-        if tenant in seen_keka:
-            raise HTTPException(status_code=422, detail=f"Duplicate Keka tenant: {tenant}.")
-        seen_keka.add(tenant)
+        board_key = str(detected["board_key"]).lower()
+        if board_key in seen_keka:
+            raise HTTPException(status_code=422, detail=f"Duplicate Keka public portal: {board_key}.")
+        seen_keka.add(board_key)
         entry = {"careers_url": detected["board_url"], "company": company.strip()}
         registry_id = _optional_registry_id(board, "Keka")
         if registry_id is not None:
@@ -5523,7 +5523,9 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             _record_source_board("keka", False)
             failures.append("invalid Keka careers board configuration")
             continue
-        tenant = str(detected["board_key"]).lower()
+        tenant = str(detected["tenant"]).lower()
+        portal = str(detected["portal"]).lower()
+        careers_base = f"https://{detected['host']}/careers" if portal == "default" else f"https://{detected['host']}/careers/{portal}"
         try:
             final_url, html = _keka_fetch_careers_page("keka", careers_url)
             feed_match = re.search(
@@ -5535,7 +5537,7 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 raise ValueError("Keka careers page did not expose a public career feed.")
             feed_id = feed_match.group(1)
             parsed = urlsplit(final_url)
-            endpoint = f"https://{parsed.hostname}/careers/api/embedjobs/default/active/{feed_id}"
+            endpoint = f"https://{parsed.hostname}/careers/api/embedjobs/{portal}/active/{feed_id}"
             response = _tracked_source_get(
                 "keka", endpoint,
                 headers={**UA, "Accept": "application/json"},
@@ -5574,7 +5576,7 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             title = str(item.get("title") or "").strip()
             if raw_id in (None, "") or not title:
                 continue
-            source_id = f"keka-{tenant}-{raw_id}"
+            source_id = f"keka-{tenant}-{raw_id}" if portal == "default" else f"keka-{tenant}-{portal}-{raw_id}"
             if source_id in seen_ids:
                 continue
             seen_ids.add(source_id)
@@ -5609,10 +5611,11 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 and re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}", published_raw)
                 else "date" if published_at else "unknown"
             )
-            url = f"https://{parsed.hostname}/careers/jobdetails/{quote(str(raw_id), safe='')}"
+            url = f"{careers_base}/jobdetails/{quote(str(raw_id), safe='')}"
             salary = item.get("salaryRange") if isinstance(item.get("salaryRange"), dict) else {}
             details = {
                 "tenant": tenant,
+                "portal": portal,
                 "board_registry_id": board.get("registry_id"),
                 "job_number": item.get("jobNumber"),
                 "department_id": item.get("departmentIdentifier"),

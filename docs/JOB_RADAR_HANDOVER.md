@@ -7005,3 +7005,9 @@ Next priorities: Workday facet subdivision; Keka non-default portal slug support
 User action: nothing required now. Hirebase key remains absent and source flags remain off.
 
 Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n
+
+---
+
+## 2026-11-09 19:47 IST — latest continuation
+
+Workday incremental inventory was pushed as `6197446`; exact-head GitHub V2 CI #1430 passed. Keka portal-aware URL parsing, collection, verification, multi-portal identity and config validation are implemented locally. Focused Keka tests: 37 passed; full V2 regression: 439 passed in 359.301s. Keka changes remain uncommitted/unpushed; next agent should inspect current git diff, commit/push to PR #65, and verify exact-head CI. Then prioritize Workday facet-aware inventory, company-agnostic Workday/Keka/Darwinbox public board discovery, and a persistent per-board scheduler. PR #65 stays draft; no deployment/source activation. Hirebase key is absent; nothing required from user.

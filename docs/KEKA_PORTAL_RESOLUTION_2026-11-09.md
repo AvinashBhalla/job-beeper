@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-09 19:30 IST  
 **Branch:** feat/global-ats-discovery-hirebase-guard-20261109  
-**Status:** planned follow-up after Workday inventory regression; no Keka collector code changed in this step.
+**Status:** implemented in the current worktree; focused and full V2 regression passed; not yet pushed or deployed.
 
 ## Finding from source research
 
@@ -40,3 +40,6 @@ Reference code: https://github.com/kalil0321/ats-scrapers/blob/main/src/ats_scra
 ## Acceptance
 
 At least two distinct non-default mocked public portal paths can be verified and collected, while the default portal remains backwards compatible. No global company discovery claim should be made: portal URL discovery is a separate P0 task.
+## Implementation status — 2026-11-09 19:47 IST
+
+Implemented in the current worktree. The strict resolver supports default `/careers` and non-default `/careers/{portal-slug}` paths. Non-default board keys use `tenant:portal`; job IDs include tenant and portal. Collector and verifier both use the portal-specific embed endpoint and job-detail URL. Config allows distinct portals on one tenant and rejects duplicate tenant+portal. Focused tests: 37 passed. Full V2 regression: 439 passed in 359.301 seconds. Keka changes are not yet pushed; exact-head GitHub CI remains required.

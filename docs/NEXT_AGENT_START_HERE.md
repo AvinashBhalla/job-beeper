@@ -342,3 +342,7 @@ User action: nothing required now. Hirebase key remains absent and source flags 
 Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n
 
 Latest recovery checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md.
+
+## Latest continuation — 2026-11-09 19:47 IST
+
+Read `docs/RECOVERY_CHECKPOINT_2026-11-09_1947_IST.md` first. Workday incremental inventory is pushed in commit `6197446` and exact-head GitHub V2 CI #1430 passed. Keka non-default portal support is implemented locally but not yet pushed. Focused board-discovery tests passed 37/37; full V2 regression passed 439/439 in 359.301 seconds. Next: commit/push Keka to PR #65 and verify exact-head CI; then Workday facet-aware partitioning, company-agnostic Workday/Keka/Darwinbox discovery, and a persistent per-board scheduler. No user action is required; Hirebase key remains absent and sources remain disabled.
