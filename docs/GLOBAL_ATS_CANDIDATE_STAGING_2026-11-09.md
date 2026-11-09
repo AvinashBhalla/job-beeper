@@ -74,7 +74,7 @@ HTML candidate controls have unique IDs and the dashboard loader/import/link/rej
 
 ## PR and deployment status
 
-Candidate staging was committed at `243da9c35e93979e59d0de281130581cad4124d1`, pushed to PR #65, and exact-head CI #1437 passed. The exact same immutable candidate image is deployed on shared dev 8001 and connector QA 8010. Both run eight real public source feeds; LinkedIn and Hirebase remain off; notifications and external LLM credentials are off. Dev completed multiple cycles and QA has one complete initial pass. Detailed metrics, backups, cadence, SSH tunnels and the remaining QA-account action are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md`. Production remains untouched.
+Candidate staging was committed at `243da9c35e93979e59d0de281130581cad4124d1`, pushed to PR #65, and exact-head CI #1437 passed. The exact same immutable candidate image is deployed on shared dev 8001 and connector QA 8010. Both run eight real public source feeds; LinkedIn and Hirebase remain off; notifications and external LLM credentials are off. Dev completed multiple cycles and QA has one complete initial pass. Connector QA repeat pass: 2 runs per source, 1,891 total live jobs, 0 HTTP 429/page/board failures, SQLite integrity ok and zero sends. Dev DB latest: 10,278 jobs / 8,228 runs / integrity ok / zero sends. Exact-head docs CI #1438 passed on `b09cba6`. Detailed metrics, backups, cadence, SSH tunnels and the remaining QA-account action are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md`. Production remains untouched.
 
 ## Explicitly not implemented yet
 

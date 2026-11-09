@@ -125,3 +125,26 @@ The first creates the QA admin and the second an ordinary member. Do not paste p
 ## 8. User inputs
 
 Only action needed for live two-role QA is to create the QA admin/member as above and perform UAT. No API key or production credential is required. Hirebase key remains absent. Production promotion needs separate explicit approval after dev/QA sign-off.
+
+## 2026-11-09 22:19 IST — final QA repeat pass and exact-head docs CI
+
+GitHub Actions V2 CI #1438 / run `42658009285` passed on docs/hand-over commit `b09cba6138035d23f0e413e8a263ff189261f764`. The earlier feature-code commit `243da9c` also passed exact-head CI #1437. PR #65 remains open/draft/unmerged.
+
+A second controlled QA ingestion pass was executed with `radar.run_source()` for all eight enabled providers; source schedule values remained 3,600 seconds and notifications stayed off. Results across two passes per provider:
+
+| Source | Runs | Jobs seen (sum) | New rows (sum) | Requests (sum) | 429 | Page / board failures |
+|---|---:|---:|---:|---:|---:|---:|
+| Naukri | 2 | 398 | 213 | 2 | 0 | 0 / 0 |
+| Greenhouse | 2 | 739 | 370 | 6 | 0 | 0 / 0 |
+| Ashby | 2 | 1,648 | 825 | 4 | 0 | 0 / 0 |
+| Workday | 2 | 47 | 28 | 43 | 0 | 0 / 0 |
+| SmartRecruiters | 2 | 600 | 304 | 46 | 0 | 0 / 0 |
+| Workable | 2 | 12 | 6 | 2 | 0 | 0 / 0 |
+| Keka | 2 | 218 | 109 | 4 | 0 | 0 / 0 |
+| Darwinbox | 2 | 72 | 36 | 2 | 0 | 0 / 0 |
+
+After the second pass QA DB has 1,891 jobs, 16 source runs, 1,891 canonical opportunities, 1,891 global evaluations, 1,891 notification ledger decisions, zero users/preferences, zero sent notifications, and SQLite integrity `ok`. Idempotent feeds returned no new duplicate rows for Ashby, Workable, Keka and Darwinbox; Naukri/Greenhouse/Workday/SmartRecruiters delivered newly available items. The normal 60-minute QA scheduler's next autonomous cycle remains unobserved; the second pass was an explicit controlled test, not a cadence change.
+
+Latest shared dev check: 10,278 jobs, 8,228 source runs, SQLite integrity `ok`, zero sent notifications; health HTTP 200. Production remains untouched.
+
+Only outstanding owner input: create QA-only admin/member interactively with commands documented here, then review admin/member UI on port 8010. Do not copy production credentials/users.
