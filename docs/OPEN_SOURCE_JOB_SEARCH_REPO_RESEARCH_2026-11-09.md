@@ -214,3 +214,7 @@ Stars and README throughput claims do not prove low latency. JobBeeper should ru
 - incomplete/failed board sweep count and recovery after cooldown.
 
 A provider showing fewer 429s but repeatedly omitting pages is not healthier. A large worker count that returns quickly while silently losing boards is not lower latency in a useful sense.
+
+## Mapping research to current JobBeeper code
+
+See `docs/ATS_PROVIDER_GAP_ANALYSIS_2026-11-09.md` for the concrete Workday/Keka/Darwinbox differences in the current collector implementation and the sequenced engineering plan.
