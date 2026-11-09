@@ -6656,3 +6656,43 @@ GitHub V2 CI run `42483043107` completed successfully on Workday commit `c4f9c66
 - Current 1-page cap was a deliberate low-pressure initial production activation, not a pagination implementation limit: the code already supports offset paging and has tests for a second page when `WORKDAY_MAX_PAGES_PER_BOARD` is patched to 2. Detail lookup is separately capped at 20 per board.
 - Research notes (community measurements; not an official Workday API contract): [Adderley Data — 20/page, 2,000 cap and offset loop pitfalls](https://adderleydata.com/guides/workday-job-board-api/) and [Ctrio Lab — public Workday CXS endpoint and page limits](https://ctriolab.com/jobs/workday-jobs-api/). Re-verify against each real tenant before raising limits.
 - Recommended next change: test NVIDIA offsets 20/40 in an isolated low-rate experiment; verify pages are distinct, short pages terminate, `total` is read only as advisory, duplicate page fingerprints stop loops, and 429 persists the cooldown. If stable, raise to a small bounded page cap (e.g. 3–5 pages) while keeping detail calls separately capped and no more than 120-second poll cadence. Never set `limit>20`; do not crawl all 2,000 on every poll or bypass facets/caps. Preserve the newest page on every poll so freshly posted jobs remain the priority.
+
+
+## 2026-11-09 — Production login diagnosis: Secure cookie over HTTP (OCI ingress action required)
+
+### Diagnosis confirmed from production evidence
+
+- The owner reports login returns to the sign-in form. Browser screenshots show direct HTTP at `http://130.210.27.197:8000/dashboard/#jobs` (Chrome labels it “Not secure”).
+- Production access logs prove the password credentials are valid: three `POST /api/auth/login` requests returned `200 OK`, each immediately followed by `GET /api/auth/me` returning `401 Unauthorized`. The account exists and is active: `bawejaavichal01@gmail.com`, user ID 1, role admin. Sessions were created for this account. Never ask the owner to send the password in chat.
+- Root cause: `_auth_cookie_secure()` defaults to true (`v2/radar.py`); `_issue_user_session()` sets both `job_beeper_session` and `job_beeper_csrf` with `Secure`. Browsers do not send Secure cookies over ordinary HTTP. Therefore the password login succeeds and the server issues a session, but the subsequent `/api/auth/me` request has no session cookie and returns 401. This is not an invalid-credentials problem.
+- Do **not** set `JOB_BEEPER_COOKIE_SECURE=false` on a public production HTTP origin. That would make session cookies transportable over plaintext HTTP. The password has already been submitted over HTTP in the reported attempts; after HTTPS is live, the owner should consider changing it using a proper password-change feature/approved procedure. Never request or store it in chat/docs.
+
+### HTTPS preparation already completed on VM
+
+- Installed Ubuntu Nginx and Certbot snap 5.9.0. Nginx runs on port 80. Certbot 5.9.0 supports `--ip-address`, `--preferred-profile shortlived`, and the webroot authenticator for IP address certificates. Let's Encrypt IP certificates are short-lived (160 hours) and require automated renewal.
+- Added persistent host INPUT firewall rules for TCP 80 and TCP 443 using `netfilter-persistent`; existing SSH and Docker rules preserved.
+- Nginx site is `/etc/nginx/sites-available/jobbeeper-ip.conf`, enabled at `/etc/nginx/sites-enabled/jobbeeper-ip.conf`. It serves `/.well-known/acme-challenge/` from `/var/www/letsencrypt`; ordinary HTTP currently returns 503 during HTTPS setup. Local challenge probe with `Host: 130.210.27.197` returned 200.
+- Attempted a Let's Encrypt staging request:
+  `sudo certbot certonly --staging --non-interactive --agree-tos -m bawejaavichal01@gmail.com --preferred-profile shortlived --ip-address 130.210.27.197 --webroot --webroot-path /var/www/letsencrypt`
+  It failed because the CA could not connect to `130.210.27.197:80` (timeout during connect). The local Nginx challenge path works. This isolates the remaining block to OCI VCN Security List / attached NSG ingress rules.
+- The application is still directly reachable at port 8000 and the production container/DB/source configuration were not changed as part of this HTTPS setup. Current app image remains `job-radar-prod-canary:6e5becb`; app health 200. Login should not be used over HTTP until HTTPS is ready.
+
+### Owner action required in Oracle Cloud Console
+
+1. Open Oracle Cloud Console → Networking → Virtual Cloud Networks.
+2. Open the VCN and identify the subnet/NSG attached to the JobBeeper instance's primary VNIC.
+3. In the effective Security List and any attached NSG, add two **stateful ingress** rules (Stateless unchecked):
+   - Source CIDR: `0.0.0.0/0`; Protocol TCP; source port: All/blank; destination port: `80`.
+   - Source CIDR: `0.0.0.0/0`; Protocol TCP; source port: All/blank; destination port: `443`.
+4. Save. Keep port 22's existing source restrictions intact; do not expose database/internal ports.
+
+Oracle's Security List/NSG workflow: https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/creating-securitylist.htm and https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/manage-nsg-security-rules.htm .
+
+### Next steps once owner opens ingress
+
+1. Re-run the **staging** Certbot command above. Do not request a production certificate until staging challenge succeeds.
+2. Request production cert with same command minus `--staging`; cert path should be `/etc/letsencrypt/live/130.210.27.197/fullchain.pem` and `privkey.pem`.
+3. Configure Nginx port 443 reverse proxy to `127.0.0.1:8000`, forward `Host`, `X-Real-IP`, `X-Forwarded-For`, and `X-Forwarded-Proto: https`; keep the port-80 ACME challenge route and redirect all other HTTP to HTTPS.
+4. Set `JOB_BEEPER_PUBLIC_ORIGIN=https://130.210.27.197` and `JOB_BEEPER_COOKIE_SECURE=true` in the production env file. Change Compose published port from `8000:8000` to `127.0.0.1:8000:8000` only after Nginx HTTPS reverse proxy is healthy, so clients cannot bypass TLS. Keep the current data volume.
+5. Configure a renewal timer at least daily (160-hour certificate lifetime); Certbot deploy hook reloads Nginx after renewal. Validate certificate SAN matches IP, validity, external browser login, `/api/auth/me` 200, and logout/login cycle.
+6. Do not loosen cookie security as a workaround. Remove temporary test challenge file and change Nginx HTTP 503 handler to HTTPS redirect after cert is installed.

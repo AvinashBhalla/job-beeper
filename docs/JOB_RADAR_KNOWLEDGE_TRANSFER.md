@@ -3527,3 +3527,11 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Production Workday NVIDIA source currently polls one page of 20 per 120 seconds, detail lookups capped at 20. This is a deliberate low-pressure initial rollout; the collector has offset paging code but `WORKDAY_MAX_PAGES_PER_BOARD=1` today.
 - Workday CXS is an undocumented endpoint used by the public career-site UI. Empirical reports show hard page size 20, offsets by 20, total may cap at 2,000 or be reliable only on the first page; some sites repeat first-page data past end. See links in the Workday section of `JOB_RADAR_HANDOVER.md`.
 - Next agent should not simply set a huge page size. Validate offsets 20/40 at low request volume, duplicate/loop detection, short-page stop, 429 cooldown and detail budget; then consider a small fixed page cap. Do not call the current collector full board coverage.
+
+
+## 2026-11-09 — Login root cause confirmed; HTTPS depends on OCI ingress
+
+- Admin account exists and is active. Server logs show password login POSTs returned 200, followed by `/api/auth/me` 401. Browser URL is plain HTTP, while auth session/CSRF cookies are Secure by default. Browser doesn't send these cookies over HTTP: not a bad-password issue. Do not ask for or accept the owner password in chat; do not disable Secure cookies on public HTTP.
+- Installed Nginx + Certbot 5.9.0, added persistent VM INPUT allow rules for TCP 80/443, configured an ACME webroot. Local challenge returns 200. Let's Encrypt staging IP-cert challenge failed on public IP `130.210.27.197:80` with timeout. The OCI cloud ingress Security List/attached NSG still blocks port 80 (and likely 443).
+- Owner must add stateful TCP ingress `0.0.0.0/0` -> destination port 80 and 443 in OCI Console. Details and precise commands are in `JOB_RADAR_HANDOVER.md`. Once opened, re-run staging certbot, then production cert, configure Nginx TLS proxy and set `JOB_BEEPER_PUBLIC_ORIGIN=https://130.210.27.197` / secure cookie true. Restrict app port 8000 to loopback after reverse proxy is live.
+- Production app and data are healthy/unchanged; current production image `job-radar-prod-canary:6e5becb`. Do not mark login fixed until external HTTPS login yields `/api/auth/me` 200.
