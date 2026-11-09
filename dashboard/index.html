@@ -98,7 +98,7 @@
           <span class="nav-group-title">Intelligence</span>
           <a class="nav-link-item admin-only-navigation" href="#sources" data-section="sourcesSection" id="navSources" hidden>
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-            <span>Source Health</span>
+            <span>Coverage &amp; Health</span>
             <span class="pulse-dot" id="sidebarSourcePulse"></span>
           </a>
         </div>
@@ -613,19 +613,77 @@
         <!-- ===================================================================
              4. SOURCE HEALTH SECTION
              =================================================================== -->
-        <section id="sourcesSection" class="workspace-page admin-only-section" aria-label="Source Health Workspace" hidden>
+        <section id="sourcesSection" class="workspace-page admin-only-section" aria-label="Coverage and Health Workspace" hidden>
           <div class="view-content-wrapper">
             <div class="view-headline-row">
               <div>
-                <h2 class="view-title-main">Source Health &amp; Ingestion Telemetry</h2>
-                <p class="view-subtitle-main">Latest source health and measured request, retry, rate-limit and partial-failure totals over the last 24 hours. Historical runs are marked Not measured.</p>
+                <h2 class="view-title-main">Coverage &amp; Health</h2>
+                <p class="view-subtitle-main">See which source connectors are enabled, which employer boards are in the registry, and whether collection is running reliably.</p>
               </div>
-              <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
+              <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh coverage</button>
             </div>
 
-            <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">
-              <span class="settings-block-title">Employer &amp; Career Board Discovery</span>
-              <p class="auth-description">Enter a company's normal website or careers URL. Job Beeper checks public careers links, identifies supported ATS board patterns and adds candidates to this review queue. Discovery does not enable a collector or send Telegram alerts.</p>
+            <div class="source-coverage-note" role="note">
+              <strong>Important: enabled does not mean complete coverage.</strong>
+              JobBeeper currently polls employer boards that have been discovered, verified and activated. A green source means its connector is enabled; it does not mean every company using that ATS has been found. Global company-agnostic ATS discovery is a P0 engineering gap. The manual company scan below is currently a fallback, not an automatic market-wide crawler.
+            </div>
+
+            <div class="source-overview-grid" aria-label="Source overview">
+              <article class="source-overview-card">
+                <span class="source-overview-label">Connectors enabled</span>
+                <strong id="sourceKpiEnabled" class="source-overview-value">—</strong>
+                <span class="source-overview-hint">Provider adapters switched on</span>
+              </article>
+              <article class="source-overview-card">
+                <span class="source-overview-label">Registry boards loaded</span>
+                <strong id="sourceKpiBoards" class="source-overview-value">—</strong>
+                <span id="sourceKpiBoardsHint" class="source-overview-hint">Loading registry status…</span>
+              </article>
+              <article class="source-overview-card">
+                <span class="source-overview-label">Sources needing attention</span>
+                <strong id="sourceKpiAttention" class="source-overview-value">—</strong>
+                <span class="source-overview-hint">Recent errors or partial runs</span>
+              </article>
+              <article class="source-overview-card">
+                <span class="source-overview-label">New jobs in latest runs</span>
+                <strong id="sourceKpiNewJobs" class="source-overview-value">—</strong>
+                <span class="source-overview-hint">New records from each source's latest run</span>
+              </article>
+            </div>
+
+            <details class="source-help-panel">
+              <summary>How to read this page</summary>
+              <div class="source-help-content">
+                <p><strong>Connector:</strong> the platform adapter (for example Workday), not a particular employer.</p>
+                <p><strong>Employer board:</strong> one company's public career site or ATS tenant. This is what actually gets polled.</p>
+                <p><strong>Enabled:</strong> the adapter is switched on. It does not prove that all employers on that ATS are covered.</p>
+                <p><strong>Jobs seen:</strong> listings returned in the latest run. <strong>New jobs:</strong> records not already in JobBeeper after deduplication.</p>
+                <p><strong>429:</strong> the provider rate-limited a request and asked us to slow down. <strong>Retries:</strong> another attempt was made; it may or may not have succeeded.</p>
+                <p><strong>Average request time:</strong> time for one HTTP request, not the full time from employer publication to your notification.</p>
+                <p><strong>Not measured:</strong> older run records may predate detailed request telemetry. It does not mean zero requests.</p>
+                <p><strong>Job legitimacy:</strong> whether an individual job is still open, genuine or reposted is a separate job-level check; this page does not calculate that score.</p>
+              </div>
+            </details>
+
+            <section class="source-board-workspace" aria-labelledby="sourceBoardsHeading">
+              <div class="source-subsection-heading">
+                <div>
+                  <h3 id="sourceBoardsHeading">Employer boards in the registry</h3>
+                  <p>These are the company-specific boards currently known to JobBeeper. Discovery/verification status is not the same as a successful recurring poll.</p>
+                </div>
+                <span class="source-inline-note">Up to 1,000 latest entries</span>
+              </div>
+              <div class="data-table-container">
+                <table class="table-dataset">
+                  <thead><tr><th>Company</th><th>ATS provider</th><th>Board</th><th>Collector</th><th>Registry status</th><th>Evidence / actions</th></tr></thead>
+                  <tbody id="discoveredBoardsTableBody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading employer boards…</td></tr></tbody>
+                </table>
+              </div>
+            </section>
+
+            <details class="settings-block source-manual-discovery" id="boardDiscoveryPanel">
+              <summary class="settings-block-title">Manually add or correct an employer board <span class="source-inline-note">Fallback / advanced</span></summary>
+              <p class="auth-description">Use this only when automatic discovery has missed a public employer career site or its details need correction. This searches one company at a time; it is not a global Workday/Keka/Darwinbox directory.</p>
               <form id="boardDiscoveryForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--space-8);align-items:end;">
                 <div class="form-field-group">
                   <label class="form-field-label" for="discoveryCompanyName">Company name</label>
@@ -643,40 +701,37 @@
                   <label class="form-field-label" for="discoveryCountry">Country (optional)</label>
                   <input id="discoveryCountry" class="number-field-input" type="text" maxlength="80" placeholder="India">
                 </div>
-                <button type="submit" class="btn-pill btn-pill-primary" id="discoverCompanyBtn">Discover career boards</button>
+                <button type="submit" class="btn-pill btn-pill-primary" id="discoverCompanyBtn">Scan this company</button>
               </form>
               <p id="boardDiscoveryStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">No company scanned in this session.</p>
-              <div class="data-table-container" style="margin-top:var(--space-6);">
+            </details>
+
+            <section class="source-reliability-workspace" aria-labelledby="sourceReliabilityHeading">
+              <div class="source-subsection-heading">
+                <div>
+                  <h3 id="sourceReliabilityHeading">Collector reliability</h3>
+                  <p>Operational request metrics over the last 24 hours. These describe the connector, not job quality or overall employer coverage.</p>
+                </div>
+                <span class="source-inline-note">Latest run + rolling 24h</span>
+              </div>
+              <div class="data-table-container">
                 <table class="table-dataset">
-                  <thead><tr><th>Company</th><th>ATS provider</th><th>Board identifier</th><th>Collector</th><th>Review status</th><th>Discovered from</th><th>Actions</th></tr></thead>
-                  <tbody id="discoveredBoardsTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No discovered boards yet.</td></tr></tbody>
+                  <thead>
+                    <tr>
+                      <th title="Provider adapter, not a single employer">Connector</th>
+                      <th title="Enabled, running, partial, error or disabled">Status / last success</th>
+                      <th title="Latest run only; new jobs are newly inserted after dedupe">Latest run</th>
+                      <th title="HTTP requests, rate-limit responses and retry attempts in the last 24h">Request health (24h)</th>
+                      <th title="Average duration for one HTTP request; page and board failures are separate">Speed / failures (24h)</th>
+                      <th>Diagnostics</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sourceHealthTableBody">
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading source telemetry…</td></tr>
+                  </tbody>
                 </table>
               </div>
-            </div>
-
-            <div class="data-table-container">
-              <table class="table-dataset">
-                <thead>
-                  <tr>
-                    <th>Source</th>
-                    <th>Status</th>
-                    <th>Jobs Seen (Latest)</th>
-                    <th>New Jobs (Latest)</th>
-                    <th>Measured Runs (24h)</th>
-                    <th>Requests (24h)</th>
-                    <th>HTTP 429 (24h)</th>
-                    <th>Retries (24h)</th>
-                    <th>Avg Request (24h)</th>
-                    <th>Page / Board Failures (24h)</th>
-                    <th>Last Success (IST)</th>
-                    <th>Diagnostics</th>
-                  </tr>
-                </thead>
-                <tbody id="sourceHealthTableBody">
-                  <!-- Populated by JS -->
-                </tbody>
-              </table>
-            </div>
+            </section>
           </div>
         </section>
 
@@ -716,7 +771,7 @@
     </a>
     <a href="#sources" class="mobile-tab-btn admin-only-navigation" data-section="sourcesSection" hidden>
       <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
-      <span>Health</span>
+      <span>Coverage</span>
     </a>
     <a href="#preferences" class="mobile-tab-btn" data-section="preferencesSection">
       <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>

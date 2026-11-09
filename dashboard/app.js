@@ -883,7 +883,7 @@
           target.id === 'jobsSection' ? 'Jobs Feed' :
           target.id === 'appliedSection' ? 'Applied Jobs' :
           target.id === 'preferencesSection' ? 'Matching Preferences' :
-          target.id === 'sourcesSection' ? 'Source Health' :
+          target.id === 'sourcesSection' ? 'Coverage & Health' :
           target.id === 'accessSection' ? 'Account' : 'Jobs Feed';
       }
 
@@ -1587,78 +1587,90 @@
     const tbody = $('sourceHealthTableBody');
     if (!tbody) return;
 
-    if (state.sourceStatus.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:var(--space-20);">Loading source telemetry…</td></tr>`;
+    const sources = state.sourceStatus || [];
+    const enabledSources = sources.filter(src => src.enabled !== false);
+    const attentionSources = enabledSources.filter(src => {
+      const runtime = src.runtime || {};
+      const outcome = src.last_run_outcome || runtime.last_run_outcome || '';
+      return Boolean(runtime.error || src.last_error)
+        || outcome === 'failed'
+        || outcome === 'rate_limited'
+        || outcome === 'partial_failed'
+        || outcome === 'partial_rate_limited';
+    });
+    const latestNewJobs = sources.reduce((sum, src) => sum + Number(src.new_jobs || 0), 0);
+    const setKpi = (id, value) => { const el = $(id); if (el) el.textContent = Number(value || 0).toLocaleString(); };
+    setKpi('sourceKpiEnabled', enabledSources.length);
+    const knownBoards = state.discoveredBoards || [];
+    setKpi('sourceKpiBoards', knownBoards.length);
+    setKpi('sourceKpiAttention', attentionSources.length);
+    setKpi('sourceKpiNewJobs', latestNewJobs);
+    const boardHint = $('sourceKpiBoardsHint');
+    if (boardHint) {
+      const counts = knownBoards.reduce((acc, board) => {
+        const status = String(board.review_status || 'discovered').toLowerCase();
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+      const truncated = knownBoards.length >= 1000 ? ' · latest 1,000 only' : '';
+      boardHint.textContent = `${counts.active || 0} monitoring · ${counts.verified || 0} verified · ${(counts.discovered || 0) + (counts.reviewed || 0)} pending${truncated}`;
+    }
+
+    if (!sources.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-20);">No source telemetry is available yet.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = state.sourceStatus.map(src => {
+    tbody.innerHTML = sources.map(src => {
       const runtime = src.runtime || {};
       const metrics24h = src.last_24h || {};
       const measuredRuns = Number(metrics24h.measured_runs || 0);
       const totalRuns = Number(metrics24h.runs || 0);
-      const metricsMeasured = measuredRuns > 0;
-      const runCoverage = metricsMeasured
-        ? `${measuredRuns} / ${totalRuns}`
-        : '<span style="color:var(--text-muted);">Not measured</span>';
-      const metricValue = value => metricsMeasured ? esc(value ?? 0) : '<span style="color:var(--text-muted);">Not measured</span>';
-      const pageBoardFailures = metricsMeasured
-        ? `${Number(metrics24h.pages_failed || 0)}/${Number(metrics24h.pages_attempted || 0)} pages · ${Number(metrics24h.boards_failed || 0)}/${Number(metrics24h.boards_attempted || 0)} boards`
-        : '<span style="color:var(--text-muted);">Not measured</span>';
+      const measured = measuredRuns > 0;
       const errorText = runtime.error || src.last_error || '';
       const relayFeed = src.source === 'naukri' ? src.last_feed : null;
       const relayFeedNote = relayFeed
-        ? '<div style="color:' + (relayFeed.fresh ? 'var(--text-muted)' : 'var(--status-warning)') + ';font-size:11px;margin-bottom:4px;">Last good relay: ' + Math.floor(Number(relayFeed.age_seconds || 0) / 60) + 'm old · ' + esc(relayFeed.jobs_count ?? 0) + ' jobs · ' + (relayFeed.fresh ? 'fresh' : 'STALE') + ' · ' + (relayFeed.snapshot_unchanged ? 'same snapshot' : 'updated snapshot') + '</div>'
+        ? '<div class="source-diagnostic-note">Relay snapshot: ' + Math.floor(Number(relayFeed.age_seconds || 0) / 60) + 'm old · ' + esc(relayFeed.jobs_count ?? 0) + ' jobs · ' + (relayFeed.fresh ? 'fresh' : 'stale') + ' · ' + (relayFeed.snapshot_unchanged ? 'unchanged' : 'updated') + '</div>'
         : '';
-      const runOutcome = src.last_run_outcome || runtime.last_run_outcome || '';
-      const isPartial = runOutcome === 'partial_failed' || runOutcome === 'partial_rate_limited';
-      const isError = Boolean(errorText) && !isPartial;
+      const outcome = src.last_run_outcome || runtime.last_run_outcome || '';
+      const isPartial = outcome === 'partial_failed' || outcome === 'partial_rate_limited';
+      const isError = !isPartial && (Boolean(errorText) || outcome === 'failed' || outcome === 'rate_limited');
       const isRunning = Boolean(runtime.running);
       const isDisabled = src.enabled === false;
       const sourceLabels = {
-        linkedin: 'LinkedIn',
-        naukri: 'Naukri (Relay)',
-        instahyre: 'Instahyre',
-        greenhouse: 'Greenhouse',
-        ashby: 'Ashby',
-        lever: 'Lever',
-        workday: 'Workday',
-        smartrecruiters: 'SmartRecruiters',
-        workable: 'Workable',
-        keka: 'Keka',
-        darwinbox: 'Darwinbox',
+        linkedin: 'LinkedIn', naukri: 'Naukri (relay)', instahyre: 'Instahyre',
+        greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
+        smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka', darwinbox: 'Darwinbox',
       };
       const sourceName = sourceLabels[src.source] || src.source;
-      let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
-      if (isDisabled) {
-        statusBadge = `<span class="signal-pill" style="background:var(--surface-muted);color:var(--text-muted);border-color:var(--border-default);">DISABLED</span>`;
-      } else if (isRunning) {
-        statusBadge = `<span class="signal-pill signal-warning">${SVG_ICONS.rotateCw} RUNNING</span>`;
-      } else if (isPartial) {
-        statusBadge = `<span class="signal-pill signal-warning">PARTIAL</span>`;
-      } else if (isError) {
-        statusBadge = `<span class="signal-pill" style="background:var(--status-error-subtle);color:var(--status-error);border-color:var(--status-error-border);">${SVG_ICONS.x} ERROR</span>`;
-      }
-
-      return `
-        <tr>
-          <td><b style="color:var(--text-primary);">${esc(sourceName)}</b></td>
-          <td>${statusBadge}</td>
-          <td class="meta-mono">${esc(src.jobs_seen ?? 0)}</td>
-          <td class="meta-mono">${esc(src.new_jobs ?? 0)}</td>
-          <td class="meta-mono">${runCoverage}</td>
-          <td class="meta-mono">${metricValue(metrics24h.requests_attempted)}</td>
-          <td class="meta-mono">${metricValue(metrics24h.http_429)}</td>
-          <td class="meta-mono">${metricValue(metrics24h.retry_attempts)}</td>
-          <td class="meta-mono">${metricsMeasured ? `${esc(metrics24h.avg_request_duration_ms ?? '—')} ms` : '<span style="color:var(--text-muted);">Not measured</span>'}</td>
-          <td class="meta-mono">${pageBoardFailures}</td>
-          <td class="meta-mono" style="font-size:12px;">${esc(fmtTimestamp(runtime.last_success, 'minute'))}</td>
-          <td>
-            ${relayFeedNote}
-            ${errorText ? `<code style="color:${isPartial ? 'var(--status-warning)' : 'var(--status-error)'};font-family:var(--font-mono);font-size:11px;">${esc(errorText)}</code>` : '<span style="color:var(--text-muted);font-size:12px;">Operational</span>'}
-          </td>
-        </tr>
-      `;
+      let statusLabel = runtime.last_success ? 'Enabled' : 'Not checked yet';
+      let statusClass = runtime.last_success ? 'source-status-enabled' : 'source-status-warning';
+      if (isDisabled) { statusLabel = 'Disabled'; statusClass = 'source-status-disabled'; }
+      else if (isRunning) { statusLabel = 'Checking now'; statusClass = 'source-status-warning'; }
+      else if (isPartial) { statusLabel = 'Partially delayed'; statusClass = 'source-status-warning'; }
+      else if (isError) { statusLabel = 'Needs attention'; statusClass = 'source-status-error'; }
+      const lastSuccess = runtime.last_success ? fmtTimestamp(runtime.last_success, 'minute') : 'Not checked yet';
+      const seen = Number(src.jobs_seen || 0);
+      const added = Number(src.new_jobs || 0);
+      const requestText = measured
+        ? `${Number(metrics24h.requests_attempted || 0).toLocaleString()} requests · ${Number(metrics24h.http_429 || 0)} rate-limited · ${Number(metrics24h.retry_attempts || 0)} retries`
+        : 'Not measured (historical runs)';
+      const speedText = measured
+        ? `${metrics24h.avg_request_duration_ms == null ? '—' : `${esc(metrics24h.avg_request_duration_ms)} ms avg`}<div class="source-diagnostic-note">Pages failed: ${Number(metrics24h.pages_failed || 0)}/${Number(metrics24h.pages_attempted || 0)} · Boards failed: ${Number(metrics24h.boards_failed || 0)}/${Number(metrics24h.boards_attempted || 0)}</div><div class="source-diagnostic-note">Telemetry measured on ${measuredRuns}/${totalRuns} runs</div>`
+        : '<span class="source-unmeasured">Not measured yet</span>';
+      const diag = errorText
+        ? `<code class="source-error-detail">${esc(errorText)}</code>`
+        : (isPartial ? '<span class="source-status-warning-text">Latest run completed with partial failures.</span>' : (isError ? '<span class="source-status-warning-text">Latest run did not complete successfully.</span>' : '<span class="source-diagnostic-note">No reported error on the latest run.</span>'));
+      const cooldown = Number(src.last_cooldown_seconds || 0);
+      const cooldownNote = cooldown > 0 ? `<div class="source-diagnostic-note">Last cooldown: ${Math.round(cooldown)} seconds</div>` : '';
+      return `<tr>
+        <td><strong>${esc(sourceName)}</strong><div class="source-diagnostic-note">${esc(src.source)}</div></td>
+        <td><span class="source-status-pill ${statusClass}">${statusLabel}</span><div class="source-diagnostic-note">Last successful run: ${esc(lastSuccess)}</div></td>
+        <td><strong>${seen.toLocaleString()} seen</strong><div class="source-diagnostic-note">${added.toLocaleString()} new records in latest run</div></td>
+        <td>${requestText}</td>
+        <td>${speedText}</td>
+        <td>${relayFeedNote}${diag}${cooldownNote}</td>
+      </tr>`;
     }).join('');
   }
 
@@ -2108,31 +2120,40 @@
     if (!tbody) return;
     const boards = state.discoveredBoards || [];
     if (!boards.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No discovered boards yet. Add a company website above.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">No employer boards are registered yet. Use the manual fallback below, or wait for the global discovery engine to be implemented.</td></tr>';
       return;
     }
+    const reviewLabels = {
+      discovered: 'Discovered · not checked',
+      reviewed: 'Reviewed · not verified',
+      verified: 'Verified · not monitoring',
+      active: 'Monitoring',
+      rejected: 'Rejected',
+    };
     tbody.innerHTML = boards.map(board => {
       const collector = board.collector_available
-        ? `<span style="color:var(--status-success);">${esc(board.collector_source)} available</span>`
-        : '<span style="color:var(--text-muted);">Discovery only</span>';
-      const review = esc(board.review_status || 'discovered');
+        ? '<span class="source-board-available">Collector available</span>'
+        : '<span class="source-unmeasured">No collector yet</span>';
+      const review = esc(reviewLabels[board.review_status] || 'Status unknown');
       const verifyButton = board.collector_available && board.review_status !== 'verified' && board.review_status !== 'active'
-        ? `<button type="button" class="btn-pill btn-pill-secondary board-verify-btn" data-board-id="${esc(board.id)}">Verify endpoint</button>`
+        ? `<button type="button" class="btn-pill btn-pill-secondary board-verify-btn" data-board-id="${esc(board.id)}">Verify</button>`
         : '';
       const activateButton = board.review_status === 'verified'
-        ? `<button type="button" class="btn-pill btn-pill-primary board-activate-btn" data-board-id="${esc(board.id)}">Activate source</button>`
+        ? `<button type="button" class="btn-pill btn-pill-primary board-activate-btn" data-board-id="${esc(board.id)}">Start monitoring</button>`
         : '';
       const actions = board.review_status === 'active'
-        ? `<span style="color:var(--status-success);">Active</span><button type="button" class="btn-pill btn-pill-secondary board-disable-btn" data-board-id="${esc(board.id)}">Disable board</button>`
+        ? `<button type="button" class="btn-pill btn-pill-secondary board-disable-btn" data-board-id="${esc(board.id)}">Stop monitoring</button>`
         : `${verifyButton}${activateButton}<button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="reviewed">Mark reviewed</button><button type="button" class="btn-pill btn-pill-secondary board-review-btn" data-board-id="${esc(board.id)}" data-status="rejected">Reject</button>`;
+      const discoveredFrom = board.discovered_from
+        ? `<a href="${esc(board.discovered_from)}" target="_blank" rel="noopener noreferrer">Evidence page</a>`
+        : '<span class="source-unmeasured">No evidence URL</span>';
       return `<tr>
-        <td><b>${esc(board.company_name)}</b><div style="font-size:11px;color:var(--text-muted);">${esc(board.domain)}</div></td>
+        <td><b>${esc(board.company_name)}</b><div class="source-diagnostic-note">${esc(board.domain)}</div></td>
         <td>${esc(board.provider)}</td>
         <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a></td>
         <td>${collector}</td>
-        <td>${review}</td>
-        <td><a href="${esc(board.discovered_from)}" target="_blank" rel="noopener noreferrer">Open page</a></td>
-        <td style="display:flex;gap:4px;flex-wrap:wrap;">${actions}</td>
+        <td>${review}<div class="source-diagnostic-note">Last verified: ${esc(fmtTimestamp(board.last_verified_at, 'minute'))}</div></td>
+        <td><div>${discoveredFrom}</div><div class="source-board-actions">${actions}</div></td>
       </tr>`;
     }).join('');
     tbody.querySelectorAll('.board-review-btn').forEach(button => {
@@ -2155,16 +2176,17 @@
     if (!state.isAdmin) return;
     const tbody = $('discoveredBoardsTableBody');
     if (tbody && !state.discoveredBoards?.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading discovered boards…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading employer boards…</td></tr>';
     }
     try {
-      const response = await authClient.request('/discovery/boards?limit=500', { cache: 'no-store' });
+      const response = await authClient.request('/discovery/boards?limit=1000', { cache: 'no-store' });
       if (!response.ok) throw new Error(`Could not load boards (HTTP ${response.status}).`);
       const data = await response.json();
       state.discoveredBoards = data.boards || [];
       renderDiscoveredBoards();
+      renderSourceHealth();
     } catch (error) {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:var(--status-error);padding:var(--space-12);">${esc(error.message || 'Board registry unavailable.')}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="color:var(--status-error);padding:var(--space-12);">${esc(error.message || 'Board registry unavailable.')}</td></tr>`;
     }
   }
 
