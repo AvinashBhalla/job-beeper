@@ -261,3 +261,40 @@ No user input is needed to implement a conservative CDX-based candidate-only exp
 ## Next company-agnostic discovery design (2026-11-09)
 
 New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.
+
+## 2026-11-09 22:20 IST — additional repositories and live-service status check
+
+This addendum adds one strong engineering reference and one retired service discovered during the later repository pass. GitHub star counts below are approximate snapshots observed on 2026-11-09. They are community-interest indicators only; no repository has been demonstrated to be faster or to have unlimited ATS access just because it has more stars.
+
+### New candidate: job-net — strongest rate-policy and completeness reference
+
+Repository: https://github.com/MichaelFornal/job-net
+Licence shown by GitHub: MIT. Star count was not reliably exposed in the current search result; do not quote one without a direct live count.
+
+The README documents 43 ATS-specific fetchers behind one normalized row contract, 21 discovery/liveness probes, a three-tier dedup key and posted-date provenance. The design deliberately avoids one global concurrency limit: every ATS uses its own throttle because provider limits differ. Its engineering notes discuss a throttle penalty that decays rather than becoming permanent; the README says all crawlers back off on 429 and that backoff decays. It is also careful not to bypass authentication/CAPTCHAs or read content it was not served.
+
+**What to adopt:** provider-specific throttle policy, explicit discovery/liveness separate from fetching, one normalized row contract, three-tier dedup, posted-date provenance and decaying backoff. The code is large (~62k lines) despite a small dependency footprint; inspect individual modules and concepts, do not transplant the whole application. We have not independently benchmarked its live latency or validated every one of the 43 adapters.
+
+### Open Jobs — high-value design, but hosted service is retired
+
+Repository: https://github.com/elliottdehn/open-jobs
+GitHub snapshot observed: roughly 390 stars / 46 forks. The README states its crawler, nightly build and search page were shut down on **10 October 2026**; the last dataset snapshot was built **5 October 2026**. Its static data export is retained, but its live index/API and nightly freshness pipeline are no longer operating.
+
+Its design is still worth studying: one crawler per employer/career site, immutable first-seen timestamp, diff-based added/removed/changed ledger, freshness/re-stamping/ghost classification, daily publication under immutable prefixes, and a manifest switch only after the full new index is ready. It is not a current service integration and its 31 GB export is a frozen snapshot, not a near-real-time feed.
+
+### Popularity snapshot and recommendation order
+
+| Repository | Approximate stars | Best value to JobBeeper | Adopt? |
+|---|---:|---|---|
+| Career-Ops | ~80k | Reverse ATS directory scans, checkpoints, adaptive per-host concurrency and cooldown | Yes — discovery pattern, not the local-first runtime |
+| Freehire | ~3.4k | Provider-isolated workers, board catalogue, persistent per-board cooldown, outboxes and dedup | Yes — ingestion invariants; don't rely on hosted service without SLA/terms |
+| JobSpy | ~4.6k | Supplementary non-ATS boards including Naukri and global boards | Later, source-by-source; not an ATS discovery engine |
+| JobNavigator | ~184 | Multi-user product UX, applications, browser assistant and account separation | UX reference |
+| ats-scrapers | ~151 | Python adapters, shared async fetcher, Retry-After-aware retry/backoff and error mapping | Best Python adapter reference |
+| Job Board Aggregator | ~181 | Common Crawl-derived directory/discovery and anomaly monitoring | Study code only; bundled company data is CC BY-NC |
+| job-net | Not confirmed | Per-ATS throttles, decaying 429 backoff, 43 adapters, date provenance and 3-tier dedup | Strongest new rate-control reference |
+| open-jobs | ~390 | Per-career-site crawler fleet, immutable first-seen, daily diff ledger and liveness signals | Design reference only; hosted service shut down 2026-10-10 |
+
+### Practical conclusion for latency and rate limits
+
+There is no credible “no rate limits” repository. The projects that look operationally mature handle limits by separating provider workers, keying concurrency/throttle state by ATS host/provider, honoring Retry-After, decaying backoff, checkpointing partial work and reporting incomplete coverage. JobBeeper should implement these patterns inside its own per-board scheduler and source telemetry. Do not increase concurrency based on star counts or README job-volume claims; benchmark p50/p95 request time, full-board duration, 429 rate, page completeness and first-seen delay on a fixed allowlist.
