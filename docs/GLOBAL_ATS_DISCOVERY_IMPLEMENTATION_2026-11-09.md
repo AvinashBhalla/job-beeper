@@ -113,5 +113,26 @@ The user encountered a ChatGPT UI connection interruption (“Connection interru
 - Branch pushed: `feat/global-ats-discovery-hirebase-guard-20261109`.
 - Draft PR: https://github.com/AvinashBhalla/job-beeper/pull/65 (base `v2-live-radar`).
 - Full V2 regression: 430 tests passed in 385.001 seconds; background job `bjo6lrjfig` exit code 0. Focused discovery/Hirebase suite: 30 passed. Python compile, JSON, Compose config and diff checks passed.
-- GitHub connector returned no PR-triggered workflow runs for this SHA at the time of handover; verify checks on PR #65 before review/merge.
-- PR remains draft/open, unmerged. No deployment or Hirebase requests/activation.
+- Superseded CI note: exact-head GitHub Actions V2 CI run #1427 (42620547252) passed on 999b66543ac162346d42cd3be2c39993c0475a6e, including dashboard JavaScript syntax and the full V2 test suite.
+- PR remains draft/open, unmerged. No deployment or Hirebase requests/activation.\n\n---
+
+## 2026-11-09 18:10 IST — latest Hirebase paging and regression checkpoint
+
+The Hirebase sampler now stores a per-provider cursor with:
+- last_polled_at
+- fixed window_start
+- next_page
+
+Initial discovery starts with a bounded seven-day window. A provider query is estimated before the metered search. Pages are drained oldest-first with a fixed four-row page size; the next page is persisted across daily runs so a large initial result window cannot be truncated by the daily result budget. Once the window is drained, the cursor advances to the run-start timestamp minus a two-hour overlap, as recommended by the Hirebase ingestion docs. Pending cursors are committed only after JobBeeper has upserted the returned jobs. This is designed to avoid repeated first-page results while still catching delayed indexing.
+
+The Hirebase Free-plan usage-summary response may have null Stripe subscription / period fields. The client handles the Free plan using a calendar-month UTC period while still requiring a valid m_jobs_api_calls meter. The local 400/12/4 budgets and conservative unknown-request reservations remain enforced.
+
+**Verified release state at 2026-11-09 18:10 IST**
+- PR #65: open, draft, mergeable; base v2-live-radar.
+- Head: 999b66543ac162346d42cd3be2c39993c0475a6e.
+- GitHub Actions V2 CI run #1427 (42620547252): completed successfully on this exact head. Its syntax job includes Python compilation checks, dashboard JavaScript syntax, focused tests and the full V2 unittest suite; every step succeeded.
+- Local full V2 suite: 430 passed in 385.001 seconds.
+- Focused discovery/Hirebase tests: 30 passed.
+- Development Compose config validated. No container was rebuilt or restarted.
+- Dedicated development Hirebase env file is empty, mode 600, under a mode-700 directory. No API key has been added or read; no Hirebase API call has been made; Hirebase source is disabled.
+- No ATS source activated, no database import into a live service, no notifications sent, no production/shared-dev change.

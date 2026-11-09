@@ -304,4 +304,23 @@ Do not interpret one probe as universal ATS availability. Darwinbox `.com` and s
 
 Branch `feat/global-ats-discovery-hirebase-guard-20261109` adds a CC BY 4.0 LastRound AI August 2026 candidate seed directory for 9,935 Greenhouse/Lever/Ashby board slugs, and an optional Hirebase sample collector for Workday/Keka/Darwinbox. Hirebase is disabled by default, daily, estimate-first, limited to 4 rows per platform/day, 12/day total and 400 per billing period. It has an SQLite reservation ledger and fail-closed uncertain-request handling. No key has been added and no Hirebase API request has been made. The directory import only creates low-confidence unverified candidates; no ATS source is activated. This is not yet global automatic discovery for Workday/Keka/Darwinbox. See `GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md`.
 
-Open-source architecture research is in `OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md`: Freehire for one-shot provider workers/outboxes, Career-Ops for reverse discovery and per-host concurrency, ats-scrapers for Python adapter contracts. Do not use CC BY-NC company datasets from Feashliaa/Riley aggregator in commercial JobBeeper.
+Open-source architecture research is in `OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md`: Freehire for one-shot provider workers/outboxes, Career-Ops for reverse discovery and per-host concurrency, ats-scrapers for Python adapter contracts. Do not use CC BY-NC company datasets from Feashliaa/Riley aggregator in commercial JobBeeper.\n
+
+## 2026-11-09 18:10 IST — verified CI and updated research
+
+PR #65 is still **open and draft**, mergeable, based on v2-live-radar. Current head is 999b66543ac162346d42cd3be2c39993c0475a6e. Exact-head GitHub Actions V2 CI run #1427 / ID 42620547252 completed successfully, including dashboard JS syntax, focused tests and the full V2 unittest suite. The local full suite is 430/430 (385.001s); focused new tests are 30/30.
+
+The expanded open-source comparison is in docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md. New high-value finding: current kalil0321/ats-scrapers has Workday, Keka and Darwinbox adapters. Workday uses facet subdivision to address the 2,000-result query cap; Keka exposes credential-free public career portal JSON endpoints; Darwinbox's adapter uses httpcloak for a Cloudflare-protected endpoint. Do not adopt TLS impersonation to evade an anti-bot control. The library's shared Fetcher does Retry-After-aware 429/5xx retries and explicit 403/406 handling. This makes it the best Python provider reference, but not a dependency we should blindly import.
+
+Job Forager's company-list expansion and Workday pagination are useful to study, but inspected HTTP clients disable TLS certificate validation, broadly swallow exceptions and use fixed concurrency rather than persistent host budgets. Do not copy those transport choices. JobSpy is for supplementary job boards and explicitly warns about 429s; it is not a global ATS discovery source.
+
+### Next priorities
+
+1. Keep PR #65 draft while we review the latest research note and migration ordering across sibling branches.
+2. Build an independent, compliant public-board candidate harvester for Workday/Keka/Darwinbox using career-link/sitemap/Common Crawl and trusted directory seeds, with provenance recorded.
+3. Reuse/adapt the allowed Keka public portal extraction pattern and Workday facet-aware pagination. Do not enable the Darwinbox Cloudflare-bypass path; require a documented/public authorised route.
+4. Turn verified candidate boards into a per-board queue with host-aware concurrency, Retry-After, persistent cooldown, jitter, backpressure and page/facet checkpoints.
+5. Run controlled p50/p95, 429, incomplete-page, first-seen-delay and freshness benchmarks before increasing concurrency.
+6. Hirebase remains an optional, dev-only sample until the user supplies a key securely and approves estimate-only testing. Do not use its data in a commercial multi-user product without written permission.
+
+Do not merge or deploy this branch as an assertion that JobBeeper now has complete global ATS coverage. It is the quota-safe sampling and candidate-directory foundation; independent Workday/Keka/Darwinbox employer discovery and full board scheduling remain outstanding.
