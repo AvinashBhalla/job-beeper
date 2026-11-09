@@ -3535,3 +3535,11 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Installed Nginx + Certbot 5.9.0, added persistent VM INPUT allow rules for TCP 80/443, configured an ACME webroot. Local challenge returns 200. Let's Encrypt staging IP-cert challenge failed on public IP `130.210.27.197:80` with timeout. The OCI cloud ingress Security List/attached NSG still blocks port 80 (and likely 443).
 - Owner must add stateful TCP ingress `0.0.0.0/0` -> destination port 80 and 443 in OCI Console. Details and precise commands are in `JOB_RADAR_HANDOVER.md`. Once opened, re-run staging certbot, then production cert, configure Nginx TLS proxy and set `JOB_BEEPER_PUBLIC_ORIGIN=https://130.210.27.197` / secure cookie true. Restrict app port 8000 to loopback after reverse proxy is live.
 - Production app and data are healthy/unchanged; current production image `job-radar-prod-canary:6e5becb`. Do not mark login fixed until external HTTPS login yields `/api/auth/me` 200.
+
+
+## 2026-11-09 — HTTPS transport fix deployed
+
+- Owner opened OCI stateful TCP 80/443 ingress. Existing route table already had internet gateway. Let's Encrypt production short-lived IP certificate issued for IP SAN `130.210.27.197`, lineage `jobbeeper-ip-prod` (expiry 2026-11-15 21:07 UTC).
+- Nginx now redirects HTTP to HTTPS, serves ACME challenge and proxies TLS 443 to app loopback. Production `.env`: `JOB_BEEPER_PUBLIC_ORIGIN=https://130.210.27.197`, `JOB_BEEPER_COOKIE_SECURE=true`. Docker app port mapping is loopback-only `127.0.0.1:8000:8000`.
+- External health 200, dashboard 200, anonymous auth/me 401 expected, HTTP redirects 301, public 8000 inaccessible, certificate trusted/SAN correct. App data/config/image unchanged (`6e5becb`).
+- Owner should log in at `https://130.210.27.197/dashboard/` and confirm `/api/auth/me` 200. Never ask for password in chat. Certbot timer is active; deploy hook reloads Nginx. Dry-run renewal was running with randomized ~341s delay; confirm result in certbot log. Remove unused staging lineage `130.210.27.197` after no certbot process active. Remove OCI port 8000 ingress later after HTTPS owner validation.

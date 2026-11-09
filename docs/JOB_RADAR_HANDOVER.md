@@ -6696,3 +6696,27 @@ Oracle's Security List/NSG workflow: https://docs.oracle.com/en-us/iaas/Content/
 4. Set `JOB_BEEPER_PUBLIC_ORIGIN=https://130.210.27.197` and `JOB_BEEPER_COOKIE_SECURE=true` in the production env file. Change Compose published port from `8000:8000` to `127.0.0.1:8000:8000` only after Nginx HTTPS reverse proxy is healthy, so clients cannot bypass TLS. Keep the current data volume.
 5. Configure a renewal timer at least daily (160-hour certificate lifetime); Certbot deploy hook reloads Nginx after renewal. Validate certificate SAN matches IP, validity, external browser login, `/api/auth/me` 200, and logout/login cycle.
 6. Do not loosen cookie security as a workaround. Remove temporary test challenge file and change Nginx HTTP 503 handler to HTTPS redirect after cert is installed.
+
+
+## 2026-11-09 — HTTPS login fix deployed on production IP
+
+### Owner added OCI ingress; TLS is now live
+
+- Owner added stateful TCP ingress rules from `0.0.0.0/0` to destination ports 80 and 443 on the `job-radar-vnic` Default Security List. Existing SSH/22 and app/8000 rules were not deleted. The VCN route table already had `0.0.0.0/0 -> Internet Gateway`; no route change was needed.
+- Public ACME HTTP challenge then became reachable. Let's Encrypt staging IP certificate issuance succeeded, followed by a separate production certificate lineage `jobbeeper-ip-prod` for IP SAN `130.210.27.197` (issuer Let's Encrypt YE1, not staging). Production certificate files: `/etc/letsencrypt/live/jobbeeper-ip-prod/fullchain.pem` and `privkey.pem`; expiry 2026-11-15 21:07 UTC (short-lived IP certificate).
+- Nginx configured at `/etc/nginx/sites-available/jobbeeper-ip.conf`: port 80 preserves ACME challenge and redirects other requests to HTTPS; port 443 TLS reverse-proxies to `127.0.0.1:8000`, forwards Host/real IP/X-Forwarded-For/X-Forwarded-Proto, TLS 1.2/1.3.
+- Production `.env` now explicitly sets `JOB_BEEPER_PUBLIC_ORIGIN=https://130.210.27.197` and `JOB_BEEPER_COOKIE_SECURE=true` (600 permissions). Production Compose port mapping changed from public `8000:8000` to `127.0.0.1:8000:8000`; same image `job-radar-prod-canary:6e5becb` and same external data volume. Container restarted once during the env/port change and is now running with restart count 0.
+- External verification: `https://130.210.27.197/health` 200; dashboard 200; anonymous `/api/auth/me` 401 (expected without a session); HTTP dashboard 301 to HTTPS; public port 8000 unreachable; TLS certificate chain is trusted and SAN contains IP `130.210.27.197`. `nginx -t` succeeds. No database or source configuration changes.
+- The earlier HTTP login attempts returned 200 from login followed by 401 from `/api/auth/me` because Secure cookies were not returned over HTTP. This is fixed at the transport/origin layer. Owner must now sign in at `https://130.210.27.197/dashboard/`; successful authenticated `/api/auth/me` 200 still requires the owner to test using their private password. Do not request password in chat.
+
+### Certificate renewal
+
+- Certbot snap 5.9.0 installed. Snap timer `snap.certbot.renew.timer` is active. Added deploy hook `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` to reload Nginx after successful renewal.
+- A dry-run renewal test was started for `jobbeeper-ip-prod`; Certbot inserted a randomized 341-second delay before the staging challenge. Confirm final result in `/var/log/letsencrypt/letsencrypt.log` or rerun `sudo certbot renew --dry-run --cert-name jobbeeper-ip-prod` after any active test completes. Certificate expires in ~6 days, so verify timer and renewal before 2026-11-15 21:07 UTC.
+- A separate staging-only lineage named `130.210.27.197` exists at `/etc/letsencrypt/live/130.210.27.197`; it is not referenced by Nginx. Remove it with `sudo certbot delete --cert-name 130.210.27.197` after confirming no renewal process is running, to avoid confusion. Do not delete `jobbeeper-ip-prod`.
+- OCI Security List still has the original public TCP/8000 rule, but the host now binds Docker's 8000 mapping to loopback only, so port 8000 is no longer publicly reachable. Later remove the obsolete OCI 8000 ingress rule after verifying the owner can use HTTPS.
+
+### Owner action
+
+- Use `https://130.210.27.197/dashboard/` (not `http://130.210.27.197:8000`). Sign in with the existing admin account `bawejaavichal01@gmail.com`. No password was read or changed. If successful, check `/api/auth/me` returns 200 and then verify Preferences, Sources, Applied, and admin board controls.
+- Since the password was previously entered over plaintext HTTP, change it after successful HTTPS login if a password-change mechanism is available; never send it to ChatGPT.

@@ -266,3 +266,7 @@ The current feature branch adds per-user server-owned application records and th
 ### Workday source scope note — 2026-11-09
 
 The production NVIDIA Workday connector currently ingests one 20-job page per 120-second poll and fetches at most 20 details. It is active and healthy but intentionally partial. The public CXS endpoint is undocumented; empirical behaviour suggests 20 is a hard page size and some tenants cap totals or repeat data. Do not increase request volume until offsets 20/40, duplicate-page detection, 429 handling and short-page termination have been verified. Details and references are in `JOB_RADAR_HANDOVER.md`.
+
+### 2026-11-09 — HTTPS authentication transport fixed
+
+Production now has a Let's Encrypt IP certificate for `130.210.27.197`, Nginx HTTPS reverse proxy, HTTP-to-HTTPS redirect, secure cookies retained, and app port 8000 bound to loopback. Health/dashboard return 200; owner login must be confirmed over `https://130.210.27.197/dashboard/`. Certbot auto-renew timer and Nginx deploy hook are installed. Operational details in `JOB_RADAR_HANDOVER.md`.
