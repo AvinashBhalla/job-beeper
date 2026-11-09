@@ -1,3 +1,11 @@
+# CURRENT HANDOVER — 2026-11-09 repository cleanup
+
+**Read first:** [Repository cleanup and next-agent handover](REPOSITORY_CLEANUP_2026-11-09.md). It records the current seven open PRs, 16 remote branches, archived/deleted stale docs branches, the closed unmerged PR #35, current dev/QA image and live-feed evidence, owner QA steps, and the ordered next tasks.
+
+The older dated notes below are retained as history and may describe earlier runtime images, branch counts or PR states. Use the newest dated checkpoint in `docs/JOB_RADAR_HANDOVER.md` and the cleanup report above as the current source of truth. The production-first/older promotion guidance in historical sections is superseded by `docs/DEVELOPMENT_RELEASE_POLICY_AND_REPO_CLEANUP_2026-11-09.md`: engineering is dev-first and production requires separate owner approval.
+
+---
+
 # Next Agent Start Here — Job Radar V2
 
 

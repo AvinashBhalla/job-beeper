@@ -3930,3 +3930,15 @@ After the second pass QA DB has 1,891 jobs, 16 source runs, 1,891 canonical oppo
 Latest shared dev check: 10,278 jobs, 8,228 source runs, SQLite integrity `ok`, zero sent notifications; health HTTP 200. Production remains untouched.
 
 Only outstanding owner input: create QA-only admin/member interactively with commands documented here, then review admin/member UI on port 8010. Do not copy production credentials/users.
+
+
+## 2026-11-09 — Repository cleanup superseding update
+
+Owner requested removal of extra PR/branch clutter. See `docs/REPOSITORY_CLEANUP_2026-11-09.md` for the complete audit, exact SHAs/tags, PR inventory, retained branch rationale, environment evidence and next-agent checklist.
+
+- Remote branches: 20 → 16. Four superseded docs branches were archived under `archive/repository-cleanup-20261109/*` and then deleted by name.
+- Open PRs: 8 → 7. PR #35 (688-commit V2→main placeholder, GitHub `dirty`) was closed unmerged. `main` and `v2-live-radar` were not changed.
+- Keep PRs #59–#65 as separate, draft review units. Their exact audited heads all have green V2 CI; do not batch-merge because they overlap config and collector files.
+- Dev 8001 and connector QA 8010 remain on the same exact `243da9c` image; both healthy, zero restarts. QA controlled run: 8 providers × 2 passes, 16 successful runs, 1,891 unique live jobs, no 429/page/board failures, DB integrity OK, zero sends. Await the autonomous 60-minute QA cycle and owner role-based QA.
+- Production image/runtime and all production data/credentials were left untouched.
+- Next: provision QA-only admin/member accounts interactively, complete owner UAT, observe autonomous QA cadence, then implement per-board scheduling/host budgets and conservative serialized discovery.

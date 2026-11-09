@@ -45,3 +45,8 @@ P2: more ATS connectors after discovery/scheduler contracts; Hirebase estimate-o
 ## User input / next handoff
 
 Owner to provision QA-only admin/member using interactive `v2.auth_admin` CLI and perform dev/QA UAT. No Hirebase key needed; Workday/Keka/Darwinbox are now enabled only in isolated non-production canaries, Hirebase remains disabled. Production unchanged; separate approval required.
+
+
+## 2026-11-09 — repository structure cleanup
+
+Owner-requested cleanup completed: remote branch count 20→16 and open PR count 8→7. Closed stale PR #35 unmerged; archived four superseded documentation branch tips under `archive/repository-cleanup-20261109/*` then removed their remote branch names. PRs #59–#65 remain independent review units with green exact-head CI; no code merge or runtime deployment occurred. Details and next-agent tasks: `docs/REPOSITORY_CLEANUP_2026-11-09.md`.
