@@ -119,7 +119,7 @@ Do not migrate to PostgreSQL, Redis, Kafka, Celery or microservices just because
 | Assisted apply | Design only | No answer bank or browser companion |
 | Auto-apply | Not implemented | Must remain off pending a separate permission/safety gate |
 
-ATS discovery can recognize providers that have no collectors. Current discovery-only families include Recruitee, Breezy HR, Teamtailor, BambooHR, Rippling and Personio. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
+ATS discovery can recognize providers that have no collectors. Current discovery-only families include Recruitee, Breezy HR, Teamtailor, BambooHR and Rippling. Personio has a default-off feature-branch XML adapter candidate; it is not merged or deployed. Do not call these active sources until a public/authorized adapter, verified board, tests and safe activation exist. An employer-authenticated recruitment API is not a public job feed.
 
 ## 5. Prioritized delivery sequence
 

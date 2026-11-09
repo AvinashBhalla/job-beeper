@@ -103,3 +103,12 @@ GitHub audit: keep #35 as draft release gate; #46, #50 and #52 are stale/superse
 ## 2026-11-09 — Two-role Desktop QA ready
 
 Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` before browser testing. A fresh isolated synthetic QA app runs on VM loopback 8006 (local browser URL `http://localhost:18006/dashboard/`, tunnel `ssh -N -L 18006:127.0.0.1:8006 ubuntu@130.210.27.197`). Temporary accounts `qa-admin@local.test` (admin) and `qa-member@local.test` (normal user) were created and verified in that isolated DB; passwords were shared in chat only, never commit them. Four synthetic demo jobs; all collectors off, notifications off, Telegram/OAuth/LLM credentials blank. Member source-health APIs return 403; admin returns 200. Do not use old candidate 8005/18005, production 8000, shared dev 8001, experiment 8002 or connector QA 8010 for this test. Prompt and complete manual checklist are in the QA runbook. Owner and Desktop should test both roles; report gaps, do not modify code/runtime. Fix on dev first.
+
+
+## 2026-11-09 — Personio public XML connector candidate (not deployed)
+
+- Isolated branch `feat/personio-public-feed-20261109` from `origin/v2-live-radar`. Adds a default-off Personio public XML collector, board discovery/probe, admin activation/deactivation, 300-second default interval, Retry-After cooldown and first-board silent baseline. Dashboard admin source toggle, source-health label and job-source filter are included.
+- Official public XML feed must be enabled by the employer in Personio Recruiting. Read-only check of the documentation example tenant returned HTTP 200 and root `<workzag-jobs>` but 0 positions; **no populated employer tenant has yet been verified**. `createdAt` is kept as metadata only; publication timestamp remains unknown.
+- Focused suite: 8/8 passed. Full V2 suite: **408/408 passed**. Python compile, config JSON validation and `git diff --check` passed. Exact-head GitHub CI/PR review still required.
+- Status: code/research only. Source remains disabled; no real employer board activated, no ingestion, no Telegram, no shared-dev deployment and no production change.
+- See `docs/PERSONIO_SOURCE_ADAPTER.md`.

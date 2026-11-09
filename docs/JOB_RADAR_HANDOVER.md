@@ -6774,3 +6774,17 @@ Oracle's Security List/NSG workflow: https://docs.oracle.com/en-us/iaas/Content/
 - Full Desktop AI prompt, manual checklist, allowed synthetic writes, prohibited external actions, test coverage, reporting format and baseline results are in `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md`.
 - No production or shared-dev runtime was modified by this QA provisioning. No collectors or notifications were run.
 - Next: owner manually tests both accounts and runs the Desktop prompt against localhost:18006. Collect the report/screenshots, triage confirmed defects, reproduce on a feature branch, add tests, pass CI, verify on shared dev, and only then request production approval.
+
+
+## 2026-11-09 — Personio public XML connector candidate (not deployed)
+
+- Isolated branch `feat/personio-public-feed-20261109` from `origin/v2-live-radar`. Adds a default-off Personio public XML collector, board discovery/probe, admin activation/deactivation, 300-second default interval, Retry-After cooldown and first-board silent baseline. Dashboard admin source toggle, source-health label and job-source filter are included.
+- Official public XML feed must be enabled by the employer in Personio Recruiting. Read-only check of the documentation example tenant returned HTTP 200 and root `<workzag-jobs>` but 0 positions; **no populated employer tenant has yet been verified**. `createdAt` is kept as metadata only; publication timestamp remains unknown.
+- Focused suite: 8/8 passed. Full V2 suite: **408/408 passed**. Python compile, config JSON validation and `git diff --check` passed. Exact-head GitHub CI/PR review still required.
+- Status: code/research only. Source remains disabled; no real employer board activated, no ingestion, no Telegram, no shared-dev deployment and no production change.
+- See `docs/PERSONIO_SOURCE_ADAPTER.md`.
+
+
+### Parallel connector merge ordering
+
+Recruitee and Personio feature branches were intentionally created independently from the same `v2-live-radar` baseline. Each adds one source using config version 16 and an explicit migration that forces its new source off for existing configs. Do not merge both unchanged one after another: after the first connector lands, rebase the second and bump its config version/migration to the next version while preserving both connectors default-off. This is an intentional sequencing step, not a reason to combine the feature branches now.

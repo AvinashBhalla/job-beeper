@@ -3583,3 +3583,12 @@ Production already contains Greenhouse and Ashby allowlist entries but no ATS bo
 - Smoke verified: dashboard/health 200; both login + `/api/auth/me` + `/api/preferences` 200; admin telemetry endpoints 200; member telemetry endpoints 403.
 - Read `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md` for complete Desktop prompt, manual checklist, safety boundaries, test matrix and report template.
 - Owner is to run manual testing and Desktop AI testing. After feedback, reproduce on feature branch, tests + exact SHA CI, shared dev first, owner approval, then production. No production changes.
+
+
+## 2026-11-09 — Personio public XML connector candidate (not deployed)
+
+- Isolated branch `feat/personio-public-feed-20261109` from `origin/v2-live-radar`. Adds a default-off Personio public XML collector, board discovery/probe, admin activation/deactivation, 300-second default interval, Retry-After cooldown and first-board silent baseline. Dashboard admin source toggle, source-health label and job-source filter are included.
+- Official public XML feed must be enabled by the employer in Personio Recruiting. Read-only check of the documentation example tenant returned HTTP 200 and root `<workzag-jobs>` but 0 positions; **no populated employer tenant has yet been verified**. `createdAt` is kept as metadata only; publication timestamp remains unknown.
+- Focused suite: 8/8 passed. Full V2 suite: **408/408 passed**. Python compile, config JSON validation and `git diff --check` passed. Exact-head GitHub CI/PR review still required.
+- Status: code/research only. Source remains disabled; no real employer board activated, no ingestion, no Telegram, no shared-dev deployment and no production change.
+- See `docs/PERSONIO_SOURCE_ADAPTER.md`.

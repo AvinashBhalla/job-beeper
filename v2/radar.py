@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import auth, board_discovery, google_oauth, personio, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -86,7 +86,10 @@ DARWINBOX_MAX_BOARDS = 50
 DARWINBOX_PAGE_SIZE = 50
 DARWINBOX_MAX_PAGES_PER_BOARD = 5
 DARWINBOX_PAGE_DELAY_SECONDS = 0.2
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox"})
+PERSONIO_MAX_BOARDS = 50
+PERSONIO_DEFAULT_429_COOLDOWN_SECONDS = 300
+PERSONIO_MAX_429_COOLDOWN_SECONDS = 3600
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "personio"})
 INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
@@ -217,6 +220,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     if current_version < 15 <= default_version:
         merged.setdefault("source_enabled", {})["keka"] = False
         merged.setdefault("source_enabled", {})["darwinbox"] = False
+    if current_version < 16 <= default_version:
+        merged.setdefault("source_enabled", {})["personio"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -241,6 +246,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         if current_version < 15 <= default_version:
             merged["source_enabled"]["keka"] = False
             merged["source_enabled"]["darwinbox"] = False
+        if current_version < 16 <= default_version:
+            merged["source_enabled"]["personio"] = False
     return merged
 
 
@@ -569,6 +576,34 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_darwinbox.append(entry)
     config["darwinbox_boards"] = normalized_darwinbox
 
+    personio_boards = config.get("personio_boards", [])
+    if not isinstance(personio_boards, list) or len(personio_boards) > PERSONIO_MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"personio_boards must be a list with at most {PERSONIO_MAX_BOARDS} entries.")
+    normalized_personio: list[dict[str, Any]] = []
+    seen_personio: set[str] = set()
+    for board in personio_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Personio board must be an object.")
+        careers_url = board.get("careers_url") or board.get("url")
+        detected = board_discovery.detect_ats_board(careers_url) if isinstance(careers_url, str) else None
+        company = board.get("company")
+        if not detected or detected.get("provider") != "personio":
+            raise HTTPException(status_code=422, detail="Each Personio board requires a public HTTPS https://<tenant>.jobs.personio.de or .com careers URL.")
+        if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Each Personio board requires a company label of at most 120 characters.")
+        tenant = str(detected["board_key"]).lower()
+        host = str(detected.get("host") or "").lower()
+        extension = host.rsplit(".", 1)[-1]
+        if tenant in seen_personio:
+            raise HTTPException(status_code=422, detail=f"Duplicate Personio tenant: {tenant}.")
+        seen_personio.add(tenant)
+        entry = {"careers_url": detected["board_url"], "company": company.strip(), "extension": extension}
+        registry_id = _optional_registry_id(board, "Personio")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_personio.append(entry)
+    config["personio_boards"] = normalized_personio
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -584,6 +619,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "workable": bool(source_enabled.get("workable", False)),
         "keka": bool(source_enabled.get("keka", False)),
         "darwinbox": bool(source_enabled.get("darwinbox", False)),
+        "personio": bool(source_enabled.get("personio", False)),
     }
     if config["source_enabled"]["workday"] and not normalized_workday_boards:
         raise HTTPException(
@@ -595,6 +631,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         ("workable", normalized_workable),
         ("keka", normalized_keka),
         ("darwinbox", normalized_darwinbox),
+        ("personio", normalized_personio),
     ):
         if config["source_enabled"][source] and not configured_boards:
             raise HTTPException(status_code=422, detail=f"Add at least one verified {source.title()} public career board before enabling {source.title()}.")
@@ -616,6 +653,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "workable": 120,
             "keka": 120,
             "darwinbox": 120,
+            "personio": 300,
         }.items()
     }
 
@@ -5524,6 +5562,106 @@ def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def personio_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect the employer-enabled public Personio XML positions feed.
+
+    The legacy careers-site feed requires the employer to enable XML publishing
+    but does not require API credentials. Its creation timestamp is preserved
+    as metadata, not treated as a publication timestamp.
+    """
+    boards = config.get("personio_boards", [])
+    if not isinstance(boards, list) or not boards:
+        raise RuntimeError("Personio is enabled but no personio_boards are configured")
+    if len(boards) > PERSONIO_MAX_BOARDS:
+        raise RuntimeError("Personio board allowlist exceeds the configured safety limit")
+
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    successful_boards = 0
+    failures: list[str] = []
+    for board in boards:
+        careers_url = str(board.get("careers_url") or board.get("url") or "").strip() if isinstance(board, dict) else ""
+        company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
+        detected = board_discovery.detect_ats_board(careers_url)
+        if not detected or detected.get("provider") != "personio" or not company:
+            _record_source_board("personio", False)
+            failures.append("invalid Personio public board configuration")
+            continue
+        tenant = str(detected["board_key"]).lower()
+        extension = str(detected.get("host") or "").lower().rsplit(".", 1)[-1]
+        endpoint = f"https://{tenant}.jobs.personio.{extension}/xml"
+        try:
+            response = _tracked_source_get(
+                "personio", endpoint,
+                params={"language": "en"},
+                headers={**UA, "Accept": "application/xml,text/xml;q=0.9"},
+                timeout=20,
+                allow_redirects=False,
+            )
+            response.raise_for_status()
+            if int(getattr(response, "status_code", 0)) != 200:
+                raise ValueError("Personio feed did not return HTTP 200 without redirects")
+            raw_content = getattr(response, "content", b"")
+            if not isinstance(raw_content, bytes):
+                raise ValueError("Personio feed did not return XML bytes")
+            rows = personio.parse_public_positions(raw_content, tenant=tenant, extension=extension)
+            _record_source_page("personio", True)
+            _record_source_board("personio", True)
+            successful_boards += 1
+        except Exception as exc:
+            _record_source_page("personio", False)
+            _record_source_board("personio", False)
+            failed_response = getattr(exc, "response", None)
+            if getattr(failed_response, "status_code", None) == 429:
+                _set_source_rate_limit(
+                    "personio", failed_response,
+                    default_seconds=PERSONIO_DEFAULT_429_COOLDOWN_SECONDS,
+                    maximum_seconds=PERSONIO_MAX_429_COOLDOWN_SECONDS,
+                )
+                failures.append(f"{tenant}: rate limited")
+                break
+            status = getattr(failed_response, "status_code", None)
+            failures.append(f"{tenant}: {type(exc).__name__}" + (f" HTTP {status}" if status else ""))
+            log.warning("personio: tenant=%s failed error_type=%s", tenant, type(exc).__name__)
+            continue
+
+        for item in rows:
+            source_id = f"personio-{tenant}-{item['reference']}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+            details = {
+                "tenant": tenant,
+                "board_registry_id": board.get("registry_id"),
+                "subcompany": item.get("subcompany"),
+                "department": item.get("department"),
+                "recruiting_category": item.get("recruiting_category"),
+                "employment_type": item.get("employment_type"),
+                "seniority": item.get("seniority"),
+                "schedule": item.get("schedule"),
+                "years_of_experience": item.get("years_of_experience"),
+                "keywords": item.get("keywords"),
+                "occupation": item.get("occupation"),
+                "occupation_category": item.get("occupation_category"),
+                "created_at": item.get("created_at"),
+                "salary_information": item.get("salary_information"),
+                "details_fetched": True,
+            }
+            jobs.append(normalize_job(
+                "personio", source_id, item.get("subcompany") or company,
+                item["title"], item.get("location") or "Unspecified",
+                item["url"], None, "unknown", item.get("description") or "",
+                source_details=details,
+            ))
+
+    if successful_boards == 0:
+        raise RuntimeError("All configured Personio boards failed: " + "; ".join(failures))
+    if failures:
+        log.warning("personio: partial board failures=%s successful_boards=%s", len(failures), successful_boards)
+    log.info("personio: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -5536,6 +5674,7 @@ COLLECTORS = {
     "workable": workable_collect,
     "keka": keka_collect,
     "darwinbox": darwinbox_collect,
+    "personio": personio_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -5906,6 +6045,7 @@ async def startup() -> None:
     restore_source_rate_limit_state("workable")
     restore_source_rate_limit_state("keka")
     restore_source_rate_limit_state("darwinbox")
+    restore_source_rate_limit_state("personio")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -6674,6 +6814,9 @@ def activate_discovered_board(board_id: int):
     elif provider == "darwinbox":
         config_key = "darwinbox_boards"
         registry_entry = {"careers_url": board["board_url"], "company": company}
+    elif provider == "personio":
+        config_key = "personio_boards"
+        registry_entry = {"careers_url": board["board_url"], "company": company}
     else:
         raise HTTPException(status_code=409, detail="This board provider has no activation mapping.")
 
@@ -6700,7 +6843,7 @@ def activate_discovered_board(board_id: int):
         if provider == "workday":
             parsed = _parse_workday_board_url(item.get("url"))
             return bool(parsed and f"{parsed['tenant']}:{parsed['site']}".lower() == key.lower())
-        if provider in {"keka", "darwinbox"}:
+        if provider in {"keka", "darwinbox", "personio"}:
             value = item.get("careers_url") or item.get("url")
             detected = board_discovery.detect_ats_board(value) if isinstance(value, str) else None
             return bool(detected and detected.get("provider") == provider and str(detected.get("board_key", "")).lower() == key.lower())
@@ -6775,6 +6918,7 @@ def deactivate_discovered_board(board_id: int):
         "workable": "workable_boards",
         "keka": "keka_boards",
         "darwinbox": "darwinbox_boards",
+        "personio": "personio_boards",
     }.get(str(board["provider"]))
     if not source or not config_key:
         raise HTTPException(status_code=409, detail="This board has no supported collector configuration.")

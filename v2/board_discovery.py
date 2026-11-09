@@ -55,6 +55,7 @@ COLLECTOR_SOURCES = {
     "workable": "workable",
     "keka": "keka",
     "darwinbox": "darwinbox",
+    "personio": "personio",
 }
 
 
@@ -310,6 +311,20 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         jobs = payload.get("data") if isinstance(payload, dict) and payload.get("status") == "success" else None
         if not isinstance(jobs, list):
             raise ValueError("Darwinbox candidate API did not return a successful public jobs list.")
+    elif provider == "personio":
+        tenant = candidate["board_key"].lower()
+        extension = (urlsplit(board_url).hostname or "").lower().rsplit(".", 1)[-1]
+        endpoint = f"https://{tenant}.jobs.personio.{extension}/xml"
+        response = requests.get(
+            endpoint, params={"language": "en"},
+            headers={**headers, "Accept": "application/xml,text/xml;q=0.9"},
+            timeout=REQUEST_TIMEOUT_SECONDS, allow_redirects=False,
+        )
+        response.raise_for_status()
+        if int(response.status_code) != 200:
+            raise ValueError("Personio XML feed did not return HTTP 200 without redirects.")
+        from v2 import personio
+        jobs = personio.parse_public_positions(response.content, tenant=tenant, extension=extension)
     elif provider == "lever":
         api_host = "api.eu.lever.co" if ".eu." in candidate["host"] else "api.lever.co"
         endpoint = f"https://{api_host}/v0/postings/{candidate['board_key']}"

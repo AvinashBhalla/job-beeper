@@ -77,7 +77,13 @@ Status legend:
 | 35 | Y Combinator | Job marketplace | Not implemented in V2 | Work at a Startup / YC company job marketplace; partner/public listing access must be verified. |
 | 36 | Zoho Recruit | ATS | Research lead; not implemented in V2 | Candidate-facing career portal per employer; distinguish public careers pages from authenticated Zoho Recruit APIs. |
 
-**Checkpoint truth:** the V2 runtime collector registry currently contains only linkedin, naukri, instahyre, greenhouse, ashby, and lever. Only Naukri is enabled for recurring shared-dev polling. Four additional sources plus LinkedIn were exercised as controlled one-off pipelines. The remaining named systems are product requirements, not completed integrations.
+### Additional connector candidates beyond the original 36-platform scope
+
+| Platform | Status | Notes |
+|---|---|---|
+| Personio | **Default-off feature-branch candidate**; public XML endpoint/root smoke and eight focused tests pass; full V2 suite 408/408 passed. | Employer must enable XML feed; docs state it requires no credentials once enabled. Feed exposes published positions, descriptions, job family fields and `createdAt`; `createdAt` is not treated as publication time. See `docs/PERSONIO_SOURCE_ADAPTER.md`. |
+
+**Checkpoint truth:** the current V2 mainline collector registry contains eleven sources: linkedin, naukri, instahyre, greenhouse, ashby, lever, workday, smartrecruiters, workable, keka and darwinbox. The Personio adapter is a separate feature-branch candidate and is not part of mainline yet. Only Naukri is enabled for recurring shared-development polling. Collector registration, employer-board discovery, board activation, and actual recurring coverage are distinct release states.
 
 ## 4. Evidence-based connector research
 

@@ -10,7 +10,8 @@
     "smartrecruiters": 120,
     "workable": 120,
     "keka": 120,
-    "darwinbox": 120
+    "darwinbox": 120,
+    "personio": 300
   },
   "locations": [
     "Bengaluru, Karnataka, India",
@@ -118,9 +119,10 @@
     "smartrecruiters": false,
     "workable": false,
     "keka": false,
-    "darwinbox": false
+    "darwinbox": false,
+    "personio": false
   },
-  "config_version": 15,
+  "config_version": 16,
   "workday_boards": [],
   "greenhouse_boards": [
     {
@@ -150,5 +152,6 @@
   "smartrecruiters_boards": [],
   "workable_boards": [],
   "keka_boards": [],
-  "darwinbox_boards": []
+  "darwinbox_boards": [],
+  "personio_boards": []
 }

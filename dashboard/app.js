@@ -1627,6 +1627,7 @@
         workable: 'Workable',
         keka: 'Keka',
         darwinbox: 'Darwinbox',
+        personio: 'Personio',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
@@ -2293,6 +2294,7 @@
       { value: 'workable', label: 'Workable' },
       { value: 'keka', label: 'Keka' },
       { value: 'darwinbox', label: 'Darwinbox' },
+      { value: 'personio', label: 'Personio' },
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';
