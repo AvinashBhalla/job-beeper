@@ -91,3 +91,11 @@ Do not ask the owner to repeat the platform list, latency goal, Workday/Darwinbo
 4. Continue the requested 36-platform coverage matrix. Next priority: Darwinbox employer-by-employer public candidate endpoint research, then provider-specific adapters for the discovery-only ATS families. Do not call employer-authenticated endpoints without employer-issued credentials.
 5. Add bounded concurrency/per-board scheduling and freshness/backfill/closure semantics before promising a two-minute SLA across many employers. Workday remains sequential and a board can take tens of seconds.
 6. Preserve release gates: PR #51 stays draft until CI, security and browser QA pass; no shared-dev or production deployment without the separate explicit approval. Production has active Telegram/global notification state—do not modify its container, volume, config or queue.
+
+## 2026-11-09 owner release boundary (read first)
+
+The owner is manually testing production. **Do not modify production directly.** All code/config changes go to isolated feature branches based on latest `origin/v2-live-radar`, then exact-SHA CI, review, shared-dev deployment/QA, owner UAT, and only then separately approved production promotion. Read `docs/DEVELOPMENT_RELEASE_POLICY_AND_REPO_CLEANUP_2026-11-09.md` before any code or GitHub cleanup. Preserve the dirty VM-local checkout `/home/ubuntu/job-beeper-dev` (`v2/config.json`, `.env.save`, `.venv/`, config backup); it is behind remote and not the authoritative clean worktree. Do not reset, clean, overwrite or stage it.
+
+Career-Ops and its extension are reference projects, not replacement architectures. Adopt evidence-based fit, job legitimacy/repost checks, truthful resume tailoring, reusable answer bank, referral research/drafts and optional browser-assisted form fill with a human submit checkpoint. Do not copy code without license review, do not build local-first CLI architecture into the hosted app, and do not automate consequential submission/outreach without approval.
+
+GitHub audit: keep #35 as draft release gate; #46, #50 and #52 are stale/superseded candidates for closure after verifying their useful changes are in current V2. Do not merge their stale trees or mass-delete branches/worktrees. Full rationale and cleanup sequence are in the policy doc.
