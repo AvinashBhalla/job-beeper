@@ -68,9 +68,13 @@ New `GlobalDirectoryApiTests` cases cover:
 
 Focused suite: `v2.test_global_discovery_hirebase.GlobalDirectoryApiTests` — **11 passed** after final provenance and link-state refinements.
 
-Final full V2 regression job `lkscpl0ioe` finished with 451 passed in 501.840s, exit code 0; log `/tmp/job-radar-global-candidate-final-tests.log`. The earlier job was stopped after safety refinements and is not authoritative.
+Final full V2 regression job `4q00ns5dgm` finished with 451 passed in 482.864s, exit code 0; log `/tmp/job-radar-global-candidate-final-tests.log`. Exact-head GitHub V2 CI #1437 (`42648073320`) also passed the full suite and modern dashboard JS syntax.
 
 HTML candidate controls have unique IDs and the dashboard loader/import/link/reject functions are wired. VM Node 12 cannot parse existing dashboard optional chaining/nullish-coalescing; modern dashboard JS syntax requires exact-head GitHub V2 CI after push.
+
+## PR and deployment status
+
+Candidate staging was committed at `243da9c35e93979e59d0de281130581cad4124d1`, pushed to PR #65, and exact-head CI #1437 passed. The exact same immutable candidate image is deployed on shared dev 8001 and connector QA 8010. Both run eight real public source feeds; LinkedIn and Hirebase remain off; notifications and external LLM credentials are off. Dev completed multiple cycles and QA has one complete initial pass. Detailed metrics, backups, cadence, SSH tunnels and the remaining QA-account action are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md`. Production remains untouched.
 
 ## Explicitly not implemented yet
 

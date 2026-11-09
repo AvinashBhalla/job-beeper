@@ -2,7 +2,7 @@
 
 ## Start here
 
-1. `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md` — latest verified state, tests, safety and next steps.
+1. `docs/RECOVERY_CHECKPOINT_2026-11-09_2209_IST.md` — latest verified state, live feed deployments, metrics, user action and next priorities.
 2. `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md` — candidate table/API/UI design and validation.
 3. `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md` — Common Crawl and unmatched discovery approach.
 4. `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md` — completed Workday inventory architecture.
@@ -16,7 +16,15 @@
 - Keka default/non-default portal resolution/collection/verification; full V2 439 passed; exact-head CI #1431 passed.
 - Open-source research and Common Crawl candidate-only architecture.
 
-## Current uncommitted increment
+## Candidate staging pushed and CI-passed
+
+- PR #65 head `243da9c35e93979e59d0de281130581cad4124d1`, exact-head CI #1437 passed.
+- Full local V2 suite 451 passed in 482.864s; focused candidate API 11 passed.
+- Candidate code is deployed to shared dev 8001 and connector QA 8010 on identical image SHA; eight live sources on both, LinkedIn off, all notification/LLM credentials blank.
+- Dev: 10,259 jobs / 8,221 runs / integrity OK / zero sends after multiple cycles. QA: 1,864 jobs / 8 successful runs / integrity OK / zero sends after first cycle.
+- Complete operating plan and backup hashes: `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md`.
+
+## Current remaining work
 
 - Separate `ats_global_discovery_candidates` SQLite table, unique by provider+host+board key.
 - Admin-only import/list/link/reject APIs; no synthetic employer creation.
@@ -34,6 +42,6 @@ P1: Darwinbox blocked-state correctness; latency/429/completeness/first-seen ben
 
 P2: more ATS connectors after discovery/scheduler contracts; Hirebase estimate-only only after explicit approval.
 
-## User input
+## User input / next handoff
 
-Nothing required now. Hirebase key absent. Workday/Keka/Darwinbox/Hirebase source flags remain false.
+Owner to provision QA-only admin/member using interactive `v2.auth_admin` CLI and perform dev/QA UAT. No Hirebase key needed; Workday/Keka/Darwinbox are now enabled only in isolated non-production canaries, Hirebase remains disabled. Production unchanged; separate approval required.

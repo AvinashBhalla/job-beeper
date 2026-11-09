@@ -1,6 +1,21 @@
 # Next Agent Start Here — Job Radar V2
 
-**Checkpoint:** 2026-11-08 — SQLite P0 live in shared dev; Workday adapter committed and exact-SHA CI passed
+
+## 2026-11-09 22:09 IST — current feature and live-feed rollout (READ THIS FIRST)
+
+Current feature branch is `feat/global-ats-discovery-hirebase-guard-20261109` at `243da9c35e93979e59d0de281130581cad4124d1`; PR #65 is OPEN/DRAFT/UNMERGED. Exact-head GitHub V2 CI #1437 (`42648073320`) passed all stages. Local final V2 suite: 451 passed in 482.864s; candidate-specific API suite 11 passed.
+
+The owner asked for the same real public feeds in non-production before prod. This is now deployed: shared dev port 8001 and connector QA port 8010 both run image `job-radar-dev-multitenant:243da9c`, image SHA `sha256:75d1f8ffe01335f35a7a7447671d2319f46edb4fcfe5eb9cf829617998de5e31`. Both use separate databases and the same production public board allowlist for eight feeds: Naukri, Greenhouse, Ashby, Workday, SmartRecruiters, Workable, Keka and Darwinbox. LinkedIn stays disabled outside prod due to production telemetry showing 10 HTTP 429s / 7 failed pages. Instahyre, Lever, Hirebase remain off. Notifications/Telegram/Gemini/LLM all off. Production port 8000 was not changed.
+
+Dev has successfully completed the eight-source live pass plus follow-on cycles: 3 runs each for Ashby, Darwinbox, Greenhouse, Keka, Workable, Workday; 2 SmartRecruiters; ongoing Naukri. Last two hours: 0 429, 0 page/board failures. Latest DB 10,259 jobs, 8,221 source_runs, integrity ok, zero notification sends. QA first full live pass: 1,864 jobs across 8 successful source runs, zero 429/page/board failures, integrity ok, zero sends; next 60-minute poll cycle still needs observation.
+
+Deployment/backups/metrics and tunnel links are fully recorded in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/RECOVERY_CHECKPOINT_2026-11-09_2209_IST.md`. Use shared dev at `http://localhost:18001/dashboard/` via `ssh -N -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197`; live connector QA at `http://localhost:18010/dashboard/` via `ssh -N -L 18010:127.0.0.1:8010 ubuntu@130.210.27.197`; synthetic QA remains `http://localhost:18006/dashboard/` and is unchanged.
+
+Connector QA currently has zero users; owner must provision QA-only users interactively (never copy prod users): `sudo docker exec -it job-radar-connectors-qa python -m v2.auth_admin create-admin --email qa-admin@local.test`, then `... create-user --email qa-member@local.test`. CLI prompts for passwords locally.
+
+Next: owner UAT dev/QA + create QA admin/member; observe QA next 60-minute cycle; keep PR #65 draft pending UAT; then merge/review separately. Continue P1 per-board scheduling/host budgets, serialized Common Crawl/sitemap discovery and latency/completeness benchmarking. Do not deploy to production without separate explicit owner approval.
+
+**Checkpoint:** 2026-11-09 22:09 IST — PR #65 CI-passed; candidate deployed to shared dev and connector QA with eight live feeds
 **Read this first when taking over the Job Radar task.**
 
 ## Owner's product goal
@@ -9,14 +24,14 @@ Build a reliable multi-source job radar that fetches new jobs from all 36 reques
 
 The required 36 platforms and source-by-source current status are in [ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md](ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md). Workday is now implemented and tested on one NVIDIA public board but remains disabled; Darwinbox is the next connector. The list mixes ATS vendors and job marketplaces; ATS feeds generally require a specific employer board/tenant, so company/career-site discovery is a core requirement.
 
-## Current environment
+## Current environment — supersedes older historical sections below
 
-- Oracle VM: job-radar; SSH login ubuntu; full passwordless sudo. Use sudo for Docker/systemd.
-- Shared dev: container `job-radar-dev`, image `job-radar-dev-multitenant:c441737`, host port 8001, health HTTP 200. P0 SQLite contention fix is live here only.
-- Production: container v2-radar-1 on port 8000, still old image and untouched. Health HTTP 200.
-- Shared-dev image was built from exact P0 CI-tested SHA `c441737ca6c19f17002d9a43923a4a64353f0977`. The Workday adapter is a later uncommitted candidate and is not in the running image.
-- PR #51: https://github.com/AvinashBhalla/job-beeper/pull/51 — open/draft, not merged.
-- Only Naukri is enabled in shared-dev's recurring scheduler. Notifications/Telegram, Gemini and LLM routing are off in shared dev.
+- Production: `v2-radar-1`, port 8000, image `job-radar-prod-canary:6e5becb`, config v15. Nine active feeds including LinkedIn; notifications/Telegram remain live. **Never touch for feature work.**
+- Shared dev: `job-radar-dev`, port 8001, image `job-radar-dev-multitenant:243da9c`, candidate SHA `243da9c`. Naukri, Greenhouse, Ashby, Workday, SmartRecruiters, Workable, Keka and Darwinbox enabled; LinkedIn/Instahyre/Lever/Hirebase off. Notifications off. Separate persistent dev volume.
+- Connector QA: `job-radar-connectors-qa`, port 8010, same immutable image SHA as dev; same eight public feed allowlists, 60-minute polling, isolated QA volume, notifications off. First full real-feed pass succeeded (1,864 jobs). No QA accounts yet.
+- Synthetic browser QA: `job-radar-browser-qa`, port 8006, 4 demo jobs, two existing QA accounts, all collectors off; unchanged.
+- PR #65 is open/draft/unmerged at `243da9c35e93979e59d0de281130581cad4124d1`; exact-head CI #1437 passed; local V2 suite 451 passed. Same candidate is deliberately deployed to dev/QA ahead of merge.
+- Full promotion procedure, backups, runtime config precedence, poll cadences, source metrics, tunnel commands and QA-account provisioning are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/RECOVERY_CHECKPOINT_2026-11-09_2209_IST.md`.
 
 ## What is actually live-tested
 
@@ -32,15 +47,13 @@ The candidate V2 COLLECTORS registers seven sources: LinkedIn, Naukri, Instahyre
 
 Latest verified shared-dev data at 2026-11-08 12:58 UTC: SQLite integrity `ok`, journal mode `wal`, app connection busy timeout 15,000ms; jobs=9,462, source_runs=7,874. The last eight source runs were successful Naukri cycles; no `database is locked` log entry appeared in the last 90 minutes. Telegram delivery is disabled, Telegram credentials absent, and no per-user notification settings are configured.
 
-## Immediate blockers before production
+## Immediate release gates
 
-1. **SQLite lock fix is implemented, CI-passed and deployed to shared dev only.** Continue the canary soak: several Naukri polls have succeeded and there are no lock errors in post-deployment logs so far. Do not treat this as a production-scale stress test.
-2. **Live multi-user flow remains incomplete.** Automated tests verify separate preferences, feeds, Telegram chats, opt-in, CSRF and user isolation. Still perform real signup/login for two users and deliver only to dedicated test chats or a fake Telegram transport. Never request secrets in chat.
-3. **Workday adapter is committed and exact-SHA CI-passed, not deployed.** Commit `c4f9c66cd05419242a761939f4c1ff883b4266d0`; GitHub V2 CI run `42483043107` passed all steps, including dashboard JavaScript syntax and full suite. Local full suite: 359 tests / 266.690s. Two real NVIDIA public-board `run_source` polls on a disposable DB: first inserted 20 jobs with full descriptions and suppressed all 20 as initial inventory; second inserted 0 duplicates; integrity `ok`, zero sends. Keep Workday disabled in shared dev until a verified employer-board pilot is separately approved.
-4. **Darwinbox is next.** The official Recruitment API needs employer-provided authentication. Validate candidate-site feeds per real employer; do not assume one universal unauthenticated endpoint.
-5. **Employer/board discovery is still missing.** Build a registry/search workflow for real ATS tenants and careers URLs. Workday currently requires the admin to paste a verified public board URL. Multi-board Workday calls are sequential and scale at roughly 24.6 seconds per board in the live test; a bounded concurrency/per-board scheduler is needed before claiming the two-minute target for larger registries.
-6. Continue the remaining 36-platform roadmap. The runtime currently registers seven source collectors; only Naukri is recurring-enabled in shared dev. Mark a source complete only after repeated real-board polling, pagination/dedup, reliable timestamp handling, live DB evaluations and per-user notification decisions.
-7. Keep the known 320px toolbar hit-test overlap deferred as requested. Do not deploy production: its Telegram/global notification settings and queue are live. Production requires a separate reviewed backup, all P0 gates and explicit owner approval.
+1. Owner UAT on dev 8001 and live connector QA 8010; create QA-only admin/member through the interactive CLI.
+2. Observe the next 60-minute QA poll cycle for all eight providers; confirm zero 429/page/board failures, healthy DB and zero sends.
+3. Review PR #65 and keep it draft until UAT/review accepted.
+4. Keep LinkedIn disabled in non-production because production showed 10 HTTP 429s and 7 page failures in the preceding 24 hours.
+5. Do not touch production until separate explicit owner approval.
 
 ## Newest branch / verification checkpoint
 

@@ -3893,3 +3893,17 @@ Validation: focused `GlobalDirectoryApiTests` 11/11 passed; full V2 suite **451 
 Next: commit/push and verify exact-head CI; then serialized Common Crawl CDX candidate harvester with 24h stop after 503 and no parallel/proxy requests, sitemap/career-link discovery, live verification, and per-board scheduling. Nothing required from user; no Hirebase key, all sources off, no live network calls/deployment.
 
 Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`; candidate implementation detail: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.
+
+## 2026-11-09 22:09 IST — live feed parity rollout completed
+
+Current feature branch is `feat/global-ats-discovery-hirebase-guard-20261109` at `243da9c35e93979e59d0de281130581cad4124d1`; PR #65 is OPEN/DRAFT/UNMERGED. Exact-head GitHub V2 CI #1437 (`42648073320`) passed all stages. Local final V2 suite: 451 passed in 482.864s; candidate-specific API suite 11 passed.
+
+The owner asked for the same real public feeds in non-production before prod. This is now deployed: shared dev port 8001 and connector QA port 8010 both run image `job-radar-dev-multitenant:243da9c`, image SHA `sha256:75d1f8ffe01335f35a7a7447671d2319f46edb4fcfe5eb9cf829617998de5e31`. Both use separate databases and the same production public board allowlist for eight feeds: Naukri, Greenhouse, Ashby, Workday, SmartRecruiters, Workable, Keka and Darwinbox. LinkedIn stays disabled outside prod due to production telemetry showing 10 HTTP 429s / 7 failed pages. Instahyre, Lever, Hirebase remain off. Notifications/Telegram/Gemini/LLM all off. Production port 8000 was not changed.
+
+Dev has successfully completed the eight-source live pass plus follow-on cycles: 3 runs each for Ashby, Darwinbox, Greenhouse, Keka, Workable, Workday; 2 SmartRecruiters; ongoing Naukri. Last two hours: 0 429, 0 page/board failures. Latest DB 10,259 jobs, 8,221 source_runs, integrity ok, zero notification sends. QA first full live pass: 1,864 jobs across 8 successful source runs, zero 429/page/board failures, integrity ok, zero sends; next 60-minute poll cycle still needs observation.
+
+Deployment/backups/metrics and tunnel links are fully recorded in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/RECOVERY_CHECKPOINT_2026-11-09_2209_IST.md`. Use shared dev at `http://localhost:18001/dashboard/` via `ssh -N -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197`; live connector QA at `http://localhost:18010/dashboard/` via `ssh -N -L 18010:127.0.0.1:8010 ubuntu@130.210.27.197`; synthetic QA remains `http://localhost:18006/dashboard/` and is unchanged.
+
+Connector QA currently has zero users; owner must provision QA-only users interactively (never copy prod users): `sudo docker exec -it job-radar-connectors-qa python -m v2.auth_admin create-admin --email qa-admin@local.test`, then `... create-user --email qa-member@local.test`. CLI prompts for passwords locally.
+
+Next: owner UAT dev/QA + create QA admin/member; observe QA next 60-minute cycle; keep PR #65 draft pending UAT; then merge/review separately. Continue P1 per-board scheduling/host budgets, serialized Common Crawl/sitemap discovery and latency/completeness benchmarking. Do not deploy to production without separate explicit owner approval.
