@@ -1,58 +1,20 @@
-# Source phase telemetry — recovery handover (2026-11-10)
 
-## Previous work completed
-- PR #67 merged to v2-live-radar as 5d6e2b4.
-- Bounded Common Crawl and robots-aware sitemap/career-link discovery are deployed to dev and connector QA.
-- Both environments use image job-radar-dev-multitenant:5d6e2b4, have HTTP 200 health, zero restarts, SQLite integrity ok, 10/10 successful board schedules, and zero notifications sent.
-- Production was not changed. Rollback containers and database/config backups remain on the VM.
-- The roadmap was updated at 6c89292. Performance baseline is docs/SOURCE_PERFORMANCE_BENCHMARK_2026-11-10.md.
 
-## Current task
-Branch: feat/source-phase-performance-telemetry-20261110
-Worktree: /tmp/job-radar-source-perf-20261110
-Base: v2-live-radar at 6c89292
+## Follow-up finding — board-scoped config invalidated every evaluation (2026-11-10)
 
-Goal: add low-overhead phase-level timings to source_runs so slow source runs can be separated into collector/network, normalization, detail enrichment, database upsert and post-processing time. Also add per-request latency distribution summaries (not just request_duration_ms_total).
+Natural post-deploy phase timings exposed a second, more important issue than collector latency. In dev over the first hour of telemetry:
+- Ashby 7 runs: evaluation phase median about 52.8s; request duration median about 1.4s.
+- Greenhouse 11 runs: evaluation phase median about 47.2s; request duration median about 1.2s.
+- Multiple Ashby/Greenhouse evaluations exceeded 60–100 seconds.
+- Some upsert phases also spiked (for example, Ashby 75.3s and Keka 79.7s); these appear to include SQLite writer contention while other source jobs are active.
 
-## Baseline findings (previous 24h, shared dev)
-- Ashby: 61/61 successful, zero 429; runtime p50/p95 89.65/242.40 seconds.
-- Greenhouse: 63/63 successful, zero 429; runtime p50/p95 65.05/190.47 seconds.
-- SmartRecruiters: 30/30 successful, zero 429; 690 requests total; runtime p50/p95 37.54/167.29 seconds.
-- Workday: 57/57 successful, zero 429; 1,520 jobs seen / 431 new; 1,219 requests; runtime p50/p95 70.58/127.81 seconds.
-- Keka and Darwinbox: 58/58 and 59/59 successful respectively, zero 429.
-- QA uses a slower 60-minute cadence. Do not change intervals or concurrency during measurement.
+A read-only config-fingerprint audit showed dev had 10,815 jobs and 10,815 evaluations, but all 10,815 stored fingerprints differed from the global config fingerprint. QA had 2,400 jobs/evaluations and zero mismatches at the instant of that audit.
 
-## Existing instrumentation inspected
-- SOURCE_METRIC_FIELDS currently stores request counts, response counts, status buckets, retry attempts, aggregate request_duration_ms_total, page counts and board counts.
-- _begin_source_run_metrics(source), _record_source_request(...), _record_source_page(...), _record_source_board(...), _finish_source_run_metrics(source) manage in-memory per-source metrics.
-- run_source (source orchestration) calls COLLECTORS[source](config), then shadow extraction, upsert_jobs, baseline suppression, evaluation refresh and notification decisions before record_run.
-- normalize_job currently returns a normalized dictionary with no timing.
-- source_runs is migration-safe via _ensure_column; new columns should be additive and nullable/default-safe.
-- Existing dashboard/admin source telemetry reads source_runs by selected metric columns. New fields must be exposed deliberately and must not break old databases.
+Code-path inspection found the cause: the durable board scheduler creates a scoped config for one board by replacing the provider's board list, then passes that scoped config to run_source(). _config_fingerprint() currently hashes the entire config, including per-board source configuration, poll intervals and source flags. refresh_job_evaluations() therefore treats all existing jobs as stale whenever a board-scoped poll runs and re-evaluates the complete inventory.
 
-## Immediate implementation plan
-1. Add a thread-safe phase timing accumulator to active_source_metrics with explicit phases: collector_total_ms, upsert_ms, shadow_ms, evaluation_ms, notification_ms. Use monotonic clocks around existing orchestration boundaries.
-2. Add per-request duration aggregates (count, total, min, max and bounded histogram buckets or compact percentile approximation). Keep endpoint URLs, query strings, request bodies and response contents out of telemetry.
-3. Avoid timing every normalize_job call individually initially; collector_total_ms already captures parsing/normalization and request time. If phase breakdown still cannot explain Ashby/Greenhouse, instrument detail-fetch vs parse in those collectors separately.
-4. Add nullable columns or one compact JSON field to source_runs; prefer explicit numeric columns for the main phases and a compact request latency summary. Use migration-safe _ensure_column.
-5. Update record_run and source health aggregation/status API to expose fields only where useful. No UI work.
-6. Add deterministic tests for phase accumulation, request latency aggregation, migration from old source_runs schema, error-path finalization, and backward compatibility of status summaries.
-7. Run focused tests, full V2 unittest suite and exact-head GitHub CI. Push one PR to v2-live-radar.
-8. Deploy to dev first, verify new metrics populate, then connector QA. Keep production untouched and keep current poll intervals, concurrency, source flags and notification settings unchanged.
-
-## Non-goals
-- Do not tune poll cadence, concurrency or rate budgets yet.
-- Do not change collector behavior or data normalization.
-- Do not add UI.
-- Do not trigger extra live polls just to produce more benchmark data.
-- Do not activate any disabled source or send test notifications.
-
-## Implementation checkpoint
-- Added additive source_runs fields for collector, shadow, upsert, evaluation and notification phase durations.
-- Added per-request min/max and bounded latency histogram buckets (lt_100ms through gte_30s); raw URLs, query strings and payloads are never persisted.
-- The source-status API now exposes latest phase timings, latest request histogram and 24-hour phase totals/averages. Legacy rows remain null/zero-safe; average timings divide only by phase-measured runs.
-- Instrumentation uses monotonic timers and does not change collector, polling, notification or matching behavior.
-- Focused SourceRequestMetricsTests: **6/6 passed**, including success, collector error, histogram, API aggregation and additive migration tests.
-- Python compilation and git diff check passed. Exact-head full V2 CI remains required before merge/deploy.
-- First full CI run found seven source-status tests using a hand-built legacy source_runs fixture that did not include the newly migrated columns. Production startup runs init_db migrations; the fixture was updated to represent the current schema. The affected SourceRequestMetricsTests and SourceStatusPersistenceTests now pass 10/10 together in the application runtime. A fresh full V2 CI run is required on this correction.
-- Second full CI run found three additional manually-created source_runs fixtures in the 429/source-registry tests that also bypass init_db. Updated those fixtures to the current migrated schema. The combined focused metric/status/latency/registry test classes now pass 17/17 in the app runtime. Fresh full V2 CI required again.
+### Fix in progress
+- Fingerprint only the configuration fields actually used by match_details() and alertability_details(): target roles, skills, locations, title exclusions, excluded role terms, remote-only, experience constraints, match threshold and notification-enabled state.
+- Keep MATCHER_RULES_VERSION in the fingerprint so intentional matcher-rule changes still trigger re-evaluation.
+- Add tests proving board lists, source flags and poll cadence do not invalidate evaluations, while matcher/alertability setting changes do.
+- This creates a one-time fingerprint migration/re-evaluation of the existing inventory, then makes subsequent board-specific runs stable. Do not manually trigger that re-evaluation; let the ordinary run perform it once and verify the fingerprint mismatch count returns to zero.
+- No source cadence, concurrency, collector, notifications or production config changes.

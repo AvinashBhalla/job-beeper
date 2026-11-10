@@ -319,7 +319,7 @@ Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: d
 
 The following capabilities are already present in the current integration code and have focused tests: Workday facet-aware partitioning (depth/queue bounded, sequential inventory), Keka non-default portal parsing/collection, and the Darwinbox public candidate collector. Current live boards are NVIDIA Workday, Bridgestone default Keka portal and Arvind Darwinbox; these do not prove a Workday 2,000-result facet canary or a live non-default Keka portal.
 
-1. **Source performance profiling (instrumentation delivered)**: PR #68 merged as 1763673 and deployed to dev/connector QA. Phase timings now cover collector, shadow, upsert, evaluation and notification; request min/max and latency histograms are persisted. Collect natural post-deploy samples for Ashby and Greenhouse, compare request latency against collector duration, and add finer parse/detail-enrichment timers only if required. Do not increase concurrency or change poll intervals until the bottleneck is understood.
+1. **Source performance profiling (instrumentation delivered; evaluation fingerprint fix in progress)**: PR #68 merged as 1763673 and deployed to dev/connector QA. The first-hour telemetry isolated a repeat full-inventory evaluation caused by hashing board-scoped source configuration. Fix branch `fix/stable-evaluation-fingerprint-20261110` narrows the fingerprint to actual matcher/alertability inputs; focused tests pass 3/3. Complete full V2 CI, open PR, deploy dev then connector QA, and verify one-time inventory re-evaluation followed by stable fingerprints. Keep cadence/concurrency unchanged.
 2. **Workday live facet validation**: use an explicitly approved public tenant that actually reaches the 2,000-result cap; verify child facet metadata, persisted queue resume, dedupe and incomplete-leaf reporting. NVIDIA currently returns only 39 jobs and has not exercised facet subdivision.
 3. **Keka non-default live validation**: validate a real public tenant portal slug with the existing collector; keep it separate from the default Bridgestone portal.
 4. **Darwinbox coverage**: keep the current Arvind public candidate collector on the approved path. Do not use TLS impersonation, anti-bot bypass or the Cloudflare-protected adapter.
@@ -327,3 +327,15 @@ The following capabilities are already present in the current integration code a
 No UI work is required for these tasks. Keep the current rate limits and notification safety unchanged during measurement.
 
 The global discovery implementation is a candidate-discovery capability, not a claim of complete 36-platform coverage. Every discovered board still needs admin review, verification, silent first inventory and a second-poll dedupe check before activation.
+
+
+## 2026-11-10 — scheduler evaluation fingerprint root cause and fix
+
+- Root cause: board-scoped scheduler config was included in the whole-config evaluation fingerprint, invalidating all shared job evaluations on each board run.
+- Fix branch: `fix/stable-evaluation-fingerprint-20261110`; focused regression tests 3/3 pass.
+- Full V2 test suite is running. Do not merge/deploy until it passes and PR review is complete.
+- Rollout requires a one-time evaluation fingerprint migration; do not manually trigger refresh. Verify mismatch count reaches zero and stays zero after later scheduled runs.
+
+### PR #69 CI checkpoint — 2026-11-10
+
+The stable evaluation-fingerprint fix passed exact-head V2 CI (run `42782187621`, code head `4092b22`). PR #69 is open and unmerged. Next release action remains review/merge approval, then controlled dev-first and connector-QA rollout with a one-time fingerprint migration.

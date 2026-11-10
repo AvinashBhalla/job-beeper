@@ -477,3 +477,24 @@ For owner-driven ChatGPT Desktop browser QA, read `docs/DESKTOP_QA_PROMPT_2026-1
 ## 2026-11-10 — Desktop QA follow-up
 
 See docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. The previously blocked anonymous scheduler request is now independently proven to return HTTP 401 with no cookie. Updated evidence totals: PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4. Admin reload, post-handoff admin viewport tests, and exported PNGs remain pending; do not claim release acceptance. Automation-only test users ids 3/4 were disabled; owner QA accounts ids 1/2 remain active.
+
+
+## 2026-11-10 13:25 IST — evaluation fingerprint defect found and fix underway
+
+- PR #68 telemetry release is merged and deployed to dev/connector QA (image `job-radar-dev-multitenant:1763673`).
+- Natural dev samples showed Ashby evaluation median ~52.8s (7 runs) and Greenhouse ~47.2s (11 runs), with request medians ~1.4s and ~1.2s.
+- Read-only audit: dev 10,815 jobs / 10,815 evaluations, all fingerprints differed from the global fingerprint. QA 2,400 jobs/evaluations and zero mismatches at audit time.
+- Cause: per-board scheduler scopes board/source configuration, but `_config_fingerprint()` hashed the entire config. Each ATS board poll therefore caused a full inventory re-evaluation.
+- Fix branch: `fix/stable-evaluation-fingerprint-20261110`, commit currently includes regression code and handover notes. Fingerprint now contains only matcher/alertability inputs plus matcher rules version. Added tests for board/operational stability and evaluation-setting invalidation.
+- Focused tests: fingerprint regressions 3/3 pass; full `MatcherTests` class 97/97 pass. Updated the legacy deprecated-setting test to assert that an unused setting does not trigger redundant re-evaluation.
+- GitHub V2 CI run `42782187621` on code commit `4092b22` passed: Python compilation, dashboard JS syntax, focused router/extractor tests and the full V2 unittest suite.
+- A separate local full-suite rerun with CI's `httpx2` dependency is still running in Termalin job `cs6l7m3y3s`; CI is the authoritative result.
+- Next: confirm full suite; inspect diff; update handover; commit/push any final docs; open PR to `v2-live-radar`; wait exact-head CI; merge only on green; deploy dev first, then connector QA. Keep rollback images and backups. Do not touch prod, cadence, concurrency, rate limits or notification settings.
+- After deployment, allow ordinary scheduled runs to perform the one-time evaluation fingerprint migration. Confirm mismatch count reaches zero and remains zero after later board polls; compare phase timings before/after. No manual refresh.
+
+### CI verification for PR #69 — 2026-11-10
+
+- PR: https://github.com/AvinashBhalla/job-beeper/pull/69
+- Code head tested: `4092b22e847e3ebc8ac096a35a4eb6b8f7dba2b8`
+- V2 CI run: `42782187621` — success. Python syntax, dashboard JavaScript syntax, focused router/extractor tests and the full V2 unittest suite all passed.
+- PR remains open and unmerged. No deployment or production change has been made.
