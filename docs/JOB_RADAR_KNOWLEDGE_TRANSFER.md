@@ -4002,3 +4002,15 @@ Use `docs/DESKTOP_QA_PROMPT_2026-11-10.md` for ChatGPT Desktop browser QA. Owner
 ## 2026-11-10 — Desktop QA evidence follow-up
 
 Read docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. Anonymous scheduler endpoint now independently returns 401 without a cookie. Original Desktop report provides admin scheduler success, member 403, Source Health absent for members, and member responsive widths without overflow. Admin reload, admin viewport rerun and PNG exports remain outstanding. Revised counts: PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4. Automation-only QA users 3/4 disabled and temp password file removed; owner QA accounts 1/2 unchanged.
+
+
+## 2026-11-10 — JobBeeper reference-product research
+
+- Research synthesis: `docs/JOBBEEPER_REVERSE_ENGINEERING_LEARNINGS_2026-11-10.md`.
+- Product roadmap update: `d3804df5e9b8cabb966c31bb8c77c393e0d86a8d`; detailed handover update: `7054045f50359aedbc9d56f8b7bd621928a50160`; research synthesis commit: `625140083790294dba34b52079bb567e913e2324`.
+- Reference JobBeeper's public UX, visible source labels and a common authenticated browser-facing jobs API are reported as observed. Its private ingestion/discovery/scheduler mechanism is **UNKNOWN**. The authenticated network capture itself is a separate local artifact referenced by the uploaded report and must be inspected in Desktop.
+- Our own shared ingestion architecture is already the right base. PR #67 merged bounded company-agnostic discovery (Common Crawl CDX + public careers/sitemap links). It is admin-triggered and review-first; candidate employers/boards are not automatically activated.
+- Preserve the invariant: user-level source toggles filter only that user's inventory/matches/alerts; global admin source settings control shared collection. The actual user preference implementation still needs source-code/test verification.
+- GitHub code baseline before docs-only updates: `v2-live-radar` `18f219dfab4ad6f2c5ad9b9704da5d3a220f7d37`. PR #69 is merged as `18f219dfab4ad6f2c5ad9b9704da5d3a220f7d37`; older unmerged wording is superseded.
+- This turn changed documentation only. No code/tests/deployments/config/database/notification/credential changes; no tests run.
+- Next action: Desktop implementation-readiness audit of the exact local checkout plus the separate network-evidence artifact. Verify source registry/discovery flow, board activation, per-user source preference persistence/filtering, schema/provenance/timestamps and test coverage. Return file/line/test evidence; do not implement until reviewed.
