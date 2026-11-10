@@ -85,3 +85,5 @@
   - Common Crawl request errors are recorded and the lease is released instead of being left until lease expiry.
 - `python -m py_compile` passed for the discovery module, its tests and `radar.py`; `git diff --check` passed.
 - Full V2 pytest suite is currently running in the isolated test container. Do not deploy or merge until it completes and CI passes.
+- Added an API integration test for the new admin-only discovery endpoints: status works for admins, member access is denied, invalid sitemap payloads return 422, and manual Common Crawl/sitemap calls delegate to the candidate importer. The test passed independently in the app runtime.
+- PR #67 is open against `v2-live-radar`. Its first GitHub V2 CI run passed, including the full V2 unittest suite. The API integration test was added after that run and is being pushed for a fresh CI pass.
