@@ -7199,3 +7199,20 @@ Desktop test prompt and owner setup are documented in `docs/DESKTOP_QA_PROMPT_20
 ## 2026-11-10 — QA evidence follow-up
 
 Owner Desktop report reviewed and supplemented in docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. Direct no-cookie GET to candidate scheduler status returned HTTP 401, closing the anonymous auth gap. Member 403 and member responsive checks remain PASS from the owner report. Admin post-handoff responsive/reload and screenshot file export remain BLOCKED/UNKNOWN. Revised evidence totals are PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4; recommendation remains BLOCKED. Do not merge or deploy PR #66 until the remaining admin evidence and screenshot artifacts are reviewed.
+
+
+## 2026-11-10 14:43 IST — stable evaluation fingerprint rollout
+
+Authoritative rollout record: `docs/RELEASE_ROLLOUT_EVAL_FINGERPRINT_2026-11-10.md`. Owner browser instructions: `docs/DEV_DESKTOP_QA_PROMPT_2026-11-10.md`.
+
+- PR #69 merged at `18f219dfab4ad6f2c5ad9b9704da5d3a220f7d37`.
+- Dev (8001) and Connector QA (8010) run identical image `job-radar-dev-multitenant:18f219d`, image ID `sha256:86693f94cf64db076ae79222ca4cf6a05a62c0b4b3fa0be0b6b09444077397d5`.
+- Both /health HTTP 200, restart count 0, SQLite integrity ok, jobs and evaluation rows equal, zero fingerprint mismatches, 10 active board schedules in success state, zero sent notifications.
+- Anonymous scheduler-status and source-status APIs return HTTP 401 in both.
+- One-time fingerprint migration completed on normal startup/board polling. No manual full refresh.
+- Small Dev natural sample shows evaluation phases reduced from repeated tens/100+ seconds to mostly sub-second / 0.1–1.4s. Upsert still varies, with an early Ashby sample at 16.32s; gather at least 20 runs/provider before any write-path optimization.
+- Full post-release cycle across every board is still pending, especially Connector QA's 60-minute cadence. Observe natural polls only.
+- Visual admin/member and responsive QA is pending. Owner should run the Dev Desktop prompt and return the report plus PNG screenshots.
+- Prior containers and online DB/config backups retained in `/tmp/job-radar-release-backups/2026-11-10-pre-eval-fingerprint/`. Production unchanged.
+
+Next: complete owner Dev UI QA; observe a full natural post-release board cycle in Dev and QA; recheck zero fingerprint mismatches; then assess upsert phase telemetry without changing concurrency/cadence. Production promotion requires separate explicit approval.

@@ -1,8 +1,18 @@
-# CURRENT HANDOVER — 2026-11-09 repository cleanup
+# CURRENT HANDOVER — 2026-11-10 release rollout
 
-**Read first:** [Repository cleanup and next-agent handover](REPOSITORY_CLEANUP_2026-11-09.md). It records the current seven open PRs, 16 remote branches, archived/deleted stale docs branches, the closed unmerged PR #35, current dev/QA image and live-feed evidence, owner QA steps, and the ordered next tasks.
+**Read first:** [Stable evaluation fingerprint rollout](RELEASE_ROLLOUT_EVAL_FINGERPRINT_2026-11-10.md).
 
-The older dated notes below are retained as history and may describe earlier runtime images, branch counts or PR states. Use the newest dated checkpoint in `docs/JOB_RADAR_HANDOVER.md` and the cleanup report above as the current source of truth. The production-first/older promotion guidance in historical sections is superseded by `docs/DEVELOPMENT_RELEASE_POLICY_AND_REPO_CLEANUP_2026-11-09.md`: engineering is dev-first and production requires separate owner approval.
+- PR #69 is **merged** into `v2-live-radar` at `18f219dfab4ad6f2c5ad9b9704da5d3a220f7d37`.
+- Shared Dev (port 8001) and Connector QA (port 8010) both run image `job-radar-dev-multitenant:18f219d`, image ID `sha256:86693f94cf64db076ae79222ca4cf6a05a62c0b4b3fa0be0b6b09444077397d5`.
+- Both health endpoints return HTTP 200, restart count 0, SQLite integrity `ok`, 10/10 active board rows in success state, zero evaluation fingerprint mismatches and zero sent notifications.
+- The initial fingerprint migration/re-evaluation completed in both databases. No manual refresh was triggered.
+- Dev private dashboard: https://termal.in/account#open-site=776b26fb-86fa-4ac2-9762-4af7dd5fe33f
+- Owner's visual QA is still pending. Use [Dev Desktop QA prompt](DEV_DESKTOP_QA_PROMPT_2026-11-10.md); ask owner to run it in ChatGPT Desktop and return the report/screenshots.
+- Dev and QA post-release board cycles are not yet fully observed across all 10 boards. Continue natural cadence only; do not manually poll.
+- Production port 8000 was not changed. Previous containers and pre-deploy DB/config backups are retained under `/tmp/job-radar-release-backups/2026-11-10-pre-eval-fingerprint/` and the `*-pre-eval-fingerprint-20261110` container names.
+- Next engineering focus: collect at least 20 natural successful runs per provider, then profile upsert/SQLite write contention only if it remains a bottleneck. Do not change cadence or concurrency during measurement.
+
+The dated historical notes below are retained as history and may describe earlier runtime images, branch counts or PR states. Use the latest rollout record above and the newest dated sections at the end of this file as the current source of truth. Dev-first policy still applies; production requires separate explicit owner approval.
 
 ---
 
@@ -498,3 +508,18 @@ See docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. The previously blocked anonymous sch
 - Code head tested: `4092b22e847e3ebc8ac096a35a4eb6b8f7dba2b8`
 - V2 CI run: `42782187621` — success. Python syntax, dashboard JavaScript syntax, focused router/extractor tests and the full V2 unittest suite all passed.
 - PR remains open and unmerged. No deployment or production change has been made.
+
+
+## 2026-11-10 14:43 IST — PR #69 deployed to Dev and Connector QA
+
+See `docs/RELEASE_ROLLOUT_EVAL_FINGERPRINT_2026-11-10.md` for exact image IDs, health/database checks, backup locations, phase timings and next tasks.
+
+- Merge commit `18f219dfab4ad6f2c5ad9b9704da5d3a220f7d37`; PR #69 merged.
+- Dev and Connector QA run the same image `job-radar-dev-multitenant:18f219d`; image ID `sha256:86693f94cf64db076ae79222ca4cf6a05a62c0b4b3fa0be0b6b09444077397d5`.
+- Dev 8001 and QA 8010 health endpoints HTTP 200; restart count 0; DB integrity `ok`; evaluation rows equal job rows; fingerprint mismatches 0; 10 active boards, all latest outcomes success; sent notifications 0.
+- Anonymous scheduler-status and source-status APIs both return 401 in both environments.
+- One-time evaluation migration completed via normal startup/board polling; no manual refresh.
+- Owner visual QA remains pending. Use `docs/DEV_DESKTOP_QA_PROMPT_2026-11-10.md`.
+- Continue natural post-release observation until all 10 boards in each environment have a last-run timestamp after deployment. QA is configured for 60-minute cadence.
+- Small early Dev sample: evaluation phases mostly 0.1–1.4 seconds after fix, versus 40–160 seconds before; upsert has some spikes up to 16.32 seconds and requires more samples before any optimization.
+- Production was not changed. Previous containers and backups retained.
