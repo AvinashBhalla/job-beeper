@@ -257,3 +257,14 @@ Run the same set of role/location/date queries against TheirStack and JobsPipe, 
 ## Decision
 
 **Proceed with the global board-catalog path as the core direct-source architecture.** PR #67 is a candidate-discovery foundation, not the completed global discovery system. Its next meaningful step is not more company form fields: it is an exhaustive, resumable ATS-token harvest, live verification, and a scheduler driven from the database board registry. Keep TheirStack/JobsPipe as measured commercial fallbacks for sources that cannot be safely/legally collected directly.
+
+
+---
+
+## Follow-up handoff: real-time feasibility, counts, cost and timeline
+
+The implementation decision and next-agent handoff has been expanded in:
+
+- [REALTIME_GLOBAL_JOB_INGESTION_DECISION_HANDOFF_2026-11-10.md](./REALTIME_GLOBAL_JOB_INGESTION_DECISION_HANDOFF_2026-11-10.md)
+
+Read that companion document before implementation. It records the October 2026 Workday/ATS board-count benchmarks, explains why direct polling cannot guarantee zero delay, separates new-board discovery from new-job detection, calculates request volume at 1/5/15-minute cadences, compares direct-ingestion and aggregator costs, estimates a 2–4 week implementation, and lists the precise code areas and next engineering steps.
