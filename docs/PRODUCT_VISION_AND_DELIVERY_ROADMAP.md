@@ -317,9 +317,13 @@ Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: d
 
 ### Next engineering priorities
 
-1. **Workday facet-aware pagination**: independently validate facet partitioning and result caps before increasing request volume; keep offsets/checkpoints, dedupe, 429 cooldown and incomplete-inventory reporting.
-2. **Keka portal coverage**: support and validate non-default portal slugs against public tenant examples, keeping each board candidate separate and reviewable.
-3. **Darwinbox public access**: investigate only a documented/public authorized candidate/job endpoint. Do not use TLS impersonation, anti-bot bypass or the Cloudflare-protected adapter.
-4. After the above, benchmark per-board freshness, p50/p95 poll latency, 429 rates and new-job yield before changing scheduler cadence.
+The following capabilities are already present in the current integration code and have focused tests: Workday facet-aware partitioning (depth/queue bounded, sequential inventory), Keka non-default portal parsing/collection, and the Darwinbox public candidate collector. Current live boards are NVIDIA Workday, Bridgestone default Keka portal and Arvind Darwinbox; these do not prove a Workday 2,000-result facet canary or a live non-default Keka portal.
+
+1. **Source performance profiling**: use docs/SOURCE_PERFORMANCE_BENCHMARK_2026-11-10.md as the baseline. Add phase-level timings and per-request latency distributions, starting with slow Ashby/Greenhouse runs and then SmartRecruiters. Do not increase concurrency or change poll intervals until the bottleneck is understood.
+2. **Workday live facet validation**: use an explicitly approved public tenant that actually reaches the 2,000-result cap; verify child facet metadata, persisted queue resume, dedupe and incomplete-leaf reporting. NVIDIA currently returns only 39 jobs and has not exercised facet subdivision.
+3. **Keka non-default live validation**: validate a real public tenant portal slug with the existing collector; keep it separate from the default Bridgestone portal.
+4. **Darwinbox coverage**: keep the current Arvind public candidate collector on the approved path. Do not use TLS impersonation, anti-bot bypass or the Cloudflare-protected adapter.
+
+No UI work is required for these tasks. Keep the current rate limits and notification safety unchanged during measurement.
 
 The global discovery implementation is a candidate-discovery capability, not a claim of complete 36-platform coverage. Every discovered board still needs admin review, verification, silent first inventory and a second-poll dedupe check before activation.
