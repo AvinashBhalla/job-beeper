@@ -8,7 +8,7 @@
 - The initial fingerprint migration/re-evaluation completed in both databases. No manual refresh was triggered.
 - Dev private dashboard: https://termal.in/account#open-site=776b26fb-86fa-4ac2-9762-4af7dd5fe33f
 - Owner's visual QA is still pending. Use [Dev Desktop QA prompt](DEV_DESKTOP_QA_PROMPT_2026-11-10.md); ask owner to run it in ChatGPT Desktop and return the report/screenshots.
-- Dev and QA post-release board cycles are not yet fully observed across all 10 boards. Continue natural cadence only; do not manually poll.
+- Dev completed a full natural post-release board cycle: 10/10 board timestamps advanced after rollout, all success. Connector QA is still waiting for its 60-minute cadence; at 09:18 UTC, next board due times were 09:44–09:52 UTC. Continue natural cadence only; do not manually poll.
 - Production port 8000 was not changed. Previous containers and pre-deploy DB/config backups are retained under `/tmp/job-radar-release-backups/2026-11-10-pre-eval-fingerprint/` and the `*-pre-eval-fingerprint-20261110` container names.
 - Next engineering focus: collect at least 20 natural successful runs per provider, then profile upsert/SQLite write contention only if it remains a bottleneck. Do not change cadence or concurrency during measurement.
 

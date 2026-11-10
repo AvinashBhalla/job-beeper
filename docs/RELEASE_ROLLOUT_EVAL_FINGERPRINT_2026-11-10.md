@@ -70,9 +70,9 @@ The active board inventory is 10 boards across 7 ATS providers and 7 host keys:
 
 ### Live poll coverage after deployment
 
-Dev's source-run table contains 15 successful source runs since its rollout, across the configured providers and Naukri relay. The scheduler state reports 10/10 boards successful, but not every board's last-run timestamp is newer than the deployment time yet. Do not claim a complete post-release cycle for all 10 Dev boards until each board's last-run timestamp advances past rollout.
+Dev has now completed a full natural post-release board cycle: all 10 of 10 active board rows have a last-finished timestamp later than the 08:47:47 UTC rollout and all latest outcomes are success. The Dev database currently has 10,847 jobs and 10,847 evaluations, zero fingerprint mismatches, SQLite integrity ok and zero sent notifications. The 10 boards' next due times have advanced normally; no manual poll was triggered.
 
-Connector QA uses a 60-minute board cadence. At the verification point, one Naukri relay run had completed after deployment; the 10 board rows still showed successful outcomes from their preceding scheduled cycle. Continue observing until every QA board has completed one full post-deploy cycle. Do not manually trigger polls to accelerate this.
+Connector QA uses a 60-minute board cadence. At 09:18 UTC, one Naukri relay run had completed after the 08:53:27 UTC rollout, while 0/10 board rows had yet reached their next due time. Their next due times fall between 09:44 and 09:52 UTC. Continue observing until every QA board has completed one full post-deploy cycle. Do not manually trigger polls to accelerate this.
 
 ### Phase timing signal
 
@@ -85,7 +85,7 @@ Examples from Dev after rollout:
 - Naukri: evaluation median in the small post-rollout sample 0.84s; upsert median 2.71s.
 - Workday: evaluation around 1.3s; 42 requests over two observed runs.
 
-These are small, early natural samples, not a controlled benchmark or SLA. Upsert duration still varies (Ashby peaked at 16.32s in the early sample). Continue collecting at least 20 successful post-release runs per provider before deciding whether an upsert optimization is needed. The current evidence supports the fingerprint fix; it does not yet prove the upsert bottleneck is eliminated.
+These are small, early natural samples, not a controlled benchmark or SLA. Upsert duration still varies (Ashby peaked at 16.32s in the early sample). The upsert lookup plan uses the unique jobs(source, source_job_id) index; canonical URL and company/location candidate lookup plans also use indexes, though company/location ordering uses a temporary B-tree. There is no evidence yet of a full table scan on these hot lookup paths. Continue collecting at least 20 successful post-release runs per provider and measure SQLite lock wait before deciding whether an upsert optimization is needed. The current evidence supports the fingerprint fix; it does not yet prove the upsert bottleneck is eliminated.
 
 ## Owner browser QA
 
@@ -98,7 +98,7 @@ No visual QA results or screenshots are claimed in this rollout record.
 ## Next engineering tasks
 
 1. Owner tests Dev UI using the runbook and returns any bugs/report.
-2. Continue natural Dev polling until all 10 board timestamps are post-release; continue QA observation until all 10 QA board timestamps are post-release.
+2. Dev's full natural post-release board cycle is complete (10/10). Continue QA observation until all 10 QA board timestamps are post-release.
 3. Re-audit fingerprint mismatches after subsequent board polls; expected zero.
 4. Collect at least 20 successful post-release runs per provider and compare collector, upsert, evaluation and notification phase times. Keep cadence/concurrency unchanged while collecting.
 5. If upsert remains the dominant bottleneck, profile the actual SQL/SQLite lock-wait paths first. Add targeted telemetry or a benchmark before changing write strategy. Preserve canonicalization, per-user evaluations, baseline suppression and source metadata semantics.

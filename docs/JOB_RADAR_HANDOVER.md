@@ -7211,7 +7211,7 @@ Authoritative rollout record: `docs/RELEASE_ROLLOUT_EVAL_FINGERPRINT_2026-11-10.
 - Anonymous scheduler-status and source-status APIs return HTTP 401 in both.
 - One-time fingerprint migration completed on normal startup/board polling. No manual full refresh.
 - Small Dev natural sample shows evaluation phases reduced from repeated tens/100+ seconds to mostly sub-second / 0.1–1.4s. Upsert still varies, with an early Ashby sample at 16.32s; gather at least 20 runs/provider before any write-path optimization.
-- Full post-release cycle across every board is still pending, especially Connector QA's 60-minute cadence. Observe natural polls only.
+- Dev completed all 10 natural post-release board polls. Connector QA uses a 60-minute cadence and was still awaiting its natural post-release cycle at 09:18 UTC. Observe only; do not force a poll.
 - Visual admin/member and responsive QA is pending. Owner should run the Dev Desktop prompt and return the report plus PNG screenshots.
 - Prior containers and online DB/config backups retained in `/tmp/job-radar-release-backups/2026-11-10-pre-eval-fingerprint/`. Production unchanged.
 
