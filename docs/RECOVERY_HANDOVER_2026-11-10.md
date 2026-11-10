@@ -88,4 +88,6 @@
 - Added an API integration test for the new admin-only discovery endpoints: status works for admins, member access is denied, invalid sitemap payloads return 422, and manual Common Crawl/sitemap calls delegate to the candidate importer. The test passed independently in the app runtime.
 - PR #67 is open against `v2-live-radar`. Its first GitHub V2 CI run passed, including the full V2 unittest suite. The API integration test was added after that run and is being pushed for a fresh CI pass.
 - To avoid spending further time on a redundant local full-suite run, the long local pytest discovery run was stopped after 24% progress; the authoritative GitHub V2 CI full unittest suite had already passed on the implementation commit. A fresh full CI run is now in progress for the follow-up API test commit `1628d05`.
-- Focused pytest for both discovery and global-candidate integration files is running in the isolated app container; the standalone API test passed (1/1), and discovery unit tests passed (12/12).
+- Focused pytest for the discovery and global-candidate integration files completed: **34 passed, 4 warnings**. The standalone API route test passed as part of that run; discovery unit tests account for 12 of the 34.
+
+- Latest full GitHub V2 CI run before this documentation-only correction: run 42768060069, conclusion SUCCESS on implementation/test commit 2e66489; both focused router/extractor tests and full V2 unittest discovery passed. The full V2 suite includes the new discovery module tests and the new admin-route integration test.
