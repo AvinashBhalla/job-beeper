@@ -335,3 +335,7 @@ The global discovery implementation is a candidate-discovery capability, not a c
 - Fix branch: `fix/stable-evaluation-fingerprint-20261110`; focused regression tests 3/3 pass.
 - Full V2 test suite is running. Do not merge/deploy until it passes and PR review is complete.
 - Rollout requires a one-time evaluation fingerprint migration; do not manually trigger refresh. Verify mismatch count reaches zero and stays zero after later scheduled runs.
+
+### PR #69 CI checkpoint — 2026-11-10
+
+The stable evaluation-fingerprint fix passed exact-head V2 CI (run `42782187621`, code head `4092b22`). PR #69 is open and unmerged. Next release action remains review/merge approval, then controlled dev-first and connector-QA rollout with a one-time fingerprint migration.

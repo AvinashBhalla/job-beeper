@@ -103,6 +103,6 @@ Corrective change on branch `fix/stable-evaluation-fingerprint-20261110`:
 - Fingerprint only the evaluation inputs read by `match_details()` and `alertability_details()` (roles, skills, locations, exclusions, remote-only, experience constraints, match threshold and notification-enabled state), plus `MATCHER_RULES_VERSION`.
 - Board configuration, source enablement, cadence and concurrency no longer invalidate persisted evaluations.
 - Added regression tests that operational/board-only changes preserve the fingerprint, while each evaluation input and matcher-rules version changes it.
-- Focused fingerprint regression tests pass 3/3; full matcher test class passes 97/97. The full CI-equivalent V2 suite is being rerun with the CI-only `httpx2` test dependency installed in an ephemeral container.
+- Focused fingerprint regression tests pass 3/3; full matcher test class passes 97/97. GitHub V2 CI run `42782187621` on code head `4092b22e847e3ebc8ac096a35a4eb6b8f7dba2b8` passed, including the full V2 unittest suite.
 
 Expected rollout behavior: because the old persisted fingerprint scheme differs, the first normal run after this code is deployed will re-evaluate the inventory once. After that migration completes, board-scoped runs should not repeatedly re-evaluate all existing jobs. Do not manually invoke a full refresh or change scheduler cadence/concurrency. Verify the mismatch count reaches zero and stays zero over subsequent naturally scheduled board runs.
