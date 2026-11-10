@@ -80,3 +80,20 @@ Python validation uses isolated environment `/tmp/job-radar-test-venv` (not the 
 ## Current branch worktree
 
 `/tmp/job-radar-board-scheduler` — branch `feat/per-board-scheduler-20261109`. Keep the existing `/tmp/job-radar-global-discovery` worktree and the live `job-radar-user-preferences` worktree untouched.
+
+## Continuation checkpoint — 2026-11-10 09:28 IST
+
+This is the latest verified state after the prior chat hit a delivery timeout. The agent was verifying the final CI test count; CI had in fact completed successfully.
+
+- Feature branch: `feat/per-board-scheduler-20261109`.
+- Feature commit: `06a2ca472c4cc8368b27c4c8ee4a86aa91a6eb1e`.
+- Draft PR: [#66](https://github.com/AvinashBhalla/job-beeper/pull/66), stacked on draft PR #65 (`feat/global-ats-discovery-hirebase-guard-20261109`). Review/merge #65 first, then #66. No deployment or merge has occurred.
+- Exact-head GitHub Actions V2 CI: run #1444 (`42676092793`) passed on `06a2ca4`. The completed `syntax` job shows Python compile, dashboard JS syntax, focused router/extractor tests and full V2 unittest suite all succeeded. The downloaded job log reports **466 tests in 60.421 seconds; OK**.
+- Local targeted scheduler/discovery suite: **52 tests passed** after the final retained-history baseline and cooldown tests.
+- Candidate image: `job-radar-board-scheduler:candidate`, image digest `sha256:339bd42f54e3f51beedba1a576a55861f992f381d89a54e261505aa5c1b6429c`.
+- Candidate container: `job-radar-board-scheduler-qa`, loopback-only `127.0.0.1:18011`, isolated volume `job-radar-board-scheduler-qa-data`; it was rebuilt from the exact feature commit and restarted without replacing dev, connector-QA, synthetic-QA or production. Private Termalin internal-site access was created for owner browsing.
+- Candidate first-pass live-feed result: **10/10 boards succeeded** across eight ATS providers; 1,660 jobs observed; 53/53 HTTP 2xx; zero 429s, request exceptions, page failures or board failures; SQLite integrity `ok`; all 10 baselines cleared; no sent notifications. Seven API hosts were represented. Workday had 15 facet partitions queued, so its total inventory remains explicitly incomplete.
+- Dashboard JS syntax passed with Node 22; `/dashboard/`, `/dashboard/app.js` and `/dashboard/auth.js` returned HTTP 200. Anonymous scheduler telemetry returned HTTP 401 as expected.
+- The isolated candidate has no test users yet. Owner-created QA-only admin and member accounts plus a Desktop browser report are the outstanding acceptance tasks. Exact commands and a browser test prompt are provided in the continuation response. Do not place passwords in command-line arguments or paste them into chat.
+
+Next work: have the owner provision QA-only accounts and run the Desktop browser prompt against the isolated candidate. Review the report, fix any issues, update this file and the smoke-test report, then keep #66 draft until the owner accepts the browser QA. Only after #65 is merged should #66 be retargeted/rebased and considered for merge. Do not deploy to dev/QA/prod merely because CI passed.

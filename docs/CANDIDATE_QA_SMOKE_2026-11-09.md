@@ -61,3 +61,11 @@ sudo docker exec -it job-radar-board-scheduler-qa python -m v2.auth_admin create
 ```
 
 Then complete the separate Desktop browser QA prompt: admin view of all 10 board rows and 7 host rows; member/anonymous denial; due times/outcomes/baselines; refresh; console/network checks; 1440, 1024, 768, 390 and 320 pixel widths. Do not change board activation, notifications, source config, or user preferences during the read-only visual pass. The Desktop report is still pending.
+
+## Exact-head continuation verification — 2026-11-10 09:28 IST
+
+The candidate image was rebuilt from feature commit `06a2ca472c4cc8368b27c4c8ee4a86aa91a6eb1e` and the existing isolated candidate container was recreated against the same dedicated QA volume. The resulting image digest is `sha256:339bd42f54e3f51beedba1a576a55861f992f381d89a54e261505aa5c1b6429c`. Database verification after restart retained 1,660 jobs, 10 source runs, 10/10 successful board schedules, zero pending baselines, zero sent notifications and `PRAGMA integrity_check=ok`.
+
+GitHub Actions V2 CI run #1444 (`42676092793`) passed on the exact head. The workflow log states `Ran 466 tests in 60.421s` and `OK`; the syntax job, Python compile, dashboard JS syntax, focused router/extractor tests and full V2 unittest suite all completed successfully.
+
+Desktop visual/accessibility/browser QA remains pending because this isolated candidate still has no QA users.
