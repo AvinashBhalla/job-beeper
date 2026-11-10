@@ -3989,3 +3989,5 @@ A later read-only inspection confirms the candidate continued operating after th
 These are cumulative *observations*, not unique jobs. The database contains 1,881 unique job rows and 1,881 notification-ledger rows. Every board's latest outcome is success, every consecutive failure count is zero, all 10 baselines are clear, all 7 host records have no active lease, no HTTP 429 was recorded, no notifications have been sent, no QA users exist yet, and SQLite integrity remains `ok`. Container health returns HTTP 200 and restart count is zero. The most recent run records are spread across the providers at the expected staggered times.
 
 This is extended cadence evidence, but it is still one isolated candidate configuration and not a production load/SLA certification. The Desktop browser/admin/member acceptance is pending.
+
+Use `docs/DESKTOP_QA_PROMPT_2026-11-10.md` for ChatGPT Desktop browser QA. Owner setup uses interactive `v2.auth_admin` commands inside only the candidate container; passwords must not be pasted into chat or saved in repository files.
