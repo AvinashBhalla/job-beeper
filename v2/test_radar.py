@@ -2962,6 +2962,9 @@ class SourceRequestMetricsTests(unittest.TestCase):
             self.assertEqual(metrics["retry_attempts"], 2)
             self.assertEqual(metrics["http_status_counts"], {"503": 1, "200": 1})
             self.assertGreaterEqual(metrics["request_duration_ms_total"], 0.0)
+            self.assertGreaterEqual(metrics["request_duration_ms_max"], metrics["request_duration_ms_min"])
+            self.assertEqual(sum(metrics["request_latency_buckets"].values()), 3)
+            self.assertEqual(metrics["request_latency_buckets"]["lt_100ms"], 3)
             self.assertEqual((metrics["pages_attempted"], metrics["pages_succeeded"], metrics["pages_failed"]), (2, 1, 1))
             self.assertEqual((metrics["boards_attempted"], metrics["boards_succeeded"], metrics["boards_failed"]), (1, 1, 0))
             self.assertNotIn("private-value", repr(metrics))
@@ -2985,11 +2988,22 @@ class SourceRequestMetricsTests(unittest.TestCase):
                     "http_429": 1,
                     "retry_attempts": 1,
                     "request_duration_ms_total": 125.5,
+                    "request_duration_ms_min": 10.0,
+                    "request_duration_ms_max": 75.0,
+                    "collector_duration_ms": 900.0,
+                    "shadow_duration_ms": 50.0,
+                    "upsert_duration_ms": 200.0,
+                    "evaluation_duration_ms": 80.0,
+                    "notification_duration_ms": 20.0,
                     "pages_attempted": 2,
                     "pages_succeeded": 2,
                     "boards_attempted": 1,
                     "boards_succeeded": 1,
                     "http_status_counts": {"200": 3, "429": 1},
+                    "request_latency_buckets": {
+                        "lt_100ms": 2, "100_500ms": 1, "500_1000ms": 0,
+                        "1_5s": 0, "5_15s": 0, "15_30s": 0, "gte_30s": 1,
+                    },
                 }
                 radar.record_run(
                     "linkedin", finished - radar.dt.timedelta(seconds=2), finished,
@@ -3003,6 +3017,13 @@ class SourceRequestMetricsTests(unittest.TestCase):
                 linkedin = next(item for item in payload["sources"] if item["source"] == "linkedin")
                 self.assertEqual(linkedin["last_request_metrics"]["requests_attempted"], 4)
                 self.assertEqual(linkedin["last_request_metrics"]["http_status_counts"], {"200": 3, "429": 1})
+                self.assertEqual(linkedin["last_request_metrics"]["request_duration_ms_min"], 10.0)
+                self.assertEqual(linkedin["last_request_metrics"]["request_duration_ms_max"], 75.0)
+                self.assertEqual(linkedin["last_request_metrics"]["request_latency_buckets"]["gte_30s"], 1)
+                self.assertEqual(linkedin["last_phase_metrics"]["collector_duration_ms"], 900.0)
+                self.assertEqual(linkedin["last_phase_metrics"]["upsert_duration_ms"], 200.0)
+                self.assertEqual(linkedin["last_24h"]["phase_duration_ms_total"]["collector"], 900.0)
+                self.assertEqual(linkedin["last_24h"]["phase_duration_ms_avg"]["upsert"], 200.0)
                 self.assertEqual(linkedin["last_24h"]["runs"], 1)
                 self.assertEqual(linkedin["last_24h"]["measured_runs"], 1)
                 self.assertEqual(linkedin["last_24h"]["requests_attempted"], 4)
@@ -3010,6 +3031,85 @@ class SourceRequestMetricsTests(unittest.TestCase):
                 self.assertEqual(linkedin["last_24h"]["jobs_seen"], 25)
                 self.assertEqual(linkedin["last_24h"]["new_jobs"], 4)
                 self.assertEqual(linkedin["last_24h"]["http_status_counts"], {"200": 3, "429": 1})
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_phase_accumulator_is_bounded_and_ignores_unknown_phases(self):
+        original_metrics = dict(radar.active_source_metrics)
+        try:
+            radar._begin_source_run_metrics("phase-test")
+            radar._record_source_phase("phase-test", "collector_duration_ms", 10.5)
+            radar._record_source_phase("phase-test", "collector_duration_ms", 4.5)
+            radar._record_source_phase("phase-test", "upsert_duration_ms", 8.0)
+            radar._record_source_phase("phase-test", "raw_url_or_payload", 999999.0)
+            metrics = radar._finish_source_run_metrics("phase-test")
+            self.assertEqual(metrics["collector_duration_ms"], 15.0)
+            self.assertEqual(metrics["upsert_duration_ms"], 8.0)
+            self.assertNotIn("raw_url_or_payload", metrics)
+        finally:
+            radar.active_source_metrics.clear()
+            radar.active_source_metrics.update(original_metrics)
+
+    def test_collector_failure_still_persists_collector_phase_timing(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.sqlite3"
+                radar.init_db()
+                collectors = dict(radar.COLLECTORS)
+
+                def failing_collector(_config):
+                    radar._record_source_request(
+                        "workday", status_code=503, duration_ms=25.0,
+                    )
+                    raise RuntimeError("synthetic collector failure")
+
+                collectors["workday"] = failing_collector
+                runtime_state = {}
+                with (
+                    patch.object(radar, "COLLECTORS", collectors),
+                    patch.object(radar, "source_state", runtime_state),
+                ):
+                    radar.run_source("workday", {})
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT outcome,collector_duration_ms,request_duration_ms_total,"
+                        "request_latency_buckets_json FROM source_runs WHERE source='workday'"
+                    ).fetchone()
+                self.assertEqual(row[0], "failed")
+                self.assertGreaterEqual(row[1], 0.0)
+                self.assertEqual(row[2], 25.0)
+                self.assertEqual(json.loads(row[3])["lt_100ms"], 1)
+            finally:
+                radar.DB_PATH = original_db
+
+    def test_source_run_metrics_columns_migrate_additively(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.sqlite3"
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    conn.execute("""
+                        CREATE TABLE source_runs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            source TEXT NOT NULL,
+                            started_at TEXT NOT NULL,
+                            finished_at TEXT NOT NULL,
+                            jobs_seen INTEGER NOT NULL,
+                            new_jobs INTEGER NOT NULL,
+                            error TEXT
+                        )
+                    """)
+                with patch.object(radar, "DEFAULT_CONFIG_PATH", Path(radar.__file__).with_name("config.json")):
+                    radar.init_db()
+                with sqlite3.connect(radar.DB_PATH) as conn:
+                    columns = {row[1] for row in conn.execute("PRAGMA table_info(source_runs)")}
+                self.assertTrue({
+                    "request_duration_ms_min", "request_duration_ms_max",
+                    "request_latency_buckets_json", "collector_duration_ms",
+                    "shadow_duration_ms", "upsert_duration_ms",
+                    "evaluation_duration_ms", "notification_duration_ms",
+                }.issubset(columns))
             finally:
                 radar.DB_PATH = original_db
 
@@ -3040,10 +3140,17 @@ class SourceRequestMetricsTests(unittest.TestCase):
                     radar.run_source("greenhouse", {})
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute(
-                        "SELECT outcome, boards_attempted, boards_succeeded, boards_failed "
+                        "SELECT outcome, boards_attempted, boards_succeeded, boards_failed, "
+                        "collector_duration_ms, shadow_duration_ms, upsert_duration_ms, "
+                        "evaluation_duration_ms, notification_duration_ms, request_latency_buckets_json "
                         "FROM source_runs WHERE source='greenhouse'"
                     ).fetchone()
-                self.assertEqual(row, ("partial_failed", 2, 1, 1))
+                self.assertEqual(row[:4], ("partial_failed", 2, 1, 1))
+                self.assertTrue(all(value is not None for value in row[4:9]))
+                self.assertEqual(json.loads(row[9]), {
+                    "100_500ms": 0, "15_30s": 0, "1_5s": 0,
+                    "5_15s": 0, "500_1000ms": 0, "gte_30s": 0, "lt_100ms": 0,
+                })
                 self.assertEqual(runtime_state["greenhouse"]["last_run_outcome"], "partial_failed")
             finally:
                 radar.DB_PATH = original_db

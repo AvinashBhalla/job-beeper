@@ -144,8 +144,15 @@ SOURCE_METRIC_FIELDS = (
     "requests_attempted", "responses_received", "request_exceptions",
     "http_2xx", "http_3xx", "http_4xx", "http_5xx", "http_429",
     "retry_attempts", "request_duration_ms_total",
+    "request_duration_ms_min", "request_duration_ms_max",
+    "collector_duration_ms", "shadow_duration_ms", "upsert_duration_ms",
+    "evaluation_duration_ms", "notification_duration_ms",
     "pages_attempted", "pages_succeeded", "pages_failed",
     "boards_attempted", "boards_succeeded", "boards_failed",
+)
+REQUEST_LATENCY_BUCKETS = (
+    "lt_100ms", "100_500ms", "500_1000ms", "1_5s",
+    "5_15s", "15_30s", "gte_30s",
 )
 
 
@@ -1150,6 +1157,14 @@ def init_db() -> None:
             http_429 INTEGER,
             retry_attempts INTEGER,
             request_duration_ms_total REAL,
+            request_duration_ms_min REAL,
+            request_duration_ms_max REAL,
+            request_latency_buckets_json TEXT,
+            collector_duration_ms REAL,
+            shadow_duration_ms REAL,
+            upsert_duration_ms REAL,
+            evaluation_duration_ms REAL,
+            notification_duration_ms REAL,
             http_status_counts_json TEXT,
             pages_attempted INTEGER,
             pages_succeeded INTEGER,
@@ -1339,6 +1354,14 @@ def init_db() -> None:
         _ensure_column(conn, "source_runs", "http_429", "INTEGER")
         _ensure_column(conn, "source_runs", "retry_attempts", "INTEGER")
         _ensure_column(conn, "source_runs", "request_duration_ms_total", "REAL")
+        _ensure_column(conn, "source_runs", "request_duration_ms_min", "REAL")
+        _ensure_column(conn, "source_runs", "request_duration_ms_max", "REAL")
+        _ensure_column(conn, "source_runs", "request_latency_buckets_json", "TEXT")
+        _ensure_column(conn, "source_runs", "collector_duration_ms", "REAL")
+        _ensure_column(conn, "source_runs", "shadow_duration_ms", "REAL")
+        _ensure_column(conn, "source_runs", "upsert_duration_ms", "REAL")
+        _ensure_column(conn, "source_runs", "evaluation_duration_ms", "REAL")
+        _ensure_column(conn, "source_runs", "notification_duration_ms", "REAL")
         _ensure_column(conn, "source_runs", "http_status_counts_json", "TEXT")
         _ensure_column(conn, "source_runs", "pages_attempted", "INTEGER")
         _ensure_column(conn, "source_runs", "pages_succeeded", "INTEGER")
@@ -2508,6 +2531,8 @@ def refresh_notification_decisions(config: dict[str, Any] | None = None) -> int:
 def _new_source_run_metrics() -> dict[str, Any]:
     return {
         **{field: 0 for field in SOURCE_METRIC_FIELDS},
+        "request_duration_ms_min": None,
+        "request_latency_buckets": {bucket: 0 for bucket in REQUEST_LATENCY_BUCKETS},
         "http_status_counts": {},
         "_lock": threading.Lock(),
     }
@@ -2528,6 +2553,19 @@ def _source_metric_update(source: str, update) -> None:
             update(metrics)
 
 
+def _record_source_phase(source: str, phase: str, duration_ms: float) -> None:
+    """Accumulate a bounded, named phase duration for the active source run."""
+    if phase not in {
+        "collector_duration_ms", "shadow_duration_ms", "upsert_duration_ms",
+        "evaluation_duration_ms", "notification_duration_ms",
+    }:
+        return
+    value = max(0.0, float(duration_ms))
+    _source_metric_update(source, lambda metrics: metrics.__setitem__(
+        phase, metrics.get(phase, 0.0) + value
+    ))
+
+
 def _record_source_request(
     source: str,
     *,
@@ -2537,8 +2575,27 @@ def _record_source_request(
     retry_attempt: bool = False,
 ) -> None:
     def update(metrics: dict[str, Any]) -> None:
+        duration = max(0.0, float(duration_ms))
         metrics["requests_attempted"] += 1
-        metrics["request_duration_ms_total"] += max(0.0, duration_ms)
+        metrics["request_duration_ms_total"] += duration
+        current_min = metrics.get("request_duration_ms_min")
+        metrics["request_duration_ms_min"] = duration if current_min is None else min(current_min, duration)
+        metrics["request_duration_ms_max"] = max(metrics["request_duration_ms_max"], duration)
+        if duration < 100:
+            bucket = "lt_100ms"
+        elif duration < 500:
+            bucket = "100_500ms"
+        elif duration < 1000:
+            bucket = "500_1000ms"
+        elif duration < 5000:
+            bucket = "1_5s"
+        elif duration < 15000:
+            bucket = "5_15s"
+        elif duration < 30000:
+            bucket = "15_30s"
+        else:
+            bucket = "gte_30s"
+        metrics["request_latency_buckets"][bucket] += 1
         if retry_attempt:
             metrics["retry_attempts"] += 1
         if exception:
@@ -2646,10 +2703,16 @@ def _finish_source_run_metrics(source: str) -> dict[str, Any]:
     with source_metrics_lock:
         metrics = active_source_metrics.pop(source, None)
         if metrics is None:
-            return {**{field: 0 for field in SOURCE_METRIC_FIELDS}, "http_status_counts": {}}
+            return {
+                **{field: 0 for field in SOURCE_METRIC_FIELDS},
+                "request_duration_ms_min": None,
+                "request_latency_buckets": {bucket: 0 for bucket in REQUEST_LATENCY_BUCKETS},
+                "http_status_counts": {},
+            }
         with metrics["_lock"]:
             return {
                 **{field: metrics[field] for field in SOURCE_METRIC_FIELDS},
+                "request_latency_buckets": dict(metrics["request_latency_buckets"]),
                 "http_status_counts": dict(metrics["http_status_counts"]),
             }
 
@@ -2681,6 +2744,10 @@ def record_run(
     status_counts_json = json.dumps(
         metrics.get("http_status_counts", {}), sort_keys=True
     )
+    latency_buckets_json = json.dumps(
+        metrics.get("request_latency_buckets", {bucket: 0 for bucket in REQUEST_LATENCY_BUCKETS}),
+        sort_keys=True,
+    )
     fields = list(SOURCE_METRIC_FIELDS)
     columns = ", ".join(fields)
     placeholders = ", ".join("?" for _ in fields)
@@ -2692,14 +2759,14 @@ def record_run(
                 source, started_at, finished_at, jobs_seen, new_jobs, error,
                 run_id, outcome, duration_seconds, error_type, http_status,
                 retry_after_seconds, cooldown_seconds, rate_limit_detected_at,
-                {columns}, http_status_counts_json
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,{placeholders},?)
+                {columns}, http_status_counts_json, request_latency_buckets_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,{placeholders},?,?)
             """,
             (
                 source, iso(started_at), iso(finished), jobs_seen, new_jobs, error,
                 run_id, outcome, max(0.0, float(duration_seconds)), error_type,
                 http_status, retry_after_seconds, cooldown_seconds,
-                rate_limit_detected_at, *metric_values, status_counts_json,
+                rate_limit_detected_at, *metric_values, status_counts_json, latency_buckets_json,
             ),
         )
         conn.commit()
@@ -6551,45 +6618,60 @@ def run_source(
     request_metrics: dict[str, Any] | None = None
     _begin_source_run_metrics(source)
     try:
+        collector_started = time.monotonic()
         try:
             jobs = COLLECTORS[source](config)
-        except Exception:
-            request_metrics = _finish_source_run_metrics(source)
-            raise
-        else:
-            request_metrics = _finish_source_run_metrics(source)
+        finally:
+            _record_source_phase(
+                source, "collector_duration_ms",
+                (time.monotonic() - collector_started) * 1000,
+            )
 
         # Gemini is deliberately shadow-only: store a separately validated
         # extraction for evaluation, but never modify matcher inputs or alerts.
-        shadow_candidates = [
-            job for job in jobs
-            if title_allowed(job.get("title", ""), config)
-            and location_allowed(job_location_for_matching(job), config)
-            and (
-                match_details(job, config)["match"]
-                or phrase_hits(config.get("target_roles", []), job.get("title", ""))
-            )
-        ]
-
+        shadow_started = time.monotonic()
         try:
-            shadow_extract_jobs(
-                shadow_candidates,
-                DB_PATH,
-                experience_known=_experience_is_reliably_known_for_shadow,
-                configured_skills=config.get("skills", []),
+            shadow_candidates = [
+                job for job in jobs
+                if title_allowed(job.get("title", ""), config)
+                and location_allowed(job_location_for_matching(job), config)
+                and (
+                    match_details(job, config)["match"]
+                    or phrase_hits(config.get("target_roles", []), job.get("title", ""))
+                )
+            ]
+            try:
+                shadow_extract_jobs(
+                    shadow_candidates,
+                    DB_PATH,
+                    experience_known=_experience_is_reliably_known_for_shadow,
+                    configured_skills=config.get("skills", []),
+                )
+            except Exception as exc:
+                # AI enrichment must fail open; source ingestion continues unchanged.
+                log.warning(
+                    "gemini shadow pass skipped source=%s error_type=%s",
+                    source,
+                    type(exc).__name__,
+                )
+        finally:
+            _record_source_phase(
+                source, "shadow_duration_ms",
+                (time.monotonic() - shadow_started) * 1000,
             )
-        except Exception as exc:
-            # AI enrichment must fail open; source ingestion continues unchanged.
-            log.warning(
-                "gemini shadow pass skipped source=%s error_type=%s",
-                source,
-                type(exc).__name__,
+
+        upsert_started = time.monotonic()
+        try:
+            new_jobs = upsert_jobs(
+                jobs,
+                config,
+                source_run_started_at=started_at,
             )
-        new_jobs = upsert_jobs(
-            jobs,
-            config,
-            source_run_started_at=started_at,
-        )
+        finally:
+            _record_source_phase(
+                source, "upsert_duration_ms",
+                (time.monotonic() - upsert_started) * 1000,
+            )
         if source == "hirebase":
             _hirebase_commit_pending_watermarks()
         elif source == "workday":
@@ -6620,21 +6702,37 @@ def run_source(
                 source,
                 baseline_suppressed,
             )
-        refresh_job_evaluations(config)
-        refresh_notification_decisions(config)
-
-        # Deliver immediately after a discovery cycle queues eligible jobs.
-        # The background worker remains as a fallback/retry path.
+        evaluation_started = time.monotonic()
         try:
-            from v2.telegram import credentials_available, deliver_queued_notifications
+            refresh_job_evaluations(config)
+        finally:
+            _record_source_phase(
+                source, "evaluation_duration_ms",
+                (time.monotonic() - evaluation_started) * 1000,
+            )
 
-            if _legacy_notifications_enabled(config, credentials_available()):
-                delivered = deliver_queued_notifications(50)
-                if delivered:
-                    log.info("telegram: delivered=%s source=%s", delivered, source)
-        except Exception:
-            log.exception("telegram immediate delivery failed source=%s", source)
+        notification_started = time.monotonic()
+        try:
+            refresh_notification_decisions(config)
 
+            # Deliver immediately after a discovery cycle queues eligible jobs.
+            # The background worker remains as a fallback/retry path.
+            try:
+                from v2.telegram import credentials_available, deliver_queued_notifications
+
+                if _legacy_notifications_enabled(config, credentials_available()):
+                    delivered = deliver_queued_notifications(50)
+                    if delivered:
+                        log.info("telegram: delivered=%s source=%s", delivered, source)
+            except Exception:
+                log.exception("telegram immediate delivery failed source=%s", source)
+        finally:
+            _record_source_phase(
+                source, "notification_duration_ms",
+                (time.monotonic() - notification_started) * 1000,
+            )
+
+        request_metrics = _finish_source_run_metrics(source)
         finished = now()
         duration_seconds = max(0.0, time.monotonic() - started_monotonic)
         cooldown_remaining = (
@@ -8645,7 +8743,11 @@ def source_status():
                 sr.http_2xx, sr.http_3xx, sr.http_4xx, sr.http_5xx, sr.http_429,
                 sr.retry_attempts, sr.request_duration_ms_total,
                 sr.http_status_counts_json, sr.pages_attempted, sr.pages_succeeded,
-                sr.pages_failed, sr.boards_attempted, sr.boards_succeeded, sr.boards_failed
+                sr.pages_failed, sr.boards_attempted, sr.boards_succeeded, sr.boards_failed,
+                sr.request_duration_ms_min, sr.request_duration_ms_max,
+                sr.request_latency_buckets_json, sr.collector_duration_ms,
+                sr.shadow_duration_ms, sr.upsert_duration_ms,
+                sr.evaluation_duration_ms, sr.notification_duration_ms
             FROM source_runs sr
             JOIN (
                 SELECT source, MAX(finished_at) AS latest_finished_at
@@ -8680,7 +8782,13 @@ def source_status():
                 SUM(COALESCE(jobs_seen, 0)),
                 SUM(COALESCE(new_jobs, 0)),
                 SUM(CASE WHEN outcome IN ('failed', 'rate_limited') THEN 1 ELSE 0 END),
-                SUM(CASE WHEN outcome IN ('partial_failed', 'partial_rate_limited') THEN 1 ELSE 0 END)
+                SUM(CASE WHEN outcome IN ('partial_failed', 'partial_rate_limited') THEN 1 ELSE 0 END),
+                SUM(COALESCE(collector_duration_ms, 0)),
+                SUM(COALESCE(shadow_duration_ms, 0)),
+                SUM(COALESCE(upsert_duration_ms, 0)),
+                SUM(COALESCE(evaluation_duration_ms, 0)),
+                SUM(COALESCE(notification_duration_ms, 0)),
+                SUM(CASE WHEN collector_duration_ms IS NOT NULL THEN 1 ELSE 0 END)
             FROM source_runs
             WHERE finished_at >= ?
             GROUP BY source
@@ -8729,6 +8837,17 @@ def source_status():
                 }
         except (TypeError, ValueError, json.JSONDecodeError):
             status_counts = {}
+        latency_buckets = {}
+        try:
+            parsed_buckets = json.loads(row[31] or "{}")
+            if isinstance(parsed_buckets, dict):
+                latency_buckets = {
+                    str(bucket): int(count)
+                    for bucket, count in parsed_buckets.items()
+                    if bucket in REQUEST_LATENCY_BUCKETS and isinstance(count, int) and count >= 0
+                }
+        except (TypeError, ValueError, json.JSONDecodeError):
+            latency_buckets = {}
         metrics_measured = row[12] is not None
         history[row[0]] = {
             "last_run": row[1],
@@ -8755,6 +8874,9 @@ def source_status():
                 "retry_attempts": row[20] or 0,
                 "request_duration_ms_total": round(row[21] or 0.0, 3),
                 "avg_request_duration_ms": round((row[21] or 0.0) / row[12], 2) if row[12] else None,
+                "request_duration_ms_min": row[29],
+                "request_duration_ms_max": row[30],
+                "request_latency_buckets": latency_buckets,
                 "http_status_counts": status_counts,
                 "pages_attempted": row[23] or 0,
                 "pages_succeeded": row[24] or 0,
@@ -8763,6 +8885,13 @@ def source_status():
                 "boards_succeeded": row[27] or 0,
                 "boards_failed": row[28] or 0,
             } if metrics_measured else None),
+            "last_phase_metrics": {
+                "collector_duration_ms": row[32],
+                "shadow_duration_ms": row[33],
+                "upsert_duration_ms": row[34],
+                "evaluation_duration_ms": row[35],
+                "notification_duration_ms": row[36],
+            },
         }
 
     windows = {}
@@ -8791,6 +8920,21 @@ def source_status():
             "new_jobs": row[20] or 0,
             "failed_runs": row[21] or 0,
             "partial_runs": row[22] or 0,
+            "phase_duration_ms_total": {
+                "collector": round(row[23] or 0.0, 3),
+                "shadow": round(row[24] or 0.0, 3),
+                "upsert": round(row[25] or 0.0, 3),
+                "evaluation": round(row[26] or 0.0, 3),
+                "notification": round(row[27] or 0.0, 3),
+            },
+            "phase_measured_runs": row[28] or 0,
+            "phase_duration_ms_avg": {
+                "collector": round((row[23] or 0.0) / row[28], 3) if row[28] else None,
+                "shadow": round((row[24] or 0.0) / row[28], 3) if row[28] else None,
+                "upsert": round((row[25] or 0.0) / row[28], 3) if row[28] else None,
+                "evaluation": round((row[26] or 0.0) / row[28], 3) if row[28] else None,
+                "notification": round((row[27] or 0.0) / row[28], 3) if row[28] else None,
+            },
             "http_status_counts": {},
         }
     for source, raw_counts in status_rows:
@@ -8807,7 +8951,10 @@ def source_status():
                 "retry_attempts", "request_duration_ms_total", "pages_attempted",
                 "pages_succeeded", "pages_failed", "boards_attempted", "boards_succeeded",
                 "boards_failed", "jobs_seen", "new_jobs", "failed_runs", "partial_runs",
-            )}, "http_status_counts": {},
+            )}, "phase_duration_ms_total": {"collector": 0.0, "shadow": 0.0, "upsert": 0.0, "evaluation": 0.0, "notification": 0.0},
+            "phase_measured_runs": 0,
+            "phase_duration_ms_avg": {"collector": None, "shadow": None, "upsert": None, "evaluation": None, "notification": None},
+            "http_status_counts": {},
         })
         for code, count in parsed_counts.items():
             if str(code).isdigit() and isinstance(count, int) and count >= 0:
@@ -8833,6 +8980,7 @@ def source_status():
             "last_retry_after_seconds": item.get("last_retry_after_seconds"),
             "last_cooldown_seconds": item.get("last_cooldown_seconds"),
             "last_request_metrics": item.get("last_request_metrics"),
+            "last_phase_metrics": item.get("last_phase_metrics"),
             "last_feed": last_naukri_feed if source == "naukri" else None,
             "last_24h": windows.get(source, {
                 "runs": 0, "measured_runs": 0, "requests_attempted": 0,
@@ -8842,6 +8990,9 @@ def source_status():
                 "avg_request_duration_ms": None, "pages_attempted": 0, "pages_succeeded": 0, "pages_failed": 0,
                 "boards_attempted": 0, "boards_succeeded": 0, "boards_failed": 0,
                 "jobs_seen": 0, "new_jobs": 0, "failed_runs": 0, "partial_runs": 0,
+                "phase_duration_ms_total": {"collector": 0.0, "shadow": 0.0, "upsert": 0.0, "evaluation": 0.0, "notification": 0.0},
+                "phase_measured_runs": 0,
+                "phase_duration_ms_avg": {"collector": None, "shadow": None, "upsert": None, "evaluation": None, "notification": None},
                 "http_status_counts": {},
             }),
             "runtime": source_state.get(source, {}),

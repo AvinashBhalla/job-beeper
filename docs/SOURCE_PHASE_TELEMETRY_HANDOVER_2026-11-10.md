@@ -46,3 +46,11 @@ Goal: add low-overhead phase-level timings to source_runs so slow source runs ca
 - Do not add UI.
 - Do not trigger extra live polls just to produce more benchmark data.
 - Do not activate any disabled source or send test notifications.
+
+## Implementation checkpoint
+- Added additive source_runs fields for collector, shadow, upsert, evaluation and notification phase durations.
+- Added per-request min/max and bounded latency histogram buckets (lt_100ms through gte_30s); raw URLs, query strings and payloads are never persisted.
+- The source-status API now exposes latest phase timings, latest request histogram and 24-hour phase totals/averages. Legacy rows remain null/zero-safe; average timings divide only by phase-measured runs.
+- Instrumentation uses monotonic timers and does not change collector, polling, notification or matching behavior.
+- Focused SourceRequestMetricsTests: **6/6 passed**, including success, collector error, histogram, API aggregation and additive migration tests.
+- Python compilation and git diff check passed. Exact-head full V2 CI remains required before merge/deploy.
