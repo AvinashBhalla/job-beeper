@@ -70,3 +70,18 @@
 - No unbounded crawling, response reads, redirects, or concurrent Common Crawl requests.
 - Keep dev/QA live-feed configurations identical in provider/board coverage; preserve their intended cadence differences.
 - Preserve rollback containers and backups until post-deploy checks pass.
+
+## 2026-11-10 continuation checkpoint
+- Recovery handover committed and pushed first as `6d9390f`.
+- Added `v2/global_ats_discovery.py` and integrated it into `v2/radar.py`:
+  - startup only initializes schema; no automatic network scan is launched;
+  - three admin-only endpoints expose status, one Common Crawl request, and one public sitemap scan;
+  - both paths use the existing global candidate importer.
+- Added `v2/test_global_ats_discovery.py`.
+- Focused tests: **12/12 passed** in an isolated container created from the current dev image. Host Python lacks the test dependencies, so tests ran against the same Python/runtime dependencies as the deployed app.
+- Functional fixes from review:
+  - Common Crawl batch cap is 200 to match the existing importer contract;
+  - optional missing sitemap documents (404) are skipped rather than failing the host scan;
+  - Common Crawl request errors are recorded and the lease is released instead of being left until lease expiry.
+- `python -m py_compile` passed for the discovery module, its tests and `radar.py`; `git diff --check` passed.
+- Full V2 pytest suite is currently running in the isolated test container. Do not deploy or merge until it completes and CI passes.
