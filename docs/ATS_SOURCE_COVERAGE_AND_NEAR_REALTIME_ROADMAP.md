@@ -2,8 +2,8 @@
 
 # Job Radar — 36-platform source coverage and near-real-time delivery roadmap
 
-**Owner requirement recorded:** 2026-11-08  
-**Applies to:** V2 candidate / PR #51 and all future agents  
+**Owner requirement recorded:** 2026-11-08
+**Applies to:** V2 candidate / PR #51 and all future agents
 **Priority:** Product requirement, not optional future polish
 
 ## 1. Product expectation
@@ -299,3 +299,176 @@ The previous JG Summit `*.darwinbox.com` candidate endpoint returned HTTP 403 on
 The isolated QA candidate now verifies the currently configured Greenhouse and Ashby boards and selected public examples: Coinbase GH 283, Graviton Research Capital GH 21, Zocdoc GH 64; OpenAI Ashby 816, PostHog Ashby 10; NVIDIA Workday 20 in the first page; Bosch Group SmartRecruiters 10 in the verification page; Hugging Face Workable 6; Bridgestone Keka 109; Arvind Darwinbox 36. The Workable probe now uses the same `apply.workable.com/api/v1/widget/accounts/{slug}` endpoint as its collector. Arvind Darwinbox two-poll ingestion inserts 36 and silently baselines on poll 1, inserts 0 on poll 2, sends no Telegram messages and retains SQLite integrity `ok`.
 
 Do not interpret one probe as universal ATS availability. Darwinbox `.com` and several `.in` tenant probes returned 403; detector is `.darwinbox.in` only and only Arvind is currently verified. No empty allowlist or unsupported provider should be enabled in production. Lever board allowlist is currently empty; the non-collector ATS families remain discovery-only until adapters are implemented.
+
+## 2026-11-09 — independent discovery seeds + Hirebase guard (feature branch only)
+
+Branch `feat/global-ats-discovery-hirebase-guard-20261109` adds a CC BY 4.0 LastRound AI August 2026 candidate seed directory for 9,935 Greenhouse/Lever/Ashby board slugs, and an optional Hirebase sample collector for Workday/Keka/Darwinbox. Hirebase is disabled by default, daily, estimate-first, limited to 4 rows per platform/day, 12/day total and 400 per billing period. It has an SQLite reservation ledger and fail-closed uncertain-request handling. No key has been added and no Hirebase API request has been made. The directory import only creates low-confidence unverified candidates; no ATS source is activated. This is not yet global automatic discovery for Workday/Keka/Darwinbox. See `GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md`.
+
+Open-source architecture research is in `OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md`: Freehire for one-shot provider workers/outboxes, Career-Ops for reverse discovery and per-host concurrency, ats-scrapers for Python adapter contracts. Do not use CC BY-NC company datasets from Feashliaa/Riley aggregator in commercial JobBeeper.\n
+
+## 2026-11-09 18:10 IST — verified CI and updated research
+
+PR #65 is still **open and draft**, mergeable, based on v2-live-radar. Current head is 999b66543ac162346d42cd3be2c39993c0475a6e. Exact-head GitHub Actions V2 CI run #1427 / ID 42620547252 completed successfully, including dashboard JS syntax, focused tests and the full V2 unittest suite. The local full suite is 430/430 (385.001s); focused new tests are 30/30.
+
+The expanded open-source comparison is in docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md. New high-value finding: current kalil0321/ats-scrapers has Workday, Keka and Darwinbox adapters. Workday uses facet subdivision to address the 2,000-result query cap; Keka exposes credential-free public career portal JSON endpoints; Darwinbox's adapter uses httpcloak for a Cloudflare-protected endpoint. Do not adopt TLS impersonation to evade an anti-bot control. The library's shared Fetcher does Retry-After-aware 429/5xx retries and explicit 403/406 handling. This makes it the best Python provider reference, but not a dependency we should blindly import.
+
+Job Forager's company-list expansion and Workday pagination are useful to study, but inspected HTTP clients disable TLS certificate validation, broadly swallow exceptions and use fixed concurrency rather than persistent host budgets. Do not copy those transport choices. JobSpy is for supplementary job boards and explicitly warns about 429s; it is not a global ATS discovery source.
+
+### Next priorities
+
+1. Keep PR #65 draft while we review the latest research note and migration ordering across sibling branches.
+2. Build an independent, compliant public-board candidate harvester for Workday/Keka/Darwinbox using career-link/sitemap/Common Crawl and trusted directory seeds, with provenance recorded.
+3. Reuse/adapt the allowed Keka public portal extraction pattern and Workday facet-aware pagination. Do not enable the Darwinbox Cloudflare-bypass path; require a documented/public authorised route.
+4. Turn verified candidate boards into a per-board queue with host-aware concurrency, Retry-After, persistent cooldown, jitter, backpressure and page/facet checkpoints.
+5. Run controlled p50/p95, 429, incomplete-page, first-seen-delay and freshness benchmarks before increasing concurrency.
+6. Hirebase remains an optional, dev-only sample until the user supplies a key securely and approves estimate-only testing. Do not use its data in a commercial multi-user product without written permission.
+
+Do not merge or deploy this branch as an assertion that JobBeeper now has complete global ATS coverage. It is the quota-safe sampling and candidate-directory foundation; independent Workday/Keka/Darwinbox employer discovery and full board scheduling remain outstanding.
+
+
+## 2026-11-09 18:15 IST — direct collector gap analysis
+
+New document: docs/ATS_PROVIDER_GAP_ANALYSIS_2026-11-09.md. This compares JobBeeper's actual v2/radar.py collectors against the researched ats-scrapers implementations.
+
+Concrete gaps:
+- Workday in JobBeeper currently has WORKDAY_PAGE_SIZE=20 and WORKDAY_MAX_PAGES_PER_BOARD=1. It only polls the first 20 jobs and has no facet partitioning for large tenants. ats-scrapers explains the hidden 2,000-result per-query cap and uses jobFamilyGroup/timeType/locations/workerSubType partitions.
+- Keka in JobBeeper extracts the public document/feed ID but hardcodes /careers/api/embedjobs/default/active/{id}. ats-scrapers resolves the actual portal path and may call /organization/{portal}/careerportalinfo before the matching portal-specific embedjobs endpoint.
+- Darwinbox in JobBeeper already uses a bounded candidate-site collector and only detects .darwinbox.in boards. Its current code does not use TLS impersonation. The ats-scrapers implementation pins httpcloak against Cloudflare; this is explicitly not approved for reuse. A 403 must remain blocked/not verified unless an authorized documented access path exists.
+- The three collectors still poll source-level config arrays. Board-specific next_due_at, host concurrency budgets, independent backoff/cursors, and a full inventory completion signal are not yet implemented.
+- The directory seed import covers Greenhouse/Ashby/Lever only; Hirebase is not an employer directory. Automatic public employer/tenant discovery for Workday/Keka/Darwinbox remains P0 outstanding.
+
+Next implementation order is now more precise:
+1. Workday: retain fast first-page incremental polling; separately add low-frequency facet-aware full inventory, persisted page/facet checkpoints, completeness and truncated-reason fields.
+2. Keka: resolve actual portal slug from URL, validate it, call matching public portal-info and embed endpoints, test at least two non-default public portals, and add truncation/paging handling.
+3. Darwinbox: preserve .in-only candidate shape and tenant-specific verification; classify 403 separately from 429; no Cloudflare/TLS bypass.
+4. Global discovery: career links + sitemaps + Common Crawl CDX candidate seeds with provenance, confidence and stale-candidate handling.
+5. Per-board queue: host-aware concurrency, per-board due times, Retry-After, cooldown, jitter, backpressure and observable queue age.
+6. Benchmark completeness, p50/p95, 429s and first-seen delay before raising concurrency.
+
+This addendum is static code review and does not change collectors, activate sources, contact ATS providers or spend Hirebase credits.
+---
+
+## 2026-11-09 — Workday inventory implementation checkpoint
+
+**Branch:** feat/global-ats-discovery-hirebase-guard-20261109
+**Worktree:** /tmp/job-radar-global-discovery
+**Current code:** Workday incremental inventory implementation is in the worktree and under full regression testing. It has not been deployed.
+
+### Completed in this work session
+
+1. Added durable SQLite table workday_board_poll_state, keyed by normalized tenant:site, with next inventory offset, last attempt, last full inventory, reported total, provider facets metadata, completion state and truncation reason.
+2. Preserved the fast first Workday page on the existing source poll interval (default 120 seconds).
+3. Added one optional inventory page per board no more often than every 15 minutes. The first pass starts at offset 20; subsequent attempts resume the saved cursor.
+4. Kept detail page requests limited to the fast freshness page. The slower inventory page adds only one list request and derives basic location from listing fields if detail data is absent.
+5. Inventory cursor state is held pending and committed only after upsert_jobs succeeds. A failed inventory page does not advance its offset; its attempt timestamp is persisted so a 120-second source cycle does not hammer the failed page.
+6. Existing Workday 429 Retry-After/cooldown behaviour remains in force.
+7. A short final page or a reached reported total below 2,000 marks a sweep complete; completed sweeps are rechecked weekly.
+8. A response at the 2,000-result ceiling, an early empty page inconsistent with that ceiling, or the local 2,000 offset safety cap is marked truncated/incomplete. The code does not claim full inventory. Facet subdivision remains the next Workday completeness task.
+9. Added admin-only GET /api/workday/inventory-status and Coverage & Health panel UI that shows board, status, reported total, facet count, next offset and truncation reason.
+10. Added tests for persisted cursor commit, first-page cadence, inventory throttling, advancing offsets, failed-page retry throttling, weekly refresh, 2,000-cap truncation and admin-only status.
+
+### Current validation
+
+- Focused tests: 31 passed across Workday collector and global discovery/Hirebase suites.
+- Full V2 test suite is currently running; do not report a final count until job completion.
+- Python compilation and git diff --check passed on the current implementation.
+- VM Node is v12 and cannot parse the dashboard's existing optional chaining/nullish-coalescing syntax. Use exact-head GitHub V2 CI for dashboard JS syntax.
+- No production/shared-dev changes, service restarts, source activation or Hirebase requests occurred.
+
+### Next implementation priorities (updated)
+
+**P0**
+1. Workday facet-aware full inventory. The current cursor paginates up to the 2,000 reported-result ceiling and surfaces truncation; it does not yet partition jobFamilyGroup, timeType, locations or workerSubType.
+2. Keka actual portal slug resolution. Current collector still hardcodes default in /careers/api/embedjobs/default/active/{id}. Implement safe path parsing, optional portal-info call and matching portal-specific embed endpoint; test at least two non-default public boards.
+3. Independent Workday/Keka/Darwinbox employer/tenant discovery. The seed directory in PR #65 only covers Greenhouse/Lever/Ashby; Hirebase is not a complete tenant directory.
+4. Per-board scheduling: due queue, host budget, jitter, persistent cooldown, independent retry/page state and queue-age visibility. Current source-wide scheduler remains a limitation.
+
+**P1**
+5. Darwinbox per-board 403/429/5xx classification and re-verification. Keep blocked 403 visible. No Cloudflare/TLS impersonation or anti-bot bypass.
+6. Benchmark p50/p95 HTTP latency, 429 rate, pages attempted/completed, jobs available vs fetched, first-seen delay and user-feed lag on verified canary boards.
+7. Extend freshness/stale/repost and job legitimacy checks once collection completeness and telemetry are reliable.
+
+**P2**
+8. Broader ATS adapters only after the provider registry, scheduler and health contracts are in place.
+9. Hirebase estimate-only development experiment only after the user adds the key to the dedicated server-side file and explicitly approves testing. Do not use Hirebase for a commercial multi-user product without vendor permission.
+
+### Required from the user
+
+Nothing is required right now. Do not ask for credentials in chat. The Hirebase key remains absent; the server-side development env file is an empty placeholder. Only request the key be added securely when estimate-only validation is actually ready and the user approves it.
+
+### Safe continuation
+
+After the full suite completes, fix any regression, commit the Workday code + tests + UI, push the same PR #65 branch, update the PR description and this handover, and verify exact-head GitHub CI. Keep PR #65 draft until the Workday/Keka/global-discovery milestones have received their own review. Do not merge/deploy solely because CI passes.\n
+## 2026-11-09 19:37 IST — Workday inventory implementation verified locally
+
+Workday now preserves offset 0 on the existing 120-second freshness poll and adds a durable per-board cursor that fetches at most one extra page every 15 minutes. Cursor advances only after upsert; failed pages are throttled without advancing; boards at the 2,000-result cap are explicitly marked incomplete. An admin-only inventory-status API and Coverage & Health panel expose progress. This is not facet-aware full inventory.
+
+Validation: full V2 suite 436 passed in 398.870s (exit code 0); focused Workday/global discovery tests 31 passed. Python compileall, JSON config validation, git diff check and HTML panel wiring passed. Exact-head GitHub CI remains required after push.
+
+Next priorities: Workday facet subdivision; Keka non-default portal slug support; independent public Workday/Keka/Darwinbox employer discovery; per-board scheduler/host budgets; controlled p50/p95 and 429 benchmarks. Darwinbox 403 must remain blocked, with no Cloudflare/TLS bypass.
+
+User action: nothing required now. Hirebase key remains absent and source flags remain off.
+
+Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n
+
+## 2026-11-09 20:10 IST — Workday facet-aware inventory in progress
+
+The next P0 implementation is now in the worktree. JobBeeper reads Workday facet metadata using the upstream response shape (`facetParameter`, `values[].id`, `values[].count`) and schedules partitions in the order jobFamilyGroup → timeType → locations → workerSubType. It does not copy the upstream library's concurrent fan-out: JobBeeper keeps one inventory page per board per 15-minute interval, a maximum facet depth of 4 and a queue budget of 500.
+
+State is persisted per tenant:site in SQLite (`facet_queue_json`, `active_facets_json`, depth, active-query flag and partition-started flag), with migration helpers for existing tables. The fast 120-second offset-0 poll and detail cap remain unchanged. Stable external IDs + idempotent upsert deduplicate overlapping multi-tag partitions. Incomplete leaves (2,000 cap with no safe next facet, depth limit, no usable facet or queue-budget overflow) remain incomplete.
+
+Admin status/UI adds pending partition count and active filters. Focused Workday collector suite: 21 passed. Full V2 regression job `4c646ih8lj` is running; log `/tmp/job-radar-workday-facets-full-tests.log`. This code is not yet committed/pushed. Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2010_IST.md` for exact continuation instructions.
+
+
+## 2026-11-09 20:18 IST — Workday facet partitioning implemented locally
+
+The Workday collector now builds a persisted FIFO facet queue when an unfiltered query hits the 2,000 cap and exposes `jobFamilyGroup`, `timeType`, `locations`, `workerSubType` partitions in priority order. Capped child queries recursively subdivide on an unused facet. It is deliberately sequential (one extra inventory page per board per 15 minutes), with depth cap 4 and queue cap 500. Incomplete leaves/overflow remain incomplete. Queue/active filters are migration-safe SQLite state and commit after upsert. Admin API/UI show pending partitions and active filters.
+
+Validation: focused Workday tests 22 passed; full V2 suite 443 passed in 402.776s; compileall, JSON, diff check and dashboard HTML/panel checks passed. Exact-head CI remains required after push. No live ATS calls; actual tenant facet shapes still require an approved canary. Details: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`; latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2018_IST.md`.
+
+
+## 2026-11-09 20:25 IST — exact final Workday facet tree
+
+The current uncommitted Workday facet implementation now includes the final admin status distinction for `in_progress_incomplete` versus terminal `truncated`. Focused Workday tests are 22/22. The earlier full V2 run passed 443 tests in 402.776s but began before the final status test was added. A second full-suite job `3tjy6iwusp` is running against the exact final tree; see `/tmp/job-radar-workday-facets-final-tests.log`. Run exact-head GitHub CI after push for modern dashboard JS and final full-suite validation.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2025_IST.md`. Facet design: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`.
+
+
+## 2026-11-09 20:30 IST — Workday facet full regression complete
+
+The exact current worktree full V2 suite passed **444 tests in 346.385 seconds**, exit code 0 (job `3tjy6iwusp`, log `/tmp/job-radar-workday-facets-final-tests.log`). Focused Workday collector suite passed 22/22. The final admin `in_progress_incomplete` status test is included in the 444. Compileall, both config JSON files, HTML IDs/panel wiring and `git diff --check` passed. All Workday/Keka/Darwinbox/Hirebase source flags remain false.
+
+Current Workday facet code, dashboard UI and docs are still uncommitted on branch `feat/global-ats-discovery-hirebase-guard-20261109`. Next: inspect diff, commit/push, update PR #65, verify exact-head V2 CI #1432 or later. Keep PR draft; no deployment/source activation.
+
+Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. It recommends a separate unmatched ATS candidate table and polite Common Crawl indexing; no AWS credentials needed unless choosing the Parquet/Athena bulk path.
+
+
+## 2026-11-09 20:35 IST — Workday facet inventory verified on CI
+
+Workday facet implementation was pushed in `4d7513803031d1c32c02a19ac8452dfb221c02ad`; exact-head GitHub V2 CI #1435 (42640211533) passed, including modern dashboard JS syntax and full V2 tests. Local full V2 suite 444 passed in 346.385s; focused Workday tests 22 passed. Latest recovery checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2035_IST.md`. Next P0: unmatched ATS candidate staging table/admin review-link flow, then serialized Common Crawl candidate discovery; preserve provenance, do not fabricate employer IDs, and require current public live verification before linking/activation.
+
+
+## 2026-11-09 20:24 IST — unmatched ATS candidate staging implemented locally
+
+Added `ats_global_discovery_candidates`, separate from `ats_board_registry` because an unmatched tenant URL has no verified employer identity. Admin-only import/list/link/reject APIs and a Coverage & Health UI panel are implemented. The import path canonicalizes Workday/Keka/Darwinbox public roots, validates HTTPS/provider/method/provenance/capture timestamp, always assigns low confidence, and creates no employer or normal board registry row. Candidate identity includes provider+host+board key. Re-import updates last-seen and keeps newest capture provenance; linked/rejected decisions are preserved. Linking requires an existing company, reuses an exact provider+URL board row when present, otherwise creates a `discovered` board only. Verification and activation remain separate.
+
+The UI allows admins to stage a captured URL, choose method/source/capture time, associate with an existing employer, or reject it. It never creates a placeholder employer. Focused API suite: 11 passed. Full V2 regression job `a8icgcj402` is running; log `/tmp/job-radar-global-candidate-full-tests.log`. HTML candidate IDs and JS workflow wiring passed static checks.
+
+Details: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`. Next: finish full suite, commit/push and exact-head CI; then implement serialized Common Crawl CDX ingestion and current-live board verification. No Common Crawl requests have been made.
+
+
+## 2026-11-09 21:01 IST — final candidate-staging tree and regression run
+
+The candidate staging API/UI remains local and uncommitted. It includes the final refinements: strict source_reference type checking; latest capture timestamp/reference wins; older captures cannot replace newer provenance; discovered_from uses a safe HTTPS source URL or falls back to the canonical board URL; linked registry status is returned accurately; Darwinbox staging uniqueness includes candidate host, while registry board key stays compatible with normal detection. Focused candidate API suite: 11 passed. Final full V2 job `lkscpl0ioe` is running (log `/tmp/job-radar-global-candidate-final-tests.log`).
+
+Latest recovery checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2101_IST.md`. Candidate design: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.
+
+## 2026-11-09 21:11 IST — unmatched ATS candidate staging full regression passed
+
+Candidate staging code/UI/tests/docs now pass the final local V2 regression: **451 passed in 501.840 seconds**, exit code 0 (job `lkscpl0ioe`; log `/tmp/job-radar-global-candidate-final-tests.log`). Focused `GlobalDirectoryApiTests`: 11 passed. Compileall, both config JSON files, diff check, HTML unique-ID/panel checks and candidate/Workday dashboard wiring passed.
+
+Implemented locally but not yet committed/pushed: `ats_global_discovery_candidates` separate from employer and ATS registry; admin-only import/list/link/reject; strict Workday/Keka/Darwinbox canonicalization; provider+host+board-key dedup; capture provenance and terminal state preservation; existing-company-only association; normal board remains discovered/unverified/unactivated; Coverage & Health candidate UI. No placeholder companies.
+
+Next: commit/push to PR #65, update PR body, verify exact-head V2 CI (modern Node JS + full suite). Then serialized Common Crawl CDX worker and sitemap/career-link discovery. Do not run Common Crawl or live ATS calls in this increment.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`; implementation details: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.

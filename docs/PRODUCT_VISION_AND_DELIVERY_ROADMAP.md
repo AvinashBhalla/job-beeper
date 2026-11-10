@@ -1,7 +1,7 @@
 # JobBeeper — Product Vision, Architecture and Delivery Roadmap
 
-**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.  
-**Last reviewed:** 2026-11-08 (Asia/Kolkata)  
+**Owner direction:** Build an end-to-end job-search product, not only a job alert bot.
+**Last reviewed:** 2026-11-08 (Asia/Kolkata)
 **Status:** Living source of truth. This document supersedes conflicting feature-order recommendations in older roadmaps; those files remain useful for implementation detail and engineering history.
 
 ## 1. Product vision
@@ -270,3 +270,37 @@ The production NVIDIA Workday connector currently ingests one 20-job page per 12
 ### 2026-11-09 — HTTPS authentication transport fixed
 
 Production now has a Let's Encrypt IP certificate for `130.210.27.197`, Nginx HTTPS reverse proxy, HTTP-to-HTTPS redirect, secure cookies retained, and app port 8000 bound to loopback. Health/dashboard return 200; owner login must be confirmed over `https://130.210.27.197/dashboard/`. Certbot auto-renew timer and Nginx deploy hook are installed. Operational details in `JOB_RADAR_HANDOVER.md`.
+
+## 2026-11-09 — global discovery engineering checkpoint
+
+The feature branch `feat/global-ats-discovery-hirebase-guard-20261109` provides a quota-guarded optional Hirebase sampler and a low-confidence CC BY 4.0 seed import for Greenhouse/Lever/Ashby. It is not the completed Workday/Keka/Darwinbox global discovery engine. Continue first-party company/tenant discovery, public board verification and board-level scheduled polling as P0 source-health work. The Hirebase free API must remain optional and should not be used in commercial multi-user production before written vendor permission. See `GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md`.\n
+
+## 2026-11-09 18:10 IST — verified CI and updated research
+
+PR #65 is still **open and draft**, mergeable, based on v2-live-radar. Current head is 999b66543ac162346d42cd3be2c39993c0475a6e. Exact-head GitHub Actions V2 CI run #1427 / ID 42620547252 completed successfully, including dashboard JS syntax, focused tests and the full V2 unittest suite. The local full suite is 430/430 (385.001s); focused new tests are 30/30.
+
+The expanded open-source comparison is in docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md. New high-value finding: current kalil0321/ats-scrapers has Workday, Keka and Darwinbox adapters. Workday uses facet subdivision to address the 2,000-result query cap; Keka exposes credential-free public career portal JSON endpoints; Darwinbox's adapter uses httpcloak for a Cloudflare-protected endpoint. Do not adopt TLS impersonation to evade an anti-bot control. The library's shared Fetcher does Retry-After-aware 429/5xx retries and explicit 403/406 handling. This makes it the best Python provider reference, but not a dependency we should blindly import.
+
+Job Forager's company-list expansion and Workday pagination are useful to study, but inspected HTTP clients disable TLS certificate validation, broadly swallow exceptions and use fixed concurrency rather than persistent host budgets. Do not copy those transport choices. JobSpy is for supplementary job boards and explicitly warns about 429s; it is not a global ATS discovery source.
+
+### Next priorities
+
+1. Keep PR #65 draft while we review the latest research note and migration ordering across sibling branches.
+2. Build an independent, compliant public-board candidate harvester for Workday/Keka/Darwinbox using career-link/sitemap/Common Crawl and trusted directory seeds, with provenance recorded.
+3. Reuse/adapt the allowed Keka public portal extraction pattern and Workday facet-aware pagination. Do not enable the Darwinbox Cloudflare-bypass path; require a documented/public authorised route.
+4. Turn verified candidate boards into a per-board queue with host-aware concurrency, Retry-After, persistent cooldown, jitter, backpressure and page/facet checkpoints.
+5. Run controlled p50/p95, 429, incomplete-page, first-seen-delay and freshness benchmarks before increasing concurrency.
+6. Hirebase remains an optional, dev-only sample until the user supplies a key securely and approves estimate-only testing. Do not use its data in a commercial multi-user product without written permission.
+
+Do not merge or deploy this branch as an assertion that JobBeeper now has complete global ATS coverage. It is the quota-safe sampling and candidate-directory foundation; independent Workday/Keka/Darwinbox employer discovery and full board scheduling remain outstanding.\n
+## 2026-11-09 19:37 IST — Workday inventory implementation verified locally
+
+Workday now preserves offset 0 on the existing 120-second freshness poll and adds a durable per-board cursor that fetches at most one extra page every 15 minutes. Cursor advances only after upsert; failed pages are throttled without advancing; boards at the 2,000-result cap are explicitly marked incomplete. An admin-only inventory-status API and Coverage & Health panel expose progress. This is not facet-aware full inventory.
+
+Validation: full V2 suite 436 passed in 398.870s (exit code 0); focused Workday/global discovery tests 31 passed. Python compileall, JSON config validation, git diff check and HTML panel wiring passed. Exact-head GitHub CI remains required after push.
+
+Next priorities: Workday facet subdivision; Keka non-default portal slug support; independent public Workday/Keka/Darwinbox employer discovery; per-board scheduler/host budgets; controlled p50/p95 and 429 benchmarks. Darwinbox 403 must remain blocked, with no Cloudflare/TLS bypass.
+
+User action: nothing required now. Hirebase key remains absent and source flags remain off.
+
+Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n

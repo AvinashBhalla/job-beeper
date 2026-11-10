@@ -4811,6 +4811,19 @@ class LeverConfigTests(unittest.TestCase):
                 {"site": "../unsafe", "company": "Bad"},
             ]})
 class WorkdayCollectorTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self._db_patch = patch.object(radar, "DB_PATH", Path(self._tmp.name) / "workday-test.sqlite3")
+        self._db_patch.start()
+        radar.init_db()
+        self._prior_workday_runtime = dict(radar.source_state.get("workday", {}))
+        radar.source_state["workday"] = {}
+
+    def tearDown(self):
+        radar.source_state["workday"] = self._prior_workday_runtime
+        self._db_patch.stop()
+        self._tmp.cleanup()
+
     def test_board_url_parser_derives_tenant_cluster_and_site(self):
         parsed = radar._parse_workday_board_url(
             "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/"
@@ -4931,7 +4944,7 @@ class WorkdayCollectorTests(unittest.TestCase):
             self.assertEqual(source, "workday")
             return fake_get(url, params=kwargs.get("params"), headers=kwargs.get("headers"), timeout=kwargs.get("timeout", 20))
 
-        with patch.object(radar, "WORKDAY_MAX_PAGES_PER_BOARD", 2), patch.object(
+        with patch.object(
             radar, "_tracked_source_post", side_effect=fake_post
         ), patch.object(radar, "_tracked_source_get", side_effect=tracked_get), patch.object(
             radar.time, "sleep", return_value=None
@@ -4953,6 +4966,331 @@ class WorkdayCollectorTests(unittest.TestCase):
         self.assertEqual(software_job["source_details"]["start_date"], "2026-11-08")
         self.assertTrue(software_job["source_details"]["details_fetched"])
         self.assertTrue(jobs[10]["source_details"]["details_fetched"])
+        # The reported 2,000 total is capped/ambiguous. This is never marked
+        # complete; the cursor stops and exposes the need for facet subdivision.
+        self.assertEqual(
+            radar.source_state["workday"]["pending_board_states"]["nvidia:NVIDIAExternalCareerSite"]["truncated_reason"],
+            "empty_page_before_reported_total_cap_requires_review",
+        )
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            self.assertEqual(
+                conn.execute("SELECT COUNT(*) FROM workday_board_poll_state").fetchone()[0],
+                0,
+            )  # Pending cursor is not persisted before the job upsert transaction.
+        radar._workday_commit_pending_board_states()
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT next_inventory_offset,inventory_complete,truncated_reason FROM workday_board_poll_state WHERE board_key=?",
+                ("nvidia:NVIDIAExternalCareerSite",),
+            ).fetchone()
+        self.assertEqual(row, (0, 0, "empty_page_before_reported_total_cap_requires_review"))
+
+    def test_workday_freshness_page_runs_every_cycle_but_inventory_cursor_is_throttled(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        board_key = "nvidia:NVIDIAExternalCareerSite"
+        now = radar.now()
+        radar._workday_set_board_poll_state(board_key, {
+            "next_inventory_offset": 40,
+            "last_inventory_attempt_at": radar.iso(now - radar.dt.timedelta(minutes=5)),
+            "last_full_inventory_at": None,
+            "reported_total": 500,
+            "facets": [],
+            "inventory_complete": False,
+            "truncated_reason": None,
+        })
+        calls = []
+        class Response:
+            status_code = 200
+            def __init__(self, postings): self.postings = postings
+            def raise_for_status(self): return None
+            def json(self): return {"jobPostings": self.postings, "total": 500, "facets": []}
+        def fake_post(source, url, *, json_body, **kwargs):
+            calls.append(json_body["offset"])
+            postings = ([{
+                "title": f"Inventory Engineer {index}",
+                "externalPath": f"/job/US-California/Inventory-Engineer_{index}",
+                "bulletFields": [f"INV-{index}"],
+            } for index in range(20)] if json_body["offset"] == 40 else [])
+            return Response(postings)
+        config = {"workday_boards": [{"url": board_url, "company": "NVIDIA"}]}
+        with patch.object(radar, "_tracked_source_post", side_effect=fake_post):
+            radar.workday_collect(config)
+        self.assertEqual(calls, [0])
+
+        calls.clear()
+        with patch.object(radar, "WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS", 60), patch.object(
+            radar, "_tracked_source_post", side_effect=fake_post
+        ):
+            radar.workday_collect(config)
+        self.assertEqual(calls, [0, 40])
+        pending = radar.source_state["workday"]["pending_board_states"][board_key]
+        self.assertEqual(pending["next_inventory_offset"], 60)
+        radar._workday_commit_pending_board_states()
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT next_inventory_offset FROM workday_board_poll_state WHERE board_key=?",
+                (board_key,),
+            ).fetchone()
+        self.assertEqual(row[0], 60)
+
+    def test_failed_workday_inventory_page_is_throttled_without_advancing_cursor(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        board_key = "nvidia:NVIDIAExternalCareerSite"
+        calls = []
+        class Response:
+            status_code = 200
+            def raise_for_status(self): return None
+            def json(self): return {"jobPostings": [], "total": 500, "facets": []}
+        def fail_inventory(source, url, *, json_body, **kwargs):
+            calls.append(json_body["offset"])
+            if json_body["offset"]:
+                raise RuntimeError("temporary inventory failure")
+            return Response()
+        config = {"workday_boards": [{"url": board_url, "company": "NVIDIA"}]}
+        with patch.object(radar, "_tracked_source_post", side_effect=fail_inventory):
+            radar.workday_collect(config)
+        self.assertEqual(calls, [0, 20])
+        pending = radar.source_state["workday"]["pending_board_states"][board_key]
+        self.assertEqual(pending["next_inventory_offset"], 20)
+        radar._workday_commit_pending_board_states()
+
+        calls.clear()
+        with patch.object(radar, "_tracked_source_post", side_effect=fail_inventory):
+            radar.workday_collect(config)
+        self.assertEqual(calls, [0])  # 120-second source poll cannot retry a failed deep page.
+
+    def test_workday_facet_selector_prefers_job_family_then_uses_next_unapplied_facet(self):
+        facets = [
+            {"facetParameter": "workerSubType", "values": [
+                {"id": "SKILL_A", "count": 20}, {"id": "SKILL_B", "count": 10},
+            ]},
+            {"facetParameter": "timeType", "values": [
+                {"id": "FULL_TIME", "count": 1200}, {"id": "PART_TIME", "count": 800},
+            ]},
+            {"facetParameter": "jobFamilyGroup", "values": [
+                {"id": "ENGINEERING", "count": 1500}, {"id": "SALES", "count": 500},
+            ]},
+        ]
+        selected = radar._workday_pick_subdivision_facet(facets, already_applied=set())
+        self.assertEqual(selected[0], "jobFamilyGroup")
+        self.assertEqual(selected[1], [("ENGINEERING", 1500), ("SALES", 500)])
+        next_selected = radar._workday_pick_subdivision_facet(
+            facets, already_applied={"jobFamilyGroup"}
+        )
+        self.assertEqual(next_selected[0], "timeType")
+        children, reason = radar._workday_facet_children(
+            {"jobFamilyGroup": ["ENGINEERING"]}, 1, facets, 0
+        )
+        self.assertIsNone(reason)
+        self.assertEqual(children, [
+            {"applied_facets": {"jobFamilyGroup": ["ENGINEERING"], "timeType": ["FULL_TIME"]}, "depth": 2},
+            {"applied_facets": {"jobFamilyGroup": ["ENGINEERING"], "timeType": ["PART_TIME"]}, "depth": 2},
+        ])
+
+    def test_workday_facet_queue_resumes_partitions_and_paginates_each_leaf(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        board_key = "nvidia:NVIDIAExternalCareerSite"
+        root_facets = [{"facetParameter": "jobFamilyGroup", "values": [
+            {"id": "ENGINEERING", "count": 2000},
+            {"id": "SALES", "count": 80},
+        ]}]
+        calls = []
+
+        class Response:
+            status_code = 200
+            def __init__(self, payload): self.payload = payload
+            def raise_for_status(self): return None
+            def json(self): return self.payload
+
+        def postings(prefix, start, count):
+            return [{
+                "title": f"{prefix} Engineer {index}",
+                "externalPath": f"/job/US-California/{prefix}-Engineer_{index}",
+                "bulletFields": [f"{prefix}-{index}"],
+            } for index in range(start, start + count)]
+
+        def fake_post(source, url, *, json_body, **kwargs):
+            filters = json_body["appliedFacets"]
+            offset = json_body["offset"]
+            calls.append((dict(filters), offset))
+            if not filters:
+                return Response({"jobPostings": [], "total": 2000, "facets": root_facets})
+            group = filters["jobFamilyGroup"][0]
+            if group == "ENGINEERING" and offset == 0:
+                return Response({"jobPostings": postings("ENG", 0, 20), "total": 25, "facets": []})
+            if group == "ENGINEERING" and offset == 20:
+                return Response({"jobPostings": postings("ENG", 20, 5), "total": 25, "facets": []})
+            if group == "SALES" and offset == 0:
+                return Response({"jobPostings": postings("SALES", 0, 5), "total": 5, "facets": []})
+            self.fail(f"Unexpected Workday facet request filters={filters} offset={offset}")
+
+        config = {"workday_boards": [{"url": board_url, "company": "NVIDIA"}]}
+        with patch.object(radar, "_tracked_source_post", side_effect=fake_post):
+            first = radar.workday_collect(config)
+        self.assertEqual(calls, [({}, 0)])
+        self.assertEqual(first, [])
+        pending = radar.source_state["workday"]["pending_board_states"][board_key]
+        self.assertTrue(pending["facet_partition_started"])
+        self.assertEqual(len(pending["facet_queue"]), 2)
+        radar._workday_commit_pending_board_states()
+
+        calls.clear()
+        with patch.object(radar, "WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS", 0), patch.object(
+            radar, "_tracked_source_post", side_effect=fake_post
+        ):
+            jobs = radar.workday_collect(config)
+        self.assertEqual(calls, [({}, 0), ({"jobFamilyGroup": ["ENGINEERING"]}, 0)])
+        self.assertEqual(len(jobs), 20)
+        pending = radar.source_state["workday"]["pending_board_states"][board_key]
+        self.assertTrue(pending["active_facet_query"])
+        self.assertEqual(pending["active_facets"], {"jobFamilyGroup": ["ENGINEERING"]})
+        self.assertEqual(pending["next_inventory_offset"], 20)
+        radar._workday_commit_pending_board_states()
+
+        calls.clear()
+        with patch.object(radar, "WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS", 0), patch.object(
+            radar, "_tracked_source_post", side_effect=fake_post
+        ):
+            jobs = radar.workday_collect(config)
+        self.assertEqual(calls, [({}, 0), ({"jobFamilyGroup": ["ENGINEERING"]}, 20)])
+        self.assertEqual(len(jobs), 5)
+        pending = radar.source_state["workday"]["pending_board_states"][board_key]
+        self.assertFalse(pending["active_facet_query"])
+        self.assertEqual(len(pending["facet_queue"]), 1)
+        radar._workday_commit_pending_board_states()
+
+        calls.clear()
+        with patch.object(radar, "WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS", 0), patch.object(
+            radar, "_tracked_source_post", side_effect=fake_post
+        ):
+            jobs = radar.workday_collect(config)
+        self.assertEqual(calls, [({}, 0), ({"jobFamilyGroup": ["SALES"]}, 0)])
+        self.assertEqual(len(jobs), 5)
+        pending = radar.source_state["workday"]["pending_board_states"][board_key]
+        self.assertTrue(pending["inventory_complete"])
+        self.assertEqual(pending["facet_queue"], [])
+        self.assertFalse(pending["active_facet_query"])
+
+    def test_workday_completed_inventory_is_rechecked_weekly(self):
+        now = radar.now()
+        state = {
+            "inventory_complete": True,
+            "last_full_inventory_at": radar.iso(now - radar.dt.timedelta(days=8)),
+            "last_inventory_attempt_at": radar.iso(now - radar.dt.timedelta(days=8)),
+            "truncated_reason": None,
+        }
+        self.assertTrue(radar._workday_inventory_is_due(state, now))
+        state["last_full_inventory_at"] = radar.iso(now - radar.dt.timedelta(days=2))
+        self.assertFalse(radar._workday_inventory_is_due(state, now))
+
+    def test_workday_inventory_status_api_reports_truncation_without_claiming_completion(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        radar._workday_set_board_poll_state("nvidia:NVIDIAExternalCareerSite", {
+            "next_inventory_offset": 0,
+            "last_inventory_attempt_at": radar.iso(radar.now()),
+            "last_full_inventory_at": None,
+            "reported_total": 2000,
+            "facets": [{"facetParameter": "jobFamilyGroup"}],
+            "inventory_complete": False,
+            "truncated_reason": "reported_total_capped_at_2000_requires_facet_partition",
+        })
+        with patch.object(radar, "get_config", return_value={
+            "poll_seconds": {"workday": 120},
+            "workday_boards": [{"url": board_url, "company": "NVIDIA"}],
+        }):
+            status = radar.get_workday_inventory_status()
+        self.assertEqual(status["boards_configured"], 1)
+        self.assertFalse(status["boards"][0]["inventory_complete"])
+        self.assertEqual(status["boards"][0]["status"], "truncated")
+        self.assertEqual(status["boards"][0]["reported_total"], 2000)
+        self.assertEqual(status["boards"][0]["facets_available"], 1)
+        self.assertIn("2,000-result cap", status["coverage_note"])
+
+    def test_workday_inventory_status_reports_partition_queue_and_active_filters(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        radar._workday_set_board_poll_state("nvidia:NVIDIAExternalCareerSite", {
+            "next_inventory_offset": 20,
+            "last_inventory_attempt_at": radar.iso(radar.now()),
+            "last_full_inventory_at": None,
+            "reported_total": 2000,
+            "facets": [{"facetParameter": "jobFamilyGroup"}],
+            "inventory_complete": False,
+            "truncated_reason": None,
+            "facet_partition_started": True,
+            "facet_queue": [{"applied_facets": {"jobFamilyGroup": ["SALES"]}, "depth": 1}],
+            "active_facets": {"jobFamilyGroup": ["ENGINEERING"]},
+            "active_facet_depth": 1,
+            "active_facet_query": True,
+        })
+        with patch.object(radar, "get_config", return_value={
+            "poll_seconds": {"workday": 120},
+            "workday_boards": [{"url": board_url, "company": "NVIDIA"}],
+        }):
+            status = radar.get_workday_inventory_status()
+        board = status["boards"][0]
+        self.assertEqual(board["status"], "in_progress")
+        self.assertTrue(board["facet_partitioned"])
+        self.assertEqual(board["pending_facet_partitions"], 1)
+        self.assertTrue(board["active_facet_query"])
+        self.assertEqual(board["active_applied_facets"], {"jobFamilyGroup": ["ENGINEERING"]})
+
+    def test_workday_inventory_status_shows_incomplete_while_other_partitions_remain(self):
+        board_url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        radar._workday_set_board_poll_state("nvidia:NVIDIAExternalCareerSite", {
+            "next_inventory_offset": 0,
+            "last_inventory_attempt_at": radar.iso(radar.now()),
+            "last_full_inventory_at": None,
+            "reported_total": 2000,
+            "facets": [],
+            "inventory_complete": False,
+            "truncated_reason": "workday_no_usable_subdivision_facet",
+            "facet_partition_started": True,
+            "facet_queue": [{"applied_facets": {"jobFamilyGroup": ["SALES"]}, "depth": 1}],
+            "active_facets": {},
+            "active_facet_depth": 0,
+            "active_facet_query": False,
+        })
+        with patch.object(radar, "get_config", return_value={
+            "poll_seconds": {"workday": 120},
+            "workday_boards": [{"url": board_url, "company": "NVIDIA"}],
+        }):
+            status = radar.get_workday_inventory_status()
+        board = status["boards"][0]
+        self.assertEqual(board["status"], "in_progress_incomplete")
+        self.assertEqual(board["pending_facet_partitions"], 1)
+        self.assertIsNotNone(board["next_inventory_due_at"])
+
+    def test_workday_old_inventory_table_migrates_facet_queue_columns(self):
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            conn.execute("DROP TABLE workday_board_poll_state")
+            conn.execute("""CREATE TABLE workday_board_poll_state (
+                board_key TEXT PRIMARY KEY,
+                next_inventory_offset INTEGER NOT NULL DEFAULT 20,
+                last_inventory_attempt_at TEXT,
+                last_full_inventory_at TEXT,
+                reported_total INTEGER,
+                facets_json TEXT NOT NULL DEFAULT '[]',
+                inventory_complete INTEGER NOT NULL DEFAULT 0,
+                truncated_reason TEXT,
+                updated_at TEXT NOT NULL
+            )""")
+            conn.execute("INSERT INTO workday_board_poll_state(board_key,updated_at) VALUES('legacy:site','2026-11-01T00:00:00Z')")
+        radar.init_db()
+        state = radar._workday_get_board_poll_state("legacy:site")
+        self.assertEqual(state["facet_queue"], [])
+        self.assertEqual(state["active_facets"], {})
+        self.assertFalse(state["facet_partition_started"])
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(workday_board_poll_state)")}
+        self.assertTrue({"facet_queue_json", "active_facets_json", "active_facet_depth", "active_facet_query", "facet_partition_started"}.issubset(columns))
+
+    def test_workday_truncated_inventory_is_not_scheduled_again_as_if_complete(self):
+        state = {
+            "inventory_complete": False,
+            "last_inventory_attempt_at": radar.iso(radar.now() - radar.dt.timedelta(days=3)),
+            "truncated_reason": "reported_total_capped_at_2000_requires_facet_partition",
+        }
+        self.assertFalse(radar._workday_inventory_is_due(state, radar.now()))
 
     def test_detail_failures_do_not_exceed_the_attempt_budget(self):
         class Response:

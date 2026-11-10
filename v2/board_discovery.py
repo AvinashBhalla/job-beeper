@@ -112,9 +112,61 @@ def _normalise_candidate_url(value: str) -> str:
     return urlunsplit(("https", parsed.netloc.lower(), path, "", ""))
 
 
+def _parse_keka_careers_url(value: str) -> dict[str, str] | None:
+    """Parse one public Keka careers URL, preserving its employer portal slug."""
+    if not isinstance(value, str) or len(value.strip()) > 2048:
+        return None
+    try:
+        parsed = urlsplit(value.strip())
+        port = parsed.port
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower().rstrip(".")
+    host_match = re.fullmatch(r"(?P<tenant>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.keka\.com", host)
+    if (
+        parsed.scheme.lower() != "https" or not host_match
+        or parsed.username is not None or parsed.password is not None
+        or port not in (None, 443) or parsed.query or parsed.fragment
+    ):
+        return None
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if len(segments) not in {1, 2} or segments[0].casefold() != "careers":
+        return None
+    reserved = {"api", "applyjob", "content", "jobdetails"}
+    portal = segments[1].casefold() if len(segments) == 2 else "default"
+    if len(segments) == 2 and (
+        not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,99}", portal)
+        or portal in reserved
+    ):
+        return None
+    tenant = host_match.group("tenant")
+    careers_path = "/careers" if portal == "default" else f"/careers/{portal}"
+    board_key = tenant if portal == "default" else f"{tenant}:{portal}"
+    return {
+        "tenant": tenant,
+        "portal": portal,
+        "board_key": board_key,
+        "careers_url": f"https://{host}{careers_path}",
+        "host": host,
+    }
+
+
 def detect_ats_board(value: str) -> dict[str, Any] | None:
     """Recognise common ATS-hosted public board URLs without guessing slugs."""
     try:
+        keka = _parse_keka_careers_url(value)
+        if keka:
+            return {
+                "provider": "keka",
+                "board_key": keka["board_key"],
+                "display_key": keka["portal"] if keka["portal"] != "default" else keka["tenant"],
+                "tenant": keka["tenant"],
+                "portal": keka["portal"],
+                "board_url": keka["careers_url"],
+                "host": keka["host"],
+                "collector_source": COLLECTOR_SOURCES.get("keka"),
+                "collector_available": True,
+            }
         url = _normalise_candidate_url(value)
         parsed = urlsplit(url)
         host = (parsed.hostname or "").lower()
@@ -149,10 +201,8 @@ def detect_ats_board(value: str) -> dict[str, Any] | None:
                 board_key = details["slug"]
                 display_key = board_key
             elif provider == "keka":
-                if not segments or segments[0].lower() != "careers":
-                    return None
-                board_key = details["slug"]
-                display_key = board_key
+                # Keka URLs are handled by _parse_keka_careers_url above.
+                return None
             elif provider == "darwinbox":
                 match_careers = re.match(
                     r"^/ms/candidatev2/(?P<company_id>[A-Za-z0-9_-]{1,100})/careers(?:/|$)",
@@ -194,7 +244,7 @@ def detect_ats_board(value: str) -> dict[str, Any] | None:
                     "cluster": details["cluster"],
                     "site": display_key,
                 })
-            elif provider in {"keka", "darwinbox"}:
+            elif provider == "darwinbox":
                 candidate["tenant"] = details["slug"]
             return candidate
     except (ValueError, TypeError):
@@ -285,7 +335,8 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("Keka careers page did not expose a public career-portal feed identifier.")
         feed_id = feed_match.group(1)
         origin = f"https://{urlsplit(final_url).hostname}"
-        endpoint = f"{origin}/careers/api/embedjobs/default/active/{feed_id}"
+        portal = candidate["portal"]
+        endpoint = f"{origin}/careers/api/embedjobs/{portal}/active/{feed_id}"
         response = requests.get(
             endpoint, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS,
             allow_redirects=False,

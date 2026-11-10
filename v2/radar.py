@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import auth, board_discovery, google_oauth, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -67,8 +67,14 @@ LEVER_PAGE_SIZE = 100
 LEVER_MAX_PAGES_PER_BOARD = 5
 LEVER_MAX_BOARDS = 20
 WORKDAY_PAGE_SIZE = 20
-WORKDAY_MAX_PAGES_PER_BOARD = 1
+WORKDAY_MAX_PAGES_PER_BOARD = 2  # Freshness page plus at most one inventory page.
 WORKDAY_MAX_DETAILS_PER_BOARD = 20
+WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS = 15 * 60
+WORKDAY_FULL_INVENTORY_REFRESH_SECONDS = 7 * 24 * 60 * 60
+WORKDAY_INVENTORY_MAX_OFFSET = 2000
+WORKDAY_MAX_FACET_DEPTH = 4
+WORKDAY_MAX_FACET_PARTITIONS = 500
+WORKDAY_SUBDIVISION_FACETS = ("jobFamilyGroup", "timeType", "locations", "workerSubType")
 WORKDAY_MAX_BOARDS = 20
 WORKDAY_DETAIL_DELAY_SECONDS = 0.1
 WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
@@ -86,8 +92,12 @@ DARWINBOX_MAX_BOARDS = 50
 DARWINBOX_PAGE_SIZE = 50
 DARWINBOX_MAX_PAGES_PER_BOARD = 5
 DARWINBOX_PAGE_DELAY_SECONDS = 0.2
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox"})
-INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday"})
+HIREBASE_PROVIDER_LIMIT = 4
+HIREBASE_MAX_MONTHLY_JOBS = 400
+HIREBASE_MAX_DAILY_JOBS = 12
+HIREBASE_PROVIDER_DAILY_JOBS = 4
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "hirebase"})
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "hirebase"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -217,6 +227,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
     if current_version < 15 <= default_version:
         merged.setdefault("source_enabled", {})["keka"] = False
         merged.setdefault("source_enabled", {})["darwinbox"] = False
+    if current_version < 17 <= default_version:
+        merged.setdefault("source_enabled", {})["hirebase"] = False
     if isinstance(defaults.get("source_enabled"), dict):
         merged["source_enabled"] = {
             **defaults.get("source_enabled", {}),
@@ -241,6 +253,8 @@ def _merge_config(defaults: dict[str, Any], current: dict[str, Any]) -> dict[str
         if current_version < 15 <= default_version:
             merged["source_enabled"]["keka"] = False
             merged["source_enabled"]["darwinbox"] = False
+        if current_version < 17 <= default_version:
+            merged["source_enabled"]["hirebase"] = False
     return merged
 
 
@@ -532,10 +546,10 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             raise HTTPException(status_code=422, detail="Each Keka board requires a public HTTPS https://<tenant>.keka.com/careers URL.")
         if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
             raise HTTPException(status_code=422, detail="Each Keka board requires a company label of at most 120 characters.")
-        tenant = str(detected["board_key"]).lower()
-        if tenant in seen_keka:
-            raise HTTPException(status_code=422, detail=f"Duplicate Keka tenant: {tenant}.")
-        seen_keka.add(tenant)
+        board_key = str(detected["board_key"]).lower()
+        if board_key in seen_keka:
+            raise HTTPException(status_code=422, detail=f"Duplicate Keka public portal: {board_key}.")
+        seen_keka.add(board_key)
         entry = {"careers_url": detected["board_url"], "company": company.strip()}
         registry_id = _optional_registry_id(board, "Keka")
         if registry_id is not None:
@@ -584,7 +598,10 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "workable": bool(source_enabled.get("workable", False)),
         "keka": bool(source_enabled.get("keka", False)),
         "darwinbox": bool(source_enabled.get("darwinbox", False)),
+        "hirebase": bool(source_enabled.get("hirebase", False)),
     }
+    if config["source_enabled"]["hirebase"] and not hirebase.api_key_configured():
+        raise HTTPException(status_code=422, detail="Configure HIREBASE_API_KEY in the isolated server environment before enabling Hirebase.")
     if config["source_enabled"]["workday"] and not normalized_workday_boards:
         raise HTTPException(
             status_code=422,
@@ -616,6 +633,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "workable": 120,
             "keka": 120,
             "darwinbox": 120,
+            "hirebase": 86400,
         }.items()
     }
 
@@ -1191,8 +1209,86 @@ def init_db() -> None:
         )
         """)
         _ensure_column(conn, "ats_board_registry", "baseline_pending", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "ats_board_registry", "directory_last_crawled", "TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_provider ON ats_board_registry(provider, review_status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ats_board_company ON ats_board_registry(company_id, provider)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ats_global_discovery_candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            board_key TEXT NOT NULL,
+            board_url TEXT NOT NULL,
+            candidate_host TEXT NOT NULL,
+            discovery_method TEXT NOT NULL,
+            source_reference TEXT NOT NULL,
+            source_captured_at TEXT,
+            first_discovered_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            confidence TEXT NOT NULL DEFAULT 'low',
+            review_status TEXT NOT NULL DEFAULT 'discovered',
+            linked_company_id INTEGER,
+            linked_board_registry_id INTEGER,
+            last_error_type TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(linked_company_id) REFERENCES employer_companies(id),
+            FOREIGN KEY(linked_board_registry_id) REFERENCES ats_board_registry(id),
+            UNIQUE(provider, candidate_host, board_key)
+        )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_global_candidate_status ON ats_global_discovery_candidates(review_status, last_seen_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_global_candidate_provider ON ats_global_discovery_candidates(provider, review_status)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS workday_board_poll_state (
+            board_key TEXT PRIMARY KEY,
+            next_inventory_offset INTEGER NOT NULL DEFAULT 20,
+            last_inventory_attempt_at TEXT,
+            last_full_inventory_at TEXT,
+            reported_total INTEGER,
+            facets_json TEXT NOT NULL DEFAULT '[]',
+            inventory_complete INTEGER NOT NULL DEFAULT 0,
+            truncated_reason TEXT,
+            facet_queue_json TEXT NOT NULL DEFAULT '[]',
+            active_facets_json TEXT NOT NULL DEFAULT '{}',
+            active_facet_depth INTEGER NOT NULL DEFAULT 0,
+            active_facet_query INTEGER NOT NULL DEFAULT 0,
+            facet_partition_started INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        _ensure_column(conn, "workday_board_poll_state", "facet_queue_json", "TEXT NOT NULL DEFAULT '[]'")
+        _ensure_column(conn, "workday_board_poll_state", "active_facets_json", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column(conn, "workday_board_poll_state", "active_facet_depth", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "workday_board_poll_state", "active_facet_query", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "workday_board_poll_state", "facet_partition_started", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS hirebase_usage_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            period_start TEXT NOT NULL,
+            period_end TEXT NOT NULL,
+            estimated_jobs INTEGER NOT NULL,
+            returned_jobs INTEGER,
+            reserved_jobs INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL,
+            included_used INTEGER,
+            included_remaining INTEGER,
+            response_verified INTEGER NOT NULL DEFAULT 0
+        )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_hirebase_usage_period ON hirebase_usage_ledger(period_start, created_at, provider)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS hirebase_provider_state (
+            provider TEXT PRIMARY KEY,
+            last_polled_at TEXT NOT NULL,
+            window_start TEXT NOT NULL,
+            next_page INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        _ensure_column(conn, "hirebase_provider_state", "window_start", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(conn, "hirebase_provider_state", "next_page", "INTEGER NOT NULL DEFAULT 1")
         conn.execute("""
         CREATE TABLE IF NOT EXISTS canonical_opportunities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4728,6 +4824,232 @@ def lever_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _workday_get_board_poll_state(board_key: str) -> dict[str, Any]:
+    with connect_sqlite(DB_PATH) as conn:
+        row = conn.execute(
+            """SELECT next_inventory_offset,last_inventory_attempt_at,
+                      last_full_inventory_at,reported_total,facets_json,
+                      inventory_complete,truncated_reason,facet_queue_json,
+                      active_facets_json,active_facet_depth,active_facet_query,
+                      facet_partition_started
+               FROM workday_board_poll_state WHERE board_key=?""",
+            (board_key,),
+        ).fetchone()
+    if not row:
+        return {
+            "next_inventory_offset": WORKDAY_PAGE_SIZE,
+            "last_inventory_attempt_at": None,
+            "last_full_inventory_at": None,
+            "reported_total": None,
+            "facets": [],
+            "inventory_complete": False,
+            "truncated_reason": None,
+            "facet_queue": [],
+            "active_facets": {},
+            "active_facet_depth": 0,
+            "active_facet_query": False,
+            "facet_partition_started": False,
+        }
+    try:
+        facets = json.loads(row[4] or "[]")
+        if not isinstance(facets, (list, dict)):
+            facets = []
+    except (TypeError, ValueError):
+        facets = []
+    try:
+        facet_queue = json.loads(row[7] or "[]")
+        if not isinstance(facet_queue, list):
+            facet_queue = []
+    except (TypeError, ValueError):
+        facet_queue = []
+    try:
+        active_facets = json.loads(row[8] or "{}")
+        if not isinstance(active_facets, dict):
+            active_facets = {}
+    except (TypeError, ValueError):
+        active_facets = {}
+    return {
+        "next_inventory_offset": max(0, int(row[0] or 0)),
+        "last_inventory_attempt_at": row[1],
+        "last_full_inventory_at": row[2],
+        "reported_total": row[3],
+        "facets": facets,
+        "inventory_complete": bool(row[5]),
+        "truncated_reason": row[6],
+        "facet_queue": facet_queue,
+        "active_facets": active_facets,
+        "active_facet_depth": max(0, int(row[9] or 0)),
+        "active_facet_query": bool(row[10]),
+        "facet_partition_started": bool(row[11]),
+    }
+
+
+def _workday_set_board_poll_state(board_key: str, state: dict[str, Any]) -> None:
+    facets = state.get("facets")
+    if not isinstance(facets, (list, dict)):
+        facets = []
+    facets_json = json.dumps(facets, ensure_ascii=False, separators=(",", ":"))[:16_000]
+    facet_queue = state.get("facet_queue")
+    if not isinstance(facet_queue, list):
+        facet_queue = []
+    facet_queue_json = json.dumps(facet_queue[:WORKDAY_MAX_FACET_PARTITIONS], ensure_ascii=False, separators=(",", ":"))
+    if len(facet_queue_json) > 1_000_000:
+        raise ValueError("Workday facet queue exceeded the persisted state size limit")
+    active_facets = state.get("active_facets")
+    if not isinstance(active_facets, dict):
+        active_facets = {}
+    active_facets_json = json.dumps(active_facets, ensure_ascii=False, separators=(",", ":"))[:16_000]
+    reported_total = state.get("reported_total")
+    if isinstance(reported_total, bool) or not isinstance(reported_total, int) or reported_total < 0:
+        reported_total = None
+    next_offset = state.get("next_inventory_offset", WORKDAY_PAGE_SIZE)
+    if isinstance(next_offset, bool) or not isinstance(next_offset, int) or next_offset < 0:
+        next_offset = WORKDAY_PAGE_SIZE
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO workday_board_poll_state(
+                   board_key,next_inventory_offset,last_inventory_attempt_at,
+                   last_full_inventory_at,reported_total,facets_json,
+                   inventory_complete,truncated_reason,facet_queue_json,
+                   active_facets_json,active_facet_depth,active_facet_query,
+                   facet_partition_started,updated_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(board_key) DO UPDATE SET
+                   next_inventory_offset=excluded.next_inventory_offset,
+                   last_inventory_attempt_at=excluded.last_inventory_attempt_at,
+                   last_full_inventory_at=excluded.last_full_inventory_at,
+                   reported_total=excluded.reported_total,
+                   facets_json=excluded.facets_json,
+                   inventory_complete=excluded.inventory_complete,
+                   truncated_reason=excluded.truncated_reason,
+                   facet_queue_json=excluded.facet_queue_json,
+                   active_facets_json=excluded.active_facets_json,
+                   active_facet_depth=excluded.active_facet_depth,
+                   active_facet_query=excluded.active_facet_query,
+                   facet_partition_started=excluded.facet_partition_started,
+                   updated_at=excluded.updated_at""",
+            (
+                board_key, next_offset, state.get("last_inventory_attempt_at"),
+                state.get("last_full_inventory_at"), reported_total, facets_json,
+                int(bool(state.get("inventory_complete"))),
+                state.get("truncated_reason"), facet_queue_json, active_facets_json,
+                max(0, min(int(state.get("active_facet_depth") or 0), WORKDAY_MAX_FACET_DEPTH)),
+                int(bool(state.get("active_facet_query"))),
+                int(bool(state.get("facet_partition_started"))), iso(now()),
+            ),
+        )
+        conn.commit()
+
+
+def _workday_commit_pending_board_states() -> None:
+    pending = source_state.setdefault("workday", {}).pop("pending_board_states", {})
+    if not isinstance(pending, dict):
+        return
+    for board_key, state in pending.items():
+        if isinstance(board_key, str) and isinstance(state, dict):
+            _workday_set_board_poll_state(board_key, state)
+
+
+def _workday_pick_subdivision_facet(
+    facets: Any, *, already_applied: set[str]
+) -> tuple[str, list[tuple[str, int]]] | None:
+    """Choose a Workday subdivision facet from the public response metadata."""
+    if not isinstance(facets, list):
+        return None
+    by_param: dict[str, list[tuple[str, int]]] = {}
+    for facet in facets[:100]:
+        if not isinstance(facet, dict):
+            continue
+        param = facet.get("facetParameter")
+        values = facet.get("values")
+        if (
+            not isinstance(param, str) or param not in WORKDAY_SUBDIVISION_FACETS
+            or param in already_applied or not isinstance(values, list)
+        ):
+            continue
+        seen: set[str] = set()
+        items: list[tuple[str, int]] = []
+        for value in values[:WORKDAY_MAX_FACET_PARTITIONS]:
+            if not isinstance(value, dict):
+                continue
+            value_id = value.get("id")
+            count = value.get("count")
+            if isinstance(count, bool):
+                continue
+            try:
+                parsed_count = int(count)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if (
+                not isinstance(value_id, str) or not value_id.strip()
+                or len(value_id) > 200 or value_id in seen or parsed_count <= 0
+            ):
+                continue
+            seen.add(value_id)
+            items.append((value_id, parsed_count))
+        if len(items) > 1:
+            by_param[param] = items
+    for preferred in WORKDAY_SUBDIVISION_FACETS:
+        if preferred in by_param:
+            return preferred, by_param[preferred]
+    if by_param:
+        return max(by_param.items(), key=lambda entry: len(entry[1]))
+    return None
+
+
+def _workday_facet_children(
+    applied_facets: dict[str, list[str]], depth: int, facets: Any,
+    queue_size: int,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Build bounded child queries for one capped Workday query."""
+    if depth >= WORKDAY_MAX_FACET_DEPTH:
+        return [], "workday_facet_depth_limit_reached"
+    selected = _workday_pick_subdivision_facet(
+        facets, already_applied=set(applied_facets)
+    )
+    if selected is None:
+        return [], "workday_no_usable_subdivision_facet"
+    param, values = selected
+    remaining = WORKDAY_MAX_FACET_PARTITIONS - queue_size
+    if remaining <= 0:
+        return [], "workday_facet_partition_budget_reached"
+    children = [
+        {"applied_facets": {**applied_facets, param: [value_id]}, "depth": depth + 1}
+        for value_id, _count in values[:remaining]
+    ]
+    overflow_reason = (
+        "workday_facet_partition_budget_reached"
+        if len(children) < len(values) else None
+    )
+    return children, overflow_reason
+
+
+def _workday_inventory_is_due(state: dict[str, Any], current: dt.datetime) -> bool:
+    if state.get("truncated_reason") and not state.get("facet_queue") and not state.get("active_facet_query"):
+        return False
+    last_attempt = state.get("last_inventory_attempt_at")
+    if state.get("inventory_complete"):
+        last_full = state.get("last_full_inventory_at")
+        if not last_full:
+            return False
+        try:
+            parsed = dt.datetime.fromisoformat(str(last_full).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+        except ValueError:
+            parsed = current - dt.timedelta(seconds=WORKDAY_FULL_INVENTORY_REFRESH_SECONDS)
+        return (current - parsed).total_seconds() >= WORKDAY_FULL_INVENTORY_REFRESH_SECONDS
+    if not last_attempt:
+        return True
+    try:
+        parsed = dt.datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+    except ValueError:
+        return True
+    return (current - parsed).total_seconds() >= WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS
+
+
 def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     """Collect a bounded set of public Workday career-site postings.
 
@@ -4767,11 +5089,63 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         details_fetched = 0
         board_jobs: list[dict[str, Any]] = []
         rate_limited = False
+        board_key = f"{tenant}:{site}"
+        poll_state = _workday_get_board_poll_state(board_key)
+        inventory_due = _workday_inventory_is_due(poll_state, now())
+        inventory_offset = int(poll_state.get("next_inventory_offset") or 0)
+        facet_queue = list(poll_state.get("facet_queue") or [])
+        active_facets = dict(poll_state.get("active_facets") or {})
+        active_facet_depth = int(poll_state.get("active_facet_depth") or 0)
+        active_facet_query = bool(poll_state.get("active_facet_query"))
+        facet_partition_started = bool(poll_state.get("facet_partition_started"))
+        if poll_state.get("inventory_complete") and inventory_due:
+            # Weekly refresh starts a new root sweep; the freshness request below
+            # will decide whether it remains linear or needs facet partitions.
+            inventory_offset = WORKDAY_PAGE_SIZE
+            facet_queue = []
+            active_facets = {}
+            active_facet_depth = 0
+            active_facet_query = False
+            facet_partition_started = False
+            poll_state = {
+                **poll_state,
+                "inventory_complete": False,
+                "truncated_reason": None,
+                "facet_queue": [],
+                "active_facets": {},
+                "active_facet_depth": 0,
+                "active_facet_query": False,
+                "facet_partition_started": False,
+            }
+        # Resume a queued partition only when its throttle window is due.
+        if inventory_due and facet_partition_started and not active_facet_query and facet_queue:
+            task = facet_queue.pop(0)
+            task_filters = task.get("applied_facets") if isinstance(task, dict) else None
+            task_depth = task.get("depth") if isinstance(task, dict) else None
+            if isinstance(task_filters, dict) and all(
+                isinstance(key, str) and isinstance(value, list)
+                and all(isinstance(item, str) for item in value)
+                for key, value in task_filters.items()
+            ):
+                active_facets = task_filters
+                active_facet_depth = max(1, min(int(task_depth or 1), WORKDAY_MAX_FACET_DEPTH))
+                active_facet_query = True
+                inventory_offset = 0
+            else:
+                poll_state = {**poll_state, "truncated_reason": "workday_invalid_facet_queue_entry"}
+        page_specs = [(0, True, {})]
+        inventory_spec_added = False
+        if inventory_due and active_facet_query and WORKDAY_MAX_PAGES_PER_BOARD > 1:
+            page_specs.append((inventory_offset, False, active_facets))
+            inventory_spec_added = True
+        reported_total = poll_state.get("reported_total")
+        facets = poll_state.get("facets", [])
+        inventory_state_update: dict[str, Any] | None = None
+        inventory_attempt_at = iso(now()) or ""
 
-        for page_number in range(WORKDAY_MAX_PAGES_PER_BOARD):
-            offset = page_number * WORKDAY_PAGE_SIZE
+        for page_number, (offset, freshness_page, request_facets) in enumerate(page_specs):
             payload = {
-                "appliedFacets": {},
+                "appliedFacets": request_facets,
                 "limit": WORKDAY_PAGE_SIZE,
                 "offset": offset,
                 "searchText": "",
@@ -4785,18 +5159,89 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 postings = data.get("jobPostings") if isinstance(data, dict) else None
                 if not isinstance(postings, list):
                     raise ValueError("Workday response did not contain jobPostings")
+                if isinstance(data, dict):
+                    raw_total = data.get("total")
+                    if isinstance(raw_total, int) and not isinstance(raw_total, bool) and raw_total >= 0:
+                        reported_total = raw_total
+                    raw_facets = data.get("facets")
+                    if isinstance(raw_facets, list):
+                        facets = raw_facets[:100]
+                    elif isinstance(raw_facets, dict):
+                        facets = dict(list(raw_facets.items())[:100])
                 successful_pages += 1
                 _record_source_page("workday", True)
+
+                if freshness_page and inventory_due and not facet_partition_started:
+                    if reported_total == WORKDAY_INVENTORY_MAX_OFFSET:
+                        children, partition_error = _workday_facet_children(
+                            {}, 0, facets, len(facet_queue)
+                        )
+                        if children:
+                            facet_queue.extend(children)
+                            facet_partition_started = True
+                            active_facets = {}
+                            active_facet_depth = 0
+                            active_facet_query = False
+                            inventory_offset = 0
+                            inventory_state_update = {
+                                **poll_state,
+                                "next_inventory_offset": 0,
+                                "last_inventory_attempt_at": inventory_attempt_at,
+                                "reported_total": reported_total,
+                                "facets": facets,
+                                "facet_queue": facet_queue,
+                                "active_facets": {},
+                                "active_facet_depth": 0,
+                                "active_facet_query": False,
+                                "facet_partition_started": True,
+                                "inventory_complete": False,
+                                "truncated_reason": partition_error,
+                            }
+                            log.info(
+                                "workday: tenant=%s site=%s capped total=%s; queued %s facet partitions",
+                                tenant, site, reported_total, len(facet_queue),
+                            )
+                            # Do not waste this cycle paginating the capped root
+                            # query. The next scheduled inventory request starts
+                            # at the first child partition.
+                            inventory_spec_added = True
+                        elif partition_error:
+                            log.warning(
+                                "workday: tenant=%s site=%s cannot subdivide capped root query reason=%s",
+                                tenant, site, partition_error,
+                            )
+                    if (
+                        not inventory_spec_added
+                        and not facet_partition_started
+                        and WORKDAY_MAX_PAGES_PER_BOARD > 1
+                    ):
+                        page_specs.append((max(WORKDAY_PAGE_SIZE, inventory_offset), False, {}))
+                        inventory_spec_added = True
             except Exception as exc:
                 _record_source_page("workday", False)
                 failed_response = getattr(exc, "response", None)
+                if not freshness_page:
+                    # Failed inventory pages are throttled too. Keep the offset
+                    # unchanged so the page is retried after the inventory cadence.
+                    inventory_state_update = {
+                        **poll_state,
+                        "next_inventory_offset": inventory_offset,
+                        "last_inventory_attempt_at": inventory_attempt_at,
+                        "reported_total": reported_total,
+                        "facets": facets,
+                        "facet_queue": facet_queue,
+                        "active_facets": active_facets,
+                        "active_facet_depth": active_facet_depth,
+                        "active_facet_query": active_facet_query,
+                        "facet_partition_started": facet_partition_started,
+                    }
                 if getattr(failed_response, "status_code", None) == 429:
                     _set_workday_rate_limit(failed_response)
                     rate_limited = True
                     failures.append(f"{tenant}/{site} list rate limited")
                 else:
                     failures.append(
-                        f"{tenant}/{site} page {page_number + 1}: {type(exc).__name__}"
+                        f"{tenant}/{site} page offset {offset}: {type(exc).__name__}"
                     )
                 log.warning(
                     "workday: tenant=%s site=%s page=%s failed error_type=%s",
@@ -4835,7 +5280,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 detail_info: dict[str, Any] = {}
                 # Detail retrieval does not depend on the administrator's role or
                 # location filters; per-user evaluation happens after ingestion.
-                if details_attempted < WORKDAY_MAX_DETAILS_PER_BOARD:
+                if freshness_page and details_attempted < WORKDAY_MAX_DETAILS_PER_BOARD:
                     try:
                         if details_attempted:
                             time.sleep(WORKDAY_DETAIL_DELAY_SECONDS)
@@ -4888,6 +5333,8 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 primary_location = (
                     detail_info.get("location")
                     or detail_info.get("jobRequisitionLocation")
+                    or (safe_bullet_fields[1] if len(safe_bullet_fields) > 1 else None)
+                    or item.get("locationsText")
                 )
                 if isinstance(primary_location, dict):
                     primary_location = (
@@ -4941,13 +5388,146 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     source_details=details,
                 ))
 
-            if rate_limited or len(postings) < WORKDAY_PAGE_SIZE:
+            if not freshness_page:
+                next_offset = offset + WORKDAY_PAGE_SIZE
+                truncated_reason = poll_state.get("truncated_reason")
+                inventory_complete = False
+                last_full_inventory_at = poll_state.get("last_full_inventory_at")
+                next_active = active_facet_query
+                next_active_facets = active_facets
+                next_active_depth = active_facet_depth
+                next_partition_started = facet_partition_started
+                next_queue = list(facet_queue)
+
+                # A capped filtered query may be subdivided again using a
+                # different facet. Keep the request budget bounded: one page
+                # every 15 minutes, no fan-out.
+                if (
+                    reported_total == WORKDAY_INVENTORY_MAX_OFFSET
+                    and next_active
+                ):
+                    children, partition_error = _workday_facet_children(
+                        next_active_facets,
+                        next_active_depth,
+                        facets,
+                        len(next_queue),
+                    )
+                    if children:
+                        next_queue.extend(children)
+                        next_active = False
+                        next_active_facets = {}
+                        next_active_depth = 0
+                        next_offset = 0
+                        if partition_error:
+                            truncated_reason = partition_error
+                        log.info(
+                            "workday: tenant=%s site=%s query facets=%s capped; queued %s child partitions",
+                            tenant, site, sorted(active_facets), len(children),
+                        )
+                    elif partition_error:
+                        truncated_reason = partition_error
+                        # No more safe facets are available. Continue this leaf
+                        # query to its 2,000-result ceiling, then leave the
+                        # board explicitly truncated.
+                        if offset >= WORKDAY_INVENTORY_MAX_OFFSET - WORKDAY_PAGE_SIZE:
+                            next_active = False
+                            next_offset = 0
+                        else:
+                            next_offset = offset + WORKDAY_PAGE_SIZE
+
+                elif (
+                    not next_partition_started
+                    and reported_total == WORKDAY_INVENTORY_MAX_OFFSET
+                    and not next_active
+                ):
+                    # Root query had no usable facets. An empty page before the
+                    # reported cap is inconsistent and should stop conservatively.
+                    if len(postings) < WORKDAY_PAGE_SIZE:
+                        truncated_reason = truncated_reason or "empty_page_before_reported_total_cap_requires_review"
+                        next_offset = 0
+                    elif offset >= WORKDAY_INVENTORY_MAX_OFFSET - WORKDAY_PAGE_SIZE:
+                        truncated_reason = truncated_reason or "workday_no_usable_subdivision_facet"
+                        next_offset = 0
+                    else:
+                        next_offset = offset + WORKDAY_PAGE_SIZE
+
+                elif len(postings) < WORKDAY_PAGE_SIZE:
+                    if next_active:
+                        next_active = False
+                        next_active_facets = {}
+                        next_active_depth = 0
+                        next_offset = 0
+                    elif not next_partition_started:
+                        next_offset = 0
+                        inventory_complete = True
+                        last_full_inventory_at = inventory_attempt_at
+                    else:
+                        next_offset = 0
+
+                elif isinstance(reported_total, int) and reported_total < WORKDAY_INVENTORY_MAX_OFFSET and next_offset >= reported_total:
+                    if next_active:
+                        next_active = False
+                        next_active_facets = {}
+                        next_active_depth = 0
+                    elif not next_partition_started:
+                        inventory_complete = True
+                        last_full_inventory_at = inventory_attempt_at
+                    next_offset = 0
+
+                elif (
+                    not next_partition_started
+                    and isinstance(reported_total, int)
+                    and reported_total < WORKDAY_INVENTORY_MAX_OFFSET
+                    and next_offset < reported_total
+                ):
+                    # Continue the ordinary unfiltered inventory query.
+                    pass
+
+                elif next_offset >= WORKDAY_INVENTORY_MAX_OFFSET:
+                    truncated_reason = truncated_reason or "inventory_safety_offset_cap_reached"
+                    next_offset = 0
+                    next_active = False
+                    next_active_facets = {}
+                    next_active_depth = 0
+
+                # If the last facet task completed successfully, mark the
+                # overall sweep complete. A prior truncation always wins.
+                if next_partition_started and not next_active and not next_queue:
+                    if not truncated_reason:
+                        inventory_complete = True
+                        last_full_inventory_at = inventory_attempt_at
+                    next_partition_started = False if inventory_complete else True
+
+                inventory_state_update = {
+                    **poll_state,
+                    "next_inventory_offset": next_offset,
+                    "last_inventory_attempt_at": inventory_attempt_at,
+                    "last_full_inventory_at": last_full_inventory_at,
+                    "reported_total": reported_total,
+                    "facets": facets,
+                    "inventory_complete": inventory_complete,
+                    "truncated_reason": truncated_reason,
+                    "facet_queue": next_queue,
+                    "active_facets": next_active_facets,
+                    "active_facet_depth": next_active_depth,
+                    "active_facet_query": next_active,
+                    "facet_partition_started": next_partition_started,
+                }
+                if truncated_reason:
+                    log.warning(
+                        "workday: tenant=%s site=%s inventory incomplete offset=%s total=%s reason=%s",
+                        tenant, site, offset, reported_total, truncated_reason,
+                    )
+                elif inventory_complete:
+                    log.info(
+                        "workday: tenant=%s site=%s inventory sweep complete reported_total=%s",
+                        tenant, site, reported_total,
+                    )
+            if rate_limited:
                 break
-            if page_number == WORKDAY_MAX_PAGES_PER_BOARD - 1:
-                log.warning(
-                    "workday: tenant=%s site=%s reached bounded pagination cap pages=%s page_size=%s",
-                    tenant, site, WORKDAY_MAX_PAGES_PER_BOARD, WORKDAY_PAGE_SIZE,
-                )
+
+        if inventory_state_update is not None:
+            source_state.setdefault("workday", {}).setdefault("pending_board_states", {})[board_key] = inventory_state_update
 
         if successful_pages:
             successful_boards += 1
@@ -5284,7 +5864,9 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             _record_source_board("keka", False)
             failures.append("invalid Keka careers board configuration")
             continue
-        tenant = str(detected["board_key"]).lower()
+        tenant = str(detected["tenant"]).lower()
+        portal = str(detected["portal"]).lower()
+        careers_base = f"https://{detected['host']}/careers" if portal == "default" else f"https://{detected['host']}/careers/{portal}"
         try:
             final_url, html = _keka_fetch_careers_page("keka", careers_url)
             feed_match = re.search(
@@ -5296,7 +5878,7 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 raise ValueError("Keka careers page did not expose a public career feed.")
             feed_id = feed_match.group(1)
             parsed = urlsplit(final_url)
-            endpoint = f"https://{parsed.hostname}/careers/api/embedjobs/default/active/{feed_id}"
+            endpoint = f"https://{parsed.hostname}/careers/api/embedjobs/{portal}/active/{feed_id}"
             response = _tracked_source_get(
                 "keka", endpoint,
                 headers={**UA, "Accept": "application/json"},
@@ -5335,7 +5917,7 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             title = str(item.get("title") or "").strip()
             if raw_id in (None, "") or not title:
                 continue
-            source_id = f"keka-{tenant}-{raw_id}"
+            source_id = f"keka-{tenant}-{raw_id}" if portal == "default" else f"keka-{tenant}-{portal}-{raw_id}"
             if source_id in seen_ids:
                 continue
             seen_ids.add(source_id)
@@ -5370,10 +5952,11 @@ def keka_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 and re.search(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}", published_raw)
                 else "date" if published_at else "unknown"
             )
-            url = f"https://{parsed.hostname}/careers/jobdetails/{quote(str(raw_id), safe='')}"
+            url = f"{careers_base}/jobdetails/{quote(str(raw_id), safe='')}"
             salary = item.get("salaryRange") if isinstance(item.get("salaryRange"), dict) else {}
             details = {
                 "tenant": tenant,
+                "portal": portal,
                 "board_registry_id": board.get("registry_id"),
                 "job_number": item.get("jobNumber"),
                 "department_id": item.get("departmentIdentifier"),
@@ -5524,6 +6107,323 @@ def darwinbox_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _tracked_hirebase_request(method: str, endpoint: str, **kwargs):
+    """Record safe Hirebase request metrics without logging its key or query payload."""
+    started_monotonic = time.monotonic()
+    try:
+        response = requests.request(method, endpoint, **kwargs)
+    except Exception:
+        _record_source_request(
+            "hirebase", status_code=None,
+            duration_ms=(time.monotonic() - started_monotonic) * 1000,
+            exception=True,
+        )
+        raise
+    _record_source_request(
+        "hirebase", status_code=getattr(response, "status_code", None),
+        duration_ms=(time.monotonic() - started_monotonic) * 1000,
+    )
+    return response
+
+
+def _hirebase_local_usage(conn: sqlite3.Connection, period_start: str, today_start: str, provider: str) -> tuple[int, int, int]:
+    row = conn.execute(
+        """SELECT
+             COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                               THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0),
+             COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                               THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0),
+             COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                               THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+           FROM hirebase_usage_ledger
+           WHERE period_start=? AND status IN ('reserved','unknown','complete_unverified','complete')
+             AND created_at>=?""",
+        (period_start, today_start),
+    ).fetchone()
+    daily_total = int(row[0] or 0) if row else 0
+    provider_row = conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                    THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+           FROM hirebase_usage_ledger
+           WHERE period_start=? AND created_at>=? AND provider=?
+             AND status IN ('reserved','unknown','complete_unverified','complete')""",
+        (period_start, today_start, provider),
+    ).fetchone()
+    monthly_row = conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                    THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+           FROM hirebase_usage_ledger
+           WHERE period_start=? AND status IN ('reserved','unknown','complete_unverified','complete')""",
+        (period_start,),
+    ).fetchone()
+    return int(monthly_row[0] or 0), daily_total, int(provider_row[0] or 0)
+
+
+def _hirebase_reserve(provider: str, estimated_jobs: int, usage: dict[str, Any], *, reserve_jobs: int | None = None) -> int | None:
+    today_start = iso(current_day_start_utc()) or iso(now())
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        monthly_used, daily_used, provider_daily_used = _hirebase_local_usage(
+            conn, str(usage["period_start"]), str(today_start), provider
+        )
+        allowed = hirebase.provider_allowance(
+            usage,
+            local_monthly_used=monthly_used,
+            local_daily_used=daily_used,
+            provider_daily_used=provider_daily_used,
+            monthly_cap=HIREBASE_MAX_MONTHLY_JOBS,
+            daily_cap=HIREBASE_MAX_DAILY_JOBS,
+            provider_daily_cap=HIREBASE_PROVIDER_DAILY_JOBS,
+        )
+        reservation_size = estimated_jobs if reserve_jobs is None else reserve_jobs
+        if reservation_size > allowed or estimated_jobs <= 0 or reservation_size <= 0:
+            return None
+        cursor = conn.execute(
+            """INSERT INTO hirebase_usage_ledger(
+                   provider,created_at,period_start,period_end,estimated_jobs,
+                   returned_jobs,reserved_jobs,status
+               ) VALUES(?,?,?,?,?,NULL,?,'reserved')""",
+            (provider, iso(now()), usage["period_start"], usage["period_end"],
+             estimated_jobs, reservation_size),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def _hirebase_finish_reservation(reservation_id: int, *, jobs_returned: int | None,
+                                 usage_headers: dict[str, Any] | None,
+                                 uncertain: bool = False) -> None:
+    if uncertain:
+        status = "unknown"
+        returned = None
+        reserved = None
+    elif jobs_returned is None:
+        status = "failed"
+        returned = None
+        reserved = 0
+    elif usage_headers is None:
+        # Keep the full estimate reserved until a later usage-summary reconciliation.
+        status = "complete_unverified"
+        returned = jobs_returned
+        reserved = None
+    else:
+        status = "complete"
+        returned = jobs_returned
+        reserved = 0
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """UPDATE hirebase_usage_ledger
+               SET status=?,returned_jobs=?,reserved_jobs=COALESCE(?,reserved_jobs),
+                   included_used=?,included_remaining=?,response_verified=?
+               WHERE id=?""",
+            (status, returned, reserved,
+             usage_headers.get("included_used") if usage_headers else None,
+             usage_headers.get("included_remaining") if usage_headers else None,
+             int(bool(usage_headers)), reservation_id),
+        )
+        conn.commit()
+
+
+def _hirebase_get_window(provider: str) -> dict[str, Any] | None:
+    with connect_sqlite(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT last_polled_at,window_start,next_page FROM hirebase_provider_state WHERE provider=?",
+            (provider,),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "last_polled_at": str(row[0]),
+        "window_start": str(row[1]),
+        "next_page": max(1, int(row[2] or 1)),
+    }
+
+
+def _hirebase_set_window(provider: str, *, last_polled_at: str,
+                         window_start: str, next_page: int) -> None:
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO hirebase_provider_state(
+                   provider,last_polled_at,window_start,next_page,updated_at
+               ) VALUES(?,?,?,?,?) ON CONFLICT(provider) DO UPDATE SET
+                   last_polled_at=excluded.last_polled_at,
+                   window_start=excluded.window_start,
+                   next_page=excluded.next_page,
+                   updated_at=excluded.updated_at""",
+            (provider, last_polled_at, window_start, next_page, iso(now())),
+        )
+        conn.commit()
+
+
+def _hirebase_commit_pending_watermarks() -> None:
+    pending = source_state.setdefault("hirebase", {}).pop("pending_watermarks", {})
+    if not isinstance(pending, dict):
+        return
+    for provider, cursor in pending.items():
+        if provider not in hirebase.ALLOWED_PROVIDERS or not isinstance(cursor, dict):
+            continue
+        last_polled_at = cursor.get("last_polled_at")
+        window_start = cursor.get("window_start")
+        next_page = cursor.get("next_page")
+        if (isinstance(last_polled_at, str) and isinstance(window_start, str)
+                and isinstance(next_page, int) and not isinstance(next_page, bool) and next_page >= 1):
+            _hirebase_set_window(
+                provider, last_polled_at=last_polled_at,
+                window_start=window_start, next_page=next_page,
+            )
+
+
+def hirebase_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Optional daily Hirebase sampler with estimate-first, persisted hard budgets.
+
+    This is disabled by default, fetches only 4 jobs per provider/day, caps local
+    use at 400 jobs per Hirebase billing period (100 below the free allowance),
+    and never uses a user's preferences to constrain global collection.
+    """
+    if not hirebase.api_key_configured():
+        raise RuntimeError("Hirebase source enabled but HIREBASE_API_KEY is not configured")
+    try:
+        usage = hirebase.usage_summary(requester=_tracked_hirebase_request)
+    except hirebase.HirebaseError as exc:
+        response = getattr(exc, "response", None)
+        if getattr(response, "status_code", None) == 429:
+            _set_source_rate_limit("hirebase", response, default_seconds=300, maximum_seconds=3600)
+        raise RuntimeError(f"Hirebase usage preflight failed: {exc}") from exc
+
+    jobs: list[dict[str, Any]] = []
+    spent_this_run = 0
+    pending_watermarks: dict[str, dict[str, Any]] = {}
+    for provider in ("workday", "keka", "darwinbox"):
+        poll_started_at = iso(now()) or ""
+        cursor = _hirebase_get_window(provider)
+        if cursor:
+            window_start = cursor["window_start"]
+            page_number = cursor["next_page"]
+        else:
+            # First sample only starts with a seven-day discovery window. Pages
+            # are drained oldest-first before the cursor advances to fresh data.
+            initial_start = now() - dt.timedelta(days=7)
+            window_start = iso(initial_start) or poll_started_at
+            page_number = 1
+        payload = hirebase.provider_query(
+            provider, limit=HIREBASE_PROVIDER_LIMIT,
+            ingested_after=window_start, page=page_number,
+        )
+        try:
+            estimated = hirebase.estimate(payload, requester=_tracked_hirebase_request)
+        except hirebase.HirebaseError as exc:
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+            if status_code == 429:
+                _set_source_rate_limit("hirebase", response, default_seconds=300, maximum_seconds=3600)
+                _record_source_board("hirebase", False)
+                log.warning("hirebase: provider=%s estimate rate-limited; remaining estimates stopped", provider)
+                break
+            if status_code in {401, 403}:
+                _record_source_board("hirebase", False)
+                raise RuntimeError(f"Hirebase estimate preflight failed: {exc}") from exc
+            _record_source_board("hirebase", False)
+            log.warning("hirebase: provider=%s estimate failed error=%s", provider, str(exc))
+            continue
+        _record_source_page("hirebase", True)
+        if estimated == 0:
+            # The current page is empty, so drain is complete. Resume from the
+            # poll start minus two hours to catch late-indexed rows next cycle.
+            next_window = iso(now() - dt.timedelta(hours=2)) or poll_started_at
+            _hirebase_set_window(
+                provider, last_polled_at=poll_started_at,
+                window_start=next_window, next_page=1,
+            )
+            _record_source_board("hirebase", True)
+            continue
+        if estimated > HIREBASE_PROVIDER_LIMIT:
+            _record_source_board("hirebase", False)
+            log.warning("hirebase: provider=%s estimate exceeded hard per-query cap", provider)
+            continue
+
+        # Preserve the fixed page size so page boundaries do not shift when an
+        # estimate returns fewer than four rows. Reserve the full requested limit
+        # because Hirebase's hard-cap check holds the requested limit atomically.
+        payload["limit"] = HIREBASE_PROVIDER_LIMIT
+        reservation_id = _hirebase_reserve(
+            provider, estimated, usage, reserve_jobs=HIREBASE_PROVIDER_LIMIT
+        )
+        if reservation_id is None:
+            log.info("hirebase: provider=%s skipped; local or provider allowance would be exceeded", provider)
+            _record_source_board("hirebase", True)
+            continue
+        try:
+            raw_jobs, meter_headers, pagination = hirebase.search(
+                payload, requester=_tracked_hirebase_request
+            )
+        except hirebase.HirebaseError as exc:
+            message = str(exc)
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+            uncertain = response is None or status_code >= 500 if status_code is not None else True
+            # A successful HTTP response with invalid JSON/shape may already have
+            # consumed credits; retain the reservation until usage reconciliation.
+            if status_code == 200:
+                uncertain = True
+            _hirebase_finish_reservation(
+                reservation_id, jobs_returned=None, usage_headers=None, uncertain=uncertain
+            )
+            _record_source_page("hirebase", False)
+            if status_code == 429:
+                _set_source_rate_limit(
+                    "hirebase", response,
+                    default_seconds=300, maximum_seconds=3600,
+                )
+                _record_source_board("hirebase", False)
+                log.warning("hirebase: provider=%s rate limited; remaining provider searches stopped", provider)
+                break
+            _record_source_board("hirebase", False)
+            log.warning("hirebase: provider=%s search failed error=%s", provider, message)
+            if status_code in {401, 403}:
+                raise RuntimeError(f"Hirebase search rejected authentication/authorization: {message}") from exc
+            continue
+
+        normalized: list[dict[str, Any]] = []
+        for item in raw_jobs:
+            parsed = hirebase.normalize_provider_job(item)
+            if not parsed:
+                continue
+            normalized.append(normalize_job(
+                "hirebase", parsed["source_job_id"], parsed["company"],
+                parsed["title"], parsed["location"], parsed["url"],
+                parsed["posted_at"], parsed["posted_precision"],
+                parsed["description"], source_details=parsed["source_details"],
+            ))
+        _hirebase_finish_reservation(
+            reservation_id, jobs_returned=len(raw_jobs), usage_headers=meter_headers
+        )
+        _record_source_page("hirebase", True)
+        _record_source_board("hirebase", True)
+        if pagination["page"] < pagination["total_pages"]:
+            next_window = window_start
+            next_page = pagination["page"] + 1
+        else:
+            next_window = iso(dt.datetime.fromisoformat(poll_started_at) - dt.timedelta(hours=2)) or poll_started_at
+            next_page = 1
+        pending_watermarks[provider] = {
+            "last_polled_at": poll_started_at,
+            "window_start": next_window,
+            "next_page": next_page,
+        }
+        jobs.extend(normalized)
+        spent_this_run += len(raw_jobs)
+        if meter_headers:
+            usage["remaining"] = meter_headers["included_remaining"]
+        else:
+            # No metering confirmation: stop after this search rather than risk a second request.
+            usage["remaining"] = 0
+            break
+        if spent_this_run >= HIREBASE_MAX_DAILY_JOBS:
+            break
+    if pending_watermarks:
+        source_state.setdefault("hirebase", {})["pending_watermarks"] = pending_watermarks
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -5536,6 +6436,7 @@ COLLECTORS = {
     "workable": workable_collect,
     "keka": keka_collect,
     "darwinbox": darwinbox_collect,
+    "hirebase": hirebase_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
 
@@ -5559,6 +6460,10 @@ def run_source(source: str, config: dict[str, Any]) -> None:
         linkedin_rate_limit_generation if source == "linkedin" else None
     )
     runtime_at_start = source_state.setdefault(source, {})
+    if source == "hirebase":
+        runtime_at_start.pop("pending_watermarks", None)
+    elif source == "workday":
+        runtime_at_start.pop("pending_board_states", None)
     runtime_at_start["running"] = True
     runtime_at_start["current_run_id"] = run_id
     jobs: list[dict[str, Any]] = []
@@ -5605,6 +6510,10 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             config,
             source_run_started_at=started_at,
         )
+        if source == "hirebase":
+            _hirebase_commit_pending_watermarks()
+        elif source == "workday":
+            _workday_commit_pending_board_states()
         board_baseline_suppressed = suppress_activated_board_inventory(source)
         if board_baseline_suppressed:
             log.info(
@@ -5906,6 +6815,7 @@ async def startup() -> None:
     restore_source_rate_limit_state("workable")
     restore_source_rate_limit_state("keka")
     restore_source_rate_limit_state("darwinbox")
+    restore_source_rate_limit_state("hirebase")
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -6424,6 +7334,337 @@ def latency_summary(hours: int = 24):
     return {"hours": hours, "sources": summary}
 
 
+GLOBAL_DISCOVERY_METHODS = frozenset({
+    "commoncrawl_cdx", "commoncrawl_url_index", "sitemap", "career_link",
+    "licensed_seed", "manual",
+})
+GLOBAL_DISCOVERY_PROVIDERS = frozenset({"workday", "keka", "darwinbox"})
+
+
+def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
+    """Canonicalise a public Workday/Keka/Darwinbox capture to its board root."""
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 2048:
+        raise ValueError("A public ATS candidate URL of at most 2,048 characters is required.")
+    try:
+        parsed = urlsplit(value.strip())
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Candidate URL is malformed.") from exc
+    if (
+        parsed.scheme.lower() != "https" or not parsed.hostname
+        or parsed.username is not None or parsed.password is not None
+        or port not in (None, 443) or parsed.query or parsed.fragment
+    ):
+        raise ValueError("Candidate URL must be HTTPS without credentials, a custom port, query or fragment.")
+    host = parsed.hostname.lower().rstrip(".")
+    segments = [segment for segment in parsed.path.split("/") if segment]
+
+    if re.fullmatch(r"[a-z0-9-]{1,80}\.wd[0-9]{1,3}\.myworkdayjobs\.com", host):
+        if segments and re.fullmatch(r"[a-z]{2}-[A-Z]{2}", segments[0]):
+            segments = segments[1:]
+        if not segments or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", segments[0]):
+            raise ValueError("Workday URL does not contain a valid public career site.")
+        root_url = f"https://{host}/{segments[0]}"
+        detected = board_discovery.detect_ats_board(root_url)
+        if not detected or detected.get("provider") != "workday":
+            raise ValueError("Workday career site could not be resolved.")
+        parsed_board = _parse_workday_board_url(root_url)
+        if not parsed_board:
+            raise ValueError("Workday career site URL is not supported.")
+        return {
+            "provider": "workday", "board_key": f"{parsed_board['tenant']}:{parsed_board['site']}",
+            "board_url": parsed_board["url"], "candidate_host": host,
+        }
+
+    if host.endswith(".keka.com"):
+        if not segments or segments[0].casefold() != "careers" or len(segments) > 2:
+            if not segments or segments[0].casefold() != "careers":
+                raise ValueError("Keka candidate URL must be under /careers.")
+            portal = segments[1].casefold() if len(segments) > 1 else "default"
+            root_path = "/careers" if portal == "default" else f"/careers/{portal}"
+        else:
+            root_path = "/" + "/".join(segments)
+        root_url = f"https://{host}{root_path}"
+        detected = board_discovery.detect_ats_board(root_url)
+        if not detected or detected.get("provider") != "keka":
+            raise ValueError("Keka career portal URL is not supported.")
+        return {
+            "provider": "keka", "board_key": str(detected["board_key"]),
+            "board_url": str(detected["board_url"]), "candidate_host": host,
+        }
+
+    if host.endswith(".darwinbox.in"):
+        match = re.match(
+            r"^/ms/candidatev2/(?P<company_id>[A-Za-z0-9_-]{1,100})/careers(?:/|$)",
+            parsed.path, re.I,
+        )
+        host_match = re.fullmatch(r"[a-z0-9-]{1,80}\.darwinbox\.in", host)
+        if not match or not host_match:
+            raise ValueError("Darwinbox candidate URL must use a public candidate careers path.")
+        company_id = match.group("company_id")
+        root_url = f"https://{host}/ms/candidatev2/{company_id}/careers"
+        detected = board_discovery.detect_ats_board(root_url)
+        if not detected or detected.get("provider") != "darwinbox":
+            raise ValueError("Darwinbox candidate careers URL is not supported.")
+        return {
+            "provider": "darwinbox", "board_key": str(detected["board_key"]),
+            "board_url": root_url, "candidate_host": host,
+        }
+
+    raise ValueError("Only supported public Workday, Keka and Darwinbox candidate URLs are accepted.")
+
+
+def _normalise_global_capture_time(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or len(value.strip()) > 40:
+        raise ValueError("source_captured_at must be an ISO timestamp or Common Crawl 14-digit timestamp.")
+    raw = value.strip()
+    try:
+        if re.fullmatch(r"[0-9]{14}", raw):
+            parsed = dt.datetime.strptime(raw, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        else:
+            parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            parsed = parsed.astimezone(UTC)
+    except ValueError as exc:
+        raise ValueError("source_captured_at is not a valid ISO or Common Crawl timestamp.") from exc
+    if parsed > now() + dt.timedelta(days=1):
+        raise ValueError("source_captured_at cannot be in the future.")
+    return parsed.isoformat()
+
+
+@app.post("/api/discovery/global-candidates/import", dependencies=[Depends(require_admin)])
+def import_global_ats_candidates(payload: dict[str, Any]):
+    """Store unmatched public ATS URLs for review; never create employer records."""
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not 1 <= len(candidates) <= 200:
+        raise HTTPException(status_code=422, detail="candidates must contain between 1 and 200 items.")
+    timestamp = iso(now()) or ""
+    inserted = updated = preserved_terminal = skipped = 0
+    errors: list[dict[str, Any]] = []
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        for index, item in enumerate(candidates):
+            try:
+                if not isinstance(item, dict):
+                    raise ValueError("candidate must be an object")
+                board = _normalise_global_ats_candidate_url(item.get("board_url") or item.get("url"))
+                method = str(item.get("discovery_method") or "").strip().lower()
+                if method not in GLOBAL_DISCOVERY_METHODS:
+                    raise ValueError("discovery_method is not supported")
+                raw_reference = item.get("source_reference")
+                if not isinstance(raw_reference, str):
+                    raise ValueError("source_reference must be a string")
+                source_reference = raw_reference.strip()
+                if not source_reference or len(source_reference) > 2048:
+                    raise ValueError("source_reference is required and must be at most 2,048 characters")
+                captured_at = _normalise_global_capture_time(item.get("source_captured_at"))
+                existing = conn.execute(
+                    """SELECT id,review_status FROM ats_global_discovery_candidates
+                       WHERE provider=? AND candidate_host=? AND board_key=?""",
+                    (board["provider"], board["candidate_host"], board["board_key"]),
+                ).fetchone()
+                conn.execute(
+                    """INSERT INTO ats_global_discovery_candidates(
+                           provider,board_key,board_url,candidate_host,discovery_method,
+                           source_reference,source_captured_at,first_discovered_at,last_seen_at,
+                           confidence,review_status,created_at,updated_at
+                       ) VALUES(?,?,?,?,?,?,?,?,?,'low','discovered',?,?)
+                       ON CONFLICT(provider,candidate_host,board_key) DO UPDATE SET
+                           board_url=excluded.board_url,
+                           candidate_host=excluded.candidate_host,
+                           discovery_method=CASE
+                               WHEN ats_global_discovery_candidates.source_captured_at IS NULL
+                                 OR (excluded.source_captured_at IS NOT NULL AND excluded.source_captured_at >= ats_global_discovery_candidates.source_captured_at)
+                               THEN excluded.discovery_method ELSE ats_global_discovery_candidates.discovery_method END,
+                           source_reference=CASE
+                               WHEN ats_global_discovery_candidates.source_captured_at IS NULL
+                                 OR (excluded.source_captured_at IS NOT NULL AND excluded.source_captured_at >= ats_global_discovery_candidates.source_captured_at)
+                               THEN excluded.source_reference ELSE ats_global_discovery_candidates.source_reference END,
+                           source_captured_at=CASE
+                               WHEN ats_global_discovery_candidates.source_captured_at IS NULL
+                                 OR (excluded.source_captured_at IS NOT NULL AND excluded.source_captured_at >= ats_global_discovery_candidates.source_captured_at)
+                               THEN excluded.source_captured_at ELSE ats_global_discovery_candidates.source_captured_at END,
+                           last_seen_at=excluded.last_seen_at,
+                           review_status=CASE WHEN ats_global_discovery_candidates.review_status IN ('linked','rejected')
+                                              THEN ats_global_discovery_candidates.review_status ELSE 'discovered' END,
+                           updated_at=excluded.updated_at""",
+                    (
+                        board["provider"], board["board_key"], board["board_url"], board["candidate_host"],
+                        method, source_reference, captured_at, timestamp, timestamp, timestamp, timestamp,
+                    ),
+                )
+                if existing is None:
+                    inserted += 1
+                elif existing[1] in {"linked", "rejected"}:
+                    preserved_terminal += 1
+                else:
+                    updated += 1
+            except ValueError as exc:
+                skipped += 1
+                errors.append({"index": index, "reason": str(exc)[:200]})
+        conn.commit()
+    return {
+        "received": len(candidates), "inserted": inserted, "updated": updated,
+        "preserved_terminal": preserved_terminal, "skipped": skipped, "errors": errors,
+        "company_records_created": 0, "boards_linked": 0, "verified": 0, "activated": 0,
+    }
+
+
+@app.get("/api/discovery/global-candidates", dependencies=[Depends(require_admin)])
+def list_global_ats_candidates(status: str | None = None, provider: str | None = None, limit: int = 250):
+    limit = max(1, min(int(limit), 500))
+    if status and status not in {"discovered", "linked", "rejected", "stale"}:
+        raise HTTPException(status_code=422, detail="Unsupported candidate review status.")
+    if provider and provider not in GLOBAL_DISCOVERY_PROVIDERS:
+        raise HTTPException(status_code=422, detail="Unsupported global candidate provider.")
+    query = """SELECT g.id,g.provider,g.board_key,g.board_url,g.candidate_host,
+                      g.discovery_method,g.source_reference,g.source_captured_at,
+                      g.first_discovered_at,g.last_seen_at,g.confidence,g.review_status,
+                      g.linked_company_id,g.linked_board_registry_id,c.company_name,
+                      b.review_status AS board_review_status,
+                      g.created_at,g.updated_at
+               FROM ats_global_discovery_candidates g
+               LEFT JOIN employer_companies c ON c.id=g.linked_company_id
+               LEFT JOIN ats_board_registry b ON b.id=g.linked_board_registry_id"""
+    clauses: list[str] = []
+    values: list[Any] = []
+    if status:
+        clauses.append("g.review_status=?")
+        values.append(status)
+    if provider:
+        clauses.append("g.provider=?")
+        values.append(provider)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY g.last_seen_at DESC,g.id DESC LIMIT ?"
+    values.append(limit)
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(query, values).fetchall()
+    return {"candidates": [dict(row) for row in rows]}
+
+
+def _global_candidate_discovered_from(candidate: Any) -> str:
+    """Use a safe clickable HTTPS provenance URL or fall back to the public board root."""
+    board_url = str(candidate["board_url"])
+    reference = str(candidate["source_reference"] or "")
+    try:
+        parsed = urlsplit(reference)
+        if parsed.scheme.lower() == "https" and parsed.hostname and parsed.username is None and parsed.password is None:
+            return reference
+    except ValueError:
+        pass
+    return board_url
+
+
+@app.post("/api/discovery/global-candidates/{candidate_id}/link", dependencies=[Depends(require_admin)])
+def link_global_ats_candidate(candidate_id: int, payload: dict[str, Any]):
+    company_id = payload.get("company_id")
+    if isinstance(company_id, bool) or not isinstance(company_id, int) or company_id < 1:
+        raise HTTPException(status_code=422, detail="company_id must be a positive integer.")
+    timestamp = iso(now()) or ""
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        candidate = conn.execute(
+            "SELECT * FROM ats_global_discovery_candidates WHERE id=?", (candidate_id,)
+        ).fetchone()
+        if not candidate:
+            raise HTTPException(status_code=404, detail="ATS candidate was not found.")
+        if candidate["review_status"] == "rejected":
+            raise HTTPException(status_code=409, detail="Rejected ATS candidates cannot be linked.")
+        if candidate["review_status"] == "linked":
+            if candidate["linked_company_id"] == company_id:
+                linked_board = conn.execute(
+                    "SELECT review_status FROM ats_board_registry WHERE id=?",
+                    (candidate["linked_board_registry_id"],),
+                ).fetchone()
+                board_status = str(linked_board[0]) if linked_board else "unknown"
+                return {
+                    "candidate_id": candidate_id, "review_status": "linked",
+                    "board_registry_id": candidate["linked_board_registry_id"],
+                    "board_review_status": board_status,
+                    "verified": board_status in {"verified", "active"},
+                    "activated": board_status == "active",
+                }
+            raise HTTPException(status_code=409, detail="ATS candidate is already linked to another employer.")
+        company = conn.execute("SELECT id,company_name FROM employer_companies WHERE id=?", (company_id,)).fetchone()
+        if not company:
+            raise HTTPException(status_code=404, detail="Employer company was not found.")
+        existing = conn.execute(
+            """SELECT id,company_id,review_status FROM ats_board_registry
+               WHERE provider=? AND board_url=? ORDER BY id LIMIT 1""",
+            (candidate["provider"], candidate["board_url"]),
+        ).fetchone()
+        if existing and int(existing["company_id"]) != company_id:
+            raise HTTPException(status_code=409, detail="This ATS board URL is already associated with a different employer.")
+        key_conflict = conn.execute(
+            """SELECT id,board_url FROM ats_board_registry
+               WHERE company_id=? AND provider=? AND board_key=? ORDER BY id LIMIT 1""",
+            (company_id, candidate["provider"], candidate["board_key"]),
+        ).fetchone()
+        if key_conflict and not existing and str(key_conflict["board_url"]) != str(candidate["board_url"]):
+            raise HTTPException(status_code=409, detail="This employer already has a different board URL with the same ATS board key.")
+        if existing:
+            board_registry_id = int(existing["id"])
+            board_review_status = str(existing["review_status"])
+        else:
+            provider = str(candidate["provider"])
+            collector_source = board_discovery.COLLECTOR_SOURCES.get(provider)
+            collector_available = bool(collector_source)
+            cursor = conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,
+                       created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?, 'discovered',?,?,?)""",
+                (
+                    company_id, provider, candidate["board_key"], candidate["board_url"],
+                    _global_candidate_discovered_from(candidate),
+                    candidate["confidence"],
+                    collector_source, int(collector_available), timestamp, timestamp, timestamp,
+                ),
+            )
+            board_registry_id = int(cursor.lastrowid)
+            board_review_status = "discovered"
+        conn.execute(
+            """UPDATE ats_global_discovery_candidates
+               SET review_status='linked',linked_company_id=?,linked_board_registry_id=?,updated_at=?
+               WHERE id=?""",
+            (company_id, board_registry_id, timestamp, candidate_id),
+        )
+        conn.commit()
+    return {
+        "candidate_id": candidate_id, "company_id": company_id,
+        "company_name": company["company_name"], "board_registry_id": board_registry_id,
+        "review_status": "linked", "board_review_status": board_review_status,
+        "verified": board_review_status in {"verified", "active"},
+        "activated": board_review_status == "active",
+    }
+
+
+@app.post("/api/discovery/global-candidates/{candidate_id}/review", dependencies=[Depends(require_admin)])
+def review_global_ats_candidate(candidate_id: int, payload: dict[str, Any]):
+    status = str(payload.get("status") or "").strip().lower()
+    if status != "rejected":
+        raise HTTPException(status_code=422, detail="Only 'rejected' is supported for unmatched candidates.")
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT review_status FROM ats_global_discovery_candidates WHERE id=?", (candidate_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="ATS candidate was not found.")
+        if row[0] == "linked":
+            raise HTTPException(status_code=409, detail="Linked ATS candidates must be managed through the employer board registry.")
+        conn.execute(
+            "UPDATE ats_global_discovery_candidates SET review_status='rejected',updated_at=? WHERE id=?",
+            (iso(now()), candidate_id),
+        )
+        conn.commit()
+    return {"candidate_id": candidate_id, "review_status": "rejected", "activated": False}
+
+
 @app.post("/api/discovery/companies/scan", dependencies=[Depends(require_admin)])
 def discover_company_boards(payload: dict[str, Any]):
     """Register one employer and discover public ATS board candidates for review."""
@@ -6520,6 +7761,105 @@ def discover_company_boards(payload: dict[str, Any]):
     }
 
 
+@app.post("/api/discovery/directories/last-round/import", dependencies=[Depends(require_admin)])
+def import_last_round_ats_directory():
+    """Import the attributed CC BY 4.0 ATS directory as unverified candidates only."""
+    directory_path = ROOT / "data" / "lastroundai-ats-company-directory-2026-08.csv"
+    try:
+        candidates = ats_directory.load_directory(directory_path)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"ATS directory could not be read ({type(exc).__name__}).") from exc
+    timestamp = iso(now()) or ""
+    inserted_companies = 0
+    inserted_boards = 0
+    updated_boards = 0
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        for board in candidates:
+            provider = board["provider"]
+            slug = board["board_key"]
+            company_name = board["company_name"]
+            # Reuse a previously discovered board instead of creating a duplicate
+            # company row with a synthetic directory domain.
+            existing_any = conn.execute(
+                """SELECT id,company_id FROM ats_board_registry
+                   WHERE provider=? AND board_key=?
+                   ORDER BY CASE review_status WHEN 'active' THEN 0 WHEN 'verified' THEN 1 ELSE 2 END,id
+                   LIMIT 1""",
+                (provider, slug),
+            ).fetchone()
+            if existing_any:
+                conn.execute(
+                    "UPDATE ats_board_registry SET directory_last_crawled=?,last_seen_at=?,updated_at=? WHERE id=?",
+                    (board["last_crawled"], timestamp, timestamp, int(existing_any[0])),
+                )
+                updated_boards += 1
+                continue
+            domain = ats_directory.synthetic_domain(provider, slug)
+            before = conn.total_changes
+            conn.execute(
+                """INSERT INTO employer_companies(
+                       company_name,domain,website_url,careers_url,country,discovery_status,
+                       pages_checked,last_discovered_at,error_count,created_at,updated_at
+                   ) VALUES(?,?,?,?,NULL,'seeded_directory',0,?,0,?,?)
+                   ON CONFLICT(domain) DO UPDATE SET
+                       company_name=excluded.company_name,
+                       website_url=excluded.website_url,
+                       careers_url=excluded.careers_url,
+                       discovery_status=CASE WHEN employer_companies.discovery_status IN ('scanned','boards_found')
+                                             THEN employer_companies.discovery_status ELSE 'seeded_directory' END,
+                       last_discovered_at=excluded.last_discovered_at,
+                       updated_at=excluded.updated_at""",
+                (company_name, domain, board["board_url"], board["board_url"], timestamp, timestamp, timestamp),
+            )
+            if conn.total_changes > before:
+                inserted_companies += 1
+            company = conn.execute("SELECT id FROM employer_companies WHERE domain=?", (domain,)).fetchone()
+            if not company:
+                continue
+            existing = conn.execute(
+                "SELECT id,review_status FROM ats_board_registry WHERE company_id=? AND provider=? AND board_key=?",
+                (int(company[0]), provider, slug),
+            ).fetchone()
+            conn.execute(
+                """INSERT INTO ats_board_registry(
+                       company_id,provider,board_key,board_url,discovered_from,confidence,
+                       collector_source,collector_available,review_status,last_seen_at,
+                       created_at,updated_at,directory_last_crawled
+                   ) VALUES(?,?,?,?,?,'low',?,1,'discovered',?,?,?,?)
+                   ON CONFLICT(company_id,provider,board_key) DO UPDATE SET
+                       board_url=excluded.board_url,
+                       discovered_from=excluded.discovered_from,
+                       collector_source=excluded.collector_source,
+                       collector_available=1,
+                       directory_last_crawled=excluded.directory_last_crawled,
+                       last_seen_at=excluded.last_seen_at,
+                       review_status=CASE WHEN ats_board_registry.review_status IN ('active','rejected','verified','reviewed')
+                                          THEN ats_board_registry.review_status ELSE 'discovered' END,
+                       updated_at=excluded.updated_at""",
+                (int(company[0]), provider, slug, board["board_url"], ats_directory.DATASET_URL,
+                 provider, timestamp, timestamp, timestamp, board["last_crawled"]),
+            )
+            if existing is None:
+                inserted_boards += 1
+            elif existing[1] not in {"active", "rejected", "verified", "reviewed"}:
+                updated_boards += 1
+        conn.commit()
+    return {
+        "dataset": ats_directory.DATASET_NAME,
+        "snapshot": ats_directory.DATASET_SNAPSHOT,
+        "license": ats_directory.DATASET_LICENSE,
+        "attribution": ats_directory.DATASET_ATTRIBUTION,
+        "source_url": ats_directory.DATASET_URL,
+        "companies_in_snapshot": len(candidates),
+        "companies_added_or_refreshed": inserted_companies,
+        "boards_added": inserted_boards,
+        "unverified_boards_refreshed": updated_boards,
+        "review_status": "discovered",
+        "activation": "none; imported candidates are not verified or scheduled",
+        "coverage_limit": "Greenhouse, Lever and Ashby only; Workday, Keka and Darwinbox are not in this dataset",
+    }
+
+
 @app.get("/api/discovery/companies", dependencies=[Depends(require_admin)])
 def list_discovered_companies(limit: int = 100):
     limit = max(1, min(int(limit), 500))
@@ -6536,13 +7876,129 @@ def list_discovered_companies(limit: int = 100):
     return {"companies": [dict(row) for row in rows]}
 
 
+@app.get("/api/discovery/coverage-summary", dependencies=[Depends(require_admin)])
+def get_discovery_coverage_summary():
+    """Return registry counts by provider and review state; never imply total market coverage."""
+    with connect_sqlite(DB_PATH) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0]
+        directory_seeded = conn.execute(
+            "SELECT COUNT(*) FROM ats_board_registry WHERE directory_last_crawled IS NOT NULL"
+        ).fetchone()[0]
+        rows = conn.execute(
+            """SELECT provider,review_status,COUNT(*),
+                      SUM(CASE WHEN collector_available=1 THEN 1 ELSE 0 END),
+                      SUM(CASE WHEN directory_last_crawled IS NOT NULL THEN 1 ELSE 0 END)
+               FROM ats_board_registry GROUP BY provider,review_status ORDER BY provider,review_status"""
+        ).fetchall()
+    providers: dict[str, Any] = {}
+    for provider, status, count, available, seeded in rows:
+        entry = providers.setdefault(provider, {
+            "total": 0, "collector_available": 0, "directory_seeded": 0, "by_status": {}
+        })
+        entry["by_status"][status] = int(count or 0)
+        entry["total"] += int(count or 0)
+        entry["collector_available"] += int(available or 0)
+        entry["directory_seeded"] += int(seeded or 0)
+    return {
+        "employer_boards_known": int(total or 0),
+        "directory_seed_candidates": int(directory_seeded or 0),
+        "providers": providers,
+        "market_coverage_percentage": None,
+        "coverage_note": "Registry coverage is not total market coverage. Candidate directories are not verified boards; private and non-indexed employers may be absent.",
+    }
+
+
+@app.get("/api/workday/inventory-status", dependencies=[Depends(require_admin)])
+def get_workday_inventory_status():
+    """Explain per-board Workday inventory progress without implying full coverage."""
+    config = get_config()
+    configured = config.get("workday_boards", [])
+    boards: list[dict[str, Any]] = []
+    for board in configured if isinstance(configured, list) else []:
+        if not isinstance(board, dict):
+            continue
+        parsed = _parse_workday_board_url(board.get("url"))
+        if not parsed:
+            continue
+        board_key = f"{parsed['tenant']}:{parsed['site']}"
+        state = _workday_get_board_poll_state(board_key)
+        facet_work_remaining = bool(
+            state.get("facet_queue") or state.get("active_facet_query")
+        )
+        if state.get("truncated_reason") and facet_work_remaining:
+            status = "in_progress_incomplete"
+            last_attempt = state.get("last_inventory_attempt_at")
+            next_due_at = None
+            if last_attempt:
+                try:
+                    last_dt = dt.datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00"))
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=UTC)
+                    next_due_at = iso(last_dt + dt.timedelta(seconds=WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS))
+                except ValueError:
+                    next_due_at = None
+        elif state.get("truncated_reason"):
+            status = "truncated"
+            next_due_at = None
+        elif state.get("inventory_complete"):
+            status = "complete"
+            last_full = state.get("last_full_inventory_at")
+            next_due_at = None
+            if last_full:
+                try:
+                    last_dt = dt.datetime.fromisoformat(str(last_full).replace("Z", "+00:00"))
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=UTC)
+                    next_due_at = iso(last_dt + dt.timedelta(seconds=WORKDAY_FULL_INVENTORY_REFRESH_SECONDS))
+                except ValueError:
+                    next_due_at = None
+        elif state.get("last_inventory_attempt_at"):
+            status = "in_progress"
+            try:
+                last_dt = dt.datetime.fromisoformat(str(state["last_inventory_attempt_at"]).replace("Z", "+00:00"))
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=UTC)
+                next_due_at = iso(last_dt + dt.timedelta(seconds=WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS))
+            except ValueError:
+                next_due_at = None
+        else:
+            status = "not_started"
+            next_due_at = iso(now())
+        boards.append({
+            "company": str(board.get("company") or "Unknown employer"),
+            "board_key": board_key,
+            "url": parsed["url"],
+            "status": status,
+            "freshness_poll_seconds": int(config.get("poll_seconds", {}).get("workday", 120)),
+            "inventory_page_interval_seconds": WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS,
+            "next_inventory_offset": state.get("next_inventory_offset"),
+            "reported_total": state.get("reported_total"),
+            "facets_available": len(state.get("facets") or []),
+            "facet_partitioned": bool(state.get("facet_partition_started")),
+            "pending_facet_partitions": len(state.get("facet_queue") or []),
+            "active_facet_query": bool(state.get("active_facet_query")),
+            "active_applied_facets": state.get("active_facets") or {},
+            "last_inventory_attempt_at": state.get("last_inventory_attempt_at"),
+            "last_full_inventory_at": state.get("last_full_inventory_at"),
+            "next_inventory_due_at": next_due_at,
+            "truncated_reason": state.get("truncated_reason"),
+            "inventory_complete": bool(state.get("inventory_complete")),
+        })
+    return {
+        "boards_configured": len(boards),
+        "boards": boards,
+        "freshness_poll_note": "The first page is polled on the source cadence. At most one extra inventory page per board is requested every 15 minutes.",
+        "coverage_note": "Queries reporting the 2,000-result cap are subdivided using available jobFamilyGroup, timeType, locations and workerSubType facets. Any leaf that cannot be safely subdivided remains explicitly incomplete.",
+    }
+
+
 @app.get("/api/discovery/boards", dependencies=[Depends(require_admin)])
 def list_discovered_boards(status: str | None = None, limit: int = 250):
     limit = max(1, min(int(limit), 1000))
     query = """SELECT b.id,b.company_id,c.company_name,c.domain,b.provider,b.board_key,
                       b.board_url,b.discovered_from,b.confidence,b.collector_source,
                       b.collector_available,b.review_status,b.baseline_pending,b.last_verified_at,
-                      b.last_seen_at,b.last_error_type
+                      b.last_seen_at,b.last_error_type,b.directory_last_crawled
                FROM ats_board_registry b JOIN employer_companies c ON c.id=b.company_id"""
     values: list[Any] = []
     if status:
@@ -6812,6 +8268,76 @@ def deactivate_discovered_board(board_id: int):
         "source_enabled": bool(saved.get("source_enabled", {}).get(source)),
         "remaining_boards": len(remaining),
         "takes_effect_next_poll": True,
+    }
+
+
+@app.get("/api/hirebase/status", dependencies=[Depends(require_admin)])
+def hirebase_status():
+    """Show safe Hirebase configuration and local budget state; never returns the key."""
+    config = get_config()
+    cutoff = iso(current_day_start_utc()) or iso(now())
+    with connect_sqlite(DB_PATH) as conn:
+        monthly = conn.execute(
+            """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                        THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0),
+                      COUNT(*),MAX(created_at),MAX(period_end),MAX(included_remaining)
+               FROM hirebase_usage_ledger
+               WHERE period_start=(SELECT period_start FROM hirebase_usage_ledger
+                                   ORDER BY created_at DESC,id DESC LIMIT 1)"""
+        ).fetchone()
+        daily = conn.execute(
+            """SELECT COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                        THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+               FROM hirebase_usage_ledger WHERE created_at>=?""", (cutoff,)
+        ).fetchone()
+        providers = conn.execute(
+            """SELECT provider,COALESCE(SUM(CASE WHEN status IN ('reserved','unknown','complete_unverified')
+                                                  THEN reserved_jobs ELSE COALESCE(returned_jobs,0) END),0)
+               FROM hirebase_usage_ledger WHERE created_at>=? GROUP BY provider""", (cutoff,)
+        ).fetchall()
+    local_monthly = int(monthly[0] or 0)
+    return {
+        "api_key_configured": hirebase.api_key_configured(),
+        "source_enabled": bool(config.get("source_enabled", {}).get("hirebase", False)),
+        "poll_seconds": int(config.get("poll_seconds", {}).get("hirebase", 86400)),
+        "budget": {
+            "monthly_hard_cap": HIREBASE_MAX_MONTHLY_JOBS,
+            "daily_hard_cap": HIREBASE_MAX_DAILY_JOBS,
+            "per_provider_daily_cap": HIREBASE_PROVIDER_DAILY_JOBS,
+            "free_plan_monthly_allowance": 500,
+            "safety_buffer": 100,
+            "locally_counted_period_jobs": local_monthly,
+            "locally_counted_today_jobs": int(daily[0] or 0),
+            "remaining_local_monthly_budget": max(0, HIREBASE_MAX_MONTHLY_JOBS - local_monthly),
+            "remaining_local_daily_budget": max(0, HIREBASE_MAX_DAILY_JOBS - int(daily[0] or 0)),
+            "provider_today": {str(row[0]): int(row[1] or 0) for row in providers},
+            "last_query_at": monthly[2],
+            "last_metered_remaining": monthly[4],
+            "ledger_rows": int(monthly[1] or 0),
+        },
+        "note": "Hirebase remains optional and disabled by default. Usage counts include reserved/uncertain requests until reconciled.",
+    }
+
+
+@app.post("/api/hirebase/estimate", dependencies=[Depends(require_admin)])
+def hirebase_estimate(payload: dict[str, Any]):
+    """Estimate one small provider query without spending job-result credits."""
+    provider = str(payload.get("provider") or "").strip().lower()
+    limit = payload.get("limit", HIREBASE_PROVIDER_LIMIT)
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= HIREBASE_PROVIDER_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {HIREBASE_PROVIDER_LIMIT}.")
+    try:
+        query = hirebase.provider_query(provider, limit=limit)
+        cost = hirebase.estimate(query)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except hirebase.HirebaseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "provider": provider, "estimated_job_credits": cost,
+        "result_limit": limit, "estimate_costs_job_credits": 0,
+        "query_scope": "public employer postings in India; global ingestion, no user profile filters",
+        "search_spends_credits": True,
     }
 
 

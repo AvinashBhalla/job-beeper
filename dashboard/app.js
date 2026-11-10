@@ -34,6 +34,8 @@
     userPreferences: null,
     sourceStatus: [],
     discoveredBoards: [],
+    globalCandidates: [],
+    discoveredCompanies: [],
     activeSection: 'jobsSection',
     filters: {
       search: '',
@@ -883,7 +885,7 @@
           target.id === 'jobsSection' ? 'Jobs Feed' :
           target.id === 'appliedSection' ? 'Applied Jobs' :
           target.id === 'preferencesSection' ? 'Matching Preferences' :
-          target.id === 'sourcesSection' ? 'Source Health' :
+          target.id === 'sourcesSection' ? 'Coverage & Health' :
           target.id === 'accessSection' ? 'Account' : 'Jobs Feed';
       }
 
@@ -891,6 +893,9 @@
         renderAppliedTable();
       } else if (target.id === 'sourcesSection') {
         renderSourceHealth();
+        void loadSourceStatusTelemetry();
+        void loadGlobalDiscoveryCompanies();
+        void loadGlobalDiscoveryCandidates();
       }
 
       if (pushHash) {
@@ -1067,7 +1072,7 @@
 
       const reasons = job.match_reasons || [];
       const skills = job.skills_detected || [];
-      
+
       const signalsList = [];
       skills.slice(0, 3).forEach(s => {
         signalsList.push(`<span class="signal-pill signal-skill">${esc(s)}</span>`);
@@ -1627,6 +1632,7 @@
         workable: 'Workable',
         keka: 'Keka',
         darwinbox: 'Darwinbox',
+        hirebase: 'Hirebase (budgeted index)',
       };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
@@ -2086,10 +2092,6 @@
       if (!res.ok) throw new Error();
       const data = await res.json();
       state.sourceStatus = data.sources || [];
-      if (state.activeSection === 'sourcesSection') {
-        renderSourceHealth();
-        void loadDiscoveredBoards();
-      }
     } catch (e) {
       state.sourceStatus = [
         { source: 'linkedin', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
@@ -2097,9 +2099,104 @@
         { source: 'greenhouse', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
         { source: 'instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
       ];
-      if (state.activeSection === 'sourcesSection') {
-        renderSourceHealth();
-      }
+    }
+    if (state.activeSection === 'sourcesSection') {
+      renderSourceHealth();
+      void loadDiscoveredBoards();
+      void loadDirectoryCoverageSummary();
+      void loadHirebaseBudgetStatus();
+      void loadWorkdayInventoryStatus();
+    }
+  }
+
+  async function loadDirectoryCoverageSummary() {
+    if (!state.isAdmin) return;
+    const target = $('directoryCoverageSummary');
+    if (!target) return;
+    try {
+      const response = await authClient.request('/discovery/coverage-summary', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Coverage summary unavailable (HTTP ${response.status}).`);
+      const data = await response.json();
+      const providers = Object.entries(data.providers || {}).map(([provider, item]) => {
+        const statuses = item.by_status || {};
+        return `${provider}: ${Number(item.total || 0).toLocaleString()} known · ${Number(statuses.active || 0)} monitoring · ${Number(statuses.verified || 0)} verified · ${Number(statuses.discovered || 0) + Number(statuses.reviewed || 0)} candidates`;
+      });
+      target.textContent = `${Number(data.employer_boards_known || 0).toLocaleString()} employer boards in the registry (${Number(data.directory_seed_candidates || 0).toLocaleString()} directory candidates). ${providers.join(' | ') || 'No boards yet.'} Market coverage percentage is not estimated.`;
+    } catch (error) {
+      target.textContent = error.message || 'Registry coverage summary unavailable.';
+    }
+  }
+
+  async function loadWorkdayInventoryStatus() {
+    if (!state.isAdmin) return;
+    const target = $('workdayInventoryStatus');
+    if (!target) return;
+    try {
+      const response = await authClient.request('/workday/inventory-status', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Workday inventory status unavailable (HTTP ${response.status}).`);
+      const data = await response.json();
+      const boards = data.boards || [];
+      target.textContent = boards.length
+        ? boards.map(board => {
+          const progress = ['truncated', 'in_progress_incomplete'].includes(board.status)
+            ? `INCOMPLETE${board.status === 'in_progress_incomplete' ? ' · remaining partitions still processing' : ''}: ${board.truncated_reason || 'facet partition required'}`
+            : board.status === 'complete'
+              ? `Inventory completed; next weekly refresh ${board.next_inventory_due_at || 'not scheduled'}`
+              : board.status === 'in_progress'
+                ? `Next inventory offset ${Number(board.next_inventory_offset || 0).toLocaleString()} · next page after ${board.next_inventory_due_at || 'the throttle window'}`
+                : 'Inventory scan not started';
+          const partitions = board.facet_partitioned
+            ? ` · facet partitions pending ${Number(board.pending_facet_partitions || 0)}${board.active_facet_query ? ` · active ${JSON.stringify(board.active_applied_facets || {})}` : ''}`
+            : '';
+          return `${board.company} (${board.board_key}): ${progress} · reported total ${board.reported_total ?? 'unknown'} · facets ${Number(board.facets_available || 0)}${partitions}`;
+        }).join(' | ')
+        : 'No Workday employer boards are configured.';
+    } catch (error) {
+      target.textContent = error.message || 'Workday inventory progress unavailable.';
+    }
+  }
+
+  async function loadHirebaseBudgetStatus() {
+    if (!state.isAdmin) return;
+    const target = $('hirebaseBudgetStatus');
+    if (!target) return;
+    try {
+      const response = await authClient.request('/hirebase/status', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Budget status unavailable (HTTP ${response.status}).`);
+      const data = await response.json();
+      const budget = data.budget || {};
+      const usage = Number(budget.locally_counted_period_jobs || 0);
+      const today = Number(budget.locally_counted_today_jobs || 0);
+      const provider = budget.provider_today || {};
+      document.querySelectorAll('.hirebase-estimate-btn').forEach(button => {
+        button.disabled = !data.api_key_configured;
+        button.title = data.api_key_configured ? 'Run a zero-job-credit estimate.' : 'Add HIREBASE_API_KEY to the isolated development server environment first.';
+      });
+      target.textContent = `API key: ${data.api_key_configured ? 'configured on server' : 'not configured'} · Source: ${data.source_enabled ? 'enabled' : 'disabled'} · Local budget: ${usage}/${budget.monthly_hard_cap || 400} this billing period · ${today}/${budget.daily_hard_cap || 12} today · per ATS: ${budget.per_provider_daily_cap || 4}/day (Workday ${provider.workday || 0}, Keka ${provider.keka || 0}, Darwinbox ${provider.darwinbox || 0}). Uncertain requests remain reserved.`;
+    } catch (error) {
+      target.textContent = error.message || 'Hirebase budget status unavailable.';
+    }
+  }
+
+  async function estimateHirebase(provider, button) {
+    const results = $('hirebaseEstimateResults');
+    if (!button || !results) return;
+    button.disabled = true;
+    results.textContent = `Estimating ${provider} results. This endpoint does not spend job credits…`;
+    try {
+      const response = await authClient.request('/hirebase/estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, limit: 4 }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || `Estimate failed (HTTP ${response.status}).`);
+      results.textContent = `${provider}: estimated ${Number(data.estimated_job_credits || 0)} result credits for a maximum ${data.result_limit} result query. Estimate cost: ${data.estimate_costs_job_credits}. Run is not started.`;
+      await loadHirebaseBudgetStatus();
+    } catch (error) {
+      results.textContent = error.message || `${provider} estimate failed.`;
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -2128,7 +2225,7 @@
       return `<tr>
         <td><b>${esc(board.company_name)}</b><div style="font-size:11px;color:var(--text-muted);">${esc(board.domain)}</div></td>
         <td>${esc(board.provider)}</td>
-        <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a></td>
+        <td><a href="${esc(board.board_url)}" target="_blank" rel="noopener noreferrer">${esc(board.board_key)}</a>${board.directory_last_crawled ? `<div style="font-size:11px;color:var(--text-muted);">Directory snapshot: ${esc(board.directory_last_crawled)}</div>` : ''}</td>
         <td>${collector}</td>
         <td>${review}</td>
         <td><a href="${esc(board.discovered_from)}" target="_blank" rel="noopener noreferrer">Open page</a></td>
@@ -2151,6 +2248,182 @@
     });
   }
 
+  async function importLastRoundDirectory(button) {
+    const status = $('lastRoundDirectoryStatus');
+    if (!button) return;
+    button.disabled = true;
+    if (status) status.textContent = 'Importing the local CC BY 4.0 directory snapshot…';
+    try {
+      const response = await authClient.request('/discovery/directories/last-round/import', { method: 'POST' });
+      if (!response.ok) throw new Error(`Directory import failed (HTTP ${response.status}).`);
+      const result = await response.json();
+      if (status) status.textContent = `Snapshot rows: ${Number(result.companies_in_snapshot || 0).toLocaleString()}. New board records: ${Number(result.boards_added || 0).toLocaleString()}. None are verified or activated. Attribution: LastRound AI (CC BY 4.0).`;
+      await loadDiscoveredBoards();
+      await loadDirectoryCoverageSummary();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Directory import failed.';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function loadGlobalDiscoveryCompanies() {
+    if (!state.isAdmin) return;
+    try {
+      const response = await authClient.request('/discovery/companies?limit=500', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Could not load employers (HTTP ${response.status}).`);
+      const data = await response.json();
+      state.discoveredCompanies = data.companies || [];
+      renderGlobalDiscoveryCandidates();
+    } catch (error) {
+      const target = $('globalCandidateStatus');
+      if (target) target.textContent = error.message || 'Employer list unavailable.';
+    }
+  }
+
+  async function loadGlobalDiscoveryCandidates() {
+    if (!state.isAdmin) return;
+    const tbody = $('globalCandidatesTableBody');
+    if (tbody && !state.globalCandidates.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">Loading unmatched ATS candidates…</td></tr>';
+    }
+    try {
+      const response = await authClient.request('/discovery/global-candidates?limit=500', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Could not load global candidates (HTTP ${response.status}).`);
+      const data = await response.json();
+      state.globalCandidates = data.candidates || [];
+      renderGlobalDiscoveryCandidates();
+    } catch (error) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:var(--status-error);padding:var(--space-10);">${esc(error.message || 'Candidate registry unavailable.')}</td></tr>`;
+    }
+  }
+
+  function renderGlobalDiscoveryCandidates() {
+    const tbody = $('globalCandidatesTableBody');
+    if (!tbody) return;
+    const candidates = state.globalCandidates || [];
+    if (!candidates.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-10);">No unmatched ATS candidates yet. Add a captured public ATS URL above or wait for a discovery source.</td></tr>';
+      return;
+    }
+    const companies = state.discoveredCompanies || [];
+    tbody.innerHTML = candidates.map(candidate => {
+      const linked = candidate.review_status === 'linked';
+      const rejected = candidate.review_status === 'rejected';
+      const options = companies.map(company =>
+        `<option value="${esc(company.id)}">${esc(company.company_name)} (${esc(company.domain)})</option>`
+      ).join('');
+      const association = linked
+        ? `<span style="color:var(--status-success);">Linked to ${esc(candidate.company_name || `company ${candidate.linked_company_id}`)}</span>`
+        : rejected ? '<span style="color:var(--text-muted);">Rejected</span>'
+          : companies.length
+            ? `<select class="number-field-input global-candidate-company" data-candidate-id="${esc(candidate.id)}"><option value="">Choose existing employer…</option>${options}</select>`
+            : '<span style="color:var(--text-muted);">Add an employer using the form below before linking.</span>';
+      const linkedBoardStatus = candidate.board_review_status || 'unknown';
+      const actions = linked
+        ? `<span style="color:var(--text-muted);">Board status: ${esc(linkedBoardStatus)}</span>`
+        : rejected ? ''
+          : `${companies.length ? `<button type="button" class="btn-pill btn-pill-primary global-candidate-link" data-candidate-id="${esc(candidate.id)}">Link employer</button>` : ''}<button type="button" class="btn-pill btn-pill-secondary global-candidate-reject" data-candidate-id="${esc(candidate.id)}">Reject</button>`;
+      return `<tr>
+        <td>${esc(candidate.provider)}</td>
+        <td><a href="${esc(candidate.board_url)}" target="_blank" rel="noopener noreferrer">${esc(candidate.board_key)}</a><div style="font-size:11px;color:var(--text-muted);">${esc(candidate.candidate_host)}</div></td>
+        <td>${esc(candidate.discovery_method)}<div style="font-size:11px;color:var(--text-muted);">${esc(candidate.source_reference)}</div></td>
+        <td>${esc(candidate.source_captured_at || 'Not captured')}</td>
+        <td>${esc(candidate.confidence)} · ${esc(candidate.review_status)}</td>
+        <td>${association}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap;">${actions}</td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.global-candidate-link').forEach(button => {
+      button.addEventListener('click', () => {
+        const id = Number(button.dataset.candidateId);
+        const select = tbody.querySelector(`.global-candidate-company[data-candidate-id="${id}"]`);
+        const companyId = Number(select?.value || 0);
+        if (!companyId) {
+          const status = $('globalCandidateStatus');
+          if (status) status.textContent = 'Choose an existing employer before linking this candidate.';
+          return;
+        }
+        void linkGlobalDiscoveryCandidate(id, companyId, button);
+      });
+    });
+    tbody.querySelectorAll('.global-candidate-reject').forEach(button => {
+      button.addEventListener('click', () => void rejectGlobalDiscoveryCandidate(Number(button.dataset.candidateId), button));
+    });
+  }
+
+  async function importGlobalDiscoveryCandidate(event) {
+    event.preventDefault();
+    const button = $('importGlobalCandidateBtn');
+    const status = $('globalCandidateStatus');
+    const boardUrl = $('globalCandidateUrl')?.value.trim();
+    const method = $('globalCandidateMethod')?.value;
+    const sourceReference = $('globalCandidateReference')?.value.trim();
+    const capturedInput = $('globalCandidateCapturedAt')?.value;
+    if (!boardUrl || !sourceReference) {
+      if (status) status.textContent = 'Enter a public ATS URL and its discovery reference.';
+      return;
+    }
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Validating and staging the ATS candidate. No employer will be created.';
+    try {
+      const capturedAt = capturedInput ? new Date(capturedInput).toISOString() : null;
+      const response = await authClient.request('/discovery/global-candidates/import', {
+        method: 'POST',
+        body: { candidates: [{ board_url: boardUrl, discovery_method: method, source_reference: sourceReference, source_captured_at: capturedAt }] },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Candidate import failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `Staged ${data.inserted || 0} new candidate(s), refreshed ${data.updated || 0}, preserved ${data.preserved_terminal || 0} linked/rejected, skipped ${data.skipped || 0}. No employer was created, verified or activated.`;
+      if ($('globalCandidateUrl')) $('globalCandidateUrl').value = '';
+      if ($('globalCandidateReference')) $('globalCandidateReference').value = '';
+      if ($('globalCandidateCapturedAt')) $('globalCandidateCapturedAt').value = '';
+      await loadGlobalDiscoveryCandidates();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not stage ATS candidate.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function linkGlobalDiscoveryCandidate(candidateId, companyId, button) {
+    if (button) button.disabled = true;
+    const status = $('globalCandidateStatus');
+    if (status) status.textContent = `Linking candidate ${candidateId} to the selected existing employer…`;
+    try {
+      const response = await authClient.request(`/discovery/global-candidates/${encodeURIComponent(candidateId)}/link`, {
+        method: 'POST', body: { company_id: companyId },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Candidate link failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `Linked to ${data.company_name}. Board remains ${data.board_review_status}; verified=${data.verified}; activated=${data.activated}.`;
+      await Promise.all([loadGlobalDiscoveryCandidates(), loadDiscoveredBoards(), loadDirectoryCoverageSummary()]);
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not link ATS candidate.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function rejectGlobalDiscoveryCandidate(candidateId, button) {
+    if (!window.confirm('Reject this unmatched ATS candidate? Re-discovery will not revive a rejected candidate.')) return;
+    if (button) button.disabled = true;
+    const status = $('globalCandidateStatus');
+    try {
+      const response = await authClient.request(`/discovery/global-candidates/${encodeURIComponent(candidateId)}/review`, {
+        method: 'POST', body: { status: 'rejected' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Candidate rejection failed (HTTP ${response.status}).`);
+      if (status) status.textContent = `Candidate ${candidateId} rejected. Future imports will preserve this decision.`;
+      await loadGlobalDiscoveryCandidates();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not reject ATS candidate.';
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   async function loadDiscoveredBoards() {
     if (!state.isAdmin) return;
     const tbody = $('discoveredBoardsTableBody');
@@ -2158,7 +2431,7 @@
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-12);">Loading discovered boards…</td></tr>';
     }
     try {
-      const response = await authClient.request('/discovery/boards?limit=500', { cache: 'no-store' });
+      const response = await authClient.request('/discovery/boards?limit=1000', { cache: 'no-store' });
       if (!response.ok) throw new Error(`Could not load boards (HTTP ${response.status}).`);
       const data = await response.json();
       state.discoveredBoards = data.boards || [];
@@ -2191,7 +2464,7 @@
       if ($('discoveryCompanyName')) $('discoveryCompanyName').value = '';
       if ($('discoveryWebsiteUrl')) $('discoveryWebsiteUrl').value = '';
       if ($('discoveryCareersUrl')) $('discoveryCareersUrl').value = '';
-      await loadDiscoveredBoards();
+      await Promise.all([loadDiscoveredBoards(), loadGlobalDiscoveryCompanies()]);
     } catch (error) {
       if (status) status.textContent = error.message || 'Company discovery failed.';
       showToast(error.message || 'Company discovery failed.', 'error', 7000);
@@ -2293,6 +2566,7 @@
       { value: 'workable', label: 'Workable' },
       { value: 'keka', label: 'Keka' },
       { value: 'darwinbox', label: 'Darwinbox' },
+      { value: 'hirebase', label: 'Hirebase' },
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';
@@ -2376,7 +2650,20 @@
     // Refresh buttons
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
     if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
+    if ($('importLastRoundDirectoryBtn')) $('importLastRoundDirectoryBtn').addEventListener('click', (event) => importLastRoundDirectory(event.currentTarget));
+    const hirebaseSourceToggle = document.querySelector('#cfgSourcesWrap input[data-source="hirebase"]');
+    if (hirebaseSourceToggle) hirebaseSourceToggle.addEventListener('change', () => {
+      if (hirebaseSourceToggle.checked && !window.confirm(
+        'Enable the optional Hirebase daily sampler in this environment? It may spend up to 12 job credits per day and 400 per billing period. Every query is estimated first. The source remains disabled until you save configuration.'
+      )) {
+        hirebaseSourceToggle.checked = false;
+      }
+    });
+    document.querySelectorAll('.hirebase-estimate-btn').forEach(button => {
+      button.addEventListener('click', () => estimateHirebase(button.dataset.provider, button));
+    });
     if ($('boardDiscoveryForm')) $('boardDiscoveryForm').addEventListener('submit', discoverCompanyBoards);
+    if ($('globalCandidateForm')) $('globalCandidateForm').addEventListener('submit', importGlobalDiscoveryCandidate);
 
     // Server-side job feed pagination.
     if ($('previousJobsPageBtn')) $('previousJobsPageBtn').addEventListener('click', () => {

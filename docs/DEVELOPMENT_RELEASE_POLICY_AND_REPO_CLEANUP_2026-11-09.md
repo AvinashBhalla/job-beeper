@@ -129,3 +129,10 @@ When the owner reports a bug, capture: page/route, account role (never password)
 ### Current boundary
 
 Shared dev now runs the current V2 integration code and is safe for development/UAT of code paths with notifications disabled and Naukri as the only scheduled source. It is not a copy of production config: the dev preset intentionally remains Naukri-only and notification-off. Production continues serving the owner's manual UAT. Any reported production issue must be reproduced against this refreshed dev runtime first.
+
+
+## 9. Owner-requested repository cleanup — 2026-11-09
+
+This section supersedes the earlier recommendation in §4/§8 to keep PR #35 open as a release placeholder. The owner asked to remove unnecessary PR/branch clutter. PR #35 was closed **unmerged** because it was a 688-commit, 94-file V2→main PR and GitHub reported `mergeable_state=dirty`. This is not authorization to promote; `main`, `v2-live-radar`, production and all runtime data were left unchanged. After owner UAT and explicit separate approval, create a fresh release PR from the then-current V2 integration SHA with exact-head CI, backup, migration/rollback plan and smoke/soak evidence.
+
+Four superseded documentation branches were archived as annotated tags under `archive/repository-cleanup-20261109/` before deleting their remote branch names. Seven independent feature/docs PRs #59–#65 remain open/draft; do not batch-merge them because they overlap config and collector modules. The full branch inventory, exact SHAs, CI evidence, worktree cleanup and QA handoff are in `docs/REPOSITORY_CLEANUP_2026-11-09.md`.

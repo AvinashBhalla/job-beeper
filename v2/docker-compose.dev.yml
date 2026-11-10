@@ -13,6 +13,9 @@ services:
     volumes:
       - radar-dev-data:/data
       - ./config.dev.json:/app/v2/config.json:ro
+    env_file:
+      - path: /home/ubuntu/.config/job-beeper/dev-hirebase.env
+        required: false
     environment:
       JOB_RADAR_DB: /data/jobs.db
       # This service is loopback-only and used through an SSH tunnel; production stays Secure=true.

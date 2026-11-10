@@ -26,7 +26,7 @@
 - **Safety/current runtime:** verified current dev flags are extraction=true and matcher=true; Telegram token/chat absent; notifications disabled and LinkedIn disabled. Dev health returned OK after bounded retries. Production was not touched. Gemini API usage limits remain 3 calls/source run and 20/day; the diagnostic itself made no network calls. Preserve VM-local `M v2/config.json` and untracked `.venv/`; never stage, overwrite, reset, or clean them.
 - **Standing autonomy instruction (user directive, 2026-10-15):** proceed with routine, reversible work inside the established Job Radar V2 scope without step-by-step confirmation, including code/docs/tests and isolated-dev configuration/restarts required for this validated Gemini matcher task. User has explicitly approved enabling `GEMINI_MATCHER_ENABLED=true` in isolated dev. Do not repeatedly ask permission for these scoped steps. Hard boundaries remain: keep production matcher/deployment unchanged, never send/replay notifications, never expose or commit secrets, never delete/recreate volumes or reset/clean local files, and do not perform destructive DB/schema or other irreversible/security-sensitive changes without a clearly scoped safe plan. If no tool can reach the VM, say so plainly and provide an exact narrow command rather than claiming completion.
 - **Exact next action:** the Gemini experience matcher/cache-to-live-evaluation acceptance criterion is now met in isolated dev. Continue with read-only verification that this evaluation is consistently reflected by canonical opportunity/API/dashboard output while notification dispatch remains disabled. Next perform a safe backend test run after reviewing the exact current checkout (`git status --short`, branch/HEAD; preserve VM-local `M v2/config.json` and `?? .venv/`; pull only with `git pull --ff-only` if behind and don't overwrite either local file). Then review end-to-end canonicalization, persisted notification-ledger decisions under notifications-off policy, and dashboard/API representation. Do not send any Telegram alerts. Afterwards, progress through the existing reference roadmap one scoped issue at a time: Greenhouse stale-board/freshness guard and two-poll one-board canary (GET-only, notifications off), then Ashby → Lever → SmartRecruiters individually, observability improvements, and only then prepare a reviewed promotion PR. Production cutover, production matcher activation, and any real alert send remain separate gates. Keep existing volume, local config and `.venv/`; do not perform destructive operations.
-- **Continuation prompt:** “Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`. Dev matcher is true and the earlier transient health reset recovered. Container is running with restart_count=0, not OOM-killed, health status OK, existing /data volume retained, Telegram credentials blank, notifications/LinkedIn disabled. The exact-hash/current-model/TTL Gemini result is required total_professional 3–5 years, confidence 0.95, evidence present; the LIVE persisted evaluation now matches 3–5 years and has an experience match reason. The diagnostic itself made no Gemini calls or notifications. Continue autonomously with API/dashboard/ledger consistency tests and then the reference roadmap one safe phase at a time; don't send alerts or change production. Preserve config/.venv and update both handovers every turn.” 
+- **Continuation prompt:** “Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`, and `docs/JOBBEEPER_REFERENCE.md`. Dev matcher is true and the earlier transient health reset recovered. Container is running with restart_count=0, not OOM-killed, health status OK, existing /data volume retained, Telegram credentials blank, notifications/LinkedIn disabled. The exact-hash/current-model/TTL Gemini result is required total_professional 3–5 years, confidence 0.95, evidence present; the LIVE persisted evaluation now matches 3–5 years and has an experience match reason. The diagnostic itself made no Gemini calls or notifications. Continue autonomously with API/dashboard/ledger consistency tests and then the reference roadmap one safe phase at a time; don't send alerts or change production. Preserve config/.venv and update both handovers every turn.”
 - **Cross-reference:** `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` is the compact state; `docs/JOBBEEPER_REFERENCE.md` remains the architecture/rollout guardrail.
 ## Historical handoff — 2026-10-12 (superseded by the 2026-10-14 Gemini matcher follow-up)
 - **Goal:** verify Gemini JD experience end-to-end in isolated development: extraction → evidence validation → fresh/model-matched cache → opt-in matcher → persisted evaluation → notification decision.
@@ -2481,7 +2481,7 @@ Recommended implementation contract:
 4. Collect metrics: candidate count, model calls/skips, valid/invalid outputs, per-field agreement vs deterministic/source metadata, p50/p95 latency, failure/backoff counts and estimated cost. Do not log secrets or dump full JD content.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Latest user VM verification: 78 tests passed in 53.339s; dev health OK on 8001, config v10 has Naukri only and notifications off; source status matches; prod 8000 healthy. The LinkedIn experience parser patch can now move through reviewed release PR/merge and main CI (do not switch production checkout during promotion). User proposes an LLM for required skills/experience because deterministic parsing misses formats. No LLM code/provider added yet. Design a separate, disabled-by-default, schema-validated enrichment module; source-labeled deterministic metadata takes precedence, conflicts remain uncertain, LLM never assigns match scores or controls eligibility by itself. Add fixtures for ranges, required/preferred, skill-specific vs total experience, absent/conflicting metadata and prompt-injection text; shadow-mode in dev, cost/latency/error metrics, timeout/backoff/cache. Choose provider and secret/budget configuration before implementation. Do not alter production or enable dev notifications/LinkedIn; then continue Greenhouse one-board canary only after the current fix is promoted.” 
+“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. Latest user VM verification: 78 tests passed in 53.339s; dev health OK on 8001, config v10 has Naukri only and notifications off; source status matches; prod 8000 healthy. The LinkedIn experience parser patch can now move through reviewed release PR/merge and main CI (do not switch production checkout during promotion). User proposes an LLM for required skills/experience because deterministic parsing misses formats. No LLM code/provider added yet. Design a separate, disabled-by-default, schema-validated enrichment module; source-labeled deterministic metadata takes precedence, conflicts remain uncertain, LLM never assigns match scores or controls eligibility by itself. Add fixtures for ranges, required/preferred, skill-specific vs total experience, absent/conflicting metadata and prompt-injection text; shadow-mode in dev, cost/latency/error metrics, timeout/backoff/cache. Choose provider and secret/budget configuration before implementation. Do not alter production or enable dev notifications/LinkedIn; then continue Greenhouse one-board canary only after the current fix is promoted.”
 
 
 ## Latest handoff — 2026-10-12: dev verification passed; LLM job-description enrichment proposal
@@ -2514,7 +2514,7 @@ User wants an LLM to extract JD skills and required experience because determini
 4. Resume source roadmap only after release gate: Greenhouse one-board dev canary, then Instahyre schema/freshness validation, then Ashby/Lever/SmartRecruiters. Preserve no historical alert replay and no LinkedIn limit evasion.
 
 ### Continuation prompt
-“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. User supplied successful dev verification: 78 tests pass in 53.339s; dev health OK at port 8001, config v10 is Naukri-only with notifications off, source status agrees, and production port 8000 remains healthy. The LinkedIn experience parser fix is ready for reviewed promotion to main; verify main CI, but do not switch the production VM checkout as part of promotion. User proposed an LLM to extract skills/experience from JDs. No LLM implementation/provider has been chosen. Design it as a separate disabled-by-default strict-schema extractor with local validation, deterministic/source-labelled metadata precedence, uncertainty on conflicts, prompt-injection isolation, cache by JD hash/schema, timeouts/backoff and hard spend caps. Shadow mode first with notifications off; evaluate required/preferred skills, year ranges, skill-specific vs total experience, missing/conflicting fields and malicious text. Select provider and secure budget/secrets before coding. No production change; then Greenhouse one-board dev canary and later Instahyre/ATS roadmap.” 
+“Continue Job Radar V2. Read `docs/JOB_RADAR_HANDOVER.md`, `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md` and `docs/JOBBEEPER_REFERENCE.md` on `v2-live-radar`; update both handovers after every prompt. User supplied successful dev verification: 78 tests pass in 53.339s; dev health OK at port 8001, config v10 is Naukri-only with notifications off, source status agrees, and production port 8000 remains healthy. The LinkedIn experience parser fix is ready for reviewed promotion to main; verify main CI, but do not switch the production VM checkout as part of promotion. User proposed an LLM to extract skills/experience from JDs. No LLM implementation/provider has been chosen. Design it as a separate disabled-by-default strict-schema extractor with local validation, deterministic/source-labelled metadata precedence, uncertainty on conflicts, prompt-injection isolation, cache by JD hash/schema, timeouts/backoff and hard spend caps. Shadow mode first with notifications off; evaluate required/preferred skills, year ranges, skill-specific vs total experience, missing/conflicting fields and malicious text. Select provider and secure budget/secrets before coding. No production change; then Greenhouse one-board dev canary and later Instahyre/ATS roadmap.”
 
 
 ## 2026-10-12 — Gemini JD extraction implemented in dev branch (not yet VM-verified)
@@ -3077,7 +3077,7 @@ HTTP 401 indicates Gemini rejected authentication for those calls. `api_key_conf
 - No fetch, pull, reset, checkout, merge, deploy, Docker action, restart, backup, or database change was performed. No VM commands were executed by the assistant. Production runtime/container/volume identity remains unverified, and Docker socket access remains blocked for `ubuntu`.
 - Next step: keep both checkouts untouched. Obtain authorized Docker visibility through OCI-supported console/recovery or an existing administrator. After runtime identity and a verified backup are established, separately plan Git synchronization; first review the 8 commits on `main` not in v2 and resolve the intended release/merge strategy. Do not merge/deploy v2 into production merely because its branch has a higher commit count.
 - Keep PR #36 merge commit `58fdff19aa6c4e5c53c402fc0af8d2642ceb467d` as the known green CI baseline (78/78). No production deployment has been performed or verified. Greenhouse canary remains a later isolated dev task with notifications off; dev LinkedIn and Gemini shadow stay disabled.
-- Continuation prompt: “Read the latest dated sections of both handover docs. Live refs: main=`58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, v2-live-radar=`816946c27248e0002df6aaacab7dd1caff56db79`. GitHub says the branches diverged: v2 is 160 ahead / 8 behind main, merge base `cefc185a58387ebc21544e1d3b2e1a9ac07f654b`. Local prod/dev HEADs are ancestors of live v2, but local origin refs are stale. Do not fetch/sync/merge/deploy. First restore authorized Docker visibility and identify actual runtime/mounts with a verified backup plan; review the 8 main-only commits before choosing any release strategy.” 
+- Continuation prompt: “Read the latest dated sections of both handover docs. Live refs: main=`58fdff19aa6c4e5c53c402fc0af8d2642ceb467d`, v2-live-radar=`816946c27248e0002df6aaacab7dd1caff56db79`. GitHub says the branches diverged: v2 is 160 ahead / 8 behind main, merge base `cefc185a58387ebc21544e1d3b2e1a9ac07f654b`. Local prod/dev HEADs are ancestors of live v2, but local origin refs are stale. Do not fetch/sync/merge/deploy. First restore authorized Docker visibility and identify actual runtime/mounts with a verified backup plan; review the 8 main-only commits before choosing any release strategy.”
 
 
 ## Execution preference and next action clarified — 2026-10-12
@@ -4495,7 +4495,7 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - Regression tests cover a fresh exact-hash trusted result (including bridge marker and sandbox evaluation bounds/reason), mismatched JD hash, expired cache, and skill-specific result rejection. Test assertions ensure no API call occurs. These new tests have NOT been run yet; don't claim they pass.
 - GitHub compare from the VM's prior code revision bcb8cfc to the current branch shows only the two handover docs plus these diagnostic utility/test files changed; app core modules did not change since the tested/rebuilt code.
 - Next user step: fast-forward the checkout without disturbing local files, then run the new focused test:
-  
+
       cd ~/job-beeper-dev
       git status --short
       git pull --ff-only origin v2-live-radar
@@ -4503,7 +4503,7 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
       ./.venv/bin/python -m unittest v2.test_gemini_experience_diagnostic
 
   Preserve M v2/config.json and ?? .venv/. Stop on pull failure/conflict or test failure. Do not rebuild merely to use the diagnostic: after the test passes, execute the checked-in diagnostic source through stdin inside the current app container so it imports the already-deployed core code:
-  
+
       sudo docker exec -i -w /app job-radar-dev python - < v2/gemini_experience_diagnostic.py
 
   It reads /data/jobs.db read-only and writes only a disposable temporary SQLite file. Return complete output, which contains redacted flags/evidence booleans and numeric bounds only; no raw JSON or job details.
@@ -4519,7 +4519,7 @@ Preserve existing local `M v2/config.json` and untracked `.venv/`; never stage e
 - The initial git status lines were not visible in the pasted output; preserve `v2/config.json` and `.venv/` if present and never stage, reset, clean, or overwrite them.
 - No live diagnostic has yet been run. The new diagnostic's unit tests confirm its fixtures for a trusted exact-hash fresh result and rejection of mismatched hashes, expired entries and skill-specific scope. This is test evidence, not proof the actual development database contains a qualifying current job.
 - **Next command:** execute the local diagnostic script through stdin inside the existing running app container. The script source comes from the checked-out VM file; Python imports `v2.radar` and `v2.gemini_extractor` from the already-running image. It opens `/data/jobs.db` read-only, identifies at most one eligible candidate by re-computing the exact current job input hash and model/TTL checks, inspects persisted evaluation summaries, and invokes the bridge/persistence writer only on a temporary one-job SQLite database that is deleted afterward:
-  
+
       cd ~/job-beeper-dev
       sudo docker exec -i -w /app job-radar-dev python - < v2/gemini_experience_diagnostic.py
 
@@ -4986,7 +4986,7 @@ The user asked to implement and document a multi-provider LLM fallback for Groq,
 - Safe next VM step, after reviewing current status: read-only `git status --short`, branch, HEAD and fetch for `origin/v2-live-radar` from `/home/ubuntu/job-beeper-dev`. Preserve VM-local modified `v2/config.json`, untracked `.venv/`, ignored `.env`, and named volume `job-radar-dev_radar-dev-data`. Do not reset/clean/stash blindly or touch the separate production-ish Compose project. Only use `git pull --ff-only` if the tree/branch/ahead-behind state proves it is safe.
 - Do not ask the user to paste keys in chat. Do not enable the router, run job-processing endpoints, trigger Gemini/provider requests, rebuild/restart containers, change DB/volume state, enable matcher use, or send notifications until test results and an explicit staged rollout are agreed. If safe to proceed after tests, give exact VM-local secret-entry steps and verify only allowlisted booleans/provider names/model IDs, never secret values.
 
- 
+
 ## Current handoff — 2026-10-28 — Multi-provider router hardening and CI verification
 
 - **Goal:** continue the existing Job Radar V2 multi-provider shadow-extraction router safely, preserving fresh multi-source discovery, strict experience validation, explainable matching and low-noise delivery.
@@ -6774,3 +6774,373 @@ Oracle's Security List/NSG workflow: https://docs.oracle.com/en-us/iaas/Content/
 - Full Desktop AI prompt, manual checklist, allowed synthetic writes, prohibited external actions, test coverage, reporting format and baseline results are in `docs/QA/DESKTOP_TWO_ROLE_QA_2026-11-09.md`.
 - No production or shared-dev runtime was modified by this QA provisioning. No collectors or notifications were run.
 - Next: owner manually tests both accounts and runs the Desktop prompt against localhost:18006. Collect the report/screenshots, triage confirmed defects, reproduce on a feature branch, add tests, pass CI, verify on shared dev, and only then request production approval.
+
+## 2026-11-09 — Global ATS discovery + optional Hirebase sampler feature branch
+
+**Branch:** `feat/global-ats-discovery-hirebase-guard-20261109` (based on `origin/v2-live-radar` at `ecb347a`). **No merge, deployment, source activation or external Hirebase request has occurred.**
+
+### What this branch adds
+
+- A strict optional Hirebase client (`v2/hirebase.py`) with fixed API host, env-only `HIREBASE_API_KEY`, no redirects, no import-time requests, sanitized errors and metered usage header parsing.
+- Admin-only `/api/hirebase/status` and `/api/hirebase/estimate`. Estimate is a zero-job-credit endpoint and caps each query at four rows, only for Workday/Keka/Darwinbox. Key value is never returned.
+- Optional `hirebase` collector, disabled in default config, daily poll. Each provider query is estimate-first, global (not filtered using a user's private role/profile), and capped at four rows/day/provider for Workday, Keka and Darwinbox.
+- Persisted Hirebase usage ledger reserves estimated credits before search. Local guardrails: 400 per current billing period (100 below the 500 Free allowance), 12/day total and 4/day per provider. Timeouts, malformed success responses or missing metering confirmation retain the full reservation. HTTP 429 persists cooldown and stops remaining provider queries. Hirebase requests are included in source request telemetry.
+- Config migration v16→v17 forces Hirebase off. Enabling it requires `HIREBASE_API_KEY` in the server environment. No key has been set.
+- Dedicated optional env file wired in development Compose: `/home/ubuntu/.config/job-beeper/dev-hirebase.env`. The file was created with an empty placeholder and mode 600 under a mode-700 directory; never read/printed. The existing `/home/ubuntu/job-beeper-dev/.env` was not changed. Compose configuration validation passed; no container was rebuilt/restarted.
+- A CC BY 4.0 LastRound AI August 2026 snapshot is bundled as `v2/data/lastroundai-ats-company-directory-2026-08.csv`: 9,935 candidate slugs (4,966 Greenhouse, 2,856 Ashby, 2,113 Lever). The source CSV, commit and blob SHA plus attribution are recorded in `v2/data/LASTROUND_AI_ATTRIBUTION.md`.
+- Admin-only `/api/discovery/directories/last-round/import` imports these only as low-confidence `discovered` candidates, preserving the snapshot date. It does not verify, activate, poll, ingest jobs or alert. It reuses an existing provider/slug record instead of duplicating a manually discovered board.
+- Admin-only `/api/discovery/coverage-summary` returns registry counts per provider/review state but no market-coverage percentage. Dashboard adds Hirebase estimate buttons, usage-budget display, opt-in confirmation, directory import, snapshot dates and coverage summary. Showing Coverage & Health triggers its data loaders.
+- Research docs: `docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md` and `docs/GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md`.
+
+### Validation
+
+- Focused new tests: **27 passed** (`test_hirebase`, `test_ats_directory`, `test_global_discovery_hirebase`).
+- Full V2 suite: **426 passed** in 416.2s at the last full regression run. This run preceded the final dashboard lazy-load/title tweak and added last assertions; rerun full suite at final HEAD before merge.
+- Python compile, JSON config validation, `git diff --check`, HTML duplicate/missing ID checks, CSS variable checks and development Compose config validation passed.
+- VM has Node v12.22.9, which cannot parse existing dashboard optional-chaining/nullish-coalescing syntax. Exact-head GitHub CI with the modern Node runtime is required for JS validation.
+
+### Limits and next work
+
+This branch is **not yet the complete autonomous global crawler**. LastRound gives candidate seeds only for Greenhouse/Lever/Ashby. Hirebase only provides a small India-focused Workday/Keka/Darwinbox sample after the key is supplied and source explicitly enabled. It does not discover every new Workday/Keka/Darwinbox tenant. No independent Common Crawl harvester, search-index crawler, complete tenant resolver or global board-to-scheduler is delivered yet.
+
+Next: final exact-HEAD test/CI; user securely adds the key to the empty development secret file; verify `/api/hirebase/status` reports configured while disabled; use only the free estimate buttons; then, with explicit approval, enable the sampler in development. Separately build first-party Workday/Keka/Darwinbox employer discovery and board-level scheduling. Hirebase's terms restrict competing job-data products/raw redistribution; do not use it for commercial multi-user JobBeeper production without written permission.
+
+### Open-source research shortlist
+
+- Freehire `strelov1/freehire` — 3.4k/373 snapshot; strongest ingestion architecture reference (run-once provider workers, board catalogue, shards, idempotent upserts, cooldown, transactional outboxes).
+- Career-Ops `career-ops-hq/career-ops` — about 80.6k/14.8k snapshot; strongest reverse ATS discovery/per-host concurrency reference. Its external Feashliaa company dataset is CC BY-NC; do not reuse commercially.
+- `kalil0321/ats-scrapers` — 151/37; useful Python adapter/fetcher pattern.
+- `Riley-Dorrington/job-board-aggregator` — 181/40; Common Crawl + daily anomaly monitoring pattern. Code MIT, curated company lists CC BY-NC; don't bundle them into commercial JobBeeper.
+- JobSpy `speedyapply/JobSpy` — about 4.7k/927; supplementary job-board aggregator adapters, not global ATS directory.
+- JobNavigator `vesaias/JobNavigator` — 184/52; product UX reference.
+
+Stars are attention, not latency or rate-limit proof. Benchmark p50/p95 and 429s per host before changing concurrency. See `docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md`.
+
+
+## 2026-11-09 18:07 IST — recovery checkpoint after ChatGPT connection interruption
+
+The user reported the conversation UI stuck on “Connection interrupted. Waiting for the complete answer” and supplied a screenshot. This is a ChatGPT response-stream interruption, not evidence of a JobBeeper application outage. The screenshot shows the prior answer did not finish rendering. The implementation and documentation are on the development VM; do not repeat work blindly.
+
+### Current working state
+
+- Repository/worktree: /tmp/job-radar-global-discovery
+- Branch: feat/global-ats-discovery-hirebase-guard-20261109
+- Base: origin/v2-live-radar at ecb347aef013e5249ce1270006d3bc226e111c3e
+- Not pushed, no PR created, no merge or deployment.
+- Files already modified/new: see git status --short --branch on the VM. git diff --check had passed before the latest watermark changes; rerun it.
+- Docs already added:
+  - docs/GLOBAL_ATS_DISCOVERY_IMPLEMENTATION_2026-11-09.md
+  - docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md
+  - v2/data/LASTROUND_AI_ATTRIBUTION.md
+  - appendices in docs/NEXT_AGENT_START_HERE.md, docs/JOB_RADAR_HANDOVER.md, docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md, docs/ATS_SOURCE_COVERAGE_AND_NEAR_REALTIME_ROADMAP.md, docs/PRODUCT_VISION_AND_DELIVERY_ROADMAP.md
+- User explicitly asked that findings and next steps be documented first. This checkpoint is appended to the three primary handover docs before any further implementation work.
+
+### Last known test state — important distinction
+
+- Before incremental cursor work and the final dashboard tweaks, a complete V2 regression run passed 426 tests in 416.2 seconds.
+- The focused Hirebase/directory suite now passes 30 tests, including incremental query construction, per-provider pagination cursor state, zero-estimate advancement and candidate-only import.
+- After Free-plan period handling, the Hirebase client-only suite passed 12 tests.
+- A full suite job ipu4poub1j was started at 12:23 UTC but was stopped after the user interruption and subsequent code changes made its run stale. Its log /tmp/job-radar-global-discovery-final-tests.log is not a final exact-HEAD result.
+- Therefore the current branch has no final test result yet. Do not claim 426 tests validates current HEAD. Rerun focused tests, then the complete V2 suite after watermark/pagination work is settled.
+
+### Latest implementation changes since the previous handover
+
+Hirebase incremental ingestion is now being changed to avoid repeatedly spending credits on the same rolling seven-day results:
+
+- First run uses a bounded seven-day sample.
+- Later runs use Hirebase ingested_after with sort_by=first_ingested, ascending, and a two-hour overlap.
+- New hirebase_provider_state stores per-provider cursor/pagination state.
+- Cursor commits are deferred until run_source has successfully upserted the jobs, to avoid advancing the cursor when DB ingestion fails.
+- The schema currently includes last_polled_at, window_start, and next_page; the latest code has evolved beyond the first simple watermark patch to support paginated continuation. Inspect current code before editing; don't overwrite it with the older design.
+- Current helper functions are around v2/radar.py:5687-5715; collector around v2/radar.py:5752-5881; run-source commit around v2/radar.py:5970.
+- v2/hirebase.py:49-72 constructs first-run vs incremental query. normalize_provider_job retains first_ingested.
+- The test test_provider_query_uses_incremental_first_ingested_cursor was added to v2/test_hirebase.py, but it may not have landed inside the test class correctly. Inspect tail -50 v2/test_hirebase.py and fix if necessary.
+- Need add tests for per-provider watermark persistence, two-hour overlap, page continuation when estimated results exceed the limit, commit only after upsert, and no cursor advance on search/DB failure. Keep the result limit at or below the zero-credit estimate.
+- Be careful: the previous test launch ran before the current cursor/pagination implementation. It is stale and must not be relied on.
+
+### Safety / Hirebase status
+
+- Hirebase source remains disabled by default; 24-hour schedule.
+- No Hirebase API key has been supplied or read. The dedicated dev secret file /home/ubuntu/.config/job-beeper/dev-hirebase.env was created empty with mode 600 under a mode-700 directory. Existing shared .env untouched.
+- No Hirebase API estimate/search requests have been made.
+- Free plan usage API has null subscription and period dates. Code now falls back to the calendar month in UTC while requiring valid meter counters. Hirebase client test passed after this change.
+- Per-query result cap must remain no larger than its estimate. Local guardrails: 400/month, 12/day overall, 4/day/provider.
+- Hirebase Terms restrict competing job-data products and raw redistribution. Do not enable for commercial multi-user JobBeeper production without written permission. The UI requires explicit confirmation before enabling and estimate buttons remain disabled without a key.
+
+### Candidate discovery status
+
+- LastRound AI August 2026 CSV snapshot is CC BY 4.0 and has exactly 9,935 rows: 4,966 Greenhouse, 2,856 Ashby, 2,113 Lever.
+- Import creates low-confidence, unverified candidates only; does not activate or poll boards. Reuses existing provider/slug rows.
+- Snapshot is dated; verify endpoints before activation. No total market coverage percentage is claimed.
+- This still does not deliver autonomous employer/tenant discovery for Workday/Keka/Darwinbox. Hirebase is only a tiny India-focused sample for those providers.
+
+### Immediate next steps (do these in order)
+
+1. Inspect/fix v2/test_hirebase.py method placement and review the current incremental cursor/pagination code.
+2. Add focused tests for cursor persistence/commit semantics and pagination. Ensure estimate-first and hard caps are intact.
+3. Run focused Hirebase/directory tests and git diff --check, compile Python, validate JSON and Compose.
+4. Run the full V2 suite at exact final HEAD. If long-running, use a background job and poll until completed; do not abandon it.
+5. Validate dashboard JS using GitHub Actions/modern Node. VM Node 12 cannot parse existing optional chaining/nullish-coalescing syntax; do not rewrite unrelated JS to satisfy that old runtime.
+6. Update the implementation note and all three handovers with exact final test count, commit SHA, CI run and any remaining blockers.
+7. Only then push branch and create/update a draft PR. No deployment, no Hirebase activation, no key setup or live source enablement without explicit user approval.
+8. Future P0 after this branch: implement first-party global Workday/Keka/Darwinbox company/tenant discovery and a verified-board-to-scheduler pipeline. Use Freehire's provider-isolated workers/outboxes, Career-Ops reverse discovery/per-host concurrency, and ats-scrapers fetcher contracts as architecture references. Do not reuse CC BY-NC company datasets from Career-Ops/Riley aggregator commercially.
+
+### Open-source shortlist
+
+See docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md for details. Leading references: Freehire (ingestion architecture), Career-Ops (reverse discovery and per-host concurrency; dataset is CC BY-NC), ats-scrapers (Python adapters), Job Board Aggregator (Common Crawl and anomaly monitoring; bundled dataset CC BY-NC), JobSpy (non-ATS board adapters), JobNavigator (product UX). Stars are popularity, not latency/rate-limit proof.
+
+## PR and commit checkpoint — 2026-11-09 18:50 IST
+
+- Commit: 533c889574bb6daddece8121c66f208c6fcec8de (`feat: add guarded global ATS discovery foundation`).
+- Branch pushed: `feat/global-ats-discovery-hirebase-guard-20261109`.
+- Draft PR: https://github.com/AvinashBhalla/job-beeper/pull/65 (base `v2-live-radar`).
+- Full V2 regression: 430 tests passed in 385.001 seconds; background job `bjo6lrjfig` exit code 0. Focused discovery/Hirebase suite: 30 passed. Python compile, JSON, Compose config and diff checks passed.
+- Superseded CI note: exact-head GitHub Actions V2 CI run #1427 (42620547252) passed on 999b66543ac162346d42cd3be2c39993c0475a6e, including dashboard JavaScript syntax and the full V2 test suite.
+- PR remains draft/open, unmerged. No deployment or Hirebase requests/activation.\n
+
+## 2026-11-09 18:10 IST — verified CI and updated research
+
+PR #65 is still **open and draft**, mergeable, based on v2-live-radar. Current head is 999b66543ac162346d42cd3be2c39993c0475a6e. Exact-head GitHub Actions V2 CI run #1427 / ID 42620547252 completed successfully, including dashboard JS syntax, focused tests and the full V2 unittest suite. The local full suite is 430/430 (385.001s); focused new tests are 30/30.
+
+The expanded open-source comparison is in docs/OPEN_SOURCE_JOB_SEARCH_REPO_RESEARCH_2026-11-09.md. New high-value finding: current kalil0321/ats-scrapers has Workday, Keka and Darwinbox adapters. Workday uses facet subdivision to address the 2,000-result query cap; Keka exposes credential-free public career portal JSON endpoints; Darwinbox's adapter uses httpcloak for a Cloudflare-protected endpoint. Do not adopt TLS impersonation to evade an anti-bot control. The library's shared Fetcher does Retry-After-aware 429/5xx retries and explicit 403/406 handling. This makes it the best Python provider reference, but not a dependency we should blindly import.
+
+Job Forager's company-list expansion and Workday pagination are useful to study, but inspected HTTP clients disable TLS certificate validation, broadly swallow exceptions and use fixed concurrency rather than persistent host budgets. Do not copy those transport choices. JobSpy is for supplementary job boards and explicitly warns about 429s; it is not a global ATS discovery source.
+
+### Next priorities
+
+1. Keep PR #65 draft while we review the latest research note and migration ordering across sibling branches.
+2. Build an independent, compliant public-board candidate harvester for Workday/Keka/Darwinbox using career-link/sitemap/Common Crawl and trusted directory seeds, with provenance recorded.
+3. Reuse/adapt the allowed Keka public portal extraction pattern and Workday facet-aware pagination. Do not enable the Darwinbox Cloudflare-bypass path; require a documented/public authorised route.
+4. Turn verified candidate boards into a per-board queue with host-aware concurrency, Retry-After, persistent cooldown, jitter, backpressure and page/facet checkpoints.
+5. Run controlled p50/p95, 429, incomplete-page, first-seen-delay and freshness benchmarks before increasing concurrency.
+6. Hirebase remains an optional, dev-only sample until the user supplies a key securely and approves estimate-only testing. Do not use its data in a commercial multi-user product without written permission.
+
+Do not merge or deploy this branch as an assertion that JobBeeper now has complete global ATS coverage. It is the quota-safe sampling and candidate-directory foundation; independent Workday/Keka/Darwinbox employer discovery and full board scheduling remain outstanding.
+
+
+## 2026-11-09 18:15 IST — direct collector gap analysis
+
+New document: docs/ATS_PROVIDER_GAP_ANALYSIS_2026-11-09.md. This compares JobBeeper's actual v2/radar.py collectors against the researched ats-scrapers implementations.
+
+Concrete gaps:
+- Workday in JobBeeper currently has WORKDAY_PAGE_SIZE=20 and WORKDAY_MAX_PAGES_PER_BOARD=1. It only polls the first 20 jobs and has no facet partitioning for large tenants. ats-scrapers explains the hidden 2,000-result per-query cap and uses jobFamilyGroup/timeType/locations/workerSubType partitions.
+- Keka in JobBeeper extracts the public document/feed ID but hardcodes /careers/api/embedjobs/default/active/{id}. ats-scrapers resolves the actual portal path and may call /organization/{portal}/careerportalinfo before the matching portal-specific embedjobs endpoint.
+- Darwinbox in JobBeeper already uses a bounded candidate-site collector and only detects .darwinbox.in boards. Its current code does not use TLS impersonation. The ats-scrapers implementation pins httpcloak against Cloudflare; this is explicitly not approved for reuse. A 403 must remain blocked/not verified unless an authorized documented access path exists.
+- The three collectors still poll source-level config arrays. Board-specific next_due_at, host concurrency budgets, independent backoff/cursors, and a full inventory completion signal are not yet implemented.
+- The directory seed import covers Greenhouse/Ashby/Lever only; Hirebase is not an employer directory. Automatic public employer/tenant discovery for Workday/Keka/Darwinbox remains P0 outstanding.
+
+Next implementation order is now more precise:
+1. Workday: retain fast first-page incremental polling; separately add low-frequency facet-aware full inventory, persisted page/facet checkpoints, completeness and truncated-reason fields.
+2. Keka: resolve actual portal slug from URL, validate it, call matching public portal-info and embed endpoints, test at least two non-default public portals, and add truncation/paging handling.
+3. Darwinbox: preserve .in-only candidate shape and tenant-specific verification; classify 403 separately from 429; no Cloudflare/TLS bypass.
+4. Global discovery: career links + sitemaps + Common Crawl CDX candidate seeds with provenance, confidence and stale-candidate handling.
+5. Per-board queue: host-aware concurrency, per-board due times, Retry-After, cooldown, jitter, backpressure and observable queue age.
+6. Benchmark completeness, p50/p95, 429s and first-seen delay before raising concurrency.
+
+This addendum is static code review and does not change collectors, activate sources, contact ATS providers or spend Hirebase credits.
+---
+
+## 2026-11-09 — Workday inventory implementation checkpoint
+
+**Branch:** feat/global-ats-discovery-hirebase-guard-20261109
+**Worktree:** /tmp/job-radar-global-discovery
+**Current code:** Workday incremental inventory implementation is in the worktree and under full regression testing. It has not been deployed.
+
+### Completed in this work session
+
+1. Added durable SQLite table workday_board_poll_state, keyed by normalized tenant:site, with next inventory offset, last attempt, last full inventory, reported total, provider facets metadata, completion state and truncation reason.
+2. Preserved the fast first Workday page on the existing source poll interval (default 120 seconds).
+3. Added one optional inventory page per board no more often than every 15 minutes. The first pass starts at offset 20; subsequent attempts resume the saved cursor.
+4. Kept detail page requests limited to the fast freshness page. The slower inventory page adds only one list request and derives basic location from listing fields if detail data is absent.
+5. Inventory cursor state is held pending and committed only after upsert_jobs succeeds. A failed inventory page does not advance its offset; its attempt timestamp is persisted so a 120-second source cycle does not hammer the failed page.
+6. Existing Workday 429 Retry-After/cooldown behaviour remains in force.
+7. A short final page or a reached reported total below 2,000 marks a sweep complete; completed sweeps are rechecked weekly.
+8. A response at the 2,000-result ceiling, an early empty page inconsistent with that ceiling, or the local 2,000 offset safety cap is marked truncated/incomplete. The code does not claim full inventory. Facet subdivision remains the next Workday completeness task.
+9. Added admin-only GET /api/workday/inventory-status and Coverage & Health panel UI that shows board, status, reported total, facet count, next offset and truncation reason.
+10. Added tests for persisted cursor commit, first-page cadence, inventory throttling, advancing offsets, failed-page retry throttling, weekly refresh, 2,000-cap truncation and admin-only status.
+
+### Current validation
+
+- Focused tests: 31 passed across Workday collector and global discovery/Hirebase suites.
+- Full V2 test suite is currently running; do not report a final count until job completion.
+- Python compilation and git diff --check passed on the current implementation.
+- VM Node is v12 and cannot parse the dashboard's existing optional chaining/nullish-coalescing syntax. Use exact-head GitHub V2 CI for dashboard JS syntax.
+- No production/shared-dev changes, service restarts, source activation or Hirebase requests occurred.
+
+### Next implementation priorities (updated)
+
+**P0**
+1. Workday facet-aware full inventory. The current cursor paginates up to the 2,000 reported-result ceiling and surfaces truncation; it does not yet partition jobFamilyGroup, timeType, locations or workerSubType.
+2. Keka actual portal slug resolution. Current collector still hardcodes default in /careers/api/embedjobs/default/active/{id}. Implement safe path parsing, optional portal-info call and matching portal-specific embed endpoint; test at least two non-default public boards.
+3. Independent Workday/Keka/Darwinbox employer/tenant discovery. The seed directory in PR #65 only covers Greenhouse/Lever/Ashby; Hirebase is not a complete tenant directory.
+4. Per-board scheduling: due queue, host budget, jitter, persistent cooldown, independent retry/page state and queue-age visibility. Current source-wide scheduler remains a limitation.
+
+**P1**
+5. Darwinbox per-board 403/429/5xx classification and re-verification. Keep blocked 403 visible. No Cloudflare/TLS impersonation or anti-bot bypass.
+6. Benchmark p50/p95 HTTP latency, 429 rate, pages attempted/completed, jobs available vs fetched, first-seen delay and user-feed lag on verified canary boards.
+7. Extend freshness/stale/repost and job legitimacy checks once collection completeness and telemetry are reliable.
+
+**P2**
+8. Broader ATS adapters only after the provider registry, scheduler and health contracts are in place.
+9. Hirebase estimate-only development experiment only after the user adds the key to the dedicated server-side file and explicitly approves testing. Do not use Hirebase for a commercial multi-user product without vendor permission.
+
+### Required from the user
+
+Nothing is required right now. Do not ask for credentials in chat. The Hirebase key remains absent; the server-side development env file is an empty placeholder. Only request the key be added securely when estimate-only validation is actually ready and the user approves it.
+
+### Safe continuation
+
+After the full suite completes, fix any regression, commit the Workday code + tests + UI, push the same PR #65 branch, update the PR description and this handover, and verify exact-head GitHub CI. Keep PR #65 draft until the Workday/Keka/global-discovery milestones have received their own review. Do not merge/deploy solely because CI passes.
+## Next adapter implementation note
+
+After Workday full-suite validation, continue with `docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md`. It contains the exact default/non-default portal behavior, safe URL rules, reference adapter findings and required tests.\n
+## 2026-11-09 19:37 IST — Workday inventory implementation verified locally
+
+Workday now preserves offset 0 on the existing 120-second freshness poll and adds a durable per-board cursor that fetches at most one extra page every 15 minutes. Cursor advances only after upsert; failed pages are throttled without advancing; boards at the 2,000-result cap are explicitly marked incomplete. An admin-only inventory-status API and Coverage & Health panel expose progress. This is not facet-aware full inventory.
+
+Validation: full V2 suite 436 passed in 398.870s (exit code 0); focused Workday/global discovery tests 31 passed. Python compileall, JSON config validation, git diff check and HTML panel wiring passed. Exact-head GitHub CI remains required after push.
+
+Next priorities: Workday facet subdivision; Keka non-default portal slug support; independent public Workday/Keka/Darwinbox employer discovery; per-board scheduler/host budgets; controlled p50/p95 and 429 benchmarks. Darwinbox 403 must remain blocked, with no Cloudflare/TLS bypass.
+
+User action: nothing required now. Hirebase key remains absent and source flags remain off.
+
+Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1947_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n
+
+---
+
+## 2026-11-09 19:47 IST — latest continuation
+
+Workday incremental inventory was pushed as `6197446`; exact-head GitHub V2 CI #1430 passed. Keka portal-aware URL parsing, collection, verification, multi-portal identity and config validation are implemented and pushed. Focused Keka tests: 37 passed; full V2 regression: 439 passed in 359.301s. Keka changes were pushed as afa177b; exact-head GitHub V2 CI #1431 passed. Then prioritize Workday facet-aware inventory, company-agnostic Workday/Keka/Darwinbox public board discovery, and a persistent per-board scheduler. PR #65 stays draft; no deployment/source activation. Hirebase key is absent; nothing required from user.
+
+## 2026-11-09 20:10 IST — Workday facet-aware inventory in progress
+
+The next P0 implementation is now in the worktree. JobBeeper reads Workday facet metadata using the upstream response shape (`facetParameter`, `values[].id`, `values[].count`) and schedules partitions in the order jobFamilyGroup → timeType → locations → workerSubType. It does not copy the upstream library's concurrent fan-out: JobBeeper keeps one inventory page per board per 15-minute interval, a maximum facet depth of 4 and a queue budget of 500.
+
+State is persisted per tenant:site in SQLite (`facet_queue_json`, `active_facets_json`, depth, active-query flag and partition-started flag), with migration helpers for existing tables. The fast 120-second offset-0 poll and detail cap remain unchanged. Stable external IDs + idempotent upsert deduplicate overlapping multi-tag partitions. Incomplete leaves (2,000 cap with no safe next facet, depth limit, no usable facet or queue-budget overflow) remain incomplete.
+
+Admin status/UI adds pending partition count and active filters. Focused Workday collector suite: 21 passed. Full V2 regression job `4c646ih8lj` is running; log `/tmp/job-radar-workday-facets-full-tests.log`. This code is not yet committed/pushed. Read `docs/RECOVERY_CHECKPOINT_2026-11-09_2010_IST.md` for exact continuation instructions.
+
+Workday facet design: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`.
+
+
+## 2026-11-09 20:18 IST — Workday facet partitioning implemented locally
+
+The Workday collector now builds a persisted FIFO facet queue when an unfiltered query hits the 2,000 cap and exposes `jobFamilyGroup`, `timeType`, `locations`, `workerSubType` partitions in priority order. Capped child queries recursively subdivide on an unused facet. It is deliberately sequential (one extra inventory page per board per 15 minutes), with depth cap 4 and queue cap 500. Incomplete leaves/overflow remain incomplete. Queue/active filters are migration-safe SQLite state and commit after upsert. Admin API/UI show pending partitions and active filters.
+
+Validation: focused Workday tests 22 passed; full V2 suite 443 passed in 402.776s; compileall, JSON, diff check and dashboard HTML/panel checks passed. Exact-head CI remains required after push. No live ATS calls; actual tenant facet shapes still require an approved canary. Details: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`; latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2018_IST.md`.
+
+
+## 2026-11-09 20:25 IST — exact final Workday facet tree
+
+The current uncommitted Workday facet implementation now includes the final admin status distinction for `in_progress_incomplete` versus terminal `truncated`. Focused Workday tests are 22/22. The earlier full V2 run passed 443 tests in 402.776s but began before the final status test was added. A second full-suite job `3tjy6iwusp` is running against the exact final tree; see `/tmp/job-radar-workday-facets-final-tests.log`. Run exact-head GitHub CI after push for modern dashboard JS and final full-suite validation.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2025_IST.md`. Facet design: `docs/WORKDAY_FACET_PARTITIONING_2026-11-09.md`.
+
+## Next company-agnostic discovery design (2026-11-09)
+
+New design note: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. Research confirms Common Crawl CDX is heavily rate-limited: serialize requests, no proxies, sleep between calls, and stop for 24 hours after an IP block/503. For broad/high-volume filtering, use the Parquet URL Index via Athena/Spark/Polars/DuckDB rather than frequent CDX wildcard sweeps. The next code step should create a separate unmatched ATS candidate table because current `ats_board_registry` requires a real company ID; do not manufacture employer identities from tenant slugs. Candidate URLs must preserve crawl provenance, be live-verified, and only then linked to the employer board registry.
+
+
+## 2026-11-09 20:30 IST — Workday facet full regression complete
+
+The exact current worktree full V2 suite passed **444 tests in 346.385 seconds**, exit code 0 (job `3tjy6iwusp`, log `/tmp/job-radar-workday-facets-final-tests.log`). Focused Workday collector suite passed 22/22. The final admin `in_progress_incomplete` status test is included in the 444. Compileall, both config JSON files, HTML IDs/panel wiring and `git diff --check` passed. All Workday/Keka/Darwinbox/Hirebase source flags remain false.
+
+Current Workday facet code, dashboard UI and docs are still uncommitted on branch `feat/global-ats-discovery-hirebase-guard-20261109`. Next: inspect diff, commit/push, update PR #65, verify exact-head V2 CI #1432 or later. Keep PR draft; no deployment/source activation.
+
+Next global discovery design: `docs/COMPANY_AGNOSTIC_ATS_DISCOVERY_2026-11-09.md`. It recommends a separate unmatched ATS candidate table and polite Common Crawl indexing; no AWS credentials needed unless choosing the Parquet/Athena bulk path.
+
+
+## 2026-11-09 20:35 IST — Workday facet inventory verified on CI
+
+Workday facet implementation was pushed in `4d7513803031d1c32c02a19ac8452dfb221c02ad`; exact-head GitHub V2 CI #1435 (42640211533) passed, including modern dashboard JS syntax and full V2 tests. Local full V2 suite 444 passed in 346.385s; focused Workday tests 22 passed. Latest recovery checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2035_IST.md`. Next P0: unmatched ATS candidate staging table/admin review-link flow, then serialized Common Crawl candidate discovery; preserve provenance, do not fabricate employer IDs, and require current public live verification before linking/activation.
+
+
+## 2026-11-09 20:24 IST — unmatched ATS candidate staging implemented locally
+
+Added `ats_global_discovery_candidates`, separate from `ats_board_registry` because an unmatched tenant URL has no verified employer identity. Admin-only import/list/link/reject APIs and a Coverage & Health UI panel are implemented. The import path canonicalizes Workday/Keka/Darwinbox public roots, validates HTTPS/provider/method/provenance/capture timestamp, always assigns low confidence, and creates no employer or normal board registry row. Candidate identity includes provider+host+board key. Re-import updates last-seen and keeps newest capture provenance; linked/rejected decisions are preserved. Linking requires an existing company, reuses an exact provider+URL board row when present, otherwise creates a `discovered` board only. Verification and activation remain separate.
+
+The UI allows admins to stage a captured URL, choose method/source/capture time, associate with an existing employer, or reject it. It never creates a placeholder employer. Focused API suite: 11 passed. Full V2 regression job `a8icgcj402` is running; log `/tmp/job-radar-global-candidate-full-tests.log`. HTML candidate IDs and JS workflow wiring passed static checks.
+
+Details: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`. Next: finish full suite, commit/push and exact-head CI; then implement serialized Common Crawl CDX ingestion and current-live board verification. No Common Crawl requests have been made.
+
+
+## 2026-11-09 21:01 IST — final candidate-staging tree and regression run
+
+The candidate staging API/UI remains local and uncommitted. It includes the final refinements: strict source_reference type checking; latest capture timestamp/reference wins; older captures cannot replace newer provenance; discovered_from uses a safe HTTPS source URL or falls back to the canonical board URL; linked registry status is returned accurately; Darwinbox staging uniqueness includes candidate host, while registry board key stays compatible with normal detection. Focused candidate API suite: 11 passed. Final full V2 job `lkscpl0ioe` is running (log `/tmp/job-radar-global-candidate-final-tests.log`).
+
+Latest recovery checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2101_IST.md`. Candidate design: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.
+
+## 2026-11-09 21:11 IST — unmatched ATS candidate staging full regression passed
+
+Candidate staging code/UI/tests/docs now pass the final local V2 regression: **451 passed in 501.840 seconds**, exit code 0 (job `lkscpl0ioe`; log `/tmp/job-radar-global-candidate-final-tests.log`). Focused `GlobalDirectoryApiTests`: 11 passed. Compileall, both config JSON files, diff check, HTML unique-ID/panel checks and candidate/Workday dashboard wiring passed.
+
+Implemented locally but not yet committed/pushed: `ats_global_discovery_candidates` separate from employer and ATS registry; admin-only import/list/link/reject; strict Workday/Keka/Darwinbox canonicalization; provider+host+board-key dedup; capture provenance and terminal state preservation; existing-company-only association; normal board remains discovered/unverified/unactivated; Coverage & Health candidate UI. No placeholder companies.
+
+Next: commit/push to PR #65, update PR body, verify exact-head V2 CI (modern Node JS + full suite). Then serialized Common Crawl CDX worker and sitemap/career-link discovery. Do not run Common Crawl or live ATS calls in this increment.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`; implementation details: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.
+
+
+## 2026-11-09 21:11 IST — latest candidate-staging checkpoint
+
+Unmatched ATS candidate staging is implemented locally on `feat/global-ats-discovery-hirebase-guard-20261109`: new `ats_global_discovery_candidates` table; admin-only import/list/link/reject APIs; strict Workday/Keka/Darwinbox URL canonicalization; host-aware candidate identity; capture provenance and terminal review-state preservation; existing-employer-only linking; normal board remains discovered/unverified/unactivated; Coverage & Health UI.
+
+Validation: focused `GlobalDirectoryApiTests` 11/11 passed; full V2 suite **451 passed in 501.840s**, exit 0 (`lkscpl0ioe`); compileall, config JSON, HTML IDs/panel and `git diff --check` passed. Candidate changes are not yet committed/pushed and require exact-head CI.
+
+Next: commit/push and verify exact-head CI; then serialized Common Crawl CDX candidate harvester with 24h stop after 503 and no parallel/proxy requests, sitemap/career-link discovery, live verification, and per-board scheduling. Nothing required from user; no Hirebase key, all sources off, no live network calls/deployment.
+
+Latest checkpoint: `docs/RECOVERY_CHECKPOINT_2026-11-09_2111_IST.md`; candidate implementation detail: `docs/GLOBAL_ATS_CANDIDATE_STAGING_2026-11-09.md`.
+
+## 2026-11-09 22:09 IST — live feed parity rollout completed
+
+Current feature branch is `feat/global-ats-discovery-hirebase-guard-20261109` at `243da9c35e93979e59d0de281130581cad4124d1`; PR #65 is OPEN/DRAFT/UNMERGED. Exact-head GitHub V2 CI #1437 (`42648073320`) passed all stages. Local final V2 suite: 451 passed in 482.864s; candidate-specific API suite 11 passed.
+
+The owner asked for the same real public feeds in non-production before prod. This is now deployed: shared dev port 8001 and connector QA port 8010 both run image `job-radar-dev-multitenant:243da9c`, image SHA `sha256:75d1f8ffe01335f35a7a7447671d2319f46edb4fcfe5eb9cf829617998de5e31`. Both use separate databases and the same production public board allowlist for eight feeds: Naukri, Greenhouse, Ashby, Workday, SmartRecruiters, Workable, Keka and Darwinbox. LinkedIn stays disabled outside prod due to production telemetry showing 10 HTTP 429s / 7 failed pages. Instahyre, Lever, Hirebase remain off. Notifications/Telegram/Gemini/LLM all off. Production port 8000 was not changed.
+
+Dev has successfully completed the eight-source live pass plus follow-on cycles: 3 runs each for Ashby, Darwinbox, Greenhouse, Keka, Workable, Workday; 2 SmartRecruiters; ongoing Naukri. Last two hours: 0 429, 0 page/board failures. Latest DB 10,259 jobs, 8,221 source_runs, integrity ok, zero notification sends. QA first full live pass: 1,864 jobs across 8 successful source runs, zero 429/page/board failures, integrity ok, zero sends; next 60-minute poll cycle still needs observation.
+
+Deployment/backups/metrics and tunnel links are fully recorded in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/RECOVERY_CHECKPOINT_2026-11-09_2209_IST.md`. Use shared dev at `http://localhost:18001/dashboard/` via `ssh -N -L 18001:127.0.0.1:8001 ubuntu@130.210.27.197`; live connector QA at `http://localhost:18010/dashboard/` via `ssh -N -L 18010:127.0.0.1:8010 ubuntu@130.210.27.197`; synthetic QA remains `http://localhost:18006/dashboard/` and is unchanged.
+
+Connector QA currently has zero users; owner must provision QA-only users interactively (never copy prod users): `sudo docker exec -it job-radar-connectors-qa python -m v2.auth_admin create-admin --email qa-admin@local.test`, then `... create-user --email qa-member@local.test`. CLI prompts for passwords locally.
+
+Next: owner UAT dev/QA + create QA admin/member; observe QA next 60-minute cycle; keep PR #65 draft pending UAT; then merge/review separately. Continue P1 per-board scheduling/host budgets, serialized Common Crawl/sitemap discovery and latency/completeness benchmarking. Do not deploy to production without separate explicit owner approval.
+
+## 2026-11-09 22:19 IST — final QA repeat pass and exact-head docs CI
+
+GitHub Actions V2 CI #1438 / run `42658009285` passed on docs/hand-over commit `b09cba6138035d23f0e413e8a263ff189261f764`. The earlier feature-code commit `243da9c` also passed exact-head CI #1437. PR #65 remains open/draft/unmerged.
+
+A second controlled QA ingestion pass was executed with `radar.run_source()` for all eight enabled providers; source schedule values remained 3,600 seconds and notifications stayed off. Results across two passes per provider:
+
+| Source | Runs | Jobs seen (sum) | New rows (sum) | Requests (sum) | 429 | Page / board failures |
+|---|---:|---:|---:|---:|---:|---:|
+| Naukri | 2 | 398 | 213 | 2 | 0 | 0 / 0 |
+| Greenhouse | 2 | 739 | 370 | 6 | 0 | 0 / 0 |
+| Ashby | 2 | 1,648 | 825 | 4 | 0 | 0 / 0 |
+| Workday | 2 | 47 | 28 | 43 | 0 | 0 / 0 |
+| SmartRecruiters | 2 | 600 | 304 | 46 | 0 | 0 / 0 |
+| Workable | 2 | 12 | 6 | 2 | 0 | 0 / 0 |
+| Keka | 2 | 218 | 109 | 4 | 0 | 0 / 0 |
+| Darwinbox | 2 | 72 | 36 | 2 | 0 | 0 / 0 |
+
+After the second pass QA DB has 1,891 jobs, 16 source runs, 1,891 canonical opportunities, 1,891 global evaluations, 1,891 notification ledger decisions, zero users/preferences, zero sent notifications, and SQLite integrity `ok`. Idempotent feeds returned no new duplicate rows for Ashby, Workable, Keka and Darwinbox; Naukri/Greenhouse/Workday/SmartRecruiters delivered newly available items. The normal 60-minute QA scheduler's next autonomous cycle remains unobserved; the second pass was an explicit controlled test, not a cadence change.
+
+Latest shared dev check: 10,278 jobs, 8,228 source runs, SQLite integrity `ok`, zero sent notifications; health HTTP 200. Production remains untouched.
+
+Only outstanding owner input: create QA-only admin/member interactively with commands documented here, then review admin/member UI on port 8010. Do not copy production credentials/users.
+
+
+## 2026-11-09 — Repository cleanup superseding update
+
+Owner requested removal of extra PR/branch clutter. See `docs/REPOSITORY_CLEANUP_2026-11-09.md` for the complete audit, exact SHAs/tags, PR inventory, retained branch rationale, environment evidence and next-agent checklist.
+
+- Remote branches: 20 → 16. Four superseded docs branches were archived under `archive/repository-cleanup-20261109/*` and then deleted by name.
+- Open PRs: 8 → 7. PR #35 (688-commit V2→main placeholder, GitHub `dirty`) was closed unmerged. `main` and `v2-live-radar` were not changed.
+- Keep PRs #59–#65 as separate, draft review units. Their exact audited heads all have green V2 CI; do not batch-merge because they overlap config and collector files.
+- Dev 8001 and connector QA 8010 remain on the same exact `243da9c` image; both healthy, zero restarts. QA controlled run: 8 providers × 2 passes, 16 successful runs, 1,891 unique live jobs, no 429/page/board failures, DB integrity OK, zero sends. Await the autonomous 60-minute QA cycle and owner role-based QA.
+- Production image/runtime and all production data/credentials were left untouched.
+- Next: provision QA-only admin/member accounts interactively, complete owner UAT, observe autonomous QA cadence, then implement per-board scheduling/host budgets and conservative serialized discovery.
+
+
+## 2026-11-09 — connector QA autonomous cadence checkpoint
+
+The next autonomous 60-minute connector-QA run was observed at 17:05:04 UTC, following the initial scheduled run at 16:05:03 UTC. Eight of eight sources succeeded: 1,879 seen, 25 new, 55 HTTP 200 responses, zero 429/request/page/board failures. QA DB: 1,916 jobs, 24 source_runs, canonical/evaluation/notification-ledger rows 1,916, integrity `ok`, sent notifications 0, users/preferences 0. The autonomous-cycle gate is complete for one interval. Next owner action: create QA-only admin/member accounts interactively and execute role/tenant-isolation UAT on port 8010. Detailed per-source counts are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/REPOSITORY_CLEANUP_2026-11-09.md`.
