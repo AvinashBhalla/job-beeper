@@ -480,6 +480,38 @@ class MatcherTests(unittest.TestCase):
             upgraded = radar._config_fingerprint(BASE_CONFIG)
         self.assertNotEqual(baseline, upgraded)
 
+    def test_operational_and_board_config_do_not_invalidate_evaluations(self):
+        baseline = radar._config_fingerprint(BASE_CONFIG)
+        board_scoped = {
+            **BASE_CONFIG,
+            "ashby_boards": [{"name": "One board", "url": "https://jobs.example/one"}],
+            "greenhouse_boards": [],
+            "source_enabled": {"ashby": True, "greenhouse": False},
+            "poll_seconds": {"ashby": 60, "greenhouse": 120},
+            "concurrency": 1,
+            "require_explicit_experience_for_alerts": False,
+        }
+        self.assertEqual(baseline, radar._config_fingerprint(board_scoped))
+
+    def test_evaluation_settings_change_evaluation_fingerprint(self):
+        baseline = radar._config_fingerprint(BASE_CONFIG)
+        for key, value in (
+            ("target_roles", ["platform engineer"]),
+            ("skills", ["rust"]),
+            ("locations", ["Delhi, India"]),
+            ("title_exclude", ["intern"]),
+            ("excluded_role_terms", ["sales"]),
+            ("remote_only", True),
+            ("candidate_experience_years", 4),
+            ("min_experience_years", 1),
+            ("max_experience_years", 5),
+            ("match_threshold", 70),
+            ("notifications_enabled", False),
+        ):
+            with self.subTest(key=key):
+                changed = {**BASE_CONFIG, key: value}
+                self.assertNotEqual(baseline, radar._config_fingerprint(changed))
+
     def test_description_role_mention_does_not_match_non_engineering_title(self):
         config = {
             **BASE_CONFIG,
@@ -1235,7 +1267,10 @@ class MatcherTests(unittest.TestCase):
                     **BASE_CONFIG,
                     "require_explicit_experience_for_alerts": False,
                 }
-                self.assertEqual(radar.refresh_job_evaluations(relaxed), 1)
+                # This legacy setting is no longer read by the matcher or
+                # alertability policy, so changing it must not invalidate the
+                # persisted evaluation.
+                self.assertEqual(radar.refresh_job_evaluations(relaxed), 0)
 
                 with sqlite3.connect(radar.DB_PATH) as conn:
                     row = conn.execute(

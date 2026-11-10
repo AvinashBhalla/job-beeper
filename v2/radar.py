@@ -1674,8 +1674,30 @@ MATCHER_RULES_VERSION = 3
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
+    # Board-scoped scheduler runs pass a copy of the runtime configuration
+    # with only one ATS board enabled. Poll cadence, source flags and board
+    # lists do not affect match_details() or alertability_details(); including
+    # them here makes every board poll invalidate the entire job inventory.
+    # Keep this allowlist aligned with the configuration read by those two
+    # evaluation functions. Bump MATCHER_RULES_VERSION when their logic changes.
+    evaluation_config = {
+        key: config.get(key)
+        for key in (
+            "target_roles",
+            "skills",
+            "locations",
+            "title_exclude",
+            "excluded_role_terms",
+            "remote_only",
+            "candidate_experience_years",
+            "min_experience_years",
+            "max_experience_years",
+            "match_threshold",
+            "notifications_enabled",
+        )
+    }
     payload = {
-        "config": config,
+        "config": evaluation_config,
         "matcher_rules_version": MATCHER_RULES_VERSION,
     }
     serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")

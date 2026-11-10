@@ -91,3 +91,18 @@ First observed post-deploy examples (not statistically sufficient for new p50/p9
 - Connector QA Naukri: one request about 0.28s; collector 0.50s; shadow 1.08s; upsert 1.89s; evaluation 0.002s; notification 0.092s.
 
 The collector phase includes request time plus parsing/normalization and any source-specific work. The current metrics do not split parser/detail enrichment separately. New request min/max and latency buckets help distinguish network waits from non-network collector cost, but phase timing must be collected for Ashby and Greenhouse before drawing conclusions about their slow baseline runs. Do not tune cadence or concurrency based on the small sample above.
+
+
+## Root cause and corrective implementation — 2026-11-10
+
+The first-hour phase sample showed dev Ashby evaluation median about 52.8s (7 runs) and Greenhouse evaluation median about 47.2s (11 runs), while their median request durations were about 1.4s and 1.2s respectively. Dev had 10,815 jobs and evaluations, and all 10,815 stored evaluation fingerprints differed from the global runtime fingerprint.
+
+Cause: the per-board scheduler passes a scoped configuration to the collector. The old `_config_fingerprint()` hashed the entire configuration, including board lists, source flags and poll cadence. Each board run therefore invalidated the full shared evaluation inventory.
+
+Corrective change on branch `fix/stable-evaluation-fingerprint-20261110`:
+- Fingerprint only the evaluation inputs read by `match_details()` and `alertability_details()` (roles, skills, locations, exclusions, remote-only, experience constraints, match threshold and notification-enabled state), plus `MATCHER_RULES_VERSION`.
+- Board configuration, source enablement, cadence and concurrency no longer invalidate persisted evaluations.
+- Added regression tests that operational/board-only changes preserve the fingerprint, while each evaluation input and matcher-rules version changes it.
+- Focused fingerprint regression tests pass 3/3; full matcher test class passes 97/97. The full CI-equivalent V2 suite is being rerun with the CI-only `httpx2` test dependency installed in an ephemeral container.
+
+Expected rollout behavior: because the old persisted fingerprint scheme differs, the first normal run after this code is deployed will re-evaluate the inventory once. After that migration completes, board-scoped runs should not repeatedly re-evaluate all existing jobs. Do not manually invoke a full refresh or change scheduler cadence/concurrency. Verify the mismatch count reaches zero and stays zero over subsequent naturally scheduled board runs.
