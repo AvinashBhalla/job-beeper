@@ -70,9 +70,9 @@ The active board inventory is 10 boards across 7 ATS providers and 7 host keys:
 
 ### Live poll coverage after deployment
 
-Dev has now completed a full natural post-release board cycle: all 10 of 10 active board rows have a last-finished timestamp later than the 08:47:47 UTC rollout and all latest outcomes are success. The Dev database currently has 10,847 jobs and 10,847 evaluations, zero fingerprint mismatches, SQLite integrity ok and zero sent notifications. The 10 boards' next due times have advanced normally; no manual poll was triggered.
+Dev has now completed a full natural post-release board cycle: all 10 of 10 active board rows have a last-finished timestamp later than the 08:47:47 UTC rollout and all latest outcomes are success. The Dev database currently has 10,850 jobs and 10,850 evaluations, zero fingerprint mismatches, SQLite integrity ok and zero sent notifications. The 10 boards' next due times have advanced normally; no manual poll was triggered.
 
-Connector QA uses a 60-minute board cadence. At 09:18 UTC, one Naukri relay run had completed after the 08:53:27 UTC rollout, while 0/10 board rows had yet reached their next due time. Their next due times fall between 09:44 and 09:52 UTC. Continue observing until every QA board has completed one full post-deploy cycle. Do not manually trigger polls to accelerate this.
+Connector QA uses a 60-minute board cadence. At 09:18 UTC, one Naukri relay run had completed after the 08:53:27 UTC rollout, while 0/10 board rows had yet reached their next due time. A follow-up at 09:18 UTC reconfirmed 0/10 post-release QA board rows; their next due times fall between 09:44:56 and 09:52:46 UTC. Continue observing until every QA board has completed one full post-deploy cycle. Do not manually trigger polls to accelerate this.
 
 ### Phase timing signal
 
