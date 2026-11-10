@@ -339,3 +339,18 @@ The global discovery implementation is a candidate-discovery capability, not a c
 ### PR #69 CI checkpoint — 2026-11-10
 
 The stable evaluation-fingerprint fix passed exact-head V2 CI (run `42782187621`, code head `4092b22`). PR #69 is open and unmerged. Next release action remains review/merge approval, then controlled dev-first and connector-QA rollout with a one-time fingerprint migration.
+
+
+## 2026-11-10 — reference JobBeeper reverse-engineering learnings
+
+The supplied reference-product report confirms the public browse/detail experience, visible source provenance labels, pricing/alert claims and (as reported) a common authenticated browser-facing `/api/user/jobs` list endpoint. It does **not** reveal the private ingestion mechanism: direct board APIs, ATS feeds, career-page crawling, company registry construction, scheduler/queues and true publication-to-alert latency remain unknown. The separate authenticated network-evidence file referenced in the report was not embedded in the uploaded Markdown and must be inspected before its detailed request/response evidence is treated as independently re-audited.
+
+The most important project comparison is that our shared ingestion architecture and bounded company-agnostic discovery path already exist. PR #67 merged as `5d6e2b467be102de7056cf6681e1de13b0c3244f` added a bounded Common Crawl CDX sampler for Workday/Keka/Darwinbox plus public sitemap/careers-link discovery. It is deliberately admin-triggered; low-confidence candidates enter review and do not automatically create/activate boards or send notifications. Admin review, public verification, explicit activation and silent first-inventory baselining remain required. This is not yet autonomous discovery of every company on every ATS.
+
+Keep global adapter/board controls separate from personal source preferences. A user source toggle must filter only that user's feed/matches/notifications; it must never stop shared collection for other users. Whether this is fully implemented in the exact current code/UI is an open audit item, not a documentation-based assumption.
+
+Use `docs/JOBBEEPER_REVERSE_ENGINEERING_LEARNINGS_2026-11-10.md` as the research synthesis. It records VERIFIED/INFERRED/UNKNOWN boundaries, the evidence-file caveat, target architecture, P0/P1/P2 priorities and what not to infer. The uploaded report remains the source for reference-product observations.
+
+### Superseding GitHub state — 2026-11-10
+
+The older PR #69 note above said the stable evaluation-fingerprint change was open/unmerged. It is superseded: PR #69 is now merged into `v2-live-radar` as `18f219dfab4ad6f2c5ad9b9704da5d3a220f7d37`. This is the application-code baseline before the documentation-only research updates below. Do not infer deployment status from the merge alone.
