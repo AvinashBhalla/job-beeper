@@ -7144,3 +7144,58 @@ Owner requested removal of extra PR/branch clutter. See `docs/REPOSITORY_CLEANUP
 ## 2026-11-09 — connector QA autonomous cadence checkpoint
 
 The next autonomous 60-minute connector-QA run was observed at 17:05:04 UTC, following the initial scheduled run at 16:05:03 UTC. Eight of eight sources succeeded: 1,879 seen, 25 new, 55 HTTP 200 responses, zero 429/request/page/board failures. QA DB: 1,916 jobs, 24 source_runs, canonical/evaluation/notification-ledger rows 1,916, integrity `ok`, sent notifications 0, users/preferences 0. The autonomous-cycle gate is complete for one interval. Next owner action: create QA-only admin/member accounts interactively and execute role/tenant-isolation UAT on port 8010. Detailed per-source counts are in `docs/LIVE_FEED_ENVIRONMENT_PARITY_2026-11-09.md` and `docs/REPOSITORY_CLEANUP_2026-11-09.md`.
+
+## 2026-11-09 — persistent per-board scheduler in progress
+
+A stacked feature branch `feat/per-board-scheduler-20261109` is being developed in `/tmp/job-radar-board-scheduler` on top of global ATS discovery. See `docs/PER_BOARD_SCHEDULER_2026-11-09.md` for schema, host scheduling policy, board-level baseline safety, admin API/UI, tests and next steps. No live containers were changed. Final full V2 test/CI and isolated Desktop browser QA are still required before PR merge or deployment.
+
+Candidate scheduler smoke test (2026-11-09): 10/10 boards across 8 providers succeeded; 1,660 jobs, 53 HTTP 2xx, 0 rate limits/exceptions/page failures/board failures, SQLite integrity ok, 0 sent notifications. Candidate is isolated at loopback port 18011 with a fresh volume; dev/QA/prod unchanged. Read `docs/CANDIDATE_QA_SMOKE_2026-11-09.md`; Desktop visual/role QA and exact-head CI are the remaining gates.
+
+## Continuation checkpoint — 2026-11-10 09:28 IST
+
+This is the latest verified state after the prior chat hit a delivery timeout. The agent was verifying the final CI test count; CI had in fact completed successfully.
+
+- Feature branch: `feat/per-board-scheduler-20261109`.
+- Feature commit: `06a2ca472c4cc8368b27c4c8ee4a86aa91a6eb1e`.
+- Draft PR: [#66](https://github.com/AvinashBhalla/job-beeper/pull/66), stacked on draft PR #65 (`feat/global-ats-discovery-hirebase-guard-20261109`). Review/merge #65 first, then #66. No deployment or merge has occurred.
+- Exact-head GitHub Actions V2 CI: run #1444 (`42676092793`) passed on `06a2ca4`. The completed `syntax` job shows Python compile, dashboard JS syntax, focused router/extractor tests and full V2 unittest suite all succeeded. The downloaded job log reports **466 tests in 60.421 seconds; OK**.
+- Local targeted scheduler/discovery suite: **52 tests passed** after the final retained-history baseline and cooldown tests.
+- Candidate image: `job-radar-board-scheduler:candidate`, image digest `sha256:339bd42f54e3f51beedba1a576a55861f992f381d89a54e261505aa5c1b6429c`.
+- Candidate container: `job-radar-board-scheduler-qa`, loopback-only `127.0.0.1:18011`, isolated volume `job-radar-board-scheduler-qa-data`; it was rebuilt from the exact feature commit and restarted without replacing dev, connector-QA, synthetic-QA or production. Private Termalin internal-site access was created for owner browsing.
+- Candidate first-pass live-feed result: **10/10 boards succeeded** across eight ATS providers; 1,660 jobs observed; 53/53 HTTP 2xx; zero 429s, request exceptions, page failures or board failures; SQLite integrity `ok`; all 10 baselines cleared; no sent notifications. Seven API hosts were represented. Workday had 15 facet partitions queued, so its total inventory remains explicitly incomplete.
+- Dashboard JS syntax passed with Node 22; `/dashboard/`, `/dashboard/app.js` and `/dashboard/auth.js` returned HTTP 200. Anonymous scheduler telemetry returned HTTP 401 as expected.
+- The isolated candidate has no test users yet. Owner-created QA-only admin and member accounts plus a Desktop browser report are the outstanding acceptance tasks. Exact commands and a browser test prompt are provided in the continuation response. Do not place passwords in command-line arguments or paste them into chat.
+
+Next work: have the owner provision QA-only accounts and run the Desktop browser prompt against the isolated candidate. Review the report, fix any issues, update this file and the smoke-test report, then keep #66 draft until the owner accepts the browser QA. Only after #65 is merged should #66 be retargeted/rebased and considered for merge. Do not deploy to dev/QA/prod merely because CI passed.
+
+## Extended autonomous scheduler observation — 2026-11-10 09:30 IST
+
+A later read-only inspection confirms the candidate continued operating after the initial smoke test rather than merely remaining healthy. The isolated container has remained up with restart count zero. It recorded 100 source runs across the 10 scheduled boards during the overnight observation window. Per-source records are consistent with ten polls per board: Ashby 20 runs for two boards, Greenhouse 30 runs for three boards, and one board each for Darwinbox, Keka, SmartRecruiters, Workable and Workday (10 runs each).
+
+| Provider | Board count | Source runs | Aggregate jobs seen | Aggregate new jobs | Requests | 429 / exceptions / page failures / board failures |
+|---|---:|---:|---:|---:|---:|---|
+| Ashby | 2 | 20 | 8,270 | 839 | 20 | 0 / 0 / 0 / 0 |
+| Darwinbox | 1 | 10 | 356 | 36 | 10 | 0 / 0 / 0 / 0 |
+| Greenhouse | 3 | 30 | 3,685 | 371 | 30 | 0 / 0 / 0 / 0 |
+| Keka | 1 | 10 | 1,090 | 109 | 20 | 0 / 0 / 0 / 0 |
+| SmartRecruiters | 1 | 10 | 2,999 | 319 | 230 | 0 / 0 / 0 / 0 |
+| Workable | 1 | 10 | 60 | 6 | 10 | 0 / 0 / 0 / 0 |
+| Workday | 1 | 10 | 362 | 201 | 219 | 0 / 0 / 0 / 0 |
+| **Total** | **10** | **100** | **16,822** | **1,881** | **539** | **All zero** |
+
+These are cumulative *observations*, not unique jobs. The database contains 1,881 unique job rows and 1,881 notification-ledger rows. Every board's latest outcome is success, every consecutive failure count is zero, all 10 baselines are clear, all 7 host records have no active lease, no HTTP 429 was recorded, no notifications have been sent, no QA users exist yet, and SQLite integrity remains `ok`. Container health returns HTTP 200 and restart count is zero. The most recent run records are spread across the providers at the expected staggered times.
+
+This is extended cadence evidence, but it is still one isolated candidate configuration and not a production load/SLA certification. The Desktop browser/admin/member acceptance is pending.
+
+Desktop test prompt and owner setup are documented in `docs/DESKTOP_QA_PROMPT_2026-11-10.md`; wait for the owner to provision the isolated admin/member accounts and return the generated Desktop report. Keep PR #66 draft until the report has been reviewed.
+
+## Final exact-head CI result — 2026-11-10
+
+- Latest code/docs head before this documentation-only result entry: `e3a9be13abd69b023ea7d2f0703b47f0beeb00a4`.
+- GitHub Actions V2 CI **run #1446** (`42753221761`) completed successfully on that exact SHA: https://github.com/AvinashBhalla/job-beeper/actions/runs/42753221761
+- The successful job ran Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32), and the full V2 unittest suite (**466 tests in 62.218 seconds, OK**). Do not confuse the focused 32-test subset with the full suite.
+- The branch's final documentation-only changes do not modify application code; the code and browser assets tested by #1446 are unchanged.
+
+## 2026-11-10 — QA evidence follow-up
+
+Owner Desktop report reviewed and supplemented in docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. Direct no-cookie GET to candidate scheduler status returned HTTP 401, closing the anonymous auth gap. Member 403 and member responsive checks remain PASS from the owner report. Admin post-handoff responsive/reload and screenshot file export remain BLOCKED/UNKNOWN. Revised evidence totals are PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4; recommendation remains BLOCKED. Do not merge or deploy PR #66 until the remaining admin evidence and screenshot artifacts are reviewed.

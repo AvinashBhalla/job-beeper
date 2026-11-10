@@ -143,6 +143,29 @@ class BoardDiscoveryApiTests(unittest.TestCase):
         self.db_patch.stop()
         self.temp_dir.cleanup()
 
+    def test_board_scheduler_status_is_admin_only_and_reports_persisted_due_times(self):
+        config = radar.get_config()
+        config["source_enabled"]["greenhouse"] = True
+        config["greenhouse_boards"] = [{"token": "scheduler-alpha", "company": "Scheduler Alpha"}]
+        saved = radar.save_config(config)
+        radar.board_scheduler.sync_config(str(self.db_path), saved)
+
+        response = self.client.get("/api/discovery/scheduler/status")
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["active_boards"], 1)
+        self.assertEqual(body["max_concurrent_boards_per_host"], 1)
+        self.assertEqual(body["boards"][0]["source"], "greenhouse")
+        self.assertEqual(body["boards"][0]["board_key"], "scheduler-alpha")
+        self.assertIsNotNone(body["boards"][0]["next_due_at"])
+
+        anonymous = TestClient(radar.app, base_url="https://testserver")
+        try:
+            denied = anonymous.get("/api/discovery/scheduler/status")
+            self.assertIn(denied.status_code, {401, 403})
+        finally:
+            anonymous.close()
+
     def test_admin_can_scan_and_review_discovered_board_without_enabling_source(self):
         fake_result = {
             "company_name": "Acme", "website_url": "https://acme.example/",
@@ -238,6 +261,11 @@ class BoardDiscoveryApiTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute("SELECT review_status,baseline_pending FROM ats_board_registry WHERE id=?", (board_id,)).fetchone()
         self.assertEqual(row, ("active", 1))
+        schedule = self.client.get("/api/discovery/scheduler/status").json()
+        scheduled_board = next(item for item in schedule["boards"] if item["registry_id"] == board_id)
+        self.assertEqual(scheduled_board["board_key"], "acme")
+        self.assertTrue(scheduled_board["baseline_pending"])
+        self.assertEqual(scheduled_board["is_active"], 1)
 
     def test_activation_links_preconfigured_greenhouse_board_without_duplicate(self):
         board_id = self._insert_verified_greenhouse_board()
@@ -332,6 +360,9 @@ class BoardDiscoveryApiTests(unittest.TestCase):
         self.assertEqual(config["greenhouse_boards"], [])
         self.assertFalse(config["source_enabled"]["greenhouse"])
         self.assertTrue(config["source_enabled"]["naukri"])
+        schedule = self.client.get("/api/discovery/scheduler/status").json()
+        record = next(item for item in schedule["boards"] if item["registry_id"] == board_id)
+        self.assertEqual(record["is_active"], 0)
 
     def test_board_deactivation_requires_admin_and_csrf(self):
         board_id = self._insert_verified_greenhouse_board()
