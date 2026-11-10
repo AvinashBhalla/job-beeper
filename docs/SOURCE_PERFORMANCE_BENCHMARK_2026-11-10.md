@@ -79,3 +79,15 @@ Profile slow source runs before tuning the scheduler:
 - use existing tests and exact-head V2 CI; no UI work is required.
 
 Workday facet partitioning, Keka non-default portal parsing/collection and Darwinbox collection are already present in the current integration code with focused tests. The remaining live-validation gaps are: a Workday tenant that actually reaches the 2,000-result cap, a real non-default Keka portal, and broader tenant coverage. Do not claim those cases are validated by the current NVIDIA/Bridgestone/Arvind live boards.
+
+
+## Telemetry follow-up after PR #68 deployment (same day)
+
+PR #68 merged as 1763673 and its image was deployed to shared dev and connector QA. New metrics are now available; historical rows remain NULL for newly introduced phase fields.
+
+First observed post-deploy examples (not statistically sufficient for new p50/p95 estimates):
+- Dev SmartRecruiters: 23 requests; request min/max about 482/2,400 ms; collector 19.39s; shadow 0.21s; upsert 0.99s; evaluation 0.71s; notification 0.78s.
+- Dev Naukri: one request about 2.99s; collector 3.10s; shadow 1.91s; upsert 2.08s; evaluation 0.095s; notification 0.80s.
+- Connector QA Naukri: one request about 0.28s; collector 0.50s; shadow 1.08s; upsert 1.89s; evaluation 0.002s; notification 0.092s.
+
+The collector phase includes request time plus parsing/normalization and any source-specific work. The current metrics do not split parser/detail enrichment separately. New request min/max and latency buckets help distinguish network waits from non-network collector cost, but phase timing must be collected for Ashby and Greenhouse before drawing conclusions about their slow baseline runs. Do not tune cadence or concurrency based on the small sample above.

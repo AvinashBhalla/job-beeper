@@ -1,93 +1,57 @@
-# JobBeeper — 2026-11-10 Recovery & Continuation Handover
+# JobBeeper recovery and continuation checkpoint — 2026-11-10 (13:22 IST)
 
-## User direction
-- Prioritize working functionality over UI polish or screenshot evidence.
-- Document progress before continuing after interruptions.
-- Ship validated changes to `v2-live-radar`, keep GitHub tidy, then proceed to the next task.
-- Do not spend time on the remaining visual QA unless it blocks functionality or acceptance.
+## Why this checkpoint exists
+The prior ChatGPT response stalled during post-deployment verification. The work below was completed on the VM and GitHub before the interruption; this note is the canonical restart point.
 
-## Completed before this task
-### Integration and release
-- PR #65 (guarded global ATS discovery foundation) merged to `v2-live-radar`.
-- PR #66 (persistent per-board ATS scheduler) merged to `v2-live-radar`.
-- Integration head at start of this work: `dee7b36` (verify current remote head before pushing).
-- V2 CI recorded 466 passing tests on the combined application changes.
-- Candidate scheduler smoke test: 10 boards, zero failures, no notifications sent.
+## Merged work
+### PR #67 — bounded company-agnostic ATS discovery
+- Merged to `v2-live-radar` as `5d6e2b467be102de7056cf6681e1de13b0c3244f`.
+- Adds manual/admin-only Common Crawl and robots-aware sitemap/career-link discovery.
+- Candidates only; no automatic provider activation or notifications.
+- Full V2 CI passed; focused discovery/API tests 34 passed.
 
-### Dev / connector QA rollout
-- Built image `job-radar-dev-multitenant:dee7b36` from the merged integration tree.
-- Replaced `job-radar-dev` and `job-radar-connectors-qa` using that image while preserving their existing volumes, environment, ports and mounted configs.
-- Previous containers retained, stopped, for rollback:
-  - `job-radar-dev-pre-scheduler-20261110`
-  - `job-radar-connectors-qa-pre-scheduler-20261110`
-- Verified database backups and exact live-feed config copies at:
-  `/tmp/job-radar-release-backups/2026-11-10-pre-scheduler-promotion/`
-  with SHA256SUMS.
-- Both replacement containers reached HTTP 200 health and were running with zero restarts.
-- The earlier audit showed all 10 board schedules successful in connector QA; dev had successful live polls and remaining schedules running/queued. Repeat the read-only audit if needed; do not change config or send notifications.
-- Dev and QA share the same provider/board allowlist; QA intentionally uses a slower 60-minute cadence than dev. Notifications are disabled.
+### PR #68 — source phase and request latency telemetry
+- Merged to `v2-live-radar` as `1763673dc638487fb2fd23a8f2ba1d74b81e1a4c`.
+- Exact-head full V2 CI run 42771424120 passed, including full unittest suite.
+- Adds collector, shadow, upsert, evaluation and notification timings; request min/max and bounded latency histograms; migration-safe fields and admin source-status reporting.
+- Focused telemetry/status/latency tests passed 17/17 after updating the manually constructed legacy-schema test fixtures.
 
-### GitHub cleanup
-- PRs #65 and #66 merged.
-- Six stale/unmergeable draft PRs #59–#64 closed with explanatory comments.
-- Their exact heads preserved as annotated tags under `archive/deferred-prs-20261110/pr-59-...` through `pr-64-...`.
-- Their remote feature branches deleted only after tagging.
-- PR #65/#66 feature branches deleted after merge.
-- GitHub open-PR inventory was zero at the end of cleanup. Recheck before opening the next PR.
+## Deployment completed
+- Image: `job-radar-dev-multitenant:1763673`.
+- Replaced shared dev and connector QA containers with the merged image.
+- Existing volumes, environment, config and ports were preserved by recreating containers from their existing Docker inspect metadata.
+- Previous containers retained for rollback:
+  - `job-radar-dev-pre-source-phase-telemetry-20261110`
+  - `job-radar-connectors-qa-pre-source-phase-telemetry-20261110`
+- Pre-deploy SQLite backups, copied live-feed configs and SHA256SUMS:
+  `/tmp/job-radar-release-backups/2026-11-10-pre-source-phase-telemetry/`
+- Production was not changed.
 
-## Current task — company-agnostic ATS discovery candidates
-- Branch/worktree created from the merged integration head:
-  - Branch: `feat/company-agnostic-ats-discovery-20261110`
-  - Worktree: `/tmp/job-radar-company-discovery-20261110`
-- The new module `v2/global_ats_discovery.py` has been written but is **not yet integrated, tested, committed or pushed**.
-- It contains:
-  1. Common Crawl catalogue refresh and one-provider-at-a-time CDX requests for Workday, Keka and Darwinbox.
-  2. A persistent SQLite lease, 60-second minimum request interval, 24-hour cooldown on HTTP 429/503, bounded response sizes and rotating provider state.
-  3. Public sitemap and career-link discovery with robots.txt checks, same-host redirects only, bounded documents/pages, per-host request budgets and cooldown.
-  4. Candidate-only import callback; no source activation or direct employer creation by the module.
-  5. Status/history reporting without exposing lease tokens.
-- Existing discovery contracts inspected in `v2/board_discovery.py`, existing candidate scan integration inspected in `v2/radar.py`, and SQLite helper inspected in `v2/sqlite_store.py`.
-- Current worktree was clean before the new module was written; verify exact status and diff.
+## Post-deploy checks already observed
+- Dev health HTTP 200; image tag correct; restart count zero; DB integrity `ok`; 10 active board schedules; zero sent notifications.
+- Connector QA health HTTP 200; image tag correct; restart count zero; DB integrity `ok`; 10/10 active schedules reporting `success`; zero sent notifications.
+- Schema migration ran on both volumes: new columns are present.
+- Fresh telemetry rows are being written. Example:
+  - Dev SmartRecruiters: 23 requests; request min/max ~482/2,400 ms; collector ~19.4s; shadow ~0.21s; upsert ~0.99s; evaluation ~0.71s; notification ~0.78s.
+  - Dev Naukri: 1 request ~2.99s; collector ~3.10s; shadow ~1.91s; upsert ~2.08s; evaluation ~0.095s; notification ~0.80s.
+  - Connector QA Naukri: 1 request ~0.28s; collector ~0.50s; shadow ~1.08s; upsert ~1.89s; evaluation ~0.002s; notification ~0.092s.
+- Historical source_runs rows correctly retain nulls for new telemetry fields; new rows populate them.
+- The first dev/QA query after rollout completed only partially due SQLite lock/wait contention while active poll cycles ran. Follow-up QA checks succeeded. Prefer short per-container read-only queries with busy_timeout=60000.
 
-## Immediate next steps (do not skip)
-1. Confirm remote `v2-live-radar` head and current worktree status; retain the existing branch.
-2. Inspect the new module for correctness, simplify/fix any defects, and write focused tests:
-   - Common Crawl catalogue parsing, provider rotation, throttle/lease/cooldown, 429/503.
-   - CDX candidate validation and truncation.
-   - robots.txt, sitemap index/urlset, same-host redirects, cross-host rejection, SSRF/private-host rejection, host cooldown, malformed/oversized XML.
-   - importer only stages candidates; it must not activate a provider or send notifications.
-3. Wire explicit admin-triggered/manual discovery into existing candidate importer/status surfaces only if the current authorization and candidate staging contracts support it. Do not add an uncontrolled startup scan or broad background crawler.
-4. Run focused tests, then the full V2 suite. Fix functional failures; ignore UI polish.
-5. Document test results and operational safety limits in this file before pushing.
-6. Commit and push the feature branch; open one PR to `v2-live-radar`.
-7. Merge only after CI passes and diff is limited to this task. Deploy dev first, verify health, DB integrity, and candidate-only behavior; then connector QA. Keep production untouched unless explicitly requested.
-8. Clean merged branch and any superseded branches only after preserving required work.
+## Current worktrees
+- Discovery release worktree: `/tmp/job-radar-roadmap-update-20261110`, detached at docs commit `6c89292`.
+- Source telemetry worktree: `/tmp/job-radar-source-perf-20261110`, feature branch for PR #68.
+- Release worktree: `/tmp/job-radar-release-source-perf-20261110`, detached at merge commit `1763673`.
+- Feature branch for PR #68 should be deleted after successful merge confirmation; it is not required for ongoing work.
 
-## Safety / release invariants
-- Discovery produces low-confidence candidates only; it must never silently activate a board or enable a source.
-- Respect robots.txt and host request budgets; no cross-host redirects for sitemap crawling.
-- No notification sends from discovery.
-- No unbounded crawling, response reads, redirects, or concurrent Common Crawl requests.
-- Keep dev/QA live-feed configurations identical in provider/board coverage; preserve their intended cadence differences.
-- Preserve rollback containers and backups until post-deploy checks pass.
+## Continue from here
+1. Update this file and the performance benchmark/roadmap with the confirmed PR #68 merge/deployment and fresh telemetry values.
+2. Verify current dev/QA health, image, restarts, DB integrity, schedule outcomes and sent notification count. Preserve cadence/config.
+3. Inspect only naturally occurring post-deployment runs for Ashby and Greenhouse (and SmartRecruiters) to collect comparable phase timings. Do not trigger manual runs or shorten cadences.
+4. Compare collector versus shadow/upsert/evaluation/notification durations. Collector duration includes network and parser/normalizer work; request min/max/histogram helps isolate network latency. This version does not yet have a separate parse/detail-enrichment timer.
+5. Continue by instrumenting a more granular Ashby/Greenhouse collector phase only if the fresh telemetry shows collector remains the dominant source of elapsed time and request timings do not explain it.
+6. Keep production untouched. Do not change poll intervals, concurrency, rate limits, sources or notification settings during profiling.
+7. For further code changes, focused tests + full V2 CI + PR to `v2-live-radar`, then dev first and connector QA. Keep both rollback containers and database backups until stable.
 
-## 2026-11-10 continuation checkpoint
-- Recovery handover committed and pushed first as `6d9390f`.
-- Added `v2/global_ats_discovery.py` and integrated it into `v2/radar.py`:
-  - startup only initializes schema; no automatic network scan is launched;
-  - three admin-only endpoints expose status, one Common Crawl request, and one public sitemap scan;
-  - both paths use the existing global candidate importer.
-- Added `v2/test_global_ats_discovery.py`.
-- Focused tests: **12/12 passed** in an isolated container created from the current dev image. Host Python lacks the test dependencies, so tests ran against the same Python/runtime dependencies as the deployed app.
-- Functional fixes from review:
-  - Common Crawl batch cap is 200 to match the existing importer contract;
-  - optional missing sitemap documents (404) are skipped rather than failing the host scan;
-  - Common Crawl request errors are recorded and the lease is released instead of being left until lease expiry.
-- `python -m py_compile` passed for the discovery module, its tests and `radar.py`; `git diff --check` passed.
-- Full V2 pytest suite is currently running in the isolated test container. Do not deploy or merge until it completes and CI passes.
-- Added an API integration test for the new admin-only discovery endpoints: status works for admins, member access is denied, invalid sitemap payloads return 422, and manual Common Crawl/sitemap calls delegate to the candidate importer. The test passed independently in the app runtime.
-- PR #67 is open against `v2-live-radar`. Its first GitHub V2 CI run passed, including the full V2 unittest suite. The API integration test was added after that run and is being pushed for a fresh CI pass.
-- To avoid spending further time on a redundant local full-suite run, the long local pytest discovery run was stopped after 24% progress; the authoritative GitHub V2 CI full unittest suite had already passed on the implementation commit. A fresh full CI run is now in progress for the follow-up API test commit `1628d05`.
-- Focused pytest for the discovery and global-candidate integration files completed: **34 passed, 4 warnings**. The standalone API route test passed as part of that run; discovery unit tests account for 12 of the 34.
-
-- Latest full GitHub V2 CI run before this documentation-only correction: run 42768060069, conclusion SUCCESS on implementation/test commit 2e66489; both focused router/extractor tests and full V2 unittest discovery passed. The full V2 suite includes the new discovery module tests and the new admin-route integration test.
+## Outstanding QA limitations
+- The prior desktop/browser screenshot evidence items for PR #66 remain separate from server/API behavior. They do not block the already merged board scheduler or current telemetry release; don't restart that UI effort unless explicitly requested.
