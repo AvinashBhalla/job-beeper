@@ -97,3 +97,22 @@ This is the latest verified state after the prior chat hit a delivery timeout. T
 - The isolated candidate has no test users yet. Owner-created QA-only admin and member accounts plus a Desktop browser report are the outstanding acceptance tasks. Exact commands and a browser test prompt are provided in the continuation response. Do not place passwords in command-line arguments or paste them into chat.
 
 Next work: have the owner provision QA-only accounts and run the Desktop browser prompt against the isolated candidate. Review the report, fix any issues, update this file and the smoke-test report, then keep #66 draft until the owner accepts the browser QA. Only after #65 is merged should #66 be retargeted/rebased and considered for merge. Do not deploy to dev/QA/prod merely because CI passed.
+
+## Extended autonomous scheduler observation — 2026-11-10 09:30 IST
+
+A later read-only inspection confirms the candidate continued operating after the initial smoke test rather than merely remaining healthy. The isolated container has remained up with restart count zero. It recorded 100 source runs across the 10 scheduled boards during the overnight observation window. Per-source records are consistent with ten polls per board: Ashby 20 runs for two boards, Greenhouse 30 runs for three boards, and one board each for Darwinbox, Keka, SmartRecruiters, Workable and Workday (10 runs each).
+
+| Provider | Board count | Source runs | Aggregate jobs seen | Aggregate new jobs | Requests | 429 / exceptions / page failures / board failures |
+|---|---:|---:|---:|---:|---:|---|
+| Ashby | 2 | 20 | 8,270 | 839 | 20 | 0 / 0 / 0 / 0 |
+| Darwinbox | 1 | 10 | 356 | 36 | 10 | 0 / 0 / 0 / 0 |
+| Greenhouse | 3 | 30 | 3,685 | 371 | 30 | 0 / 0 / 0 / 0 |
+| Keka | 1 | 10 | 1,090 | 109 | 20 | 0 / 0 / 0 / 0 |
+| SmartRecruiters | 1 | 10 | 2,999 | 319 | 230 | 0 / 0 / 0 / 0 |
+| Workable | 1 | 10 | 60 | 6 | 10 | 0 / 0 / 0 / 0 |
+| Workday | 1 | 10 | 362 | 201 | 219 | 0 / 0 / 0 / 0 |
+| **Total** | **10** | **100** | **16,822** | **1,881** | **539** | **All zero** |
+
+These are cumulative *observations*, not unique jobs. The database contains 1,881 unique job rows and 1,881 notification-ledger rows. Every board's latest outcome is success, every consecutive failure count is zero, all 10 baselines are clear, all 7 host records have no active lease, no HTTP 429 was recorded, no notifications have been sent, no QA users exist yet, and SQLite integrity remains `ok`. Container health returns HTTP 200 and restart count is zero. The most recent run records are spread across the providers at the expected staggered times.
+
+This is extended cadence evidence, but it is still one isolated candidate configuration and not a production load/SLA certification. The Desktop browser/admin/member acceptance is pending.
