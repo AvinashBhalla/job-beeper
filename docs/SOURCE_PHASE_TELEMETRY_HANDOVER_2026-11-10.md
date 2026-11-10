@@ -54,3 +54,4 @@ Goal: add low-overhead phase-level timings to source_runs so slow source runs ca
 - Instrumentation uses monotonic timers and does not change collector, polling, notification or matching behavior.
 - Focused SourceRequestMetricsTests: **6/6 passed**, including success, collector error, histogram, API aggregation and additive migration tests.
 - Python compilation and git diff check passed. Exact-head full V2 CI remains required before merge/deploy.
+- First full CI run found seven source-status tests using a hand-built legacy source_runs fixture that did not include the newly migrated columns. Production startup runs init_db migrations; the fixture was updated to represent the current schema. The affected SourceRequestMetricsTests and SourceStatusPersistenceTests now pass 10/10 together in the application runtime. A fresh full V2 CI run is required on this correction.
