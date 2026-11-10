@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import ats_directory, auth, board_discovery, board_scheduler, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, board_scheduler, global_ats_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -1372,6 +1372,7 @@ def init_db() -> None:
     user_notifications.init_schema(DB_PATH)
     user_applications.init_schema(DB_PATH)
     board_scheduler.init_schema(str(DB_PATH))
+    global_ats_discovery.init_schema(str(DB_PATH))
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
@@ -7872,6 +7873,41 @@ def review_global_ats_candidate(candidate_id: int, payload: dict[str, Any]):
         )
         conn.commit()
     return {"candidate_id": candidate_id, "review_status": "rejected", "activated": False}
+
+
+@app.get("/api/discovery/global-candidates/discovery-status", dependencies=[Depends(require_admin)])
+def global_ats_discovery_status():
+    """Show persisted CDX cooldowns, crawl selection, host budgets and run history."""
+    return global_ats_discovery.discovery_status(str(DB_PATH))
+
+
+@app.post("/api/discovery/global-candidates/discover/commoncrawl", dependencies=[Depends(require_admin)])
+def run_commoncrawl_candidate_discovery():
+    """Run one globally serialized Common Crawl catalogue refresh or provider query."""
+    return global_ats_discovery.run_commoncrawl_once(
+        str(DB_PATH),
+        importer=import_global_ats_candidates,
+    )
+
+
+@app.post("/api/discovery/global-candidates/discover/sitemaps", dependencies=[Depends(require_admin)])
+def run_public_sitemap_candidate_discovery(payload: dict[str, Any]):
+    """Scan one submitted public site for sitemap/career-link ATS candidates only."""
+    website_url = payload.get("website_url")
+    careers_url = payload.get("careers_url")
+    if not isinstance(website_url, str) or not website_url.strip():
+        raise HTTPException(status_code=422, detail="website_url is required.")
+    if careers_url is not None and not isinstance(careers_url, str):
+        raise HTTPException(status_code=422, detail="careers_url must be a string when supplied.")
+    try:
+        return global_ats_discovery.discover_public_sitemaps(
+            str(DB_PATH),
+            website_url,
+            careers_url=careers_url,
+            importer=import_global_ats_candidates,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/api/discovery/companies/scan", dependencies=[Depends(require_admin)])

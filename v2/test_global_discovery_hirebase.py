@@ -559,6 +559,67 @@ class GlobalDirectoryApiTests(unittest.TestCase):
         after_invalid = self.client.get("/api/discovery/global-candidates?provider=workday").json()["candidates"]
         self.assertEqual(after_invalid, before_invalid)
 
+    def test_company_agnostic_discovery_routes_are_admin_only_and_manual(self):
+        status = self.client.get("/api/discovery/global-candidates/discovery-status")
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertIn("commoncrawl", status.json())
+        self.assertIn("host_budgets", status.json())
+        self.assertIn("recent_runs", status.json())
+
+        member = TestClient(radar.app, base_url="https://testserver")
+        try:
+            login = member.post("/api/auth/login", json={
+                "email": "global-member@example.com",
+                "password": "another sufficiently strong password",
+            })
+            self.assertEqual(login.status_code, 200)
+            self.assertEqual(
+                member.get("/api/discovery/global-candidates/discovery-status").status_code, 403,
+            )
+            self.assertEqual(
+                member.post("/api/discovery/global-candidates/discover/commoncrawl").status_code, 403,
+            )
+            self.assertEqual(
+                member.post(
+                    "/api/discovery/global-candidates/discover/sitemaps",
+                    json={"website_url": "https://example.com"},
+                ).status_code, 403,
+            )
+        finally:
+            member.close()
+
+        missing_url = self.client.post(
+            "/api/discovery/global-candidates/discover/sitemaps",
+            json={}, headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(missing_url.status_code, 422)
+
+        with patch.object(
+            radar.global_ats_discovery, "run_commoncrawl_once",
+            return_value={"outcome": "catalogue_refreshed"},
+        ) as commoncrawl:
+            response = self.client.post(
+                "/api/discovery/global-candidates/discover/commoncrawl",
+                headers={"X-CSRF-Token": self.csrf},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["outcome"], "catalogue_refreshed")
+        self.assertIs(commoncrawl.call_args.kwargs["importer"], radar.import_global_ats_candidates)
+
+        with patch.object(
+            radar.global_ats_discovery, "discover_public_sitemaps",
+            return_value={"outcome": "no_candidates", "host": "example.com"},
+        ) as sitemap:
+            response = self.client.post(
+                "/api/discovery/global-candidates/discover/sitemaps",
+                json={"website_url": "https://example.com", "careers_url": None},
+                headers={"X-CSRF-Token": self.csrf},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["outcome"], "no_candidates")
+        self.assertEqual(sitemap.call_args.args[1], "https://example.com")
+        self.assertIs(sitemap.call_args.kwargs["importer"], radar.import_global_ats_candidates)
+
     def test_workday_inventory_status_is_admin_only_and_reports_configured_board(self):
         member = TestClient(radar.app, base_url="https://testserver")
         try:
