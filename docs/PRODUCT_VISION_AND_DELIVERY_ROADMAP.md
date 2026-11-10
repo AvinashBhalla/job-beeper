@@ -304,3 +304,22 @@ Next priorities: Workday facet subdivision; Keka non-default portal slug support
 User action: nothing required now. Hirebase key remains absent and source flags remain off.
 
 Latest checkpoint: docs/RECOVERY_CHECKPOINT_2026-11-09_1937_IST.md. Keka plan: docs/KEKA_PORTAL_RESOLUTION_2026-11-09.md.\n
+
+## 2026-11-10 — bounded company-agnostic ATS discovery delivered
+
+- PR #67 merged as `5d6e2b4`; exact-head GitHub V2 CI passed, including the full V2 unittest suite. The focused discovery/API integration tests passed 34/34 (4 warnings).
+- Added a bounded Common Crawl CDX sampler for Workday, Keka and Darwinbox, plus public employer sitemap/careers-link discovery. Results are low-confidence candidates imported through the existing review queue.
+- Discovery is manual/admin-only. Startup performs schema initialization only; no crawler starts automatically. Common Crawl uses a persisted global lease, one HTTP request per invocation, 60-second spacing and 24-hour 429/503 cooldown. Sitemap discovery respects robots.txt, same-host redirects, bounded documents/bytes and per-host cooldowns.
+- No employer records, board activations or notifications are created by discovery. Initial dev/QA rollout intentionally produced zero discovery runs and zero candidate rows until an admin triggers a scan.
+- Image `job-radar-dev-multitenant:5d6e2b4` is deployed to shared dev and connector QA. Both return health 200, have zero restarts, SQLite integrity `ok`, 10/10 active board schedules with successful outcomes, and zero sent notifications. Job counts at verification: dev 10,791; connector QA 2,328.
+- Backups/checksums: `/tmp/job-radar-release-backups/2026-11-10-pre-global-discovery/`. Previous scheduler containers retained as `job-radar-dev-pre-global-discovery-20261110` and `job-radar-connectors-qa-pre-global-discovery-20261110`. Production was not changed.
+- PR #67's feature branch was deleted after merge; deferred PR tags and prior rollback containers remain intact.
+
+### Next engineering priorities
+
+1. **Workday facet-aware pagination**: independently validate facet partitioning and result caps before increasing request volume; keep offsets/checkpoints, dedupe, 429 cooldown and incomplete-inventory reporting.
+2. **Keka portal coverage**: support and validate non-default portal slugs against public tenant examples, keeping each board candidate separate and reviewable.
+3. **Darwinbox public access**: investigate only a documented/public authorized candidate/job endpoint. Do not use TLS impersonation, anti-bot bypass or the Cloudflare-protected adapter.
+4. After the above, benchmark per-board freshness, p50/p95 poll latency, 429 rates and new-job yield before changing scheduler cadence.
+
+The global discovery implementation is a candidate-discovery capability, not a claim of complete 36-platform coverage. Every discovered board still needs admin review, verification, silent first inventory and a second-poll dedupe check before activation.
