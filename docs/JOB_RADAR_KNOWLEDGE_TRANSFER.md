@@ -3991,3 +3991,10 @@ These are cumulative *observations*, not unique jobs. The database contains 1,88
 This is extended cadence evidence, but it is still one isolated candidate configuration and not a production load/SLA certification. The Desktop browser/admin/member acceptance is pending.
 
 Use `docs/DESKTOP_QA_PROMPT_2026-11-10.md` for ChatGPT Desktop browser QA. Owner setup uses interactive `v2.auth_admin` commands inside only the candidate container; passwords must not be pasted into chat or saved in repository files.
+
+## Final exact-head CI result — 2026-11-10
+
+- Latest code/docs head before this documentation-only result entry: `e3a9be13abd69b023ea7d2f0703b47f0beeb00a4`.
+- GitHub Actions V2 CI **run #1446** (`42753221761`) completed successfully on that exact SHA: https://github.com/AvinashBhalla/job-beeper/actions/runs/42753221761
+- The successful job ran Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32), and the full V2 unittest suite (**466 tests in 62.218 seconds, OK**). Do not confuse the focused 32-test subset with the full suite.
+- The branch's final documentation-only changes do not modify application code; the code and browser assets tested by #1446 are unchanged.
