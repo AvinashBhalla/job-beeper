@@ -123,3 +123,7 @@ This is extended cadence evidence, but it is still one isolated candidate config
 - GitHub Actions V2 CI **run #1446** (`42753221761`) completed successfully on that exact SHA: https://github.com/AvinashBhalla/job-beeper/actions/runs/42753221761
 - The successful job ran Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32), and the full V2 unittest suite (**466 tests in 62.218 seconds, OK**). Do not confuse the focused 32-test subset with the full suite.
 - The branch's final documentation-only changes do not modify application code; the code and browser assets tested by #1446 are unchanged.
+
+## Desktop acceptance follow-up — 2026-11-10
+
+Read docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md for the owner-uploaded browser findings and independent anonymous 401 proof. The anonymous authorization gap is closed at the HTTP layer. The final release recommendation remains BLOCKED because admin reload persistence, admin responsive coverage after member handoff, and exported screenshot files are still missing. Do not mark this feature accepted based only on unit/CI/live-feed success.

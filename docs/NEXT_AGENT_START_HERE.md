@@ -473,3 +473,7 @@ For owner-driven ChatGPT Desktop browser QA, read `docs/DESKTOP_QA_PROMPT_2026-1
 - GitHub Actions V2 CI **run #1446** (`42753221761`) completed successfully on that exact SHA: https://github.com/AvinashBhalla/job-beeper/actions/runs/42753221761
 - The successful job ran Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32), and the full V2 unittest suite (**466 tests in 62.218 seconds, OK**). Do not confuse the focused 32-test subset with the full suite.
 - The branch's final documentation-only changes do not modify application code; the code and browser assets tested by #1446 are unchanged.
+
+## 2026-11-10 — Desktop QA follow-up
+
+See docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. The previously blocked anonymous scheduler request is now independently proven to return HTTP 401 with no cookie. Updated evidence totals: PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4. Admin reload, post-handoff admin viewport tests, and exported PNGs remain pending; do not claim release acceptance. Automation-only test users ids 3/4 were disabled; owner QA accounts ids 1/2 remain active.

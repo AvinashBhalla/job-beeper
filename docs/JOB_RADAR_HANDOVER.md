@@ -7195,3 +7195,7 @@ Desktop test prompt and owner setup are documented in `docs/DESKTOP_QA_PROMPT_20
 - GitHub Actions V2 CI **run #1446** (`42753221761`) completed successfully on that exact SHA: https://github.com/AvinashBhalla/job-beeper/actions/runs/42753221761
 - The successful job ran Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32), and the full V2 unittest suite (**466 tests in 62.218 seconds, OK**). Do not confuse the focused 32-test subset with the full suite.
 - The branch's final documentation-only changes do not modify application code; the code and browser assets tested by #1446 are unchanged.
+
+## 2026-11-10 — QA evidence follow-up
+
+Owner Desktop report reviewed and supplemented in docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. Direct no-cookie GET to candidate scheduler status returned HTTP 401, closing the anonymous auth gap. Member 403 and member responsive checks remain PASS from the owner report. Admin post-handoff responsive/reload and screenshot file export remain BLOCKED/UNKNOWN. Revised evidence totals are PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4; recommendation remains BLOCKED. Do not merge or deploy PR #66 until the remaining admin evidence and screenshot artifacts are reviewed.

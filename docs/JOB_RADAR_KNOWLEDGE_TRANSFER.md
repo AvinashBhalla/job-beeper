@@ -3998,3 +3998,7 @@ Use `docs/DESKTOP_QA_PROMPT_2026-11-10.md` for ChatGPT Desktop browser QA. Owner
 - GitHub Actions V2 CI **run #1446** (`42753221761`) completed successfully on that exact SHA: https://github.com/AvinashBhalla/job-beeper/actions/runs/42753221761
 - The successful job ran Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32), and the full V2 unittest suite (**466 tests in 62.218 seconds, OK**). Do not confuse the focused 32-test subset with the full suite.
 - The branch's final documentation-only changes do not modify application code; the code and browser assets tested by #1446 are unchanged.
+
+## 2026-11-10 — Desktop QA evidence follow-up
+
+Read docs/DESKTOP_QA_FOLLOWUP_2026-11-10.md. Anonymous scheduler endpoint now independently returns 401 without a cookie. Original Desktop report provides admin scheduler success, member 403, Source Health absent for members, and member responsive widths without overflow. Admin reload, admin viewport rerun and PNG exports remain outstanding. Revised counts: PASS 11 / FAIL 0 / BLOCKED 5 / UNKNOWN 4. Automation-only QA users 3/4 disabled and temp password file removed; owner QA accounts 1/2 unchanged.
