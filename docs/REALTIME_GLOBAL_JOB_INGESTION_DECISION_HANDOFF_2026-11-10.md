@@ -55,6 +55,8 @@ The public project veresk06/open-ats-feed measured 18,164 live boards and 439,86
 
 Its README explains that the Common Crawl S3 cluster.idx file is SURT-sorted and can be searched with HTTP byte-range requests. It reports roughly 700 KB of relevant index-block transfer to locate a provider prefix instead of downloading a roughly 110 MB index file. This is the implementation pattern to study for our harvester.
 
+**Source-count caution:** the same GitHub page's About/header text currently displays 16,361 boards / 399,398 postings, while its README results section and provider table state 18,164 / 439,867. Treat the README table as the reported detailed measurement, but inspect its dated machine-readable output before using the figure as a strict benchmark. The source page itself has stale/inconsistent summary metadata.
+
 ### What we do not have a defensible number for yet
 
 The October benchmark above does not provide Keka or Darwinbox board counts. Do not invent a number for either. Their discovery should be measured by running our own harvest, verifying candidates and publishing the results with a crawl date and status breakdown.
