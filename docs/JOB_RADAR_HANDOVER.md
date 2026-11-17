@@ -1,14 +1,14 @@
 ## 2026-11-17 — Phase 1 merged; Phase 2 readiness is next
 
 **Merged PR #76:** https://github.com/AvinashBhalla/job-beeper/pull/76
-**Merge commit / `v2-live-radar` HEAD:** `0220eef1044e042d3041adb97c2d4648afed56a0`
+**PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`; documentation follow-up HEAD: `de83e0fefa0660f54e9cda3a167b30a3e71f76de`
 **Merged feature head:** `14102fa6f24f117786199984008a191befe10836`
 **Final exact-head CI #1501:** passed; 32 focused tests + **495 full V2 tests** (58.062s). Local full suite: 495 passed; Phase 1 focused suite: 10 passed.
 
 - Manifest source `main@29cbb17190b26829d49e1458137d75f2e8f286aa`, SHA-256 `706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd`: 100 rows, 90 enabled, 10 disabled. Phase 1 stages 19 supported ATS candidates and retains 81 manual-review records. Every candidate remains low-confidence and unlinked.
 - Implementation details, source counts, endpoint names, tests and delivery sequence are in `docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md`.
 - **Runtime qualification:** no real shared DB import or deployment has happened. Only disposable SQLite tests were run. No live endpoint probes, board verification/activation, polling, scheduler change, Telegram send or production change occurred.
-- Next: establish a fresh isolated QA app+DB from merge commit 0220eef, with read-only environment/DB baseline first. Preserve the existing dirty/behind dev checkout and production. Phase 2 must use a small owner-reviewed sample only. Proposed source-manifest `verified_ats_board` review list: Canva and Abercrombie & Fitch (SmartRecruiters), Cyderes and Kobie (Lever). They are not yet V2-verified or approved for activation. No Greenhouse board should be tested until official employer identity/link is reviewed.
+- Next: establish a fresh isolated QA app+DB from PR #76 merge commit 0220eef, with read-only environment/DB baseline first. Before Phase 2, resolve the employer-record prerequisite for candidate linking and prevent provider-level activation from scheduling unrelated config peers. Preserve the existing dirty/behind dev checkout and production. Phase 2 must use a small owner-reviewed sample only. Proposed source-manifest `verified_ats_board` review list: Canva and Abercrombie & Fitch (SmartRecruiters), Cyderes and Kobie (Lever). They are not yet V2-verified or approved for activation. No Greenhouse board should be tested until official employer identity/link is reviewed.
 - In QA only, verify the approved sample through the existing endpoint; log failure classes distinctly. Activate only the explicit owner-approved subset; verify one registry row, one schedule row, host-lease constraints, silent first-poll baseline and second-poll new unique ingestion. Stop on any uncertainty.
 - No Phase 3 JD completeness/hash, Phase 4 quality audit, Phase 5 alert pilot, or production rollout should be collapsed into Phase 2.
 

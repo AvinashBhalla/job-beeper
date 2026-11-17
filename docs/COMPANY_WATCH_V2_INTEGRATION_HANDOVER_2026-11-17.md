@@ -4,7 +4,8 @@
 
 **Target branch:** `v2-live-radar`
 **Merged PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76
-**Merge commit / current branch HEAD:** `0220eef1044e042d3041adb97c2d4648afed56a0`
+**PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`
+**Current branch HEAD after documentation follow-up:** `de83e0fefa0660f54e9cda3a167b30a3e71f76de`
 **Feature head merged:** `14102fa6f24f117786199984008a191befe10836`
 **Implementation commit:** `200f34b8b04ee7dd14dfe1e61333739f860ba17c`
 **Manifest source:** `main@29cbb17190b26829d49e1458137d75f2e8f286aa:company_watch/companies.csv`
@@ -28,6 +29,14 @@ The delivery sequence in section 8 below remains controlling:
 3. In isolated QA only, use the existing verify endpoint on the approved small sample; record 401/403, 404, 429, timeout, TLS and parser errors distinctly. Do not run all 19 or all 100.
 4. Activate only an explicit owner-approved allowlist after verification. Prove registry/scheduler/lease/baseline invariants and silent first-poll baseline, then new unique ingestion on a second poll.
 5. Keep JD completeness/hash/update handling (Phase 3), quality audit (Phase 4), alerts (Phase 5), and any production rollout as separate approval gates.
+
+### Phase 2 code-path findings that must shape the implementation
+- The Phase 1 importer creates unmatched ATS candidate rows only. The existing link endpoint requires an existing employer company ID; it then creates an ATS registry row in discovered state. It does not create the employer identity.
+- The only current employer-creation endpoint found is POST /api/discovery/companies/scan. It performs public website/careers crawling (up to six pages) and may create additional board-registry candidates. It is not a metadata-only employer registration endpoint. Do not call it casually as a substitute for an owner-approved canonical identity record. Decide whether Phase 2 needs a new admin-only, no-network employer registration/mapping endpoint with canonical domain-conflict checks.
+- Existing board verification requires an ATS registry row and performs a live provider probe. On success it sets review_status=verified but leaves scheduling disabled. On failure the route currently stores the exception class; requests HTTP errors are not yet persisted as distinct HTTP 401/403/404/429 outcomes. Improve structured error classification before using the verification endpoint for a measured QA sample.
+- Existing board activation is broader than a single registry-row update: it writes the board into provider config, sets the provider-level source_enabled flag true, calls board_scheduler.sync_config on the entire config, and refreshes job evaluations/notification decisions. sync_config schedules every configured board for an enabled provider. Therefore the isolated QA config must contain only the explicitly approved sample for each provider; capture/confirm the complete provider allowlist before activation. Do not use an existing shared config with unrelated provider peers enabled.
+- Activation sets baseline_pending=1; scheduler sync creates/updates active schedules with baseline tracking. Verify the first successful poll is silently baseline-only and the second poll admits only new unique jobs. QA must have no real user notification credentials/settings.
+- The four manifest rows labelled verified_ats_board (Canva, Abercrombie & Fitch, Cyderes, Kobie) are a suggested review list only. The manifest label is not live V2 verification or owner approval.
 
 **No automatic activation:** do not treat the CSV `scan_enabled` flag or source-manifest `verified_ats_board` label as V2 approval. No polling, activation, Telegram or production deployment until the relevant QA and owner gates pass.
 

@@ -3,13 +3,14 @@
 **Read first:** docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md.
 **Target branch:** v2-live-radar.
 **Merged PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76.
-**Current merge commit:** 0220eef1044e042d3041adb97c2d4648afed56a0.
+**PR #76 merge commit:** 0220eef1044e042d3041adb97c2d4648afed56a0.
+**Current v2-live-radar HEAD (docs follow-up):** de83e0fefa0660f54e9cda3a167b30a3e71f76de.
 
 Phase 1 implementation is merged. Exact final PR-head CI #1501 passed 495 full V2 tests plus 32 focused tests. Manifest: 100 rows / 90 enabled / 10 disabled; 19 ATS candidates staged into the review queue and 81 rows held for manual review. All candidates are low-confidence/unlinked.
 
 **Important:** implementation merge is not a deployment and does not mean the manifest has been imported to any shared database. Only disposable SQLite tests were run. No live ATS endpoint probes, board verification/activation, polling, notifications, production deployment or persistent runtime DB changes occurred.
 
-**Next action:** prepare Phase 2 by establishing a fresh isolated QA app+DB from merge commit 0220eef and capturing a read-only baseline. Do not use the dirty/behind /home/ubuntu/job-beeper-dev checkout or production. Obtain owner review of a small sample first. Suggested source-manifest `verified_ats_board` entries to review are Canva and Abercrombie & Fitch (SmartRecruiters), Cyderes and Kobie (Lever); none is V2-verified or approved for activation yet. In QA only, verify the approved sample through existing V2 endpoints, then activate only an explicit approved allowlist. Prove registry/schedule/host lease/baseline invariants, silent first poll and new second-poll ingestion.
+**Next action:** prepare Phase 2 by establishing a fresh isolated QA app+DB from merge commit 0220eef and capturing a read-only baseline. Review the employer-record linking prerequisite and provider-wide activation/config sync behavior before live verification. Do not use the dirty/behind /home/ubuntu/job-beeper-dev checkout or production. Obtain owner review of a small sample first. Suggested source-manifest `verified_ats_board` entries to review are Canva and Abercrombie & Fitch (SmartRecruiters), Cyderes and Kobie (Lever); none is V2-verified or approved for activation yet. In QA only, verify the approved sample through existing V2 endpoints, then activate only an explicit approved allowlist. Prove registry/schedule/host lease/baseline invariants, silent first poll and new second-poll ingestion.
 
 Do not start Phase 3 JD completeness, Phase 4 quality audit, Phase 5 alert pilot, Telegram or production rollout as part of Phase 2. Never infer approval from `scan_enabled` or `verified_ats_board`.
 
