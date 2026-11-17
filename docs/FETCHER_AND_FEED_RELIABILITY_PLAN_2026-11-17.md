@@ -175,3 +175,12 @@ A separate implementation branch fix/smartrecruiters-detail-cache-20261117 now:
 Five focused SmartRecruiters tests pass, including existing mapping and Retry-After behavior, cached-detail reuse, 7-day refresh, and the 20-call detail budget. The 25-listing test fixture had 20 warm cached detail entries and verified exactly 20 cache hits plus 5 detail calls (one listing request + five detail requests total).
 
 The full V2 suite is still running on this branch. No production or QA source configuration was changed, no live SmartRecruiters collector was invoked, and no production deployment has occurred. Do not merge/deploy until full local regression and exact-head GitHub CI pass, followed by QA image verification.
+
+## 18 November 2026 — PR #80 CI and GitHub branch hygiene
+
+- SmartRecruiters detail-cache commit 43826b361f85e1062cf15ec96705825ae866fa6c passed GitHub Actions V2 CI workflow #1520 (exact head SHA, conclusion: success). The full local V2 suite also passed: 507 tests, 0 failures, 434.418 seconds.
+- PR #80 remains open against v2-live-radar; do not merge until the diff is reviewed and the candidate QA image is rebuilt from the reviewed commit. No live source flags or deployment were changed.
+- Remote branch inventory at this audit: main, v2-live-radar, fix/smartrecruiters-detail-cache-20261117, and three merged-PR branches. The three obsolete branches were docs/post-pr77-merge-readiness-20261117 (PR #78 merged), fix/ats-board-rate-limit-backoff-20261117 (PR #77 merged), and fix/member-remote-only-global-20261117 (PR #79 merged).
+- Cleanup policy: retain main and v2-live-radar; retain the current PR #80 head branch until merge/close; delete merged feature branches after verifying their PR is merged and the change is reachable from v2-live-radar. Do not delete branches for closed-but-unmerged PRs until their unique commits are checked for inclusion or explicitly abandoned.
+- The closed, unmerged PR inventory (#70, #64, #63, #62, #61, #60, #59, #52, #50, #46, #43, #42, etc.) is not equivalent to active work. Their branch refs are not present in the current remote branch listing, so no further deletion is needed for those refs. PR #80 is the only open PR in the current repository inventory.
+- VM check: production and QA health both HTTP 200; only the expected v2-radar-1 and job-radar-current-v2-qa containers are running; root filesystem 14 GB used / 45 GB total (29%). No VM cleanup or deployment was performed in this pass.
