@@ -1,6 +1,19 @@
 # Job Radar V2 — Knowledge Transfer
 
-**Snapshot:** 2026-11-08 — Candidate V2 integration branch; final browser regression completed, acceptance still blocked by evidence-only gates; not deployed
+
+
+## 2026-11-17 — Company Watch → V2 integration current state
+
+Read first: [Company Watch → V2 integration plan and handover](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md).
+
+- Target the mature `v2-live-radar` branch, baseline `5c28d97ea39edfa8af13d9686f7b97c3997901f3`, not `main`. Company Watch PR #72 is merged into main only; PR #73 remains draft/open on main. Do not merge/cherry-pick its complete tree into V2.
+- Company Watch CSV: 100 records, 92 enabled/8 manual; 72 are generic careers pages. Existing V2 already has 12 source collectors including Greenhouse, Lever, Ashby, SmartRecruiters, Workday and Workable, a board registry, candidate staging, explicit verify/activate APIs, per-board scheduler, SQLite upsert/dedupe, per-user preference evaluation and per-user opt-in Telegram dispatcher.
+- Integration must reuse V2's collectors/matcher/notification path. Do not migrate Company Watch `filters.json`, `judge()`, URL-only `seen.json` or `send_telegram()`.
+- Gaps to fix in order: (1) extend provider-aware candidate import for Company Watch ATS board modes; (2) resolve and validate actual employer identity; (3) keep all imported records review-only and no polling until explicit verification/activation; (4) add first-class JD completeness/status and content hash; (5) fix same/shorter-length material JD updates in `upsert_jobs()`; (6) use a per-source JD-completeness alert gate for the new cohort only, checked during queue and final send; (7) expand labelled matcher/precision benchmark and rejection breakdown; (8) only later consider registry as scheduler source-of-truth.
+- Runtime read-only evidence 2026-11-17: dev checkout is dirty and 147 commits behind; prod checkout 613 behind; Docker access denied to ubuntu. Ports 8000 timed out, 8001 reset, 8010/8006/18011 returned 200. Preserve local config/.env/.venv/backup; do not pull, reset, clean, restart, use sudo or touch prod.
+- This prompt's work was documentation/inspection only; no code/config/DB/notification/deployment changes and no tests run. No owner input is needed now.
+
+**Historical snapshot:** 2026-11-08 — Candidate V2 integration branch; final browser regression completed, acceptance still blocked by evidence-only gates; not deployed
 **Release integration branch:** `v2-live-radar`
 
 **Active candidate branch:** `integration/pr46-v2-rebase-20261108`
