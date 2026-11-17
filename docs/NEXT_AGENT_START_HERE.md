@@ -1,5 +1,24 @@
 # CURRENT HANDOVER — 2026-11-17 Phase 1 merged
 
+## CURRENT RELEASE STATE — 2026-11-17 17:06 UTC
+
+**Canonical handover:** [Production readiness, delivery plan and next-agent handover](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
+
+- Existing V2 pipeline is the priority; Company Watch Phase 2 remains paused.
+- Production is unchanged on job-radar-prod-canary:6e5becb, port 8000, health 200. Current V2 QA from PR #77 application source cc2087e runs separately on port 8013.
+- Cleanup is complete: legacy QA runtimes and unused image tags removed after archiving old QA databases/configuration; only production and current QA containers remain. Production Docker volume is preserved.
+- The daily production snapshot job has been repaired and a production DB snapshot passed SQLite integrity. Offsite encrypted backup/restore drill remains outstanding.
+- Production contains admin only; no member account or linked member Telegram. Google sign-in is disabled and the bot webhook/per-user settings are not configured. Owner member email and Telegram bot access are required for the real canary.
+- Naukri live relay was consumed in current V2 QA: 312 seen / 2 new first poll; 312 seen / 0 new on second poll. Notifications were disabled.
+- Per-user tests: 61 passed. Full V2 suite: 497 passed, 0 failed.
+- Workday adaptive 429 backoff is committed in PR #77 (cc2087e); exact-head GitHub CI #1511 passed 497 tests. Candidate image job-radar-v2-qa:cc2087e runs on QA port 8013 with 12/12 scheduler tests passing and all source/notification switches disabled. PR #77 is still open; production is not updated.
+- Fastest safe path: PR/CI → candidate QA rebuild → real member account/preferences → real Telegram webhook/link/canary → offsite backup/restore → explicit production approval and rollout → 24–72h monitoring.
+- Current estimate to first production canary: 6–10 focused engineering hours remaining, approximately 1 day if external access is available. See the canonical plan for assumptions and blockers.
+
+Older timestamped checkpoints below are historical. Do not treat prior statements that Docker inventory was unavailable, that the snapshot service remained broken, or that four QA services were still running as current.
+
+---
+
 ## Current release and cleanup status — 2026-11-17
 
 **Read first:** [Repository cleanup, production readiness and VM health](REPOSITORY_CLEANUP_AND_VM_HEALTH_2026-11-17.md).

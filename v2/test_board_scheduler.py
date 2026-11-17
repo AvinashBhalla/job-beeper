@@ -186,6 +186,53 @@ class BoardSchedulerTests(unittest.TestCase):
         )
         self.assertEqual(retry["host_key"], claim["host_key"])
 
+    def test_repeated_429s_escalate_per_board_and_reset_after_success(self):
+        board_scheduler.sync_config(str(self.db_path), self.config(), self.now)
+        excluded = {"greenhouse", "ashby", "darwinbox", "keka", "lever", "smartrecruiters", "workable"}
+        current = self.now
+        expected_cooldowns = [300, 600, 1200, 2400, 3600]
+
+        for failure_number, expected in enumerate(expected_cooldowns, start=1):
+            claim = board_scheduler.claim_due_board(
+                str(self.db_path), excluded_sources=excluded, at=current,
+            )
+            self.assertEqual(claim["source"], "workday")
+            finished = current + dt.timedelta(seconds=5)
+            result = board_scheduler.finish_poll(
+                str(self.db_path), claim, outcome="rate_limited",
+                cooldown_seconds=300, at=finished,
+            )
+            self.assertEqual(result["consecutive_failures"], failure_number)
+            expected_due = finished + dt.timedelta(seconds=expected)
+            self.assertEqual(result["next_due_at"], expected_due.isoformat())
+            self.assertEqual(result["host_cooldown_until"], expected_due.isoformat())
+            current = expected_due + dt.timedelta(seconds=1)
+
+        claim = board_scheduler.claim_due_board(
+            str(self.db_path), excluded_sources=excluded, at=current,
+        )
+        finished = current + dt.timedelta(seconds=5)
+        result = board_scheduler.finish_poll(
+            str(self.db_path), claim, outcome="success", at=finished,
+        )
+        self.assertEqual(result["consecutive_failures"], 0)
+        self.assertIsNone(result["host_cooldown_until"])
+
+        current = finished + dt.timedelta(seconds=121)
+        claim = board_scheduler.claim_due_board(
+            str(self.db_path), excluded_sources=excluded, at=current,
+        )
+        finished = current + dt.timedelta(seconds=5)
+        result = board_scheduler.finish_poll(
+            str(self.db_path), claim, outcome="rate_limited",
+            cooldown_seconds=300, at=finished,
+        )
+        self.assertEqual(result["consecutive_failures"], 1)
+        self.assertEqual(
+            result["host_cooldown_until"],
+            (finished + dt.timedelta(seconds=300)).isoformat(),
+        )
+
     def test_host_cooldown_on_one_tenant_does_not_pause_same_provider_other_host(self):
         config = self.config()
         config["source_enabled"] = {"workday": True}

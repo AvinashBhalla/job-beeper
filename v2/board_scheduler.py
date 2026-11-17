@@ -32,6 +32,8 @@ BOARD_HOST_MIN_INTERVAL_SECONDS = 5
 BOARD_LEASE_SECONDS = 15 * 60
 BOARD_FAILURE_BACKOFF_BASE_SECONDS = 60
 BOARD_FAILURE_BACKOFF_MAX_SECONDS = 15 * 60
+RATE_LIMIT_BACKOFF_BASE_SECONDS = 5 * 60
+RATE_LIMIT_BACKOFF_MAX_SECONDS = 60 * 60
 
 
 def _iso(value: dt.datetime | None = None) -> str:
@@ -353,7 +355,18 @@ def finish_poll(
             baseline_pending = False
         elif rate_limited:
             failures += 1
-            retry_delay = max(interval, min(24 * 60 * 60, max(60, int(cooldown_seconds or 300))))
+            # A fixed Retry-After fallback makes a persistently throttled
+            # employer board hit the same host every five minutes forever.
+            # Escalate per board while retaining any longer provider-supplied
+            # cooldown. The host lease then pauses only this API host, not
+            # unrelated ATS providers or tenants on different hosts.
+            requested_cooldown = max(60, int(cooldown_seconds or RATE_LIMIT_BACKOFF_BASE_SECONDS))
+            adaptive_cooldown = min(
+                RATE_LIMIT_BACKOFF_MAX_SECONDS,
+                RATE_LIMIT_BACKOFF_BASE_SECONDS * (2 ** min(failures - 1, 5)),
+            )
+            effective_cooldown = max(requested_cooldown, adaptive_cooldown)
+            retry_delay = max(interval, effective_cooldown)
         else:
             failures += 1
             retry_delay = min(
@@ -363,7 +376,10 @@ def finish_poll(
             )
         next_due = _iso(finished + dt.timedelta(seconds=retry_delay))
         host_next = _iso(finished + dt.timedelta(seconds=BOARD_HOST_MIN_INTERVAL_SECONDS))
-        cooldown_until = _iso(finished + dt.timedelta(seconds=max(60, int(cooldown_seconds or 300)))) if rate_limited else None
+        cooldown_until = (
+            _iso(finished + dt.timedelta(seconds=effective_cooldown))
+            if rate_limited else None
+        )
         conn.execute("""
             UPDATE ats_board_poll_schedule SET next_due_at=?,last_finished_at=?,last_outcome=?,
                 last_error_type=?,last_jobs_seen=?,last_jobs_new=?,last_duration_seconds=?,
