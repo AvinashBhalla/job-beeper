@@ -1,0 +1,62 @@
+name: Company Watch (isolated dry run)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 08:00, 14:00 and 21:00 Asia/Kolkata (UTC is 5h30m behind).
+    - cron: "30 2,8 * * *"
+    - cron: "30 15 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: company-watch-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Scan company careers pages without notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: company_watch/requirements.txt
+
+      - name: Install isolated watcher dependencies
+        run: python -m pip install -r company_watch/requirements.txt
+
+      - name: Prepare isolated state directory
+        run: mkdir -p company_watch/.state
+
+      - name: Restore company watcher deduplication state
+        uses: actions/cache@v4
+        with:
+          path: company_watch/.state/seen.json
+          key: company-watch-state-${{ github.ref_name }}-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            company-watch-state-${{ github.ref_name }}-${{ runner.os }}-
+
+      - name: Scan all enabled company boards in dry-run mode
+        run: >-
+          python company_watch/scan.py
+          --dry-run
+          --remember-dry-run
+          --state-file company_watch/.state/seen.json
+          --report-json company_watch/.state/latest_report.json
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: company-watch-report-${{ github.run_number }}
+          path: company_watch/.state/latest_report.json
+          if-no-files-found: warn
+          retention-days: 14
