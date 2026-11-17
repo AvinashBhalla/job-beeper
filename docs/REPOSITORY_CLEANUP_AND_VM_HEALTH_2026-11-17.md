@@ -1,20 +1,22 @@
 # JobBeeper release readiness, repository cleanup and VM health — 2026-11-17
 
-## CURRENT SOURCE OF TRUTH — 2026-11-17 17:11 UTC
+## CURRENT SOURCE OF TRUTH — 2026-11-17 17:18 UTC
 
 **Read first:** [Production readiness, delivery plan and next-agent handover](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
 
-- Priority remains the existing V2 source-to-member pipeline; Company Watch Phase 2 is paused.
-- PR #77 has been merged into v2-live-radar as 5b80499. Exact post-merge CI #1513 passed 497 tests; Workday now has progressive 5/10/20/40/60-minute per-board cooldown with Retry-After and host isolation.
-- Candidate QA image job-radar-v2-qa:cc2087e is running on 127.0.0.1:8013. It matches the merged application tree; health HTTP 200; 12/12 scheduler tests pass in-container. All 12 source flags and legacy notifications are disabled. The QA DB has 27,373 jobs and SQLite integrity ok.
-- Production is intentionally untouched: v2-radar-1 still uses job-radar-prod-canary:6e5becb on port 8000 and /health returns HTTP 200. No production deployment has happened.
-- Production DB has one admin and no normal member account, linked Telegram chat or per-user notification records. Google sign-in is disabled. Production Telegram token identity check worked, but webhook is not registered and per-user bot username/webhook-secret environment variables are missing.
-- VM cleanup complete: only production and current QA containers remain; one production volume; five retained images; zero Docker build cache; disk 28% used; about 407 MB RAM available at last sample. Legacy QA data is archived.
-- Daily SQLite snapshot service repaired and manually verified. Encrypted offsite backup and isolated restore drill still required.
-- HTTPS certificate for 130.210.27.197 expires 23 Nov 2026; Certbot snap renewal timer is active. A staging dry-run renewal completed successfully on 17 Nov; the live certificate was not changed by the dry run.
-- Revised remaining estimate: 6–10 focused engineering hours to a controlled member canary once owner email, bot-owner access and offsite backup access are available, then 24–72 hours monitoring.
+- PR #77 merged into v2-live-radar as 5b80499; exact post-merge CI #1513 passed 497 tests.
+- Candidate QA image job-radar-v2-qa:cc2087e is running on 127.0.0.1:8013. Its application tree matches the merged V2 tree; health HTTP 200; scheduler tests 12/12.
+- Live QA collector proof: Naukri 312 seen, 2 then 0 new; Greenhouse 346 seen, 2 then 0 new on 3/3 boards; Ashby 848 seen, 4 then 0 new on 2/2 boards. Manual QA runs only; all 12 QA source flags and notifications remained off.
+- QA backup qa-after-ats-smoke-20261117.sqlite3 has 27,379 jobs and integrity ok. No member Telegram chats/settings/per-user notification ledger entries in the QA copy.
+- Production is untouched on job-radar-prod-canary:6e5becb, port 8000; public HTTPS and local health 200.
+- The production DB still has admin only. Telegram bot identity works, but webhook and per-user bot username/webhook-secret configuration remain absent. No member canary has been sent.
+- Daily SQLite snapshot job repaired and verified. Offsite encrypted backup/restore remains outstanding.
+- TLS certificate expires 23 Nov 2026; Certbot timer active and staging dry-run renewal succeeded. Live certificate was not changed.
+- VM cleanup complete: two running JobBeeper containers, one production volume, five images, zero build cache, disk 28% used. Legacy QA data archived.
+- Workday backoff is merged in V2, not deployed. Company Watch Phase 2 remains paused.
+- Remaining estimate: 6–10 focused engineering hours to first controlled member canary once owner email, Telegram access and offsite backup access are available; then 24–72 hours monitoring.
 
-Next steps: provision a separate member account using the owner-provided email; complete that member's preferences; configure Telegram webhook/link private chat/explicit opt-in; verify a real new matching job and one successful per-user Telegram delivery with no duplicates; configure encrypted offsite backup and restore; deploy merged V2 only after explicit owner approval. Do not resume Company Watch Phase 2 before this proof.
+Next: provision member, complete saved preferences, configure webhook/private chat and opt-in, prove a real member alert/no duplicate, complete offsite backup/restore, then deploy only with explicit owner approval.
 ---
 
 ## Executive status

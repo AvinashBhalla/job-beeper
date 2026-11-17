@@ -1,22 +1,28 @@
 # JobBeeper — production readiness, delivery plan and next-agent handover
-## Latest execution update — 17 November 2026, 17:11 UTC
+## Latest execution update — 17 November 2026, 17:18 UTC
 
-PR #77 is now merged into v2-live-radar. This is a code merge only; it is not a production deployment.
+PR #77 is merged into v2-live-radar. This is a code merge only; it is not a production deployment.
 
-- PR: https://github.com/AvinashBhalla/job-beeper/pull/77
-- Merge commit: 5b80499d42046cbadc7570171944346d9bf57fb9
-- Post-merge GitHub Actions run #1513 completed successfully on the merge commit. Full V2 suite: 497 passed, 0 failed (64.807 seconds); focused router/extractor tests: 32 passed.
-- Exact tested application source tree: 313838340b030eac08866d0b173f4085e69a50a4. It matches the PR-head tree used to build the QA image.
+- PR #77: https://github.com/AvinashBhalla/job-beeper/pull/77
+- Merge commit: 5b80499d42046cbadc7570171944346d9bf57fb9.
+- Post-merge GitHub Actions run #1513 passed the full V2 suite: 497 passed, 0 failed (64.807 seconds); focused router/extractor tests passed 32/32.
+- Exact merged application source tree: 313838340b030eac08866d0b173f4085e69a50a4. This matches the tree used to build the candidate QA image.
 - Candidate image: job-radar-v2-qa:cc2087e, image ID sha256:741245d98b894ef99add44407632369c6f76e9ce75eaf95e32f42c0006a81422.
-- Candidate QA container job-radar-current-v2-qa is running on loopback port 8013. /health is HTTP 200. The in-container scheduler suite passes 12/12 tests. Its config has all 12 source flags disabled and notifications disabled; SQLite integrity is ok; 27,373 jobs; one copied admin; zero linked member chats, per-user settings or per-user notification ledger rows.
-- QA pre-swap DB backup: /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3, 27,373 jobs, SQLite integrity ok, SHA-256 6237a548e2f5a0278a02275a283532d23f6ea35672c93a34edf2578ffecc2e1f.
-- Production remains unchanged on image job-radar-prod-canary:6e5becb at port 8000; both public HTTPS /health and loopback /health return HTTP 200. No member account was created, no webhook was registered and no live member message was sent.
-- Final VM inventory: two running JobBeeper containers, one production Docker volume, five retained images including the prior QA image for QA rollback, zero build cache. Root disk 28% used; about 407 MB RAM available at the last sample.
-- Production HTTPS certificate covers IP 130.210.27.197 and expires 23 November 2026. The snap.certbot.renew timer is active. A Certbot staging dry-run renewal for this exact IP certificate completed successfully on 17 November; the current production certificate was not replaced by the dry run.
+- Candidate QA container job-radar-current-v2-qa is running on loopback port 8013; /health returns HTTP 200. All 12 QA source flags and legacy notifications remain disabled. The in-container scheduler suite passed 12/12 tests.
+- Live candidate QA source proofs (manual run_source calls; all writes confined to QA):
+  - Naukri: 312 seen, 2 new first pass; 312 seen, 0 new second pass.
+  - Greenhouse: 3/3 boards succeeded, 346 seen, 2 new first pass; 346 seen, 0 new second pass.
+  - Ashby: 2/2 boards succeeded, 848 seen, 4 new first pass; 848 seen, 0 new second pass.
+  - All six inserted jobs were written only into the copied QA database. No Telegram send occurred. These manual collector calls do not turn on source scheduling.
+- Latest QA snapshot: /var/backups/job-radar-daily/qa-after-ats-smoke-20261117.sqlite3; 27,379 jobs, SQLite integrity ok, 12 source switches false, notifications false, one copied admin, zero member Telegram chats/settings/per-user notification ledger rows. Size 121,507,840 bytes; SHA-256 8d14fa852b7e53ec795b6811273b171c49684602acc2da42c40a54d3994cf884.
+- Production remains unchanged on image job-radar-prod-canary:6e5becb at port 8000. Public HTTPS and loopback /health both return HTTP 200. No member account was created, no Telegram webhook was registered, no real member message was sent, and no production deployment was performed.
+- VM: two running JobBeeper containers, one production Docker volume, five retained images including prior QA rollback, zero build cache, root disk 28% used, about 407 MB available RAM at last sample.
+- HTTPS certificate for IP 130.210.27.197 expires 23 November 2026. The Certbot snap renewal timer is active, and a staging dry-run renewal completed successfully on 17 November. The live certificate was not changed by the dry run.
+- A documentation-only PR #78 is open to carry this final post-merge/source-smoke/certificate update into the current branch; its exact-head CI is the final documentation gate.
 
 ## Remaining work and revised delivery estimate
 
-The code, tests, PR merge, candidate image, QA source/dedupe proof and scheduler regression proof are complete. Remaining work is now concentrated on the real member journey and production controls:
+The code, tests, PR #77 merge, QA image, three-source collector/dedupe proof, scheduler regression proof and TLS renewal simulation are complete. Remaining work is the real member journey and production controls:
 
 1. Obtain the email address to use for a separate normal member account. Production currently has admin only; do not convert the admin.
 2. Provision the member and complete that member's own saved preferences.
@@ -28,7 +34,9 @@ The code, tests, PR merge, candidate image, QA source/dedupe proof and scheduler
 
 **Revised remaining estimate:** about **6–10 focused engineering hours** to reach a controlled production canary once the member email, Telegram bot-owner access, HTTPS/webhook configuration and offsite-backup route are available. Allow another **24–72 hours** of monitoring before calling the rollout stable. A genuinely new matching job may take longer to arrive. This estimate excludes Company Watch Phase 2.
 
-Company Watch Phase 2 remains paused until the existing member pipeline passes a real canary. It remains a later project and is not a prerequisite for proving the existing source-to-member pipeline.
+Company Watch Phase 2 remains paused until the existing member pipeline passes a real canary. It is a later project, not a prerequisite for proving the existing source-to-member pipeline.
+
+---
 
 ---
 
@@ -219,6 +227,10 @@ The V2 collector run_source("naukri") was invoked explicitly inside the QA appli
 - no Telegram notification was sent; QA legacy notifications remained disabled.
 
 This proves the relay-to-V2 collector, normalization/upsert, evaluation and repeat-poll dedupe path against this live sample. It is not yet proof of continuous production polling on the new image or member Telegram delivery.
+
+The same candidate image was also tested manually with Greenhouse and Ashby collectors against the isolated QA database. Greenhouse returned 346 listings from 3/3 successful boards (2 inserted first pass, 0 on repeat); Ashby returned 848 listings from 2/2 successful boards (4 inserted first pass, 0 on repeat). All source flags remained off, notifications remained off, and there were no Telegram deliveries. These are controlled manual collector invocations, not scheduler enablement.
+
+After the three-source smoke, the QA database contains 27,379 jobs and passes SQLite integrity_check. A fresh QA snapshot is saved at /var/backups/job-radar-daily/qa-after-ats-smoke-20261117.sqlite3 (SHA-256 8d14fa852b7e53ec795b6811273b171c49684602acc2da42c40a54d3994cf884).
 
 ### 4.3 Per-user pipeline automated tests
 

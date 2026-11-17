@@ -1,20 +1,22 @@
 ## 2026-11-17 — Phase 1 merged; Phase 2 readiness is next
 
-## CURRENT RELEASE STATE — 2026-11-17 17:11 UTC
+## CURRENT RELEASE STATE — 2026-11-17 17:18 UTC
 
 **Canonical handover:** [Production readiness, delivery plan and next-agent checklist](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
 
-- PR #77 merged into v2-live-radar as 5b80499. Post-merge GitHub CI #1513 passed the full 497-test V2 suite.
-- Candidate QA image job-radar-v2-qa:cc2087e is running on loopback port 8013; its tree matches the merged app tree; health 200; scheduler tests 12/12. All 12 source switches and legacy notifications are off in QA.
-- Production remains unchanged on job-radar-prod-canary:6e5becb, port 8000, health 200. No production deployment.
-- Production contains admin only and no member account or linked member Telegram. Bot token identity works but webhook/per-user username and webhook-secret configuration are not set.
-- Daily snapshot job repaired; local production/QA snapshots verified. Encrypted offsite backup and restore drill remain outstanding.
-- VM: two running app containers, one production volume, five retained images, zero build cache, disk 28% used. Old QA environments are archived.
-- Workday backoff is merged in V2, not deployed in production.
-- Remaining plan: provision a separate member account using the owner-provided email; set own preferences; configure Telegram webhook and link private chat; explicitly opt in; prove one new matching alert and no duplicate; offsite backup/restore; deploy only with owner approval; monitor 24–72h.
-- Estimated remaining focused engineering time to first controlled member canary: 6–10 hours once owner email, bot access and backup destination are available. Company Watch Phase 2 remains paused.
+- PR #77 is merged into v2-live-radar as 5b80499; post-merge CI #1513 passed the full 497-test suite.
+- Candidate QA image job-radar-v2-qa:cc2087e is running on loopback port 8013. The merged application tree matches the candidate; health is HTTP 200 and scheduler tests pass 12/12.
+- Live two-pass QA ingest/dedupe passed for Naukri (312 seen, 2 then 0 new), Greenhouse (346 seen, 2 then 0 new on 3/3 boards) and Ashby (848 seen, 4 then 0 new on 2/2 boards). All runs were manual QA invocations; all 12 source flags and notifications remained off.
+- Latest QA snapshot is qa-after-ats-smoke-20261117.sqlite3: 27,379 jobs, SQLite integrity ok, no member chats/settings/per-user notification rows. Its SHA-256 and path are in the canonical plan.
+- Production remains unchanged on job-radar-prod-canary:6e5becb, port 8000, public and local health 200. No member account, Telegram webhook or real per-user delivery exists yet.
+- Production DB contains admin only. Google sign-in is disabled. Telegram bot token identity check succeeded, but webhook and per-user bot username/webhook secret are not configured.
+- Daily local snapshot job is repaired and verified; encrypted offsite backup/restore drill remains a release gate.
+- TLS cert for 130.210.27.197 expires 23 Nov 2026; Certbot timer is active and its staging dry-run renewal succeeded. Live certificate was not changed by the dry run.
+- VM cleanup is complete: two running JobBeeper containers, one production volume, five retained images, zero Docker build cache, disk 28% used. Legacy QA state is archived.
+- Workday progressive 5/10/20/40/60-minute backoff is merged in V2 but is not deployed in production. Company Watch Phase 2 stays paused.
+- Remaining estimate: 6–10 focused engineering hours to a controlled member canary once owner email, bot access and offsite backup access are ready, then 24–72 hours monitoring.
 
-Older timestamped checkpoints below are historical; read the canonical plan for exact current facts and commands.
+Next: provision a separate member account; complete that member's saved preferences; set up Telegram webhook, private-chat link and explicit opt-in; prove one real matching delivery and duplicate suppression; finish offsite backup/restore; only then deploy with explicit owner approval.
 ---
 
 **Merged PR #76:** https://github.com/AvinashBhalla/job-beeper/pull/76
