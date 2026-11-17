@@ -5,7 +5,7 @@
 **Target integration branch:** `v2-live-radar`  
 **Planning branch:** `docs/company-watch-v2-integration-handover-20261117`  
 **Baseline V2 commit inspected:** `5c28d97ea39edfa8af13d9686f7b97c3997901f3`  
-**Status:** Documentation and read-only audit complete. No application code, source configuration, database, scheduler, deployment or notification setting was changed.
+**Status:** Documentation and read-only audit complete. No application code, source configuration, database, scheduler, deployment or notification setting was changed. PR #74 exact-head GitHub V2 CI is red: 484 tests, 10 failures and 2 errors, all in `v2/test_user_notifications.py`; see the CI section below.
 
 > **Primary direction:** Use Company Watch as a curated source-discovery input. Do not run it as a second production job pipeline. Reconcile verified company/board records into the existing V2 directory, then use V2 collectors, JD enrichment, SQLite, canonical dedupe, per-user preferences/evaluations and per-user Telegram delivery.
 
@@ -457,9 +457,20 @@ A listener was present on all five loopback ports. The roles of ports 8010/8006/
 - Rechecked Termalin in read-only mode and documented the local branch lag, dirty files, Docker permission error and HTTP health results.
 - Created this plan and updated the agent handover pointers in the same documentation-only branch.
 
-**No code, tests, configs, databases, credentials, source schedules, notifications, deployments, containers or running services were changed.** No test run was necessary for documentation-only modifications; exact-head CI is still required for the documentation PR if CI triggers.
+**No code, configs, databases, credentials, source schedules, notifications, deployments, containers or running services were changed.** No tests were run locally. The exact-head GitHub CI result is recorded below.
 
-## 12. Next agent — exact ordered checklist
+## 12. Exact-head GitHub CI result — 2026-11-17
+
+- Documentation PR: [#74](https://github.com/AvinashBhalla/job-beeper/pull/74), head `71d5e7ef2b0f6ec80a593bc4281441727f152d7c`; GitHub tested merge commit `3083018bdbe27b02e8cbae61fd6db502447031db` against base `5c28d97ea39edfa8af13d9686f7b97c3997901f3`.
+- [V2 CI run #1482](https://github.com/AvinashBhalla/job-beeper/actions/runs/44053095028) completed with **failure**.
+- Successful steps: Python compilation, dashboard JavaScript syntax, focused router/extractor tests.
+- Full V2 suite: **484 tests in 61.083 seconds; 10 failures and 2 errors**. All 12 are in `v2/test_user_notifications.py`.
+- Errors: `test_permanent_telegram_client_error_is_not_retried` and `test_transient_delivery_failure_is_recorded_for_retry` read a missing ledger row (`NoneType`).
+- Failures: baseline-marker suppression/revalidation, queue idempotency and user scoping, stale/nonmatching evaluation cancellation, per-user dispatch and two-user delivery expectations.
+- The PR diff is documentation-only and changes no application or test code. The base SHA had no associated workflow run available through the connected GitHub history, so do not label these failures as proven pre-existing. They are a confirmed red result on the PR's tested merge tree.
+- **Gate:** keep PR #74 draft/unmerged. Before Company Watch code integration, reproduce and diagnose the notification-suite failures on a clean checkout of the exact base SHA, then rerun the full suite. Do not weaken assertions or alter notification behaviour merely to make CI green. No runtime, source, database, scheduler, deployment or Telegram state was changed by this documentation task.
+
+## 13. Next agent — exact ordered checklist
 
 1. Read this document first, then the newest entry at the top of `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`.
 2. Work from a fresh clean checkout of exact `v2-live-radar` remote HEAD in a separate safe workspace. Do not reuse or pull the dirty VM working tree.
