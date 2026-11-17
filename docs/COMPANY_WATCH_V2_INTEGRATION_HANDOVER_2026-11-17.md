@@ -1,55 +1,45 @@
 # Company Watch → Job Radar V2 integration: engineering plan and agent handover
 
-## Current checkpoint — 2026-11-17, Phase 1 implementation complete locally; PR/CI pending
+## Current checkpoint — 2026-11-17, Phase 1 merged; Phase 2 is next (not started)
 
-**Merged base:** v2-live-radar at c3cffebbaa847337ebd442f873d2af54ca279097 (PR #74 merged).
-**Feature branch:** feat/company-watch-manifest-import-20261117.
-**Draft PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76.
-**Implementation head:** 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c (implementation commit 200f34b8b04ee7dd14dfe1e61333739f860ba17c plus CI workflow commit 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c).
-**Source manifest:** main@29cbb17190b26829d49e1458137d75f2e8f286aa, company_watch/companies.csv.
-**Manifest SHA-256:** 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd.
+**Target branch:** `v2-live-radar`
+**Merged PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76
+**Merge commit / current branch HEAD:** `0220eef1044e042d3041adb97c2d4648afed56a0`
+**Feature head merged:** `14102fa6f24f117786199984008a191befe10836`
+**Implementation commit:** `200f34b8b04ee7dd14dfe1e61333739f860ba17c`
+**Manifest source:** `main@29cbb17190b26829d49e1458137d75f2e8f286aa:company_watch/companies.csv`
+**Manifest SHA-256:** `706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd`
 
-### Current manifest facts (supersede earlier 92/8 counts)
-- 100 rows total; 90 scan_enabled=True, 10 False.
-- 72 rows are generic careers_page records; 10 rows have scan_mode=manual_review.
-- Strict local validation classifies **19 supported direct ATS rows as candidate-stageable** and **81 rows for manual review**.
-- The 19 direct ATS candidates are 10 Greenhouse, 6 Lever and 3 SmartRecruiters. Workday and Workable rows in this manifest are explicitly marked manual review/disabled and remain held; they are not promoted based on URL shape alone.
-- Staged company names: Mistral AI, Anthropic, Figma, Skild AI, Scale AI, SoundHound AI, Cresta, Toku, Canva, Duolingo, GitLab, Abercrombie & Fitch, Axiado, Cyderes (listed as Cydeces), Amtech Software, Warner Music, Kobie, SpaceX and Mythic AI. 15 of the 19 manifest rows are labelled provided_url_needs_live_validation and 4 are labelled verified_ats_board. Every imported V2 candidate still starts low-confidence and unlinked; this phase does not perform live URL verification or independently assert employer ownership.
-- Company Watch's enabled flag is preserved as source metadata and never becomes a V2 source enablement flag.
-- Manual-review reason flags (overlapping, not additive): 72 generic-careers-page records, 10 manifest-disabled records, 10 identity-ambiguous records, 10 explicit manual_review scan modes, and 2 board_type/scan_mode mismatches. No record is silently discarded; the ledger retains all original evidence.
+### Phase 1 result
+- PR #76 merged on 2026-11-17 at 12:12:13 UTC into `v2-live-radar`; GitHub branch HEAD confirmed as the merge commit above.
+- Exact final PR-head CI run **#1501 passed**: 32 focused router/extractor tests and **495 full V2 tests** (58.062s), plus package install, Python compile, and dashboard JavaScript syntax. The final head was `14102fa6f24f117786199984008a191befe10836`.
+- Local full V2 suite also passed: **495 tests, 0 failures** (751.869s). Phase 1 focused tests: **10 passed**. Python compileall, explicit py_compile, Node 20 dashboard checks and `git diff --check` passed.
+- The current pinned manifest is 100 rows / 90 enabled / 10 disabled. It stages 19 supported ATS candidates (10 Greenhouse, 6 Lever, 3 SmartRecruiters) and preserves 81 rows for manual review. Earlier 92/8 figures are stale.
+- The 19 stageable rows are Mistral AI, Anthropic, Figma, Skild AI, Scale AI, SoundHound AI, Cresta, Toku, Canva, Duolingo, GitLab, Abercrombie & Fitch, Axiado, Cyderes (manifest spelling: Cydeces), Amtech Software, Warner Music, Kobie, SpaceX and Mythic AI. Of the 19, 15 are labelled `provided_url_needs_live_validation` and 4 `verified_ats_board` in the source manifest. Every V2 candidate starts low-confidence and unlinked; Phase 1 does not independently verify employer ownership or probe live URLs.
+- Implementation includes `v2/company_watch_manifest.py`, pinned CSV snapshot, additive audit tables, pinned-hash guard, admin dry-run/import and status/review endpoints, ATS provider normalization, Source Health dashboard review panel, CI compile coverage and regression tests. See PR #76 for full diff.
 
-### Phase 1 code added on the feature branch
-- v2/company_watch_manifest.py: strict schema/100-row/row-number/duplicate-name/HTTPS validation, URL safety checks, provider parsing and conservative classification. It performs no network requests.
-- v2/data/company_watch_companies_2026-11-17.csv: pinned source snapshot with its source commit and SHA recorded above.
-- v2/radar.py: additive manifest import/audit tables; pinned SHA-256 guard; admin-only POST /api/discovery/company-watch/import with dry-run; admin-only GET /api/discovery/company-watch/manifest; candidate list exposes manifest company/identity evidence. Existing ATS candidate source provenance is preserved on upsert.
-- Existing ATS candidate URL normalizer now accepts Greenhouse, Ashby, Lever, SmartRecruiters and Workable in addition to Workday, Keka and Darwinbox. Only the manifest's 19 enabled, mode-matching supported boards stage in this snapshot.
-- v2/test_company_watch_manifest.py plus an API test in v2/test_global_discovery_hirebase.py.
-- dashboard/index.html and dashboard/app.js: administrator-only Source Health panel with dry-run → explicit confirmation → import flow, manual-review table for all held rows, and manifest identity context in the existing ATS candidate review table. There is no verify/activate/poll action.
-- .github/workflows/v2-ci.yml now compiles the new parser and regression-test modules in CI.
+### Critical runtime qualification
+**The manifest has NOT been imported into a shared dev/QA or production database.** Import/idempotency/API behavior was tested only against disposable temporary SQLite databases. No application deployment, live ATS endpoint verification, real board verification/activation, scheduler change, polling, Telegram notification or production change occurred. The merge makes the feature available in code; it does not deploy it or run the import.
 
-### Safety and test evidence
-- Full V2 suite: **495 tests passed, 0 failed**, 751.869 seconds locally, exit code 0. GitHub PR CI run #1500 also passed all steps and **495 tests in 61.641 seconds** on implementation head 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c. Command: PYTHONUNBUFFERED=1 PYTHONPATH=. /tmp/job-beeper-phase1-venv/bin/python -m unittest discover -s v2 -p 'test_*.py' -v. Log: /tmp/company-watch-phase1-final-tests.log.
-- Focused Phase 1 tests: **10 passed** (9 manifest/parser/UI tests plus 1 admin API test).
-- Python compileall passed; dashboard JS syntax passed under Node v20.20.2 (npx --yes node@20 --check dashboard/auth.js and dashboard/app.js); git diff --check passed.
-- Temporary SQLite DB received 100 manifest audit rows and 19 discovered ATS candidates. It created **zero** employer rows, board-registry rows, scheduler rows, verified boards, active boards or notifications.
-- Repeat import left the candidate count at 19; a deliberately rejected candidate remained rejected; existing Common Crawl discovery provenance was not overwritten. No manifest rows duplicated.
-- Dry-run wrote nothing. Admin API access was confirmed; non-admin received 403. Pinned manifest hash mismatch receives 409 before import.
-- Work is in a fresh /tmp/job-beeper-phase1-20261117 clone. The dirty /home/ubuntu/job-beeper-dev checkout and production checkout remain untouched. No deployment, polling, ATS endpoint probing, board activation, scheduler changes or Telegram sends occurred.
+### Next implementation gate — Phase 2 readiness, no work started
+The delivery sequence in section 8 below remains controlling:
+1. Capture a fresh read-only baseline and establish a genuinely isolated QA app + DB from the merged commit. Do not use the dirty `/home/ubuntu/job-beeper-dev` checkout or production runtime/DB; previous inspection found the dev checkout dirty/behind and Docker permissions unavailable to the current VM user.
+2. Before live verification, obtain the owner's review of a small sample. Manifest-level `verified_ats_board` entries available for review are Canva and Abercrombie & Fitch (SmartRecruiters), and Cyderes and Kobie (Lever). All remain low-confidence V2 candidates until the existing V2 verification path succeeds. Greenhouse examples carry `provided_url_needs_live_validation`; choose one only after its employer identity and official board link are reviewed.
+3. In isolated QA only, use the existing verify endpoint on the approved small sample; record 401/403, 404, 429, timeout, TLS and parser errors distinctly. Do not run all 19 or all 100.
+4. Activate only an explicit owner-approved allowlist after verification. Prove registry/scheduler/lease/baseline invariants and silent first-poll baseline, then new unique ingestion on a second poll.
+5. Keep JD completeness/hash/update handling (Phase 3), quality audit (Phase 4), alerts (Phase 5), and any production rollout as separate approval gates.
 
-### Phase 1 acceptance and next action
-Implementation is committed and pushed. Draft PR #76 is open against v2-live-radar: https://github.com/AvinashBhalla/job-beeper/pull/76. GitHub CI run #1500 passed on implementation head 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c. A documentation-only handover follow-up is being added; check the latest PR head and latest CI run before marking ready for owner review. Do not merge without the owner's review. After Phase 1 is merged, pause for separate design/review of Phase 2; do not poll or activate any board in this increment.
-
-**Phase boundary remains strict:** no polling, no board activation, no Telegram notifications, no production deployment. The isolated temporary SQLite DB is test evidence only, not the dev or production DB.
+**No automatic activation:** do not treat the CSV `scan_enabled` flag or source-manifest `verified_ats_board` label as V2 approval. No polling, activation, Telegram or production deployment until the relevant QA and owner gates pass.
 
 ---
 
 **Date:** 2026-11-17
 **Repository:** `AvinashBhalla/job-beeper`
 **Target integration branch:** `v2-live-radar`
-**Active implementation branch:** `feat/company-watch-manifest-import-20261117`
+**Merged implementation branch:** `feat/company-watch-manifest-import-20261117` (merged by PR #76)
 **Original V2 source-audit commit:** `5c28d97ea39edfa8af13d9686f7b97c3997901f3`
-**Current `v2-live-radar` base after merged PR #74:** `c3cffebbaa847337ebd442f873d2af54ca279097`
-**Status:** PR #74 is merged. Phase 1 implementation is in progress on `feat/company-watch-manifest-import-20261117`; see the current checkpoint above for exact source hash, counts, test evidence and remaining gates.
+**Current `v2-live-radar` HEAD after merged PR #76:** `0220eef1044e042d3041adb97c2d4648afed56a0`
+**Status:** PR #74 and PR #76 are merged. Phase 1 code is merged and exact-head CI #1501 is green; no shared runtime import or deployment has occurred. Phase 2 requires isolated QA and an owner-reviewed sample.
 
 > **Primary direction:** Use Company Watch as a curated source-discovery input. Do not run it as a second production job pipeline. Reconcile verified company/board records into the existing V2 directory, then use V2 collectors, JD enrichment, SQLite, canonical dedupe, per-user preferences/evaluations and per-user Telegram delivery.
 
@@ -505,7 +495,7 @@ A listener was present on all five loopback ports. The roles of ports 8010/8006/
 
 **No code, configs, databases, credentials, source schedules, notifications, deployments, containers or running services were changed.** No tests were run locally. The exact-head GitHub CI result is recorded below.
 
-## 12. Exact-head GitHub CI and merge result — 2026-11-17
+## 12. Historical pre-Phase-1 GitHub CI and PR #74 result — 2026-11-17 (superseded by current checkpoint above)
 
 - PR #75 — [test: make user notification freshness tests deterministic](https://github.com/AvinashBhalla/job-beeper/pull/75) — was merged by the owner at 2026-11-17 10:06:07 UTC. Merge commit: `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`; it is now the exact `v2-live-radar` HEAD.
 - Post-merge push CI [run #1495](https://github.com/AvinashBhalla/job-beeper/actions/runs/44061666892) passed: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32/32), and full V2 suite (**485 tests passed in 64.834 seconds**).
@@ -513,15 +503,15 @@ A listener was present on all five loopback ports. The roles of ports 8010/8006/
 - PR #74's previous runs #1482–#1494 were before PR #75's merge. The documentation branch was synchronized with the new base using merge commit `84e2817b07ae8ab771e7dd2957311164ee14cbb8`, whose first parent is the docs branch and second parent is the latest V2 base `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`.
 - Fresh exact-base PR CI [run #1497](https://github.com/AvinashBhalla/job-beeper/actions/runs/44062624606) **passed** on head `84e2817b07ae8ab771e7dd2957311164ee14cbb8`: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32/32), and full V2 suite (**485 tests in 65.347 seconds**).
 - PR #74 remains open/draft and mergeable. It contains only the four documentation/handover files. No application/runtime change was made. It is ready for owner review and merge.
-- **Next implementation gate:** after PR #74 is merged, start Phase 1 only on a fresh safe workspace from current `v2-live-radar`: strict/idempotent import of the Company Watch manifest into reviewable V2 company/ATS candidate records, no polling and no activation. Preserve the dirty VM checkout and all production/notification safeguards. No board activation, live scan, Telegram send or deployment is authorized by either documentation/test PR.
+- **Historical next gate (superseded):** after PR #74 was merged, Phase 1 implementation was started. That work is now complete and merged as PR #76. Current next gate is Phase 2 QA readiness as recorded at the top of this document.
 
-## 13. Next agent — exact ordered checklist
+## 13. Next agent — exact ordered checklist (historical where it still describes Phase 1 as next)
 
 1. Read this document first, then the newest entry at the top of `docs/JOB_RADAR_HANDOVER.md` and `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`.
 2. Work from a fresh clean checkout of exact `v2-live-radar` remote HEAD in a separate safe workspace. Do not reuse or pull the dirty VM working tree.
 3. Capture baseline tests and source/board/notification state in an isolated DB/QA environment. No production.
-4. Implement Phase 1 manifest parser/import in a feature branch, with no polling and no activation; send the proposed import report for review.
-5. Implement Phase 2 verification/activation only after import tests pass. Limit to a small manually reviewed subset.
+4. Phase 1 is complete and merged as PR #76 at `0220eef1044e042d3041adb97c2d4648afed56a0`; do not reimplement it.
+5. Establish a fresh isolated QA app+DB and capture a read-only baseline before Phase 2. Obtain owner review of a small sample, then use the existing V2 verification and activation lifecycle only in QA.
 6. Implement additive JD status/hash fields and update handling with focused migrations/tests. Keep incomplete Company Watch-origin jobs non-alertable through both queue and pre-send checks.
 7. Add labelled matcher examples and rejection reason reporting; compare against the existing V2 preferences, not Company Watch's `filters.json`.
 8. Run full V2 tests and exact-head GitHub CI. Deploy only to isolated QA after host access/checkout evidence is resolved.
@@ -539,4 +529,4 @@ Do not ask the owner to resend the 100-company list or explain the filter intent
 
 ### Continuation prompt
 
-> Continue the Company Watch → V2 integration from `docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md`. Target `v2-live-radar`, not `main` or PR #73. Keep Company Watch as a curated discovery manifest only. Phase 1 must be a strict, idempotent registry import with no polling or activation. Reuse V2 provider collectors, verification, per-board scheduler, shared upsert/canonical dedupe, saved user preferences and per-user notification dispatcher. Add first-class JD completeness/hash and updated-JD handling; gate only the new source cohort until validated. Do not merge PR #73 into V2, copy its separate matcher/sender, enable notifications, or touch production. The dev VM checkout is dirty and 147 commits behind; production is 613 behind; Docker is not available to the current user. Preserve all local files and request authorized ops access rather than resetting or using sudo. Update both handover docs after every prompt.
+> Continue the Company Watch → V2 integration from docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md. PR #76 is merged into v2-live-radar at 0220eef1044e042d3041adb97c2d4648afed56a0; Phase 1 code is complete, exact-head CI #1501 passed 495 tests, but the manifest has not been imported into any shared DB or deployed. Next establish an isolated QA app+DB from the merged commit and capture a read-only baseline. Obtain owner review of the proposed small sample (Canva, Abercrombie & Fitch, Cyderes and Kobie) before live verification. Verify and activate only the approved subset in QA, with silent first-poll baseline and second-poll new-ingestion proof. Do not poll or activate all 19/100, send Telegram, implement Phase 3 JD work, or touch production. Preserve the dirty VM checkout; do not reset/clean or bypass access controls. Update all handovers after each meaningful step.

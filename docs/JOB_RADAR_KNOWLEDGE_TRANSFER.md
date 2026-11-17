@@ -1,22 +1,20 @@
 # Job Radar V2 — Knowledge Transfer
 
-## Current checkpoint — 2026-11-17 Phase 1
+## Current checkpoint — 2026-11-17 Phase 1 merged
 
-Read docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md first. PR #74 is merged; base v2-live-radar is c3cffebbaa847337ebd442f873d2af54ca279097. Current feature branch: feat/company-watch-manifest-import-20261117. Draft PR #76: https://github.com/AvinashBhalla/job-beeper/pull/76. Implementation head 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c passed exact-head GitHub CI #1500 (495 tests). Check the latest PR head/run after the documentation-only follow-up.
+PR #76 is merged into `v2-live-radar`. Merge commit/current branch HEAD: `0220eef1044e042d3041adb97c2d4648afed56a0`. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
 
-Pinned source: main@29cbb17190b26829d49e1458137d75f2e8f286aa, SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd. Manifest has 100 rows, 90 enabled and 10 disabled (supersedes earlier 92/8). The parser stages 19 supported ATS candidates and keeps 81 rows in manual review. Of the 19 stageable rows, 15 are labelled provided_url_needs_live_validation and 4 verified_ats_board in the manifest. Every V2 candidate still remains low-confidence and unlinked because Phase 1 performs no live URL verification or independent employer-ownership check. It does not create employers, link boards, verify, activate, schedule, poll or send notifications.
+The pinned Company Watch manifest has 100 rows (90 enabled, 10 disabled); importer stages 19 direct ATS candidates and retains 81 manual-review rows. All 19 V2 candidates remain low-confidence and unlinked. The import code was not deployed to a shared runtime and the manifest was not imported to a persistent dev/QA/production DB; validation used temporary SQLite databases only.
 
-Implementation files: v2/company_watch_manifest.py, v2/data/company_watch_companies_2026-11-17.csv, v2/radar.py, dashboard/index.html, dashboard/app.js, v2/test_company_watch_manifest.py, v2/test_global_discovery_hirebase.py and .github/workflows/v2-ci.yml. Admin Source Health panel has a dry-run/confirm import flow, displays manual-review rows and shows manifest identity evidence on staged candidates. Admin endpoints: POST /api/discovery/company-watch/import (dry-run via {"dry_run":true}) and GET /api/discovery/company-watch/manifest.
+**Next:** Phase 2 readiness, not implementation yet. First establish isolated QA from merge commit 0220eef and capture baseline. Then owner-review a small sample. Source-manifest `verified_ats_board` candidates for review are Canva and Abercrombie & Fitch (SmartRecruiters), Cyderes and Kobie (Lever); none is approved for activation merely by its label. Any Greenhouse candidate needs official employer identity/link review first. In QA only, verify a small approved sample, then activate only the explicit approved allowlist; prove scheduler/lease/baseline invariants and silent first-poll + new second-poll behavior. Do not touch the dirty dev checkout or production; no notifications, Phase 3 JD work, Phase 4 quality pilot, Phase 5 alerts or deployment are authorized by the Phase 1 merge.
 
-Validation: full V2 suite **495 passed, 0 failed, exit 0 in 751.869s**; focused Phase 1 tests **10 passed**; Python compileall, Node v20 dashboard syntax and git diff check passed. Temporary DB tests verify idempotency, preserved rejected/provenance values, dry-run, admin-only access, and zero employer/board/scheduler rows. Draft PR #76 is open. Exact implementation-head CI #1500 passed all steps, including the 495-test suite; check the latest PR commit and CI again after handover documentation updates.
-
-Fresh workspace: /tmp/job-beeper-phase1-20261117. Existing dirty dev checkout and production were left untouched. Keep scope frozen: no polling, board activation, Telegram, production deployment or Phase 2 work. Next: final diff review, commit/push, PR against v2-live-radar, then exact-head CI and owner review.
+See `docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md` for acceptance details and phase boundaries.
 
 ---
 
 
 
-## Historical planning checkpoint — 2026-11-17 (superseded by current checkpoint above)
+## Historical planning checkpoint — 2026-11-17 (superseded by merged Phase 1 checkpoint above)
 
 Read first: [Company Watch → V2 integration plan and handover](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md).
 
