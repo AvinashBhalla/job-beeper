@@ -1,0 +1,158 @@
+# JobBeeper — Fetcher and Feed Reliability Plan
+
+**Status:** active priority, 17 November 2026, 18:11 UTC
+**Branch:** v2-live-radar (latest observed head before this work: 3d057335bf5a69f7ffc3f63903d1075b8253b798)
+**Production:** job-radar-prod-canary:6e5becb, port 8000
+**QA candidate:** job-radar-v2-qa:cc2087e, port 8013
+
+## Direction reset
+
+The immediate goal is a **reliable, fresh, deduplicated job feed**. Prioritize source collectors, ATS board polling, source health, normalization, canonical deduplication, matching and dashboard freshness.
+
+Telegram is **optional**. It is not required to use JobBeeper, log in, set preferences, collect jobs, evaluate jobs or view the dashboard. A user links Telegram only when they choose Telegram as an alert-delivery channel; they must then opt in to those alerts. Telegram linking, webhook setup and member notification enhancements are not blockers for the core fetcher/feed work and must not be treated as production-readiness prerequisites for dashboard access.
+
+The existing member account can be used to verify that the dashboard feed is populated, but do not expand member-only functionality, per-user notification workflows or admin/member parity during this reliability increment. Company Watch/manifest expansion is also secondary until current collectors and the production scheduler are reliable.
+
+## Current production evidence
+
+Read-only production source_runs rollup for the 24-hour window ending approximately 17 November 2026, 18:11 UTC:
+
+| Source | Runs | Requests | HTTP 429 | Failed pages | Jobs seen | New jobs | Assessment |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Workday | 627 | 4,894 | 417 | 362 | 4,211 | 33 | **Critical: repeated throttling and page failures** |
+| LinkedIn | 267 | 1,566 | 12 | 4 | 3,123 | 449 | Active, but occasional rate limiting |
+| Naukri | 503 | 503 | 0 | 2 | 151,841 | 706 | High contribution; inspect the two failed pages |
+| SmartRecruiters | 504 | 11,592 | 0 | 0 | 151,178 | 251 | Successful, but request volume deserves profiling |
+| Greenhouse | 504 | 1,512 | 0 | 0 | 175,878 | 11 | Stable; confirm low new-job count is normal |
+| Ashby | 502 | 1,004 | 0 | 0 | 425,366 | 26 | Stable |
+| Workable | 1,245 | 1,245 | 0 | 1 | 7,464 | 0 | Stable polling; inspect the single failure and zero-new period |
+| Keka | 1,243 | 2,486 | 0 | 0 | 135,339 | 12 | Stable |
+| Darwinbox | 1,248 | 1,248 | 0 | 0 | 46,371 | 7 | Stable |
+
+jobs_seen is a count of observations across runs, not unique jobs. Do not present it as unique inventory. new_jobs is new rows added by ingestion; it is not necessarily the same as the number of unique active vacancies.
+
+The most important production finding is that the live container has no v2.board_scheduler module and no ats_board_poll_schedule table. The QA candidate does have that module and table. Therefore the newer persistent per-board scheduler and PR #77's adaptive per-board 429 cooldown are **not active in production**. The production image was created on 8 November; the QA image was created on 17 November. A tested code merge alone did not upgrade the live runtime.
+
+Production's active ATS registry snapshot contains 10 active boards:
+- Greenhouse: 3
+- Ashby: 2
+- Workday: 1
+- SmartRecruiters: 1
+- Workable: 1
+- Keka: 1
+- Darwinbox: 1
+
+The runtime config also enables LinkedIn and Naukri as global fetchers. Instahyre and Lever are disabled.
+
+## Priority order
+
+### P0 — Workday request control and scheduler rollout
+
+1. Validate v2.board_scheduler against the existing 10-board production allowlist in a disposable QA database. Do not turn on polling in the current QA service; create a separate test copy/config.
+2. Prove scheduler config sync creates one due record for each enabled board, respects the existing explicit allowlist, and does not silently activate unreviewed registry rows.
+3. Exercise success, ordinary failure and HTTP 429 paths. Verify progressive per-board cooldown (5/10/20/40/60 minutes, capped at 60 minutes), longer provider Retry-After handling, persistent host cooldown and no premature re-request.
+4. Verify one throttled Workday host does not pause Greenhouse, Ashby, SmartRecruiters, Keka, Darwinbox, Naukri or LinkedIn.
+5. Build the release image from the reviewed v2-live-radar commit, take and verify a production database backup, confirm schema migration is additive/backward-compatible, then plan a controlled production update. Do not activate additional boards during the scheduler rollout.
+6. After the update, inspect per-board due times and source runs for at least 24 hours. Workday requests must fall materially; repeated 429s must no longer occur at the old cadence.
+
+### P1 — LinkedIn and Naukri reliability
+
+- LinkedIn: retain conservative request pacing and cooldown behavior; analyse the 12 recent 429s and four failed pages by query/target. Keep request budgets bounded and avoid broad retries after the first 429.
+- Naukri: preserve the five-minute relay workflow, verify every expected target/search result and inspect the two recent failed pages. Verify relay-to-V2 ingestion and second-poll idempotency.
+- Keep source discovery freshness separate from collector execution status: a successful run with zero new jobs is not a failure, but a stale last-success timestamp is not healthy.
+
+### P1 — ATS collector request efficiency and completeness
+
+- SmartRecruiters: profile why 11,592 requests were attempted across 504 runs. Keep the existing 251 new jobs while reducing avoidable pagination/detail requests.
+- Greenhouse/Ashby: verify active board identity, result caps, board-level failures and publication timestamps. Preserve the successful 3/3 and 2/2 board evidence from QA.
+- Workable/Keka/Darwinbox: keep their stable paths; investigate isolated failures and ensure per-board metrics show partial failures rather than marking a provider fully successful.
+- Do not add boards merely to increase counts. Board identity must be validated; activation stays explicit and allowlisted.
+
+### P2 — Feed quality and visibility
+
+- Verify normalize → upsert → canonical dedupe → user evaluation → dashboard feed on repeated polls.
+- Confirm stable IDs/URLs, meaningful company/title/location, posted-time provenance, job freshness, and source attribution.
+- Check that newly ingested jobs appear in the dashboard within the configured polling/refresh budget.
+- Investigate duplicate clusters, malformed postings, stale/expired listings and source-specific zero-new periods.
+- Keep role/location matching permissive enough to avoid silently excluding valid jobs; the current member profile is already producing matches with Remote only disabled.
+
+### Later, not part of this increment
+
+- Telegram linking, webhooks and per-user alert delivery.
+- Broader member-only product features and administrator/member parity.
+- Company Watch manifest expansion and adding many more employer boards.
+- New notification channels.
+
+These are separate product workstreams. They must not distract from making the existing fetchers and feed dependable.
+
+## QA and release gates
+
+- Exact-head GitHub CI passes on the PR.
+- Unit tests cover scheduler cooldown, host isolation, retries, source contracts and idempotent ingestion.
+- QA uses a copied database and separate config; no production credentials or Telegram secrets.
+- QA board scheduler test proves allowlist sync and one controlled board poll; a second poll must not duplicate job rows.
+- QA source flags remain disabled outside explicit test invocations.
+- Production database snapshot passes SQLite integrity check before any release.
+- Production image and configuration are identified; schema migration is additive and rollback image is recorded.
+- After a controlled release, compare 24-hour source metrics to this baseline. Do not claim success based only on container health or a green unit-test suite.
+
+## Small correctness fixes being handled alongside reliability
+
+- Hide the empty Intelligence navigation group from members (the Source Health link was already hidden, but its parent heading remained visible).
+- Implement the documented Remote only semantics: role is always required; a location is required unless Remote only is selected. With a location, the job must be explicitly remote and match that location. With no location, only explicitly remote worldwide jobs match. Hybrid and on-site roles do not count as remote.
+- These are small UI/preference correctness changes; they must not expand into a Telegram or notification project. They remain behind their own review/CI gate and do not change the current saved member preference.
+
+## Next exact actions
+
+1. Finish the current role/navigation and Remote only regression tests.
+2. Verify board-scheduler allowlist sync and one-board poll in an isolated QA DB/config, including Workday cooldown state without repeatedly hitting the already-throttled upstream.
+3. Review SmartRecruiters request volume and Naukri failed-page detail, then implement the highest-value fetcher fixes.
+4. Update the source-health dashboard/handovers with per-board freshness and last-success signals if current fields are insufficient.
+5. Create a reviewed PR, pass exact-head CI, rebuild candidate QA and only then plan the controlled runtime update.
+
+
+## 17 November 2026 — first isolated scheduler simulation
+
+A temporary SQLite database was created from the existing production allowlist and poll intervals, while running the scheduler code inside the candidate QA container. This was not the shared QA database and did not make any network requests.
+
+- configured_boards returned exactly 10 active allowlisted boards across 7 API hosts.
+- sync_config created exactly 10 schedule rows.
+- Workday's simulated first HTTP 429 persisted a 5-minute next-due/host cooldown.
+- Workday's simulated second HTTP 429 persisted a 10-minute next-due/host cooldown.
+- An Ashby board on api.ashbyhq.com remained claimable while the Workday NVIDIA host was cooling down.
+- The second cooldown did not affect the live QA config: all source switches remain false and notifications remain false.
+- The simulation passed. This proves the scheduler's temporary-DB state/claim/cooldown logic; it does not yet prove the full application scheduler dispatch path against a live QA ATS board. That is the next isolated QA test.
+
+
+## 17 November 2026 — scheduled dispatch integration smoke
+
+On the candidate QA image, a throwaway SQLite DB was initialized and synced with only one existing Greenhouse board (Coinbase). The normal application scheduler claim and scheduled-board dispatch path was exercised. One public Greenhouse board read returned 260 jobs; the collector/upsert persisted those rows; the scheduler recorded success with 1/1 board successful, zero failures and zero 429s; board baseline_pending cleared. The first inventory baseline was suppressed in the notification ledger. SQLite integrity_check returned ok. Telegram notifications were disabled and no Telegram credentials were available to the test. The shared QA config and production database/runtime were not changed.
+
+This proves one real scheduled board dispatch and baseline behavior. Repeat-poll idempotency for this scheduler dispatch path remains a follow-up QA check; collector-level second-poll dedupe for Naukri, Greenhouse and Ashby was previously verified.
+
+
+## 17 November 2026 — repeated scheduled-poll idempotency smoke
+
+The first actual dispatch smoke proved the one-board claim → collector → upsert → baseline-suppression → scheduler-result path. A second isolated run repeated the same board poll after respecting the scheduler host minimum interval.
+
+- First scheduled Coinbase Greenhouse poll: 260 seen, 260 inserted; all 260 first-inventory ledger entries were suppressed as baseline, not sent.
+- Second scheduled poll: 260 seen, 0 inserted.
+- Final job row count remained 260, duplicate (source, source_job_id) groups: 0, SQLite integrity_check: ok.
+- Both source_runs recorded success, one board attempted / one succeeded / zero failures. The host pacing interval was not bypassed.
+- Tests used temporary QA SQLite/config files, one public Greenhouse board per poll, notifications disabled and no Telegram credentials. The temporary files were removed. Neither shared QA data/config nor production was changed.
+
+This closes the isolated two-poll scheduler idempotency check for one representative Greenhouse board. Workday-specific scheduled dispatch remains to be exercised without repeatedly hitting its throttled upstream; its cooldown state is covered by the no-network simulation above.
+
+
+## 17 November 2026 — production snapshot migration compatibility check
+
+A fresh consistent backup of the live production DB was created before preparing the scheduler canary: /var/backups/job-radar-daily/production-before-scheduler-canary-20261117.sqlite3 (129 MB, mode 0600, SQLite integrity ok, SHA-256 8593c7fa32757635a0ee27624ec8c957c584163d13f5271976ac0f25fa684cf1). At snapshot time it contained 27,497 jobs, 2 users and 10 active ATS registry boards.
+
+The candidate V2 image was then used to initialize a disposable copy of that snapshot and sync the exact sanitized production source allowlist/poll intervals. Results:
+- Existing 27,497 job rows, 2 user rows and 10 active registry rows were preserved.
+- V2 initialization created the scheduler state schema; scheduler sync created exactly 10 schedule rows.
+- The scheduled (source, board_key) set exactly matched the 10 configured production boards.
+- SQLite integrity_check returned ok after the migration.
+- Temporary cloned DB/config were removed after the check. The production DB was not migrated and its container was not restarted.
+
+This proves schema/config-sync compatibility against a copy of the current production DB. It does not authorize production rollout or scheduled polling. Production rollout still requires reviewed code/CI, final candidate QA, an additive migration review, this verified backup and explicit owner approval.

@@ -69,6 +69,26 @@ class UserPreferencesTests(unittest.TestCase):
         )
         self.assertTrue(saved["onboarding_complete"])
 
+    def test_remote_only_can_complete_onboarding_without_a_target_location(self):
+        user = self._user("remote-worldwide@example.com")
+        saved = user_preferences.save_user_preferences(
+            self.db_path,
+            user["id"],
+            {"target_roles": ["Python Developer"], "locations": [], "remote_only": True},
+        )
+        self.assertTrue(saved["onboarding_complete"])
+        self.assertEqual(saved["locations"], [])
+        self.assertTrue(saved["remote_only"])
+
+    def test_remote_only_without_target_role_does_not_complete_onboarding(self):
+        user = self._user("remote-no-role@example.com")
+        with self.assertRaisesRegex(ValueError, "target role"):
+            user_preferences.save_user_preferences(
+                self.db_path,
+                user["id"],
+                {"target_roles": [], "locations": [], "remote_only": True},
+            )
+
     def test_preferences_are_isolated_between_users(self):
         first = self._user("first@example.com")
         second = self._user("second@example.com")

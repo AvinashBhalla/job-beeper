@@ -1,42 +1,30 @@
 # JobBeeper — production readiness, delivery plan and next-agent handover
-## Latest execution update — 17 November 2026, 17:18 UTC
+## Latest execution update — 17 November 2026, 18:30 UTC
 
-PR #77 is merged into v2-live-radar. This is a code merge only; it is not a production deployment.
+This is the current source of truth. The earlier 17:18 status and 15:15 rollout table are superseded by docs/FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md.
 
-- PR #77: https://github.com/AvinashBhalla/job-beeper/pull/77
-- Merge commit: 5b80499d42046cbadc7570171944346d9bf57fb9.
-- Post-merge GitHub Actions run #1513 passed the full V2 suite: 497 passed, 0 failed (64.807 seconds); focused router/extractor tests passed 32/32.
-- Exact merged application source tree: 313838340b030eac08866d0b173f4085e69a50a4. This matches the tree used to build the candidate QA image.
-- Candidate image: job-radar-v2-qa:cc2087e, image ID sha256:741245d98b894ef99add44407632369c6f76e9ce75eaf95e32f42c0006a81422.
-- Candidate QA container job-radar-current-v2-qa is running on loopback port 8013; /health returns HTTP 200. All 12 QA source flags and legacy notifications remain disabled. The in-container scheduler suite passed 12/12 tests.
-- Live candidate QA source proofs (manual run_source calls; all writes confined to QA):
-  - Naukri: 312 seen, 2 new first pass; 312 seen, 0 new second pass.
-  - Greenhouse: 3/3 boards succeeded, 346 seen, 2 new first pass; 346 seen, 0 new second pass.
-  - Ashby: 2/2 boards succeeded, 848 seen, 4 new first pass; 848 seen, 0 new second pass.
-  - All six inserted jobs were written only into the copied QA database. No Telegram send occurred. These manual collector calls do not turn on source scheduling.
-- Latest QA snapshot: /var/backups/job-radar-daily/qa-after-ats-smoke-20261117.sqlite3; 27,379 jobs, SQLite integrity ok, 12 source switches false, notifications false, one copied admin, zero member Telegram chats/settings/per-user notification ledger rows. Size 121,507,840 bytes; SHA-256 8d14fa852b7e53ec795b6811273b171c49684602acc2da42c40a54d3994cf884.
-- Production remains unchanged on image job-radar-prod-canary:6e5becb at port 8000. Public HTTPS and loopback /health both return HTTP 200. No member account was created, no Telegram webhook was registered, no real member message was sent, and no production deployment was performed.
-- VM: two running JobBeeper containers, one production Docker volume, five retained images including prior QA rollback, zero build cache, root disk 28% used, about 407 MB available RAM at last sample.
-- HTTPS certificate for IP 130.210.27.197 expires 23 November 2026. The Certbot snap renewal timer is active, and a staging dry-run renewal completed successfully on 17 November. The live certificate was not changed by the dry run.
-- A documentation-only PR #78 is open to carry this final post-merge/source-smoke/certificate update into the current branch; its exact-head CI is the final documentation gate.
+- PR #77 merged as 5b80499 and PR #78 merged as 3d05733. Workday adaptive cooldown code is in v2-live-radar, but it is not in the production runtime yet.
+- Production image job-radar-prod-canary:6e5becb (created 8 Nov) has no v2.board_scheduler module and no ats_board_poll_schedule table. Candidate QA image job-radar-v2-qa:cc2087e (created 17 Nov) contains the new persistent per-board scheduler.
+- Production 24-hour source baseline ending about 18:11 UTC: Workday 627 runs / 4,894 requests / 417 HTTP 429 / 362 failed pages / 33 new rows; LinkedIn 267 / 1,566 / 12 / 4 / 449; Naukri 503 / 503 / 0 / 2 / 706. SmartRecruiters made 11,592 requests in 504 successful runs and added 251 rows. Other five ATS sources were free of HTTP 429s in this window. See FETCHER_AND_FEED_RELIABILITY_PLAN for the full table and next investigations.
+- Production has 10 active allowlisted ATS boards: Greenhouse 3, Ashby 2, Workday 1, SmartRecruiters 1, Workable 1, Keka 1 and Darwinbox 1. LinkedIn and Naukri are enabled global fetchers; Instahyre and Lever are disabled.
+- Member account avi.bhalla2004@gmail.com now exists (user id 2, role user). Its saved Software Developer / India preferences currently have Remote only false and generated 1,052 matching evaluations. Telegram is not linked; that does not block dashboard, job collection, matching or feed usage.
+- Pending code branch: fix/member-remote-only-global-20261117. It allows role + Remote only with no target location (explicitly remote worldwide), uses structured ATS workplace metadata, excludes hybrid/on-site, and hides the otherwise-empty Intelligence group from members. The current member preference is not changed by this code.
+- Full local V2 regression suite on this branch: 504 tests passed, 0 failures (496.103 seconds). Python compilation, git diff --check and focused new tests passed. The VM's system Node is v12.22.9 and cannot parse existing optional chaining; rely on GitHub CI's Node syntax check for dashboard JavaScript rather than treating the local Node 12 error as an application error.
+- Disposable QA scheduler simulation used the existing 10-board config and production poll intervals: sync created exactly 10 schedule rows; Workday's first simulated 429 persisted a 5-minute host cooldown, second persisted a 10-minute cooldown, and a different-host Ashby board remained claimable during the Workday cooldown. The test used a temporary SQLite DB and made no upstream Workday request. A scheduled-dispatch integration smoke then claimed one existing Coinbase Greenhouse board twice through the real scheduler dispatch path: first poll inserted 260 jobs and silently suppressed all 260 as the initial inventory baseline; second poll observed 260 and inserted 0. Both runs succeeded (1/1 board, 0 failures), no duplicate source IDs existed, and SQLite integrity was ok. The host minimum interval was respected. Notifications were disabled and no Telegram send occurred. Both tests used temporary SQLite DBs; the shared QA config remains unchanged with all source flags false and notifications false.
+- Fresh production DB snapshot for the upcoming scheduler canary is saved at /var/backups/job-radar-daily/production-before-scheduler-canary-20261117.sqlite3; 129 MB, mode 0600, SQLite integrity ok, 27,497 jobs, 2 users, 10 active ATS boards. SHA-256: 8593c7fa32757635a0ee27624ec8c957c584163d13f5271976ac0f25fa684cf1.
+- The candidate image's additive V2 DB initialization was applied to a disposable copy of that production snapshot. Existing job/user counts and 10 active registry boards were preserved; the scheduler table was created and synced to exactly 10 rows whose active board keys matched the production allowlist. The copy passed SQLite integrity. Temporary files were removed. No production database was migrated.
+- Production and QA containers remain running; last health checks returned HTTP 200. No production container, DB, source flag, Telegram setting or Nginx config was changed.
+- Telegram is optional. It is not required to log in, save preferences, collect jobs, evaluate matches or use the dashboard. It is used only when a user chooses Telegram as an alert channel and opts in. Do not gate fetcher/feed reliability work on Telegram linking, webhook setup or a per-user notification canary.
 
-## Remaining work and revised delivery estimate
+## Active priority and next steps
 
-The code, tests, PR #77 merge, QA image, three-source collector/dedupe proof, scheduler regression proof and TLS renewal simulation are complete. Remaining work is the real member journey and production controls:
+1. Complete review of the Remote only and member Intelligence-navigation fixes on the current branch; keep the member's saved Remote only setting unchanged.
+2. Open a PR against v2-live-radar and require exact-head GitHub CI, including dashboard JS syntax and the full V2 suite.
+3. In isolated QA, prove the production 10-board allowlist and board-scheduler dispatch path, including one controlled board poll, second-poll idempotency, silent first baseline, board/host isolation and Workday cooldown persistence. Keep the shared QA instance's sources disabled; use a throwaway DB/config.
+4. Investigate Workday's repeated 429s, SmartRecruiters request volume and Naukri's failed pages. Preserve source allowlists and request budgets.
+5. Rebuild a release candidate from the reviewed commit; verify additive migration, pre-release production backup, image digest and rollback. Deploy only after exact-head CI, QA evidence and explicit owner approval.
 
-1. Obtain the email address to use for a separate normal member account. Production currently has admin only; do not convert the admin.
-2. Provision the member and complete that member's own saved preferences.
-3. Configure the per-user Telegram bot username and webhook secret in the production secret/environment store; register the public webhook at https://130.210.27.197/api/telegram/webhook; link the member's private chat; explicitly enable notifications.
-4. Prove a genuinely new matching job reaches this member's saved preferences, queues to that member only, is sent to that linked private chat, records Telegram ok=true and is not sent twice. No historical backlog may be delivered.
-5. Configure encrypted offsite backup and complete a restore drill on an isolated database.
-6. Prepare a release image from merged commit 5b80499, compare effective non-secret config and DB migration expectations, then deploy only after explicit owner approval. Production remains on 6e5becb until that gate.
-7. Monitor source health, matching and member delivery for 24–72 hours after the canary.
-
-**Revised remaining estimate:** about **6–10 focused engineering hours** to reach a controlled production canary once the member email, Telegram bot-owner access, HTTPS/webhook configuration and offsite-backup route are available. Allow another **24–72 hours** of monitoring before calling the rollout stable. A genuinely new matching job may take longer to arrive. This estimate excludes Company Watch Phase 2.
-
-Company Watch Phase 2 remains paused until the existing member pipeline passes a real canary. It is a later project, not a prerequisite for proving the existing source-to-member pipeline.
-
----
+Member-only enhancements, Telegram and Company Watch expansion are later work. The core feed can and should be used without Telegram.
 
 ---
 
@@ -45,15 +33,17 @@ Company Watch Phase 2 remains paused until the existing member pipeline passes a
 
 ## 1. Executive decision
 
-**Priority 1: prove and safely release the complete existing V2 pipeline. Keep Company Watch Phase 2 paused.**
+**Priority 1: stabilize the existing fetchers and job feed. Keep member-only enhancements, Telegram delivery and Company Watch expansion out of this increment.**
 
-The existing system already collects and stores jobs. The remaining release-critical gap is the personal/member journey: a normal member account, member-owned preferences, a linked private Telegram chat, explicit notification opt-in, per-user match decisions and a real delivery. That path is implemented and has strong automated coverage, but production has not completed a real member-to-Telegram acceptance test.
+The immediate product requirement is dependable source polling, low avoidable rate limiting, complete pagination, truthful source health, stable normalization, canonical deduplication, relevant matching and a fresh dashboard feed. The production source baseline shows Workday is the principal reliability issue, followed by smaller LinkedIn and Naukri issues; SmartRecruiters request efficiency also needs investigation.
 
-The release target is:
+The core feed path is:
 
-Naukri / existing ATS sources → V2 collection → database upsert + canonical dedupe → member's saved preferences → member's job evaluations → notification eligibility + no-backlog boundary → member-owned Telegram chat / dashboard
+Naukri / LinkedIn / approved ATS boards → source-specific collectors and scheduler → normalized job records → idempotent upsert + canonical dedupe → match evaluation → dashboard feed
 
-Do not spend the next engineering cycle expanding employer/Company Watch discovery until this path is proven with a real member in QA and then a controlled production canary.
+Telegram is optional. It is not required for login, preferences, job collection, matching or dashboard access. It is used only when a user chooses Telegram as an alert channel and opts in. Do not gate the fetcher/feed release on Telegram setup or personal notification delivery.
+
+Do not expand Company Watch or member-only features until the existing collectors, board scheduler, freshness metrics and dashboard feed meet the reliability criteria in docs/FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md.
 
 **Production has not been updated in this work.** The live production service remains on the older image job-radar-prod-canary:6e5becb on port 8000. The current V2 QA service is isolated on port 8013.
 
@@ -290,7 +280,7 @@ Do not mark the release ready until all P0 gates are met.
 - First board poll must be a silent baseline; second poll must prove new unique ingestion.
 - Then progress to JD completeness, quality audit and only later a Company Watch alert pilot. Keep its phases separate; do not compress them into one deployment.
 
-## 6. Fastest safe delivery sequence
+## 6. Historical member/Telegram rollout sequence (superseded 18:24 UTC by fetcher-first plan)
 
 This is the shortest critical path. Work can proceed in parallel where noted, but do not skip release gates.
 
@@ -304,31 +294,28 @@ This is the shortest critical path. Work can proceed in parallel where noted, bu
 | 6 | Encrypted offsite backup/restore drill; production candidate and rollback verification | Engineering | Restore evidence and rollback runbook | 2–4 hours |
 | 7 | Explicit owner-approved production rollout | Owner authorizes; engineering executes | Reviewed image deployed; health checks pass; monitored first cohort | 1–2 hours plus 24–72 hours observation |
 
-**Initial estimate at 15:15 UTC:** approximately 8–14 focused engineering hours. **Revised estimate at 17:06 UTC after PR CI and QA candidate completion:** approximately **6–10 focused engineering hours** to reach a controlled production canary, assuming the member email, bot ownership, webhook/domain configuration, offsite backup/restore access and production access are available without delay. In calendar terms, plan for **1–2 days of focused day/night work** to reach the first production canary, then **another 24–72 hours of monitoring** before calling the rollout stable.
+**Historical estimate, superseded:** the earlier 6–10-hour member/Telegram canary estimate is not the current delivery target. The active work is fetcher/feed reliability; estimate the production scheduler rollout after QA integration and GitHub CI complete. In calendar terms, plan for **1–2 days of focused day/night work** to reach the first production canary, then **another 24–72 hours of monitoring** before calling the rollout stable.
 
 This is not a promise that everything will be live in 8 hours. The main external dependencies are a real member identity, Telegram private-chat linking/webhook setup, GitHub CI, an offsite backup/restore route and explicit production approval. If any one of these is unavailable, the schedule moves by the dependency delay.
 
 Company Watch Phase 2 is a separate follow-on and is not included in this estimate. Forcing it into the same overnight release would increase risk without helping prove the existing member pipeline.
 
-## 7. Owner inputs required — only when the relevant step is reached
+## 7. Owner input
 
-1. The email address you want to use for your normal member account. Production currently has admin only; no member record exists.
-2. Access to the Telegram bot owner account and confirmation that the existing bot should be used for member notifications. Do not send the bot token in chat.
-3. Explicit approval at the production deployment gate after QA acceptance and backup/restore evidence are available.
+No owner input is required for the current fetcher diagnostics, QA scheduler verification, code changes or documentation. A separate explicit owner approval will still be required before any production container/image update.
 
-No other owner input is required for the code, QA rebuild, source health work or documentation steps.
+Telegram bot access is needed only if/when you later decide to enable Telegram as an optional notification channel. It is not required for the feed reliability work.
 
 ## 8. Next-agent checklist — continue from here
 
-1. Read this document first. Treat older timestamps/claims in REPOSITORY_CLEANUP_AND_VM_HEALTH_2026-11-17.md, NEXT_AGENT_START_HERE.md, JOB_RADAR_HANDOVER.md and JOB_RADAR_KNOWLEDGE_TRANSFER.md as historical where they conflict with this current state.
-2. Read the latest execution update above. PR #77 is merged as 5b80499 on v2-live-radar; post-merge CI #1513 passed 497 tests. The QA candidate image was built from the identical application tree.
-3. Do not attempt to merge PR #77 again. The next workstream is member provisioning and Telegram setup, followed by offsite backup/restore; do not deploy to production until the owner explicitly approves the release.
-4. Candidate QA is already rebuilt from the merged application tree as job-radar-v2-qa:cc2087e and running in job-radar-current-v2-qa on port 8013. Keep QA source polling and notifications disabled by default. Keep production Telegram and Google OAuth credentials out of QA.
-5. Complete the member provisioning and real Telegram linking gates once the owner supplies the member email and bot access.
-6. Attach QA test outputs, source-run evidence, Telegram canary ledger evidence, image digest and backup/restore evidence to this handover.
-7. Deploy only after the owner explicitly approves the release. Preserve job-radar-production-rollback:20261108 until the new release passes its monitoring window.
-8. Do not resume Company Watch Phase 2 until the existing member path passes.
-
+1. Read docs/FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md first; it is the active priority and supersedes the earlier member/Telegram canary sequence.
+2. Inspect the current production/QA images and confirm the production scheduler gap. Do not change production containers or source flags during QA work.
+3. Finish tests for the Remote only and member Intelligence navigation fixes on branch fix/member-remote-only-global-20261117. Do not change the user's saved Remote only setting.
+4. In a separate disposable QA database/config, enable only the existing 10-board allowlist and prove board_scheduler.sync_config creates the expected due rows. Test host leases, board failure isolation and Workday 429 cooldown without repeatedly hitting the throttled upstream.
+5. Investigate SmartRecruiters request volume and Naukri failed-page details. Preserve source request budgets and existing active allowlists.
+6. Open a PR against v2-live-radar, require exact-head CI, rebuild candidate QA and record source/scheduler results. No Telegram link, webhook or member notification canary is required for this workstream.
+7. Before any production rollout, take and verify a DB backup, confirm additive migration and rollback image, then obtain explicit owner approval.
+8. Do not resume Company Watch expansion or broader member-only work until the existing feed reliability criteria are met.
 ### Paths and retained evidence
 
 - Repository/worktree: /tmp/job-beeper-perf-v2

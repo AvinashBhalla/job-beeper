@@ -33,6 +33,14 @@ _NUMBER_FIELDS = {
 _ALLOWED_FIELDS = set(PREFERENCE_DEFAULTS)
 
 
+def preferences_complete(preferences: dict[str, Any]) -> bool:
+    """A role is always required; Remote only can replace explicit locations."""
+    return bool(
+        preferences.get("target_roles")
+        and (preferences.get("locations") or preferences.get("remote_only"))
+    )
+
+
 def _connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path), timeout=10)
     conn.row_factory = sqlite3.Row
@@ -117,8 +125,10 @@ def _validate_preferences(payload: dict[str, Any], require_complete: bool = True
     if require_complete:
         if not result["target_roles"]:
             raise ValueError("At least one target role is required before accessing the job feed.")
-        if not result["locations"]:
-            raise ValueError("At least one target location is required before accessing the job feed.")
+        if not result["locations"] and not result["remote_only"]:
+            raise ValueError(
+                "At least one target location is required unless Remote only is enabled."
+            )
     return result
 
 
@@ -132,9 +142,7 @@ def _decode_row(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if not isinstance(parsed, dict):
         parsed = {}
     preferences = {**PREFERENCE_DEFAULTS, **parsed}
-    preferences["onboarding_complete"] = bool(
-        preferences.get("target_roles") and preferences.get("locations")
-    )
+    preferences["onboarding_complete"] = preferences_complete(preferences)
     preferences["version"] = int(row["version"])
     preferences["updated_at"] = row["updated_at"]
     return preferences

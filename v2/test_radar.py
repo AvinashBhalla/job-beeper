@@ -143,6 +143,51 @@ class MatcherTests(unittest.TestCase):
         self.assertFalse(radar.location_allowed("Remote - USA", BASE_CONFIG))
         self.assertFalse(radar.location_allowed("Remote - Cyprus", BASE_CONFIG))
 
+    def test_remote_only_with_india_target_requires_remote_and_india(self):
+        config = {**BASE_CONFIG, "locations": ["India"], "remote_only": True}
+        self.assertTrue(radar.location_allowed("Remote - India", config))
+        self.assertTrue(radar.location_allowed("Remote, Bengaluru, Karnataka, India", config))
+        self.assertFalse(radar.location_allowed("Remote - USA", config))
+        self.assertFalse(radar.location_allowed("Bengaluru, Karnataka, India", config))
+        self.assertFalse(radar.location_allowed("Hybrid - Remote, India", config))
+
+    def test_remote_only_without_target_location_means_remote_worldwide(self):
+        config = {**BASE_CONFIG, "locations": [], "remote_only": True}
+        self.assertTrue(radar.location_allowed("Remote - USA", config))
+        self.assertTrue(radar.location_allowed("Remote - India", config))
+        self.assertFalse(radar.location_allowed("Bengaluru, Karnataka, India", config))
+        self.assertFalse(radar.location_allowed("Hybrid - Remote, India", config))
+        self.assertFalse(radar.location_allowed("", config))
+
+        matched = radar.match_details(
+            make_job("Software Engineer", "Build backend services.", "Remote - USA"),
+            config,
+        )
+        self.assertTrue(matched["match"])
+
+    def test_remote_only_uses_explicit_source_workplace_metadata(self):
+        config = {**BASE_CONFIG, "locations": ["India"], "remote_only": True}
+        remote_job = radar.normalize_job(
+            "lever", "remote-workplace-1", "Acme", "Software Engineer",
+            "Bengaluru, India", "https://example.com/remote",
+            None, "unknown", "Build software.",
+            source_details={"workplace_type": "remote"},
+        )
+        hybrid_job = radar.normalize_job(
+            "lever", "hybrid-workplace-1", "Acme", "Software Engineer",
+            "Bengaluru, India", "https://example.com/hybrid",
+            None, "unknown", "Build software.",
+            source_details={"workplace_type": "hybrid"},
+        )
+        self.assertTrue(radar.match_details(remote_job, config)["match"])
+        self.assertFalse(radar.match_details(hybrid_job, config)["match"])
+
+    def test_remote_only_uses_persisted_source_workplace_metadata(self):
+        config = {**BASE_CONFIG, "locations": [], "remote_only": True}
+        job = make_job("Software Engineer", "Build software.", "Bengaluru, India")
+        job["source_details_json"] = '{"workplace_type":"remote"}'
+        self.assertTrue(radar.match_details(job, config)["match"])
+
     def test_unqualified_remote_location_remains_global(self):
         config = {**BASE_CONFIG, "locations": ["Bengaluru, India", "Remote"]}
         self.assertTrue(radar.location_allowed("Remote - USA", config))

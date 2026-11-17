@@ -2015,7 +2015,7 @@
     if (!state.isAdmin) {
       const missing = [];
       if (!payload.target_roles?.length) missing.push('at least one target role');
-      if (!payload.locations?.length) missing.push('at least one target location');
+      if (!payload.locations?.length && !payload.remote_only) missing.push('a target location or enable Remote only for worldwide remote jobs');
       if (missing.length) {
         const message = `Add ${missing.join(' and ')} before saving your preferences.`;
         if ($('saveStatusMessage')) $('saveStatusMessage').textContent = message;

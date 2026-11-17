@@ -85,7 +85,8 @@ class UserScopedJobFeedTests(unittest.TestCase):
         )
         response = self.client.get("/api/jobs")
         self.assertEqual(response.status_code, 403)
-        self.assertIn("target role and location", response.json()["detail"])
+        self.assertIn("target role", response.json()["detail"])
+        self.assertIn("Remote only", response.json()["detail"])
 
 
     def test_preference_save_returns_specific_validation_for_missing_target_role(self):
@@ -104,6 +105,59 @@ class UserScopedJobFeedTests(unittest.TestCase):
             response.json()["detail"],
             "At least one target role is required before accessing the job feed.",
         )
+
+    def test_remote_only_without_location_unlocks_feed_for_remote_jobs_worldwide(self):
+        self.assertEqual(
+            self._login("a@example.com", "user-a-password-long").status_code,
+            200,
+        )
+        config = {**radar.get_config(), "notifications_enabled": False}
+        remote_job = radar.normalize_job(
+            "naukri", "remote-worldwide-1", "Acme", "Python Developer",
+            "Remote - USA", "https://example.com/remote-worldwide",
+            None, "unknown", "Build Python backend services.",
+        )
+        onsite_job = radar.normalize_job(
+            "naukri", "onsite-india-1", "Acme", "Python Developer",
+            "Bengaluru, Karnataka, India", "https://example.com/onsite-india",
+            None, "unknown", "Build Python backend services.",
+        )
+        radar.upsert_jobs([remote_job, onsite_job], config)
+
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        saved = self.client.put(
+            "/api/preferences",
+            json={
+                "target_roles": ["Python Developer"],
+                "locations": [],
+                "remote_only": True,
+            },
+            headers={"X-CSRF-Token": csrf},
+        )
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertTrue(saved.json()["preferences"]["onboarding_complete"])
+
+        feed = self.client.get("/api/jobs?minutes=10080&status=matched")
+        self.assertEqual(feed.status_code, 200, feed.text)
+        titles = {job["title"] for job in feed.json()["jobs"]}
+        self.assertIn("Python Developer", titles)
+        with sqlite3.connect(self.db_path) as conn:
+            remote_id = conn.execute(
+                "SELECT id FROM jobs WHERE source_job_id='remote-worldwide-1'"
+            ).fetchone()[0]
+            onsite_id = conn.execute(
+                "SELECT id FROM jobs WHERE source_job_id='onsite-india-1'"
+            ).fetchone()[0]
+            remote_match = conn.execute(
+                "SELECT match FROM user_job_evaluations WHERE user_id=? AND job_id=?",
+                (self.user_a["id"], remote_id),
+            ).fetchone()[0]
+            onsite_match = conn.execute(
+                "SELECT match FROM user_job_evaluations WHERE user_id=? AND job_id=?",
+                (self.user_a["id"], onsite_id),
+            ).fetchone()[0]
+        self.assertEqual(remote_match, 1)
+        self.assertEqual(onsite_match, 0)
 
     def test_job_feed_numeric_pagination_has_stable_pages_and_total(self):
         config = {**radar.get_config(), "notifications_enabled": False}

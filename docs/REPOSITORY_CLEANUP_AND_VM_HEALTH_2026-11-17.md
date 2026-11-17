@@ -1,22 +1,21 @@
 # JobBeeper release readiness, repository cleanup and VM health — 2026-11-17
 
-## CURRENT SOURCE OF TRUTH — 2026-11-17 17:18 UTC
+## CURRENT SOURCE OF TRUTH — 17 November 2026, 18:30 UTC
 
-**Read first:** [Production readiness, delivery plan and next-agent handover](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
+**Read first:** [Fetcher and Feed Reliability Plan](FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md).
 
-- PR #77 merged into v2-live-radar as 5b80499; exact post-merge CI #1513 passed 497 tests.
-- Candidate QA image job-radar-v2-qa:cc2087e is running on 127.0.0.1:8013. Its application tree matches the merged V2 tree; health HTTP 200; scheduler tests 12/12.
-- Live QA collector proof: Naukri 312 seen, 2 then 0 new; Greenhouse 346 seen, 2 then 0 new on 3/3 boards; Ashby 848 seen, 4 then 0 new on 2/2 boards. Manual QA runs only; all 12 QA source flags and notifications remained off.
-- QA backup qa-after-ats-smoke-20261117.sqlite3 has 27,379 jobs and integrity ok. No member Telegram chats/settings/per-user notification ledger entries in the QA copy.
-- Production is untouched on job-radar-prod-canary:6e5becb, port 8000; public HTTPS and local health 200.
-- The production DB still has admin only. Telegram bot identity works, but webhook and per-user bot username/webhook-secret configuration remain absent. No member canary has been sent.
-- Daily SQLite snapshot job repaired and verified. Offsite encrypted backup/restore remains outstanding.
-- TLS certificate expires 23 Nov 2026; Certbot timer active and staging dry-run renewal succeeded. Live certificate was not changed.
-- VM cleanup complete: two running JobBeeper containers, one production volume, five images, zero build cache, disk 28% used. Legacy QA data archived.
-- Workday backoff is merged in V2, not deployed. Company Watch Phase 2 remains paused.
-- Remaining estimate: 6–10 focused engineering hours to first controlled member canary once owner email, Telegram access and offsite backup access are available; then 24–72 hours monitoring.
+- **Priority:** make the existing fetchers, scheduler and job feed reliable. Workday is P0, LinkedIn/Naukri and SmartRecruiters efficiency are next. Defer member-only feature expansion and Company Watch.
+- **Telegram is optional:** not required for login, preferences, collection, matching or dashboard use. Only required if a user chooses Telegram alerts and opts in. It is not a release gate for the feed.
+- Production 24h baseline: Workday 627 runs / 4,894 requests / 417 HTTP 429 / 362 failed pages / 33 new; LinkedIn 267 / 1,566 / 12 / 4 / 449; Naukri 503 / 503 / 0 / 2 / 706; SmartRecruiters 504 runs / 11,592 requests / 251 new.
+- Production image 6e5becb (8 Nov) does not contain v2.board_scheduler or ats_board_poll_schedule. Candidate QA image cc2087e (17 Nov) does. The merged PR #77 cooldown is not yet active in production.
+- Production's explicit 10-board allowlist: Greenhouse 3, Ashby 2, Workday 1, SmartRecruiters 1, Workable 1, Keka 1, Darwinbox 1; LinkedIn/Naukri remain global fetchers.
+- Member avi.bhalla2004@gmail.com is active; current Software Developer / India preferences produce 1,052 matches with Remote only off. Telegram is not linked; dashboard/job feed works without it.
+- Pending branch fix/member-remote-only-global-20261117 contains Remote only worldwide-without-location semantics, structured ATS workplace matching, hybrid/on-site exclusion and the member Intelligence parent group fix. Full local V2 suite passed: 504/504; Python compile and diff checks passed. GitHub exact-head CI is still required.
+- Scheduler QA: 10-row allowlist sync passed; Workday simulated cooldowns escalated 5/10 minutes; Ashby on another host remained claimable. Actual scheduled Coinbase Greenhouse two-poll smoke passed: first 260 inserted/baseline-suppressed, second 260 seen/0 new, zero duplicates, SQLite integrity ok.
+- Fresh production snapshot saved at /var/backups/job-radar-daily/production-before-scheduler-canary-20261117.sqlite3 (129 MB, SHA-256 8593c7fa32757635a0ee27624ec8c957c584163d13f5271976ac0f25fa684cf1). Candidate V2 initialization and scheduler sync passed on a disposable copy: 27,497 jobs, 2 users preserved; scheduler created exactly 10 rows matching the production allowlist; SQLite integrity ok. Live DB was not modified.
+- Production and QA health last returned HTTP 200. No production runtime, database, source flags, Telegram settings or Nginx config changed.
 
-Next: provision member, complete saved preferences, configure webhook/private chat and opt-in, prove a real member alert/no duplicate, complete offsite backup/restore, then deploy only with explicit owner approval.
+Next: finish PR review and exact-head CI for the Remote only/Intelligence fixes; rebuild candidate QA from the reviewed commit; investigate Workday 429, SmartRecruiters request volume and Naukri failed pages; prepare the controlled scheduler runtime rollout using the verified production snapshot and explicit owner approval. Telegram/member notification work remains optional and deferred.
 ---
 
 ## Executive status
