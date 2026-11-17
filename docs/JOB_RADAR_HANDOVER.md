@@ -1,12 +1,29 @@
 # Job Radar V2 — Agent Handover & Product Source of Truth
 
+## 2026-11-17 — Phase 1 Company Watch manifest import (current)
+
+**Detailed plan:** docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md.
+**Base:** v2-live-radar c3cffebbaa847337ebd442f873d2af54ca279097 (PR #74 merged).
+**Feature branch:** feat/company-watch-manifest-import-20261117.
+
+- Source: main@29cbb17190b26829d49e1458137d75f2e8f286aa:company_watch/companies.csv; SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd.
+- Manifest: 100 rows, 90 enabled / 10 disabled (supersedes earlier 92/8). 72 are generic careers pages. Strict parser stages 19 enabled, mode-matching ATS candidates (10 Greenhouse, 6 Lever, 3 SmartRecruiters) and preserves 81 records for manual review. Candidate confidence remains low pending live and identity review.
+- Code: v2/company_watch_manifest.py, pinned v2/data/company_watch_companies_2026-11-17.csv, additive tables and admin-only endpoints in v2/radar.py; dashboard/index.html and dashboard/app.js add a dry-run/confirm import control, manual-review table and manifest identity context on staged candidates. Import API: POST /api/discovery/company-watch/import ({"dry_run":true} for preview); status/review API: GET /api/discovery/company-watch/manifest.
+- Identity and ATS board ownership are not inferred from a slug. Staged candidates stay discovered and unlinked; ambiguous, generic, disabled, unsupported and mismatched rows remain manual review. Import creates no employer records, registry boards, scheduler rows, verification or activation.
+- Full V2 suite: **495 passed, 0 failed, exit 0 in 751.869s** (/tmp/company-watch-phase1-final-tests.log). Focused Phase 1 tests: **10 passed**. Python compileall, Node v20 dashboard syntax, and git diff check passed. CI compile step was expanded to include the new parser and test modules.
+- Isolated temporary DB verified 100 ledger rows, 19 candidate rows, zero employer/board/scheduler rows, repeat-import idempotency, preservation of rejected status and existing discovery provenance. Dry-run wrote nothing; non-admin API access returned 403; manifest hash mismatch returned 409.
+- Work is in fresh /tmp/job-beeper-phase1-20261117; existing dirty dev checkout and production checkout were not touched. No polling, endpoint probing, activation, Telegram, deployment or runtime config/DB changes.
+- Next: final diff review, commit/push branch, create PR against v2-live-radar and verify exact-head CI. Owner review is the merge gate. No Phase 2 verification/activation work in this increment.
+
+---
+
 > **Purpose:** This document is the durable handover for Job Radar V2.
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
 
 
-## 2026-11-17 — Company Watch → V2 integration planning and read-only audit
+## Historical planning checkpoint — 2026-11-17 (superseded by Phase 1 checkpoint above)
 
 **Current handover:** [Company Watch → V2 integration plan and next-agent checklist](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md)
 

@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import ats_directory, auth, board_discovery, board_scheduler, global_ats_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -1253,6 +1253,49 @@ def init_db() -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_global_candidate_status ON ats_global_discovery_candidates(review_status, last_seen_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_global_candidate_provider ON ats_global_discovery_candidates(provider, review_status)")
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS company_watch_manifest_imports (
+            manifest_sha256 TEXT PRIMARY KEY,
+            source_ref TEXT NOT NULL,
+            rows_total INTEGER NOT NULL,
+            candidate_staged INTEGER NOT NULL,
+            manual_review INTEGER NOT NULL,
+            invalid INTEGER NOT NULL,
+            candidate_inserted INTEGER NOT NULL,
+            candidate_updated INTEGER NOT NULL,
+            candidate_preserved_terminal INTEGER NOT NULL,
+            imported_at TEXT NOT NULL
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS company_watch_manifest_rows (
+            manifest_sha256 TEXT NOT NULL,
+            row_number INTEGER NOT NULL,
+            company_name TEXT NOT NULL,
+            sector TEXT,
+            country TEXT,
+            careers_url TEXT NOT NULL,
+            board_type TEXT,
+            scan_mode TEXT,
+            scan_enabled INTEGER NOT NULL,
+            verification_status TEXT,
+            verification_source TEXT,
+            verification_note TEXT,
+            classification TEXT NOT NULL,
+            review_reason TEXT NOT NULL,
+            candidate_provider TEXT,
+            candidate_board_key TEXT,
+            candidate_host TEXT,
+            candidate_id INTEGER,
+            imported_at TEXT NOT NULL,
+            PRIMARY KEY(manifest_sha256, row_number),
+            FOREIGN KEY(candidate_id) REFERENCES ats_global_discovery_candidates(id)
+        )
+        """)
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_company_watch_manifest_classification
+        ON company_watch_manifest_rows(manifest_sha256, classification, row_number)
+        """)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS workday_board_poll_state (
             board_key TEXT PRIMARY KEY,
@@ -7666,9 +7709,12 @@ def latency_summary(hours: int = 24):
 
 GLOBAL_DISCOVERY_METHODS = frozenset({
     "commoncrawl_cdx", "commoncrawl_url_index", "sitemap", "career_link",
-    "licensed_seed", "manual",
+    "licensed_seed", "manual", "company_watch_manifest",
 })
-GLOBAL_DISCOVERY_PROVIDERS = frozenset({"workday", "keka", "darwinbox"})
+GLOBAL_DISCOVERY_PROVIDERS = frozenset({
+    "workday", "keka", "darwinbox", "greenhouse", "ashby", "lever",
+    "smartrecruiters", "workable",
+})
 
 
 def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
@@ -7723,6 +7769,22 @@ def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
             "board_url": str(detected["board_url"]), "candidate_host": host,
         }
 
+    detected = board_discovery.detect_ats_board(value.strip())
+    if detected and detected.get("provider") in {
+        "greenhouse", "ashby", "lever", "smartrecruiters", "workable"
+    }:
+        provider = str(detected["provider"])
+        board_key = str(detected["board_key"])
+        if provider == "greenhouse":
+            root_path = "/" + urlsplit(value.strip()).path.strip("/").split("/")[0]
+        else:
+            root_path = "/" + board_key
+        root_url = f"https://{host}{root_path}"
+        return {
+            "provider": provider, "board_key": board_key,
+            "board_url": root_url, "candidate_host": host,
+        }
+
     if host.endswith(".darwinbox.in"):
         match = re.match(
             r"^/ms/candidatev2/(?P<company_id>[A-Za-z0-9_-]{1,100})/careers(?:/|$)",
@@ -7741,7 +7803,10 @@ def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
             "board_url": root_url, "candidate_host": host,
         }
 
-    raise ValueError("Only supported public Workday, Keka and Darwinbox candidate URLs are accepted.")
+    raise ValueError(
+        "Only supported public Workday, Keka, Darwinbox, Greenhouse, Ashby, "
+        "Lever, SmartRecruiters and Workable candidate URLs are accepted."
+    )
 
 
 def _normalise_global_capture_time(value: Any) -> str | None:
@@ -7842,6 +7907,197 @@ def import_global_ats_candidates(payload: dict[str, Any]):
     }
 
 
+COMPANY_WATCH_MANIFEST_PATH = Path(__file__).with_name("data") / "company_watch_companies_2026-11-17.csv"
+COMPANY_WATCH_MANIFEST_SOURCE_REF = "main@29cbb17190b26829d49e1458137d75f2e8f286aa"
+COMPANY_WATCH_MANIFEST_SHA256 = "706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd"
+
+
+@app.post("/api/discovery/company-watch/import", dependencies=[Depends(require_admin)])
+def import_company_watch_manifest(payload: dict[str, Any] | None = None):
+    """Import the pinned 100-row manifest as review-only rows and ATS candidates."""
+    dry_run = bool(payload and payload.get("dry_run"))
+    try:
+        manifest = company_watch_manifest.parse_manifest(
+            COMPANY_WATCH_MANIFEST_PATH, _normalise_global_ats_candidate_url
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Company Watch manifest validation failed: {exc}") from exc
+
+    if manifest["manifest_sha256"] != COMPANY_WATCH_MANIFEST_SHA256:
+        raise HTTPException(
+            status_code=409,
+            detail="Pinned Company Watch manifest hash changed; update the source reference before importing.",
+        )
+
+    summary = {
+        "manifest_sha256": manifest["manifest_sha256"],
+        "source_ref": COMPANY_WATCH_MANIFEST_SOURCE_REF,
+        "rows_total": manifest["rows_total"],
+        "classification_counts": manifest["counts"],
+        "dry_run": dry_run,
+        "company_records_created": 0,
+        "boards_linked": 0,
+        "verified": 0,
+        "activated": 0,
+        "scheduled": 0,
+        "network_requests": 0,
+        "notifications_sent": 0,
+    }
+    if dry_run:
+        return summary
+
+    timestamp = iso(now()) or ""
+    inserted = updated = preserved_terminal = 0
+    with DB_LOCK, connect_sqlite(DB_PATH) as conn:
+        for row in manifest["rows"]:
+            candidate_id = None
+            candidate = row["candidate"]
+            if candidate:
+                source_reference = row["verification_source"] or row["careers_url"]
+                existing = conn.execute(
+                    """SELECT id,review_status,discovery_method,source_reference
+                       FROM ats_global_discovery_candidates
+                       WHERE provider=? AND candidate_host=? AND board_key=?""",
+                    (candidate["provider"], candidate["candidate_host"], candidate["board_key"]),
+                ).fetchone()
+                conn.execute(
+                    """INSERT INTO ats_global_discovery_candidates(
+                           provider,board_key,board_url,candidate_host,discovery_method,
+                           source_reference,source_captured_at,first_discovered_at,last_seen_at,
+                           confidence,review_status,created_at,updated_at
+                       ) VALUES(?,?,?,?,?, ?,NULL,?,?,?,'discovered',?,?)
+                       ON CONFLICT(provider,candidate_host,board_key) DO UPDATE SET
+                           board_url=excluded.board_url,
+                           discovery_method=CASE
+                               WHEN COALESCE(ats_global_discovery_candidates.discovery_method,'')!=''
+                               THEN ats_global_discovery_candidates.discovery_method
+                               ELSE excluded.discovery_method END,
+                           source_reference=CASE
+                               WHEN COALESCE(ats_global_discovery_candidates.source_reference,'')!=''
+                               THEN ats_global_discovery_candidates.source_reference
+                               ELSE excluded.source_reference END,
+                           last_seen_at=excluded.last_seen_at,
+                           review_status=CASE
+                               WHEN ats_global_discovery_candidates.review_status IN ('linked','rejected')
+                               THEN ats_global_discovery_candidates.review_status ELSE 'discovered' END,
+                           updated_at=excluded.updated_at""",
+                    (
+                        candidate["provider"], candidate["board_key"], candidate["board_url"],
+                        candidate["candidate_host"], "company_watch_manifest",
+                        source_reference, timestamp, timestamp, row["candidate_confidence"],
+                        timestamp, timestamp,
+                    ),
+                )
+                candidate_id = int(conn.execute(
+                    """SELECT id FROM ats_global_discovery_candidates
+                       WHERE provider=? AND candidate_host=? AND board_key=?""",
+                    (candidate["provider"], candidate["candidate_host"], candidate["board_key"]),
+                ).fetchone()[0])
+                if existing is None:
+                    inserted += 1
+                elif existing[1] in {"linked", "rejected"}:
+                    preserved_terminal += 1
+                else:
+                    updated += 1
+
+            conn.execute(
+                """INSERT INTO company_watch_manifest_rows(
+                       manifest_sha256,row_number,company_name,sector,country,careers_url,
+                       board_type,scan_mode,scan_enabled,verification_status,
+                       verification_source,verification_note,classification,review_reason,
+                       candidate_provider,candidate_board_key,candidate_host,candidate_id,imported_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(manifest_sha256,row_number) DO UPDATE SET
+                       company_name=excluded.company_name,sector=excluded.sector,
+                       country=excluded.country,careers_url=excluded.careers_url,
+                       board_type=excluded.board_type,scan_mode=excluded.scan_mode,
+                       scan_enabled=excluded.scan_enabled,
+                       verification_status=excluded.verification_status,
+                       verification_source=excluded.verification_source,
+                       verification_note=excluded.verification_note,
+                       classification=excluded.classification,
+                       review_reason=excluded.review_reason,
+                       candidate_provider=excluded.candidate_provider,
+                       candidate_board_key=excluded.candidate_board_key,
+                       candidate_host=excluded.candidate_host,
+                       candidate_id=excluded.candidate_id,
+                       imported_at=excluded.imported_at""",
+                (
+                    manifest["manifest_sha256"], row["row_number"], row["company_name"],
+                    row["sector"], row["country"], row["careers_url"], row["board_type"],
+                    row["scan_mode"], row["scan_enabled"], row["verification_status"],
+                    row["verification_source"], row["verification_note"], row["classification"],
+                    row["review_reason"], candidate.get("provider") if candidate else None,
+                    candidate.get("board_key") if candidate else None,
+                    candidate.get("candidate_host") if candidate else None,
+                    candidate_id, timestamp,
+                ),
+            )
+
+        manual_review = manifest["counts"].get("manual_review", 0)
+        invalid = manifest["counts"].get("invalid", 0)
+        conn.execute(
+            """INSERT INTO company_watch_manifest_imports(
+                   manifest_sha256,source_ref,rows_total,candidate_staged,manual_review,invalid,
+                   candidate_inserted,candidate_updated,candidate_preserved_terminal,imported_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(manifest_sha256) DO UPDATE SET
+                   source_ref=excluded.source_ref,rows_total=excluded.rows_total,
+                   candidate_staged=excluded.candidate_staged,manual_review=excluded.manual_review,
+                   invalid=excluded.invalid,candidate_inserted=excluded.candidate_inserted,
+                   candidate_updated=excluded.candidate_updated,
+                   candidate_preserved_terminal=excluded.candidate_preserved_terminal,
+                   imported_at=excluded.imported_at""",
+            (
+                manifest["manifest_sha256"], COMPANY_WATCH_MANIFEST_SOURCE_REF,
+                manifest["rows_total"], manifest["counts"].get("candidate_staged", 0),
+                manual_review, invalid, inserted, updated, preserved_terminal, timestamp,
+            ),
+        )
+        conn.commit()
+
+    summary.update({
+        "dry_run": False,
+        "candidate_inserted": inserted,
+        "candidate_updated": updated,
+        "candidate_preserved_terminal": preserved_terminal,
+        "manual_review_rows": manifest["counts"].get("manual_review", 0),
+        "invalid_rows": manifest["counts"].get("invalid", 0),
+    })
+    return summary
+
+
+@app.get("/api/discovery/company-watch/manifest", dependencies=[Depends(require_admin)])
+def company_watch_manifest_status():
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        batch = conn.execute(
+            "SELECT * FROM company_watch_manifest_imports ORDER BY imported_at DESC LIMIT 1"
+        ).fetchone()
+        if not batch:
+            return {"imported": False, "manifest": None, "classification_counts": {}}
+        counts = conn.execute(
+            """SELECT classification,COUNT(*) AS count
+               FROM company_watch_manifest_rows WHERE manifest_sha256=?
+               GROUP BY classification ORDER BY classification""",
+            (batch["manifest_sha256"],),
+        ).fetchall()
+        manual_rows = conn.execute(
+            """SELECT row_number,company_name,sector,country,careers_url,board_type,scan_mode,
+                      scan_enabled,verification_status,verification_source,verification_note,
+                      classification,review_reason,candidate_provider,candidate_board_key,candidate_host
+               FROM company_watch_manifest_rows
+               WHERE manifest_sha256=? AND classification!='candidate_staged'
+               ORDER BY row_number""",
+            (batch["manifest_sha256"],),
+        ).fetchall()
+    return {
+        "imported": True, "manifest": dict(batch),
+        "classification_counts": {row["classification"]: row["count"] for row in counts},
+        "manual_review_rows": [dict(row) for row in manual_rows],
+    }
+
+
 @app.get("/api/discovery/global-candidates", dependencies=[Depends(require_admin)])
 def list_global_ats_candidates(status: str | None = None, provider: str | None = None, limit: int = 250):
     limit = max(1, min(int(limit), 500))
@@ -7854,6 +8110,28 @@ def list_global_ats_candidates(status: str | None = None, provider: str | None =
                       g.first_discovered_at,g.last_seen_at,g.confidence,g.review_status,
                       g.linked_company_id,g.linked_board_registry_id,c.company_name,
                       b.review_status AS board_review_status,
+                      (SELECT m.row_number FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_row_number,
+                      (SELECT m.manifest_sha256 FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_sha256,
+                      (SELECT m.company_name FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_company_name,
+                      (SELECT m.sector FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_sector,
+                      (SELECT m.country FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_country,
+                      (SELECT m.careers_url FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_careers_url,
+                      (SELECT m.scan_enabled FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_scan_enabled,
+                      (SELECT m.verification_status FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_verification_status,
+                      (SELECT m.verification_source FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_verification_source,
+                      (SELECT m.verification_note FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_verification_note,
+                      (SELECT m.review_reason FROM company_watch_manifest_rows m
+                       WHERE m.candidate_id=g.id ORDER BY m.imported_at DESC LIMIT 1) AS manifest_review_reason,
                       g.created_at,g.updated_at
                FROM ats_global_discovery_candidates g
                LEFT JOIN employer_companies c ON c.id=g.linked_company_id

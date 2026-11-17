@@ -292,6 +292,93 @@ class GlobalDirectoryApiTests(unittest.TestCase):
         self.assertEqual(summary.json()["directory_seed_candidates"], 2)
         self.assertIsNone(summary.json()["market_coverage_percentage"])
 
+    def test_company_watch_manifest_import_endpoint_is_admin_only_and_review_only(self):
+        with patch.object(radar, "COMPANY_WATCH_MANIFEST_SHA256", "0" * 64):
+            changed_source = self.client.post(
+                "/api/discovery/company-watch/import",
+                json={"dry_run": True},
+                headers={"X-CSRF-Token": self.csrf},
+            )
+        self.assertEqual(changed_source.status_code, 409)
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_rows").fetchone()[0], 0)
+
+        dry_run = self.client.post(
+            "/api/discovery/company-watch/import",
+            json={"dry_run": True},
+            headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(dry_run.status_code, 200, dry_run.text)
+        self.assertTrue(dry_run.json()["dry_run"])
+        self.assertEqual(dry_run.json()["rows_total"], 100)
+        self.assertEqual(
+            dry_run.json()["manifest_sha256"],
+            radar.COMPANY_WATCH_MANIFEST_SHA256,
+        )
+        self.assertEqual(dry_run.json()["classification_counts"], {
+            "candidate_staged": 19, "manual_review": 81,
+        })
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_rows").fetchone()[0], 0)
+
+        imported = self.client.post(
+            "/api/discovery/company-watch/import",
+            json={},
+            headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(imported.status_code, 200, imported.text)
+        self.assertEqual(imported.json()["candidate_inserted"], 19)
+        self.assertEqual(imported.json()["manual_review_rows"], 81)
+        self.assertEqual(imported.json()["company_records_created"], 0)
+        self.assertEqual(imported.json()["boards_linked"], 0)
+        self.assertEqual(imported.json()["verified"], 0)
+        self.assertEqual(imported.json()["activated"], 0)
+        self.assertEqual(imported.json()["scheduled"], 0)
+        self.assertEqual(imported.json()["network_requests"], 0)
+        self.assertEqual(imported.json()["notifications_sent"], 0)
+
+        status = self.client.get("/api/discovery/company-watch/manifest")
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertTrue(status.json()["imported"])
+        self.assertEqual(status.json()["classification_counts"], {
+            "candidate_staged": 19, "manual_review": 81,
+        })
+        self.assertEqual(len(status.json()["manual_review_rows"]), 81)
+        self.assertIn("verification_source", status.json()["manual_review_rows"][0])
+        self.assertIn("scan_enabled", status.json()["manual_review_rows"][0])
+        candidates = self.client.get("/api/discovery/global-candidates?limit=50").json()["candidates"]
+        self.assertEqual(len(candidates), 19)
+        self.assertTrue(all(row["manifest_company_name"] for row in candidates))
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_rows").fetchone()[0], 100)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates").fetchone()[0], 19)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM employer_companies").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_poll_schedule").fetchone()[0], 0)
+
+        repeated = self.client.post(
+            "/api/discovery/company-watch/import",
+            json={},
+            headers={"X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(repeated.status_code, 200, repeated.text)
+        self.assertEqual(repeated.json()["candidate_inserted"], 0)
+        self.assertEqual(repeated.json()["candidate_updated"], 19)
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_rows").fetchone()[0], 100)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates").fetchone()[0], 19)
+
+        member = TestClient(radar.app, base_url="https://testserver")
+        try:
+            member.post("/api/auth/login", json={
+                "email": "global-member@example.com",
+                "password": "another sufficiently strong password",
+            })
+            denied = member.post("/api/discovery/company-watch/import", json={})
+            self.assertEqual(denied.status_code, 403)
+        finally:
+            member.close()
+
     def _global_candidate(self, url, source_reference="CC-MAIN-2026-43", captured_at="20261014123456", method="commoncrawl_cdx"):
         return {
             "board_url": url,

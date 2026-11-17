@@ -1,8 +1,22 @@
 # Job Radar V2 — Knowledge Transfer
 
+## Current checkpoint — 2026-11-17 Phase 1
+
+Read docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md first. PR #74 is merged; base v2-live-radar is c3cffebbaa847337ebd442f873d2af54ca279097. Current feature branch: feat/company-watch-manifest-import-20261117.
+
+Pinned source: main@29cbb17190b26829d49e1458137d75f2e8f286aa, SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd. Manifest has 100 rows, 90 enabled and 10 disabled (supersedes earlier 92/8). The parser stages 19 supported ATS candidates and keeps 81 rows in manual review. Candidate confidence is low pending live endpoint and employer-identity review. It does not create employers, link boards, verify, activate, schedule, poll or send notifications.
+
+Implementation files: v2/company_watch_manifest.py, v2/data/company_watch_companies_2026-11-17.csv, v2/radar.py, dashboard/index.html, dashboard/app.js, v2/test_company_watch_manifest.py, v2/test_global_discovery_hirebase.py and .github/workflows/v2-ci.yml. Admin Source Health panel has a dry-run/confirm import flow, displays manual-review rows and shows manifest identity evidence on staged candidates. Admin endpoints: POST /api/discovery/company-watch/import (dry-run via {"dry_run":true}) and GET /api/discovery/company-watch/manifest.
+
+Validation: full V2 suite **495 passed, 0 failed, exit 0 in 751.869s**; focused Phase 1 tests **10 passed**; Python compileall, Node v20 dashboard syntax and git diff check passed. Temporary DB tests verify idempotency, preserved rejected/provenance values, dry-run, admin-only access, and zero employer/board/scheduler rows. Exact-head GitHub CI remains pending until branch push/PR.
+
+Fresh workspace: /tmp/job-beeper-phase1-20261117. Existing dirty dev checkout and production were left untouched. Keep scope frozen: no polling, board activation, Telegram, production deployment or Phase 2 work. Next: final diff review, commit/push, PR against v2-live-radar, then exact-head CI and owner review.
+
+---
 
 
-## 2026-11-17 — Company Watch → V2 integration current state
+
+## Historical planning checkpoint — 2026-11-17 (superseded by current checkpoint above)
 
 Read first: [Company Watch → V2 integration plan and handover](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md).
 

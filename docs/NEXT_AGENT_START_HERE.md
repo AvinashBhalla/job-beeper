@@ -1,10 +1,24 @@
-# CURRENT HANDOVER — 2026-11-17 Company Watch → V2 integration
+# CURRENT HANDOVER — 2026-11-17 Phase 1 implementation complete locally
+
+**Read first:** docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md.
+**Base:** v2-live-radar at c3cffebbaa847337ebd442f873d2af54ca279097 (PR #74 merged).
+**Active branch:** feat/company-watch-manifest-import-20261117.
+
+Phase 1 is implemented in a fresh isolated checkout. Manifest: 100 rows / 90 enabled / 10 disabled, SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd. Parser stages 19 supported direct ATS candidates and retains 81 records for manual review. Earlier 92/8 figures are stale and superseded. Candidate confidence stays low pending separate live and identity review.
+
+Files: v2/company_watch_manifest.py, v2/data/company_watch_companies_2026-11-17.csv, v2/radar.py, dashboard/index.html, dashboard/app.js, v2/test_company_watch_manifest.py, v2/test_global_discovery_hirebase.py and .github/workflows/v2-ci.yml. Admin Source Health page has a dry-run/confirm import flow, manual-review table and candidate identity context. New admin endpoints: POST /api/discovery/company-watch/import (dry-run: {"dry_run":true}) and GET /api/discovery/company-watch/manifest.
+
+**Validation:** full V2 suite 495 passed, 0 failed in 751.869s (exit 0); focused Phase 1 tests 10 passed; Python compileall, Node v20 dashboard JS syntax and git diff check passed. Exact-head GitHub CI is pending until push/PR. No deployment, polling, board activation, scheduler changes or Telegram notifications occurred. Temporary SQLite DBs only; existing dirty dev checkout and production checkout were not touched.
+
+**Next action:** final diff review, commit and push feature branch, open PR targeting v2-live-radar, then verify exact-head GitHub CI and hand it to owner for review. Do not merge. Keep scope frozen: no polling, no board activation, no Telegram notifications and no production deployment. Do not touch /home/ubuntu/job-beeper-dev or /home/ubuntu/job-beeper.
+
+---
 
 
-## CURRENT HANDOVER — 2026-11-17 (READ THIS BEFORE OLDER SECTIONS)
+## Historical planning handover — 2026-11-17 (superseded by current Phase 1 handover above)
 
-**Primary handover:** [Company Watch → V2 integration plan](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md).  
-**Target code branch:** `v2-live-radar`, current remote HEAD `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5` (PR #75 merged).  
+**Primary handover:** [Company Watch → V2 integration plan](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md).
+**Target code branch:** `v2-live-radar`, current remote HEAD `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5` (PR #75 merged).
 **Planning branch:** `docs/company-watch-v2-integration-handover-20261117`.
 
 The standalone Company Watch is a discovery prototype on `main`, not the integration pipeline. PR #72 is merged into `main`; PR #73 is still draft/open on `main`. The mature V2 branch already has collectors, ATS board registry and candidate staging, explicit verify/activate/deactivate, persistent per-board scheduler, SQLite/canonical dedupe, per-user preferences/evaluations and per-user Telegram dispatch. Reconcile Company Watch's 100-row CSV as review-only candidates; do not copy its duplicate matcher, URL state or Telegram sender. The CSV contains 92 rows enabled in Company Watch and 8 manual-review rows; 72 of the 92 are generic careers pages, not verified V2 ATS boards.
