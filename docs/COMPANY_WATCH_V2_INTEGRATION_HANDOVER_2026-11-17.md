@@ -19,6 +19,12 @@
 - The 19 stageable rows are Mistral AI, Anthropic, Figma, Skild AI, Scale AI, SoundHound AI, Cresta, Toku, Canva, Duolingo, GitLab, Abercrombie & Fitch, Axiado, Cyderes (manifest spelling: Cydeces), Amtech Software, Warner Music, Kobie, SpaceX and Mythic AI. Of the 19, 15 are labelled `provided_url_needs_live_validation` and 4 `verified_ats_board` in the source manifest. Every V2 candidate starts low-confidence and unlinked; Phase 1 does not independently verify employer ownership or probe live URLs.
 - Implementation includes `v2/company_watch_manifest.py`, pinned CSV snapshot, additive audit tables, pinned-hash guard, admin dry-run/import and status/review endpoints, ATS provider normalization, Source Health dashboard review panel, CI compile coverage and regression tests. See PR #76 for full diff.
 
+### Release and repository status — 2026-11-17, 13:40 UTC
+
+- PR #71 performance change is merged into v2-live-radar as e3f1c9c; exact-head CI passed all 496 V2 tests. PR #73 is merged into main as fced495f and changes only the standalone Company Watch dry-run lane. PR #70 is closed as stale documentation. There are zero open PRs and only main/v2-live-radar remote branches.
+- The standalone Company Watch main branch is not the JobBeeper production runtime. PR #76 is in V2 source but is not deployed or imported into a persistent database. No Company Watch board is activated or being polled.
+- Full VM/repository cleanup, production screenshot interpretation, Telegram-ledger distinction and staged release gates are in docs/REPOSITORY_CLEANUP_AND_VM_HEALTH_2026-11-17.md.
+
 ### Live product verification — 2026-11-17 12:53 UTC
 
 **What is proven**

@@ -1,5 +1,17 @@
 # Job Radar V2 — Knowledge Transfer
 
+## Current release and cleanup status — 2026-11-17
+
+**Read first:** [Repository cleanup, production readiness and VM health](REPOSITORY_CLEANUP_AND_VM_HEALTH_2026-11-17.md).
+
+- Production Source Health screenshot: today 379 discovered / 26 matched / 25 alerted. Naukri, Greenhouse and Ashby operational; LinkedIn partial (6 HTTP 429 / 79 requests); Workday failing (285 HTTP 429 / 360 requests, 241/286 page/board failures). The 25 admin “alerted” count is the legacy/global Telegram ledger, not the newer per-user ledger.
+- GitHub is clean: zero open PRs; only remote branches main and v2-live-radar. PR #71 merged into V2 as e3f1c9c after 496/496 CI tests passed. PR #73 merged into main as fced495f. PR #70 closed as stale docs. Keep main and V2 separate.
+- VM-local cleanup: 20 clean worktrees removed after archiving 65 branch refs in /home/ubuntu/.archives/job-beeper-local-branches-2026-11-17.bundle (5.7 MB, verified). Four worktrees remain: dirty dev, dirty global-ATS QA, dirty source-observability QA, and active LinkedIn-backoff QA. No dirty config, DB, container, or active QA service was overwritten.
+- VM is memory/I/O constrained (956 MiB RAM, about 2.0 GiB swap used, high memory/I/O pressure); disk is only 41% used. Recommend 4 GiB RAM, then retire obsolete QA containers after Docker inventory. Docker access is currently denied to the ubuntu user.
+- Not release-ready for Company Watch production: PR #76 is merged in V2 but not deployed; manifest not imported to persistent DB; no Company Watch board has been verified/activated/polled. Follow the staged gates in the cleanup report before production.
+
+---
+
 ## Live system health and end-to-end evidence — 2026-11-17 12:53 UTC
 
 - Naukri upstream relay is scanning: five-minute systemd timer enabled; four consecutive workflow runs (#44083895797, #44084703987, #44085500607, #44086307997) completed all 18/18 targets with zero failed searches and 315 / 309 / 311 / 311 unique jobs. Latest feed timestamp 12:48:49 UTC; 311 jobs, 311 unique IDs/URLs and non-empty company/title/location/description.
@@ -14,7 +26,7 @@
 
 ## Current checkpoint — 2026-11-17 Phase 1 merged
 
-PR #76 is merged into `v2-live-radar`. PR #76 merge commit: `0220eef1044e042d3041adb97c2d4648afed56a0`. Subsequent docs-only checkpoints: `de83e0f`, `d5b6971`, and `4867367`; resolve latest remote HEAD before checkout. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
+PR #76 is merged into `v2-live-radar`. PR #76 merge commit: `0220eef1044e042d3041adb97c2d4648afed56a0`. Latest subsequent V2 merge: PR #71 at `e3f1c9c` (496 exact-head tests passed); fetch latest remote HEAD before checkout. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
 
 The pinned Company Watch manifest has 100 rows (90 enabled, 10 disabled); importer stages 19 direct ATS candidates and retains 81 manual-review rows. All 19 V2 candidates remain low-confidence and unlinked. The import code was not deployed to a shared runtime and the manifest was not imported to a persistent dev/QA/production DB; validation used temporary SQLite databases only.
 
