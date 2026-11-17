@@ -26,16 +26,18 @@ Do not convert search pointers or an entity ambiguity into an automatically scan
 - Greenhouse public Job Board API
 - Lever public postings API
 - Ashby public posting API
-- SmartRecruiters public posting API
+- SmartRecruiters public Posting API, including per-role description details for target engineering titles
+- Workday public Candidate Experience jobs endpoint, with paginated listings and a bounded number of role-detail requests
+- Workable public careers widget feed (no employer API token required for the published public job list)
 - Generic official career pages: JSON-LD `JobPosting` first, then conservative link-only leads marked `review`
 
-Workday, Workable and other dynamic career sites that are not backed by an implemented adapter are held for review rather than guessed or scraped aggressively.
+Other dynamic career sites without a supported adapter remain in manual review. HTTP 401/403, 404, 429, TLS and timeout failures are now categorized separately; access restrictions are reported rather than bypassed.
 
 ## Run locally
 
 ```bash
 python -m pip install -r company_watch/requirements.txt
-python company_watch/scan.py --dry-run --report-json /tmp/company-watch-report.json
+python company_watch/scan.py --dry-run --report-json /tmp/company-watch-report.json --report-md /tmp/company-watch-report.md
 ```
 
 To persist a local dry-run baseline intentionally:
@@ -44,7 +46,7 @@ To persist a local dry-run baseline intentionally:
 python company_watch/scan.py --dry-run --remember-dry-run --state-file company_watch/.state/seen.json
 ```
 
-The workflow does this using an isolated Actions cache. It does not write to Git.
+The workflow does this using an isolated Actions cache. It does not write to Git. Each Actions artifact contains both a readable Markdown summary and the full JSON report under `company_watch/reports/`, a non-hidden directory so GitHub's artifact uploader includes the files. The workflow checks that both report files exist and are non-empty before upload, and treats missing files as an error.
 
 ## Schedule
 

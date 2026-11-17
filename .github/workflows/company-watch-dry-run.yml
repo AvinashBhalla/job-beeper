@@ -33,8 +33,10 @@ jobs:
       - name: Install isolated watcher dependencies
         run: python -m pip install -r company_watch/requirements.txt
 
-      - name: Prepare isolated state directory
-        run: mkdir -p company_watch/.state
+      - name: Prepare isolated state and report directories
+        run: |
+          mkdir -p company_watch/.state
+          mkdir -p company_watch/reports
 
       - name: Restore company watcher deduplication state
         uses: actions/cache@v4
@@ -50,13 +52,24 @@ jobs:
           --dry-run
           --remember-dry-run
           --state-file company_watch/.state/seen.json
-          --report-json company_watch/.state/latest_report.json
+          --report-json company_watch/reports/latest_report.json
+          --report-md company_watch/reports/latest_report.md
+
+      - name: Verify report files exist
+        if: always()
+        run: |
+          test -s company_watch/reports/latest_report.json
+          test -s company_watch/reports/latest_report.md
+          ls -lh company_watch/reports/
 
       - name: Upload scan report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: company-watch-report-${{ github.run_number }}
-          path: company_watch/.state/latest_report.json
-          if-no-files-found: warn
+          path: |
+            company_watch/reports/latest_report.json
+            company_watch/reports/latest_report.md
+          if-no-files-found: error
           retention-days: 14
+          include-hidden-files: false

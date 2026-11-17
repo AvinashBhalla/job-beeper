@@ -31,6 +31,9 @@ UTC = dt.timezone.utc
 USER_AGENT = "JobBeeper-CompanyWatch/1.0 (+polite public careers-page watcher)"
 REQUEST_TIMEOUT = 25
 MAX_JOBS_PER_COMPANY = 150
+MAX_WORKDAY_DETAIL_JOBS = 30
+MAX_SMARTRECRUITERS_DETAIL_JOBS = 40
+TARGET_TITLE_RE = re.compile(r"\b(engineer|developer|software|frontend|front-end|backend|back-end|full.?stack|programmer|sde)\b", re.I)
 
 
 def utc_now() -> str:
@@ -171,12 +174,221 @@ def _smartrecruiters(company: dict[str, str], client: requests.Session) -> list[
     slug = next((part for part in parsed.path.split("/") if part), "")
     if not slug:
         raise ValueError("SmartRecruiters URL has no company identifier")
-    payload = _json_response(client, f"https://api.smartrecruiters.com/v1/companies/{slug}/postings?limit=100&offset=0")
-    out = []
-    for item in (payload.get("content") or [])[:MAX_JOBS_PER_COMPANY]:
-        loc = item.get("location") or {}
-        location = ", ".join(str(loc.get(k, "")).strip() for k in ("city", "region", "country") if loc.get(k))
-        job = _normalise_job(item.get("name"), location, item.get("ref"), "", company["name"], "smartrecruiters", generic=True)
+
+    out: list[dict[str, Any]] = []
+    offset = 0
+    detail_requests = 0
+    while len(out) < MAX_JOBS_PER_COMPANY:
+        payload = _json_response(
+            client,
+            f"https://api.smartrecruiters.com/v1/companies/{slug}/postings?limit=100&offset={offset}",
+        )
+        items = payload.get("content") or []
+        if not items:
+            break
+        for item in items:
+            if len(out) >= MAX_JOBS_PER_COMPANY:
+                break
+            loc = item.get("location") or {}
+            location = ", ".join(
+                str(loc.get(key, "")).strip()
+                for key in ("city", "region", "country")
+                if loc.get(key)
+            )
+            title = item.get("name") or ""
+            detail: dict[str, Any] = {}
+            posting_id = item.get("id")
+            if posting_id and TARGET_TITLE_RE.search(title) and detail_requests < MAX_SMARTRECRUITERS_DETAIL_JOBS:
+                detail_requests += 1
+                try:
+                    detail = _json_response(
+                        client,
+                        f"https://api.smartrecruiters.com/v1/companies/{slug}/postings/{posting_id}",
+                    )
+                    if detail_requests < MAX_SMARTRECRUITERS_DETAIL_JOBS:
+                        time.sleep(0.2)
+                except requests.RequestException:
+                    # Keep the listing as a review candidate rather than losing the whole board.
+                    detail = {}
+
+            sections = ((detail.get("jobAd") or {}).get("sections") or {})
+            description_parts = []
+            for key in ("jobDescription", "qualifications", "additionalInformation"):
+                section = sections.get(key) or {}
+                if section.get("text"):
+                    description_parts.append(str(section["text"]))
+            description = "\n".join(description_parts)
+            detail_location = detail.get("location") or {}
+            if detail_location:
+                location = ", ".join(
+                    str(detail_location.get(key, "")).strip()
+                    for key in ("city", "region", "country")
+                    if detail_location.get(key)
+                ) or location
+            job_url = (
+                detail.get("postingUrl")
+                or detail.get("applyUrl")
+                or item.get("postingUrl")
+                or f"https://jobs.smartrecruiters.com/{slug}"
+            )
+            job = _normalise_job(
+                title,
+                location,
+                job_url,
+                description,
+                company["name"],
+                "smartrecruiters",
+                generic=not bool(description.strip()),
+            )
+            if job:
+                out.append(job)
+        offset += len(items)
+        total = int(payload.get("totalFound") or 0)
+        if len(items) < 100 or (total and offset >= total):
+            break
+    return out
+
+
+def _workday(company: dict[str, str], client: requests.Session) -> list[dict[str, Any]]:
+    parsed = urlparse(company["careers_url"])
+    host = parsed.netloc
+    tenant_match = re.match(r"(?P<tenant>[^.]+)\.wd\d+\.myworkdayjobs\.com$", host, re.I)
+    if not tenant_match:
+        raise ValueError(f"Could not parse Workday tenant from host {host!r}")
+    tenant = tenant_match.group("tenant")
+    segments = [part for part in parsed.path.split("/") if part]
+    if segments and re.fullmatch(r"[a-z]{2}-[A-Z]{2}", segments[0]):
+        locale = segments[0]
+        site_parts = segments[1:]
+    else:
+        locale = "en-US"
+        site_parts = segments
+    if not site_parts:
+        raise ValueError("Workday URL does not include a career-site name")
+    site = site_parts[0]
+    api_base = f"https://{host}/wday/cxs/{tenant}/{site}"
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    out: list[dict[str, Any]] = []
+    offset = 0
+    total = 0
+    detail_requests = 0
+
+    while len(out) < MAX_JOBS_PER_COMPANY:
+        response = client.post(
+            f"{api_base}/jobs",
+            json={"appliedFacets": {}, "limit": 20, "offset": offset, "searchText": ""},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if offset == 0:
+            total = int(payload.get("total") or 0)
+        postings = payload.get("jobPostings") or []
+        if not postings:
+            break
+        for posting in postings:
+            if len(out) >= MAX_JOBS_PER_COMPANY:
+                break
+            title = posting.get("title") or ""
+            external_path = posting.get("externalPath") or ""
+            location = posting.get("locationsText") or ""
+            description = ""
+            job_url = posting.get("externalUrl") or (
+                f"https://{host}/{locale}/{site}{external_path}" if external_path else company["careers_url"]
+            )
+
+            if external_path and TARGET_TITLE_RE.search(title) and detail_requests < MAX_WORKDAY_DETAIL_JOBS:
+                detail_requests += 1
+                try:
+                    detail_response = client.get(
+                        f"{api_base}{external_path}",
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    detail_response.raise_for_status()
+                    detail_payload = detail_response.json()
+                    info = detail_payload.get("jobPostingInfo") or {}
+                    description = info.get("jobDescription") or ""
+                    location = info.get("location") or location
+                    job_url = info.get("externalUrl") or job_url
+                except requests.RequestException:
+                    # Summary data remains useful, but is not promoted to a qualified match.
+                    pass
+                if detail_requests < MAX_WORKDAY_DETAIL_JOBS:
+                    time.sleep(0.2)
+
+            job = _normalise_job(
+                title,
+                location,
+                job_url,
+                description,
+                company["name"],
+                "workday",
+                generic=not bool(description.strip()),
+            )
+            if job:
+                out.append(job)
+        offset += len(postings)
+        if len(postings) < 20 or (total and offset >= total):
+            break
+    return out
+
+
+def _workable(company: dict[str, str], client: requests.Session) -> list[dict[str, Any]]:
+    parsed = urlparse(company["careers_url"])
+    slug = next((part for part in parsed.path.split("/") if part), "")
+    if not slug:
+        raise ValueError("Workable URL has no account slug")
+    payload = _json_response(client, f"https://www.workable.com/api/accounts/{slug}?details=true")
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    country_names = {
+        "in": "India", "us": "USA", "gb": "UK", "au": "Australia",
+        "sg": "Singapore", "ae": "UAE", "ca": "Canada", "de": "Germany",
+    }
+    for item in (payload.get("jobs") or [])[:MAX_JOBS_PER_COMPANY]:
+        shortcode = str(item.get("shortcode") or item.get("id") or "")
+        if shortcode and shortcode in seen:
+            continue
+        if shortcode:
+            seen.add(shortcode)
+
+        locations = []
+        for place in item.get("locations") or []:
+            if place.get("hidden"):
+                continue
+            parts = [place.get("city"), place.get("region")]
+            country = place.get("country") or country_names.get(str(place.get("countryCode") or "").lower())
+            if country:
+                parts.append(country)
+            label = ", ".join(str(part).strip() for part in parts if part)
+            if label and label not in locations:
+                locations.append(label)
+        if not locations:
+            fallback = item.get("location") or {}
+            label = fallback.get("location_str") or ", ".join(
+                str(part).strip() for part in
+                (fallback.get("city"), fallback.get("region"), fallback.get("country")) if part
+            )
+            if label:
+                locations.append(label)
+        if item.get("telecommuting") and not any("remote" in place.lower() for place in locations):
+            locations.append("Remote")
+        location = " / ".join(locations)
+
+        job_url = (
+            f"https://apply.workable.com/{slug}/j/{shortcode}/"
+            if shortcode
+            else item.get("url") or company["careers_url"]
+        )
+        job = _normalise_job(
+            item.get("title"),
+            location,
+            job_url,
+            item.get("description") or "",
+            company["name"],
+            "workable",
+        )
         if job:
             out.append(job)
     return out
@@ -266,6 +478,10 @@ def fetch_company_jobs(company: dict[str, str], client: requests.Session) -> lis
         return _ashby(company, client)
     if mode == "smartrecruiters":
         return _smartrecruiters(company, client)
+    if mode == "workday":
+        return _workday(company, client)
+    if mode == "workable":
+        return _workable(company, client)
     if mode == "careers_page":
         return _generic_careers_page(company, client)
     raise ValueError(f"Unsupported scan mode {mode!r}")
@@ -375,6 +591,93 @@ def chunk_messages(lines: list[str], max_chars: int = 3400) -> list[str]:
     return batches
 
 
+def classify_failure(exc: Exception) -> dict[str, Any]:
+    status_code = None
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        status_code = exc.response.status_code
+    if isinstance(exc, requests.exceptions.SSLError):
+        category = "tls_error"
+    elif isinstance(exc, requests.exceptions.Timeout):
+        category = "timeout"
+    elif status_code == 403 or status_code == 401:
+        category = "blocked"
+    elif status_code == 404:
+        category = "not_found"
+    elif status_code == 429:
+        category = "rate_limited"
+    elif status_code is not None and status_code >= 500:
+        category = "server_error"
+    elif isinstance(exc, requests.exceptions.ConnectionError):
+        category = "connection_error"
+    elif isinstance(exc, requests.RequestException):
+        category = "request_error"
+    else:
+        category = "parser_or_configuration_error"
+    return {
+        "failure_category": category,
+        "status_code": status_code,
+        "retry_recommended": category in {"tls_error", "timeout", "rate_limited", "server_error", "connection_error"},
+    }
+
+
+def write_markdown_report(path: Path, report: dict[str, Any]) -> None:
+    lines = [
+        "# Company Watch report",
+        "",
+        f"- Generated: {report.get('generated_at')}",
+        f"- Mode: **{report.get('mode', 'unknown')}**",
+        "",
+        "## Scan summary",
+        "",
+        f"- Companies scanned: {report.get('companies_scanned', 0)}",
+        f"- Held for manual review: {report.get('companies_manual_review', 0)}",
+        f"- Board failures: {len(report.get('company_failures', []))}",
+        f"- Jobs observed: {report.get('jobs_seen', 0)}",
+        f"- New matches: {report.get('new_matches_count', 0)}",
+        f"- New reviews: {report.get('new_reviews_count', 0)}",
+        f"- Rejected: {report.get('rejected_count', 0)}",
+        f"- Already seen: {report.get('already_seen_count', 0)}",
+        "",
+        "## New matches",
+        "",
+    ]
+    matches = report.get("new_matches") or []
+    if matches:
+        for job in matches:
+            lines.append(f"- **{job.get('company')} — {job.get('title')}** — {job.get('location') or 'Location not stated'} ([open role]({job.get('url')}))")
+            if job.get("reasons"):
+                lines.append(f"  - {'; '.join(job['reasons'])}")
+    else:
+        lines.append("- None")
+    lines.extend(["", "## Review queue", ""])
+    reviews = report.get("new_reviews") or []
+    if reviews:
+        for job in reviews:
+            lines.append(f"- **{job.get('company')} — {job.get('title')}** — {job.get('location') or 'Location not stated'} ([open role]({job.get('url')}))")
+            if job.get("reasons"):
+                lines.append(f"  - {'; '.join(job['reasons'])}")
+    else:
+        lines.append("- None")
+    lines.extend(["", "## Board failures", ""])
+    failures = report.get("company_failures") or []
+    if failures:
+        for failure in failures:
+            status = f" HTTP {failure['status_code']}" if failure.get("status_code") else ""
+            lines.append(f"- **{failure.get('company')}** — {failure.get('failure_category', 'unknown')}{status} — {failure.get('message', '')} ([board]({failure.get('url')}))")
+    else:
+        lines.append("- None")
+    lines.extend(["", "## Failure categories", ""])
+    counts = report.get("failure_counts") or {}
+    if counts:
+        for category, count in sorted(counts.items()):
+            lines.append(f"- {category}: {count}")
+    else:
+        lines.append("- None")
+    lines.append("")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     filters = load_filters(Path(args.filters))
     companies = load_companies(Path(args.companies))
@@ -422,17 +725,24 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     report["new_reviews"].append(item)
                 new_urls[url] = utc_now()
         except Exception as exc:  # keep a bad board from stopping the rest
-            report["company_failures"].append({
+            failure = {
                 "company": company["name"],
                 "url": company["careers_url"],
                 "error_type": exc.__class__.__name__,
                 "message": str(exc)[:240],
-            })
+            }
+            failure.update(classify_failure(exc))
+            report["company_failures"].append(failure)
         if args.delay > 0 and index < len(companies) - 1:
             time.sleep(args.delay)
 
     report["new_matches_count"] = len(report["new_matches"])
     report["new_reviews_count"] = len(report["new_reviews"])
+    report["companies_failed"] = len(report["company_failures"])
+    report["failure_counts"] = {}
+    for failure in report["company_failures"]:
+        category = failure.get("failure_category", "unknown")
+        report["failure_counts"][category] = report["failure_counts"].get(category, 0) + 1
     report["new_candidate_count"] = report["new_matches_count"] + report["new_reviews_count"]
     report["state_urls_before"] = len(seen)
 
@@ -464,9 +774,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         report_path = Path(args.report_json)
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if args.report_md:
+        write_markdown_report(Path(args.report_md), report)
 
     print("COMPANY WATCH", "SEND" if args.send else "DRY RUN")
     print(f"Companies: {report['companies_scanned']} scanned / {report['companies_manual_review']} manual review / {len(report['company_failures'])} failed")
+    if report["failure_counts"]:
+        print("Failure categories: " + ", ".join(f"{key}={value}" for key, value in sorted(report["failure_counts"].items())))
     print(f"Jobs: {report['jobs_seen']} observed | {report['new_matches_count']} new matches | {report['new_reviews_count']} review | {report['rejected_count']} rejected | {report['already_seen_count']} already seen")
     print(f"Seen state: {report['state_urls_before']} -> {report['state_urls_after']} URLs")
     for job in report["new_matches"]:
@@ -486,6 +800,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--filters", default=str(DEFAULT_FILTERS))
     parser.add_argument("--state-file", default=str(DEFAULT_STATE))
     parser.add_argument("--report-json", default=str(DEFAULT_REPORT))
+    parser.add_argument("--report-md", default=None, help="Optional human-readable Markdown report path")
     parser.add_argument("--delay", type=float, default=0.4, help="Seconds between company requests (default: 0.4)")
     parser.add_argument("--report-limit", type=int, default=100, help="Maximum jobs of each verdict in report output")
     parser.add_argument("--dry-run", action="store_true", help="Explicitly run without sending Telegram messages (default)")
