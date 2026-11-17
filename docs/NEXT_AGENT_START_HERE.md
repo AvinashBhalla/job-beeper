@@ -1,17 +1,15 @@
-# CURRENT HANDOVER — 2026-11-18 release qualification
+# CURRENT HANDOVER — 2026-11-18 production release deployed
 
-**Read first:** [18 November release qualification handover](OVERNIGHT_HANDOVER_2026-11-18.md). The active execution plan is [Fetcher and Feed Reliability](FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md). Older sections below are retained as history and are superseded where dates/runtime state differ.
+**Read first:** [18 November production release handover](OVERNIGHT_HANDOVER_2026-11-18.md). The active execution plan is [Fetcher and Feed Reliability](FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md). Older sections below are historical and superseded where runtime state differs.
 
-- **Code/CI:** PR #80 (SmartRecruiters detail cache) merged at application head `69a204a7349b67d6439e50e27f673834be4d4971`; exact-head V2 CI #1522 passed. Full local V2 suite: 507 passed, 0 failures. Documentation PR #81 merged as `472c2eef80bf34e0c87e9b1e65967181a7e698f5`; exact-head CI #1524 passed.
-- **Production:** unchanged on `job-radar-prod-canary:6e5becb`, port 8000, health HTTP 200. Existing 10-board ATS allowlist is preserved; LinkedIn/Naukri remain global fetchers, Instahyre/Lever disabled.
-- **Fresh backup:** `/var/backups/job-radar-daily/production-pre-release-20261118.sqlite3`, 135,303,168 bytes, mode 0600, integrity ok, 27,534 jobs / 2 users / 10 ATS registry boards / 51,920 source runs; SHA-256 `55b7402ad1a1fb3ebe871afee0c03008c1f7b5ecc25caf8689b399ff973b3e1c`.
-- **Candidate QA:** `job-radar-v2-qa:472c2ee`, image ID `sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c`, running on loopback port 8013 with a separate copy of the production backup. Health/dashboard/OpenAPI return HTTP 200. All QA source flags and notifications remain disabled.
-- **Migration:** candidate startup preserved jobs/users/registry/source-run counts; SQLite integrity ok; schema diff added 11 tables and columns only, with no dropped tables or columns.
-- **Scheduler QA:** 15 candidate-container scheduler tests passed. Disposable allowlist sync created exactly 10 rows; Workday cooldown simulated 5/10 minutes and did not block Ashby on another host. Actual Coinbase Greenhouse scheduled dispatch on a throwaway DB: 259 first-poll inserts, 259 second-poll seen / 0 new, no duplicate source IDs, integrity ok.
-- **Dashboard filters:** candidate dashboard serves search/source/score/age/sort filters and Alertable Only / Remote Only toggles. Full V2 test suite passed.
-- **Company Watch:** 100-row manifest is still not imported into a persistent runtime DB. Keep it review-only: 90 enabled / 10 disabled, 19 direct ATS candidates, 81 manual-review rows. Do not activate all 100.
-
-**Next:** verify SmartRecruiters cache metrics in candidate QA; inspect LinkedIn/Naukri/Workday and relay state; confirm rollback image/config and production invocation; then promote only if every release gate passes. Owner authorization is already on record—do not ask for it again. Keep Telegram/member features out of scope. After core reliability, perform the staged Company Watch persistent import and limited review/activation process.
+- **Production deployed:** `v2-radar-1` now runs `job-radar-prod-release:472c2ee`, image ID `sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c`. `/health`, `/dashboard/`, `/openapi.json` return HTTP 200.
+- **Release evidence:** PR #80 application head `69a204a7349b67d6439e50e27f673834be4d4971`; exact-head CI #1522 passed; full local V2 suite 507/507. Docs PR #81 and #82 merged; exact-head CI passed.
+- **Final backup:** `/var/backups/job-radar-daily/production-before-v2-release-20261118T2058Z.sqlite3`, 135,368,704 bytes, mode 0600, integrity ok, 27,546 jobs / 2 users / 10 ATS boards / 51,984 source runs; SHA-256 `6c8fa1f139ea05a081c0f65fefc84540f9d9600febe59f57b71b3a1a0bd9da15`.
+- **Scheduler:** exactly 10 active schedules matching the 10 active registry boards. Initial pass: 9/10 successful; first inventories silently baseline-suppressed. Workday returned 429 and entered a persisted five-minute host cooldown; verify no early retry and confirm 10-minute escalation if the next request is rate-limited.
+- **Global fetchers:** Naukri relay timer active every 5 minutes; workflow #9874 succeeded; post-deploy V2 run accepted 313 jobs, 0 new and 0 page failures. LinkedIn post-deploy scan succeeded (40 seen, 10 new); the unchanged legacy global notification path delivered one notification.
+- **SmartRecruiters:** first production run saw 300, 20 detail-cache hits and 20 detail attempts (23 requests including listings). Candidate warm-cache test confirmed 300 hits / 0 details / 3 listing requests. Cache warms incrementally under the 20-detail cap; keep observing.
+- **Company Watch:** pinned 100-row manifest imported persistently. 19 candidates staged as `discovered`, 81 manual review; 0 companies created, 0 boards linked/verified/activated/scheduled, 0 network requests and 0 notifications. Registry and scheduler remain exactly 10 boards.
+- **Next:** monitor Workday cooldown and SmartRecruiters cache warm-up; compare 24-hour source metrics to baseline; verify feed freshness/dedupe. Keep all Company Watch candidates review-only until employer/board identity and provider endpoints are individually verified. Do not add Telegram/member features or activate all 100 rows.
 
 ---
 
