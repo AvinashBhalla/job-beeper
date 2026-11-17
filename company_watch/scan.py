@@ -33,7 +33,7 @@ REQUEST_TIMEOUT = 25
 MAX_JOBS_PER_COMPANY = 150
 MAX_WORKDAY_DETAIL_JOBS = 30
 MAX_SMARTRECRUITERS_DETAIL_JOBS = 40
-TARGET_TITLE_RE = re.compile(r"\\b(engineer|developer|software|frontend|front-end|backend|back-end|full.?stack|programmer|sde)\\b", re.I)
+TARGET_TITLE_RE = re.compile(r"\b(engineer|developer|software|frontend|front-end|backend|back-end|full.?stack|programmer|sde)\b", re.I)
 
 
 def utc_now() -> str:
@@ -205,6 +205,8 @@ def _smartrecruiters(company: dict[str, str], client: requests.Session) -> list[
                         client,
                         f"https://api.smartrecruiters.com/v1/companies/{slug}/postings/{posting_id}",
                     )
+                    if detail_requests < MAX_SMARTRECRUITERS_DETAIL_JOBS:
+                        time.sleep(0.2)
                 except requests.RequestException:
                     # Keep the listing as a review candidate rather than losing the whole board.
                     detail = {}
@@ -250,7 +252,7 @@ def _smartrecruiters(company: dict[str, str], client: requests.Session) -> list[
 def _workday(company: dict[str, str], client: requests.Session) -> list[dict[str, Any]]:
     parsed = urlparse(company["careers_url"])
     host = parsed.netloc
-    tenant_match = re.match(r"(?P<tenant>[^.]+)\\.wd\\d+\\.myworkdayjobs\\.com$", host, re.I)
+    tenant_match = re.match(r"(?P<tenant>[^.]+)\.wd\d+\.myworkdayjobs\.com$", host, re.I)
     if not tenant_match:
         raise ValueError(f"Could not parse Workday tenant from host {host!r}")
     tenant = tenant_match.group("tenant")
