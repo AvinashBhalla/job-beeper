@@ -897,6 +897,7 @@
         void loadSourceStatusTelemetry();
         void loadGlobalDiscoveryCompanies();
         void loadGlobalDiscoveryCandidates();
+        void loadCompanyWatchManifest();
       }
 
       if (pushHash) {
@@ -2381,6 +2382,75 @@
     }
   }
 
+  async function loadCompanyWatchManifest() {
+    if (!state.isAdmin) return;
+    const status = $('companyWatchManifestStatus');
+    const tbody = $('companyWatchManualReviewBody');
+    try {
+      const response = await authClient.request('/discovery/company-watch/manifest', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not load Company Watch manifest (HTTP ' + response.status + ').');
+      const data = await response.json();
+      if (!data.imported) {
+        if (status) status.textContent = 'The pinned 100-company manifest has not been imported into this environment.';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">No manifest rows imported yet.</td></tr>';
+        return;
+      }
+      const manifest = data.manifest || {};
+      const counts = data.classification_counts || {};
+      if (status) status.textContent = 'Manifest ' + String(manifest.manifest_sha256 || '').slice(0, 12) + '… · ' +
+        Number(manifest.rows_total || 0) + ' rows · ' + Number(counts.candidate_staged || 0) +
+        ' ATS candidates staged · ' + Number(counts.manual_review || 0) +
+        ' held for manual review. Import never verifies, activates, polls or notifies.';
+      const rows = data.manual_review_rows || [];
+      if (tbody) tbody.innerHTML = rows.length ? rows.map(row =>
+        '<tr><td>' + esc(row.row_number) + '</td><td>' + esc(row.company_name) + '</td><td>' +
+        esc(row.country || '—') + '</td><td>' + (row.scan_enabled ? 'Enabled in manifest' : 'Disabled in manifest') +
+        '<div style="font-size:11px;color:var(--text-muted);">' + esc(row.scan_mode || '—') + ' · ' +
+        esc(row.board_type || '—') + '</div></td><td>' + esc(row.verification_status || 'Not supplied') +
+        '<div style="font-size:11px;color:var(--text-muted);">' + esc(row.verification_source || '') +
+        '</div></td><td>' + esc(row.review_reason || 'Manual review required') +
+        '</td><td><a href="' + esc(row.careers_url) +
+        '" target="_blank" rel="noopener noreferrer">Open careers URL</a></td></tr>'
+      ).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">No manual-review rows.</td></tr>';
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Company Watch manifest status unavailable.';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="color:var(--status-error);padding:var(--space-8);">Manifest review rows unavailable.</td></tr>';
+    }
+  }
+
+  async function importCompanyWatchManifest(button) {
+    const status = $('companyWatchManifestStatus');
+    if (!button) return;
+    button.disabled = true;
+    try {
+      if (status) status.textContent = 'Validating the pinned manifest. No database changes yet…';
+      const previewResponse = await authClient.request('/discovery/company-watch/import', {
+        method: 'POST', body: { dry_run: true },
+      });
+      const preview = await previewResponse.json().catch(() => ({}));
+      if (!previewResponse.ok) throw new Error(preview.detail || 'Manifest validation failed (HTTP ' + previewResponse.status + ').');
+      const counts = preview.classification_counts || {};
+      const message = 'Validated ' + Number(preview.rows_total || 0) + ' manifest rows. ' +
+        Number(counts.candidate_staged || 0) + ' ATS candidates will enter the existing review queue; ' +
+        Number(counts.manual_review || 0) + ' records will be retained for manual review. No employers, links, verification, activation, polling, schedule changes or notifications will be created. Import now?';
+      if (!window.confirm(message)) {
+        if (status) status.textContent = 'Manifest validated. Import cancelled; no database changes were made.';
+        return;
+      }
+      const response = await authClient.request('/discovery/company-watch/import', { method: 'POST', body: {} });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || 'Manifest import failed (HTTP ' + response.status + ').');
+      if (status) status.textContent = 'Imported ' + Number(result.rows_total || 0) + ' manifest rows: ' +
+        Number(result.candidate_inserted || 0) + ' new candidates, ' +
+        Number(result.manual_review_rows || 0) + ' manual-review rows. No employer records, links, verification, activation, schedules or notifications were created.';
+      await Promise.all([loadCompanyWatchManifest(), loadGlobalDiscoveryCandidates()]);
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Company Watch manifest import failed.';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function renderGlobalDiscoveryCandidates() {
     const tbody = $('globalCandidatesTableBody');
     if (!tbody) return;
@@ -2407,9 +2477,16 @@
         ? `<span style="color:var(--text-muted);">Board status: ${esc(linkedBoardStatus)}</span>`
         : rejected ? ''
           : `${companies.length ? `<button type="button" class="btn-pill btn-pill-primary global-candidate-link" data-candidate-id="${esc(candidate.id)}">Link employer</button>` : ''}<button type="button" class="btn-pill btn-pill-secondary global-candidate-reject" data-candidate-id="${esc(candidate.id)}">Reject</button>`;
+      const manifestContext = candidate.manifest_company_name
+        ? '<div style="font-size:11px;color:var(--text-primary);margin-top:3px;">Manifest company: ' +
+          esc(candidate.manifest_company_name) + ' · ' + esc(candidate.manifest_country || 'Country not supplied') +
+          ' · row ' + esc(candidate.manifest_row_number) + '</div><div style="font-size:11px;color:var(--text-muted);">Identity evidence: ' +
+          esc(candidate.manifest_verification_status || 'Not supplied') + ' · ' +
+          esc(candidate.manifest_review_reason || 'Review required') + '</div>'
+        : '';
       return `<tr>
         <td>${esc(candidate.provider)}</td>
-        <td><a href="${esc(candidate.board_url)}" target="_blank" rel="noopener noreferrer">${esc(candidate.board_key)}</a><div style="font-size:11px;color:var(--text-muted);">${esc(candidate.candidate_host)}</div></td>
+        <td><a href="${esc(candidate.board_url)}" target="_blank" rel="noopener noreferrer">${esc(candidate.board_key)}</a><div style="font-size:11px;color:var(--text-muted);">${esc(candidate.candidate_host)}</div>${manifestContext}</td>
         <td>${esc(candidate.discovery_method)}<div style="font-size:11px;color:var(--text-muted);">${esc(candidate.source_reference)}</div></td>
         <td>${esc(candidate.source_captured_at || 'Not captured')}</td>
         <td>${esc(candidate.confidence)} · ${esc(candidate.review_status)}</td>
@@ -2734,6 +2811,7 @@
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
     if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
     if ($('importLastRoundDirectoryBtn')) $('importLastRoundDirectoryBtn').addEventListener('click', (event) => importLastRoundDirectory(event.currentTarget));
+    if ($('importCompanyWatchManifestBtn')) $('importCompanyWatchManifestBtn').addEventListener('click', (event) => importCompanyWatchManifest(event.currentTarget));
     const hirebaseSourceToggle = document.querySelector('#cfgSourcesWrap input[data-source="hirebase"]');
     if (hirebaseSourceToggle) hirebaseSourceToggle.addEventListener('change', () => {
       if (hirebaseSourceToggle.checked && !window.confirm(

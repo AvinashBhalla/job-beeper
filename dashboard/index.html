@@ -716,6 +716,19 @@
               </div>
             </div>
 
+            <div class="settings-block" id="companyWatchManifestPanel" style="margin-top:var(--space-10);">
+              <span class="settings-block-title">Company Watch manifest — review only</span>
+              <p class="auth-description">Import the pinned 100-company manifest into the V2 review queue. The import stages supported ATS candidates and retains ambiguous, disabled, generic and unsupported records for manual review. It does not create employers, verify or activate boards, poll sources, change schedules or send notifications.</p>
+              <button type="button" class="btn-pill btn-pill-secondary" id="importCompanyWatchManifestBtn">Validate and import 100-company manifest</button>
+              <p id="companyWatchManifestStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Checking Company Watch manifest status…</p>
+              <div class="data-table-container" style="margin-top:var(--space-6);max-height:420px;overflow:auto;">
+                <table class="table-dataset">
+                  <thead><tr><th>Row</th><th>Company</th><th>Country</th><th>Manifest scan setting</th><th>Verification evidence</th><th>Manual-review reason</th><th>Careers URL</th></tr></thead>
+                  <tbody id="companyWatchManualReviewBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">Loading manifest review rows…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+
             <div class="settings-block" id="boardSchedulerPanel" style="margin-top:var(--space-10);">
               <span class="settings-block-title">Persistent employer-board scheduler</span>
               <p class="auth-description">Each explicitly activated employer board has its own persisted due time and outcome. API-host budgets allow one active board poll per host, apply a small request spacing interval, and retain cooldowns after HTTP 429. Discovered or merely verified boards are never scheduled.</p>

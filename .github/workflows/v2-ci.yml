@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -r v2/requirements-dev.txt
-      - run: python -m py_compile v2/auth.py v2/auth_admin.py v2/user_preferences.py v2/radar.py v2/board_discovery.py v2/test_auth.py v2/test_dashboard_auth_contract.py v2/test_radar.py v2/test_board_discovery.py v2/test_user_preferences.py v2/test_user_preferences_api.py v2/seed_feature_demo.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py
+      - run: python -m py_compile v2/auth.py v2/auth_admin.py v2/user_preferences.py v2/radar.py v2/board_discovery.py v2/company_watch_manifest.py v2/test_auth.py v2/test_dashboard_auth_contract.py v2/test_radar.py v2/test_board_discovery.py v2/test_user_preferences.py v2/test_user_preferences_api.py v2/test_company_watch_manifest.py v2/test_global_discovery_hirebase.py v2/seed_feature_demo.py v2/greenhouse_canary.py v2/test_greenhouse_canary.py
       - name: Check dashboard JavaScript syntax
         run: node --check dashboard/auth.js && node --check dashboard/app.js
       - name: Run focused router and extractor tests
