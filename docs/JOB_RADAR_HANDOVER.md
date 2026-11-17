@@ -1,5 +1,24 @@
 ## 2026-11-17 — Phase 1 merged; Phase 2 readiness is next
 
+## CURRENT RELEASE STATE — 2026-11-17 15:15 UTC
+
+**Canonical handover:** [Production readiness, delivery plan and next-agent handover](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
+
+- Existing V2 pipeline is the priority; Company Watch Phase 2 remains paused.
+- Production is unchanged on job-radar-prod-canary:6e5becb, port 8000, health 200. Current V2 QA from 54fad21 runs separately on port 8013.
+- Cleanup is complete: legacy QA runtimes and unused image tags removed after archiving old QA databases/configuration; only production and current QA containers remain. Production Docker volume is preserved.
+- The daily production snapshot job has been repaired and a production DB snapshot passed SQLite integrity. Offsite encrypted backup/restore drill remains outstanding.
+- Production contains admin only; no member account or linked member Telegram. Google sign-in is disabled and the bot webhook/per-user settings are not configured. Owner member email and Telegram bot access are required for the real canary.
+- Naukri live relay was consumed in current V2 QA: 312 seen / 2 new first poll; 312 seen / 0 new on second poll. Notifications were disabled.
+- Per-user tests: 61 passed. Full V2 suite: 497 passed, 0 failed.
+- Workday adaptive 429 backoff is prepared in local branch fix/ats-board-rate-limit-backoff-20261117; full suite passes, but patch is not yet committed/pushed and production has not been updated.
+- Fastest safe path: PR/CI → candidate QA rebuild → real member account/preferences → real Telegram webhook/link/canary → offsite backup/restore → explicit production approval and rollout → 24–72h monitoring.
+- Current estimate to first production canary: 8–14 focused engineering hours, approximately 1–2 days if external access is available. See the canonical plan for assumptions and blockers.
+
+Older timestamped checkpoints below are historical. Do not treat prior statements that Docker inventory was unavailable, that the snapshot service remained broken, or that four QA services were still running as current.
+
+---
+
 **Merged PR #76:** https://github.com/AvinashBhalla/job-beeper/pull/76
 **PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`. Docs-only follow-ups include `de83e0f`, `d5b6971` and `4867367`; fetch latest remote HEAD before checkout.
 **Merged feature head:** `14102fa6f24f117786199984008a191befe10836`

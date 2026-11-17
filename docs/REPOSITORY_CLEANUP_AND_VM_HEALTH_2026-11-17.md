@@ -1,5 +1,27 @@
 # JobBeeper release readiness, repository cleanup and VM health — 2026-11-17
 
+## CURRENT SOURCE OF TRUTH — 2026-11-17 15:15 UTC
+
+**Read first:** [Production readiness, delivery plan and next-agent handover](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
+
+This section supersedes older VM/runtime observations further below in this file.
+
+- Priority: prove the existing V2 pipeline end-to-end, including a normal member's saved preferences and per-user Telegram delivery. Company Watch Phase 2 remains paused.
+- Production was not redeployed. The production app remains v2-radar-1 on port 8000 using the older job-radar-prod-canary:6e5becb image. Health returns HTTP 200.
+- A clean V2 QA app from source commit 54fad21 is running on loopback port 8013 using an isolated copy of the production database snapshot. Source polling and legacy notifications are disabled in QA.
+- Production has exactly one active admin and no member account, no linked member Telegram chat and no per-user notification settings/ledger records. Google sign-in is disabled. A normal member must be provisioned; do not convert the admin.
+- Telegram's production bot token identity check passed, but no webhook is registered and the per-user bot username/webhook-secret settings are not configured. Never place bot secrets in Git or this document.
+- The V2 Naukri collector passed a live-relay two-pass QA test: 312 seen / 2 new on first pass, 312 seen / 0 new on second pass. QA notifications were disabled.
+- Focused member/preferences/Telegram tests: 61 passed. Full V2 suite on the Workday backoff working tree: 497 passed, 0 failed.
+- Workday is the main source reliability issue (284 HTTP 429s of 355 requests and 243 failed pages in the last 24-hour snapshot). A progressive 5/10/20/40/60-minute per-board cooldown patch is prepared and locally tested, but is not yet committed, pushed or deployed.
+- VM cleanup: only production and current V2 QA containers remain; one production Docker volume remains. Legacy QA data is archived. Disk is at 28% use, with about 405 MB RAM available; 4 GiB RAM is recommended before expanding load.
+- The daily production SQLite snapshot now completes successfully; encrypted offsite backup and restore drill remain outstanding.
+- Release estimate from current state: 8–14 focused engineering hours for a controlled canary (roughly 1–2 days if external access is ready), followed by 24–72 hours monitoring. Company Watch Phase 2 is a later milestone.
+
+Next actions: (1) commit/push the Workday fix and get exact-head CI green; (2) rebuild QA from that exact candidate; (3) provision a normal member using the owner's intended email; (4) configure Telegram webhook and link the owner's private chat; (5) prove real member matching and delivery; (6) offsite backup/restore; (7) deploy only with explicit owner approval.
+
+---
+
 ## Executive status
 
 The production Source Health screenshots show a live product, not a dormant scanner. The admin dashboard recorded 379 jobs discovered today, 26 matched and 25 alerted. Naukri Relay, Greenhouse and Ashby reported operational status. LinkedIn was partial and Workday was failing heavily with HTTP 429 responses.
