@@ -5,7 +5,7 @@
 **Target branch:** `v2-live-radar`
 **Merged PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76
 **PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`
-**Current branch HEAD after documentation follow-up:** `de83e0fefa0660f54e9cda3a167b30a3e71f76de`
+**Post-merge documentation commits:** `de83e0f` (merge/Phase 2 checkpoint) and `d5b6971` (Phase 2 code-path safety findings); resolve latest branch HEAD from GitHub before starting work.
 **Feature head merged:** `14102fa6f24f117786199984008a191befe10836`
 **Implementation commit:** `200f34b8b04ee7dd14dfe1e61333739f860ba17c`
 **Manifest source:** `main@29cbb17190b26829d49e1458137d75f2e8f286aa:company_watch/companies.csv`

@@ -4,7 +4,7 @@
 **Target branch:** v2-live-radar.
 **Merged PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76.
 **PR #76 merge commit:** 0220eef1044e042d3041adb97c2d4648afed56a0.
-**Current v2-live-radar HEAD (docs follow-up):** de83e0fefa0660f54e9cda3a167b30a3e71f76de.
+**Subsequent docs-only checkpoints:** de83e0f and d5b6971. Resolve the latest remote branch HEAD before checkout.
 
 Phase 1 implementation is merged. Exact final PR-head CI #1501 passed 495 full V2 tests plus 32 focused tests. Manifest: 100 rows / 90 enabled / 10 disabled; 19 ATS candidates staged into the review queue and 81 rows held for manual review. All candidates are low-confidence/unlinked.
 

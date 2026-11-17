@@ -2,7 +2,7 @@
 
 ## Current checkpoint — 2026-11-17 Phase 1 merged
 
-PR #76 is merged into `v2-live-radar`. PR #76 merge commit: `0220eef1044e042d3041adb97c2d4648afed56a0`; current branch HEAD after documentation follow-up: `de83e0fefa0660f54e9cda3a167b30a3e71f76de`. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
+PR #76 is merged into `v2-live-radar`. PR #76 merge commit: `0220eef1044e042d3041adb97c2d4648afed56a0`. Subsequent docs-only checkpoints: `de83e0f` and `d5b6971`; resolve latest remote HEAD before checkout. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
 
 The pinned Company Watch manifest has 100 rows (90 enabled, 10 disabled); importer stages 19 direct ATS candidates and retains 81 manual-review rows. All 19 V2 candidates remain low-confidence and unlinked. The import code was not deployed to a shared runtime and the manifest was not imported to a persistent dev/QA/production DB; validation used temporary SQLite databases only.
 
