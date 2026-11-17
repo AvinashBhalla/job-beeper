@@ -1,0 +1,8 @@
+{
+  "title_must_match": ["developer", "engineer", "software", "web", "frontend", "front-end", "backend", "back-end", "full[- ]?stack", "sde", "programmer"],
+  "title_must_not_match": ["senior", "sr\\.", "staff", "principal", "lead", "manager", "architect", "director", "head of", "vp ", "intern"],
+  "location_must_match": ["bengaluru", "bangalore", "karnataka", "india"],
+  "remote_ok_if_india_in_text": true,
+  "max_years_required": 2,
+  "skills_any": ["javascript", "typescript", "react", "node", "express", "python", "django", "full[- ]?stack", "frontend", "front-end", "backend", "web", "mern", "next\\.js", "html", "css"]
+}
