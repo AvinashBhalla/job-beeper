@@ -1,13 +1,13 @@
 ## 2026-11-17 — Phase 1 merged; Phase 2 readiness is next
 
 **Merged PR #76:** https://github.com/AvinashBhalla/job-beeper/pull/76
-**PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`; documentation follow-up HEAD: `de83e0fefa0660f54e9cda3a167b30a3e71f76de`
+**PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`. Docs-only follow-ups include `de83e0f`, `d5b6971` and `4867367`; fetch latest remote HEAD before checkout.
 **Merged feature head:** `14102fa6f24f117786199984008a191befe10836`
 **Final exact-head CI #1501:** passed; 32 focused tests + **495 full V2 tests** (58.062s). Local full suite: 495 passed; Phase 1 focused suite: 10 passed.
 
 - Manifest source `main@29cbb17190b26829d49e1458137d75f2e8f286aa`, SHA-256 `706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd`: 100 rows, 90 enabled, 10 disabled. Phase 1 stages 19 supported ATS candidates and retains 81 manual-review records. Every candidate remains low-confidence and unlinked.
 - Implementation details, source counts, endpoint names, tests and delivery sequence are in `docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md`.
-- **Runtime qualification:** no real shared DB import or deployment has happened. Only disposable SQLite tests were run. No live endpoint probes, board verification/activation, polling, scheduler change, Telegram send or production change occurred.
+- **Phase 1 runtime qualification:** the Company Watch manifest has not been imported into a shared DB and PR #76 has not been deployed. Only disposable SQLite import tests were run; no Company Watch endpoint verification, board activation, Company Watch polling or Telegram send occurred. Separately, the existing Naukri relay is running and the V2 Naukri ingest path passed an isolated temp-DB smoke test; production app consumption and per-user alert delivery remain unverified.
 - Next: establish a fresh isolated QA app+DB from PR #76 merge commit 0220eef, with read-only environment/DB baseline first. Before Phase 2, resolve the employer-record prerequisite for candidate linking and prevent provider-level activation from scheduling unrelated config peers. Preserve the existing dirty/behind dev checkout and production. Phase 2 must use a small owner-reviewed sample only. Proposed source-manifest `verified_ats_board` review list: Canva and Abercrombie & Fitch (SmartRecruiters), Cyderes and Kobie (Lever). They are not yet V2-verified or approved for activation. No Greenhouse board should be tested until official employer identity/link is reviewed.
 - In QA only, verify the approved sample through the existing endpoint; log failure classes distinctly. Activate only the explicit owner-approved subset; verify one registry row, one schedule row, host-lease constraints, silent first-poll baseline and second-poll new unique ingestion. Stop on any uncertainty.
 - No Phase 3 JD completeness/hash, Phase 4 quality audit, Phase 5 alert pilot, or production rollout should be collapsed into Phase 2.
@@ -15,6 +15,18 @@
 ---
 
 # Job Radar V2 — Agent Handover & Product Source of Truth
+
+## Live system health and end-to-end evidence — 2026-11-17 12:53 UTC
+
+- Naukri upstream relay is scanning: five-minute systemd timer enabled; four consecutive workflow runs (#44083895797, #44084703987, #44085500607, #44086307997) completed all 18/18 targets with zero failed searches and 315 / 309 / 311 / 311 unique jobs. Latest feed timestamp 12:48:49 UTC; 311 jobs, 311 unique IDs/URLs and non-empty company/title/location/description.
+- Actual V2 Naukri collector consumed the live feed in an isolated temp DB. Full run_source(naukri) smoke test twice: first 311 seen / 311 new; second 311 seen / 0 new. Temp DB had 311 jobs, 311 canonical opportunities, 311 global evaluations, two successful source_runs and integrity ok. Under repository default/global config, 15/311 matched and 296/311 did not; legacy decision ledger had 15 pending / 296 suppressed. Per-user tables had zero users/preferences/evaluations/Telegram chats/settings/per-user notification rows. Notifications and Telegram were disabled; this does not prove personal matching or delivery.
+- Production app /health on port 8000 returns 200 (v2.0.0). Admin source-status and daily-summary returned 401 without an admin session. Docker access is denied to Termalin's ubuntu user. Shared dev 8001 resets; QA 8010, synthetic 8006 and feature QA 8002 health return 200. No container/log/production DB identity was inspected; no sudo workaround attempted.
+- Production snapshot journal reports integrity ok and jobs row counts 25,641 (Nov 15), 26,067 (Nov 16), 27,024 (Nov 17). Snapshot service fails after the production snapshot when a subsequent target returns "cannot exec in a stopped state".
+- Six-hour host metrics: CPU average 44% (peak 95.8%), memory average 72.9% (peak 85.5%), CPU steal average 32.4%, I/O wait average 20.4%; swap about 2.0/2.1 GiB. Shared dev checkout remains dirty/147 commits behind; production checkout 613 behind. Neither was touched.
+- **Not proven:** the live production app is consuming the relay, evaluating actual per-user preferences, or delivering notifications; the deployed image/commit/config is also unverified. Do not claim end-to-end JobBeeper health from CI or relay success alone.
+- **Next:** obtain an approved read-only path to source-run/notification telemetry and container identity; test relay → V2 ingestion → canonical dedupe → actual saved-user matching → notification decision in isolated QA, with no production credentials. Use a synthetic QA account/bot only after separate approval. No Company Watch boards have been approved or activated.
+
+---
 
 ## Historical pre-merge Phase 1 implementation checkpoint — superseded by the merged status above
 

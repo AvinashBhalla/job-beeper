@@ -1,8 +1,20 @@
 # Job Radar V2 — Knowledge Transfer
 
+## Live system health and end-to-end evidence — 2026-11-17 12:53 UTC
+
+- Naukri upstream relay is scanning: five-minute systemd timer enabled; four consecutive workflow runs (#44083895797, #44084703987, #44085500607, #44086307997) completed all 18/18 targets with zero failed searches and 315 / 309 / 311 / 311 unique jobs. Latest feed timestamp 12:48:49 UTC; 311 jobs, 311 unique IDs/URLs and non-empty company/title/location/description.
+- Actual V2 Naukri collector consumed the live feed in an isolated temp DB. Full run_source(naukri) smoke test twice: first 311 seen / 311 new; second 311 seen / 0 new. Temp DB had 311 jobs, 311 canonical opportunities, 311 global evaluations, two successful source_runs and integrity ok. Under repository default/global config, 15/311 matched and 296/311 did not; legacy decision ledger had 15 pending / 296 suppressed. Per-user tables had zero users/preferences/evaluations/Telegram chats/settings/per-user notification rows. Notifications and Telegram were disabled; this does not prove personal matching or delivery.
+- Production app /health on port 8000 returns 200 (v2.0.0). Admin source-status and daily-summary returned 401 without an admin session. Docker access is denied to Termalin's ubuntu user. Shared dev 8001 resets; QA 8010, synthetic 8006 and feature QA 8002 health return 200. No container/log/production DB identity was inspected; no sudo workaround attempted.
+- Production snapshot journal reports integrity ok and jobs row counts 25,641 (Nov 15), 26,067 (Nov 16), 27,024 (Nov 17). Snapshot service fails after the production snapshot when a subsequent target returns "cannot exec in a stopped state".
+- Six-hour host metrics: CPU average 44% (peak 95.8%), memory average 72.9% (peak 85.5%), CPU steal average 32.4%, I/O wait average 20.4%; swap about 2.0/2.1 GiB. Shared dev checkout remains dirty/147 commits behind; production checkout 613 behind. Neither was touched.
+- **Not proven:** the live production app is consuming the relay, evaluating actual per-user preferences, or delivering notifications; the deployed image/commit/config is also unverified. Do not claim end-to-end JobBeeper health from CI or relay success alone.
+- **Next:** obtain an approved read-only path to source-run/notification telemetry and container identity; test relay → V2 ingestion → canonical dedupe → actual saved-user matching → notification decision in isolated QA, with no production credentials. Use a synthetic QA account/bot only after separate approval. No Company Watch boards have been approved or activated.
+
+---
+
 ## Current checkpoint — 2026-11-17 Phase 1 merged
 
-PR #76 is merged into `v2-live-radar`. PR #76 merge commit: `0220eef1044e042d3041adb97c2d4648afed56a0`. Subsequent docs-only checkpoints: `de83e0f` and `d5b6971`; resolve latest remote HEAD before checkout. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
+PR #76 is merged into `v2-live-radar`. PR #76 merge commit: `0220eef1044e042d3041adb97c2d4648afed56a0`. Subsequent docs-only checkpoints: `de83e0f`, `d5b6971`, and `4867367`; resolve latest remote HEAD before checkout. PR: https://github.com/AvinashBhalla/job-beeper/pull/76. Exact final PR-head CI #1501 passed 32 focused tests and **495 full V2 tests** (58.062s). Local full V2 tests: 495 passed; focused Phase 1 tests: 10 passed.
 
 The pinned Company Watch manifest has 100 rows (90 enabled, 10 disabled); importer stages 19 direct ATS candidates and retains 81 manual-review rows. All 19 V2 candidates remain low-confidence and unlinked. The import code was not deployed to a shared runtime and the manifest was not imported to a persistent dev/QA/production DB; validation used temporary SQLite databases only.
 

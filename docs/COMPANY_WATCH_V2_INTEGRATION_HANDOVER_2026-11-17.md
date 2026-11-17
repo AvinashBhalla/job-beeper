@@ -19,8 +19,36 @@
 - The 19 stageable rows are Mistral AI, Anthropic, Figma, Skild AI, Scale AI, SoundHound AI, Cresta, Toku, Canva, Duolingo, GitLab, Abercrombie & Fitch, Axiado, Cyderes (manifest spelling: Cydeces), Amtech Software, Warner Music, Kobie, SpaceX and Mythic AI. Of the 19, 15 are labelled `provided_url_needs_live_validation` and 4 `verified_ats_board` in the source manifest. Every V2 candidate starts low-confidence and unlinked; Phase 1 does not independently verify employer ownership or probe live URLs.
 - Implementation includes `v2/company_watch_manifest.py`, pinned CSV snapshot, additive audit tables, pinned-hash guard, admin dry-run/import and status/review endpoints, ATS provider normalization, Source Health dashboard review panel, CI compile coverage and regression tests. See PR #76 for full diff.
 
+### Live product verification — 2026-11-17 12:53 UTC
+
+**What is proven**
+- The host job-radar is online. Production port 8000 /health returned HTTP 200, version 2.0.0. This is only an app liveness check.
+- Naukri relay timer is enabled and runs every five minutes. Four consecutive completed GitHub Actions runs succeeded: #44083895797 (12:31 UTC, 315 unique jobs), #44084703987 (12:36, 309), #44085500607 (12:41, 311), and #44086307997 (12:46, 311). Each processed all 18 search targets (six role queries across Bangalore, Gurugram and Delhi), with 0 failed targets.
+- Latest published relay feed (branch head 54d31b4e141b46ceec88354a6a8d3e24cddeeb7f, feed timestamp 2026-11-17T12:48:49Z) contains 311 jobs with 311 unique IDs and URLs; all 311 have non-empty company, title, location and description fields.
+- Ran the actual V2 naukri_collect() against the live relay in a disposable /tmp SQLite DB. It accepted 311 jobs; feed age was 140s in one run and 278s in the full-cycle run, both within the V2 15-minute freshness limit.
+- Ran V2 run_source(naukri) twice against a second disposable DB, with only Naukri enabled, notifications disabled, all Telegram credentials blank, and Gemini/LLM disabled. First run: outcome=success, 311 seen / 311 new. Second run: outcome=success, 311 seen / 0 new. Final temp DB: 311 jobs, 311 canonical opportunities, 311 global job evaluations, 2 successful source_runs, SQLite integrity ok.
+- Under the repository current default/global config, 15/311 jobs matched and 296/311 did not. The legacy notification ledger recorded 15 pending and 296 suppressed decisions. The new per-user tables contained 0 users, 0 preferences, 0 user evaluations, 0 Telegram chats/settings, and 0 per-user notification ledger rows. No sends were possible because notifications were disabled and Telegram credentials were blank. This is a baseline matcher/decision check, not a test of the owner's saved preferences or actual message delivery.
+- This proves an isolated V2 fetch → normalize → persist → canonical dedupe → global evaluation path, not that the running production app performs the same cycle. Production snapshot service logs show integrity=ok and jobs row counts 25,641 (Nov 15) to 26,067 (Nov 16) to 27,024 (Nov 17), but counts alone do not identify the inserting source.
+
+**What is not yet proven**
+- Authenticated production /api/source-status and /api/daily-summary both returned 401 without an admin session.
+- Docker inspection (docker ps) is denied to the Termalin ubuntu user. Container image identity, effective runtime source flags, DB volume and container logs remain unverified. No sudo or permission workaround was attempted.
+- Shared dev port 8001 resets connections. Connector QA 8010, synthetic QA 8006 and feature QA 8002 return HTTP 200 on /health; port 8012 resets. Production port 8000 is healthy.
+- /home/ubuntu/job-beeper-dev remains dirty and 147 commits behind, with modified v2/config.json and untracked .env.save, .venv/ and v2/config.json.backup. The production checkout /home/ubuntu/job-beeper is 613 commits behind. Neither checkout was touched.
+- The SQLite snapshot service failed at 02:46 UTC after the production snapshot succeeded; journal then reported "cannot exec in a stopped state" for a subsequent target. The timer remains enabled, but that run was not fully successful for every target. Termalin has no configured server backup jobs.
+- Six-hour host metrics show resource pressure: CPU average 44% (peak 95.8%), memory average 72.9% (peak 85.5%), CPU steal average 32.4%, I/O wait average 20.4%; current swap use was about 2.0 GiB of 2.1 GiB. This may affect latency, but is not proof of collector failure.
+
+**Current decision / next test**
+- The owner has not approved the proposed four-company Phase 2 sample. Do not ask for board approval yet; the owner wants evidence that existing JobBeeper scanning and delivery work first.
+- Obtain an approved read-only way to inspect authenticated source-run and notification telemetry, plus container identity/log/DB telemetry. No credentials or secrets should be pasted into chat.
+- Then run a controlled end-to-end smoke test in isolated QA: relay fetch → V2 source_run → jobs/canonical dedupe → actual saved-user preference evaluation → notification decision/outbox. Keep Telegram credentials blank; test delivery only with a synthetic QA account and controlled test bot after separate approval.
+- Compare running deployment image/commit/config with merged V2 code before claiming PR #76 is deployed. A merge is not a deployment.
+- Only after the existing JobBeeper pipeline is demonstrably healthy should the four-company Company Watch verification sample be revisited. No Phase 2 board verification/activation, new board polling, Telegram send or production change has occurred.
+
+---
+
 ### Critical runtime qualification
-**The manifest has NOT been imported into a shared dev/QA or production database.** Import/idempotency/API behavior was tested only against disposable temporary SQLite databases. No application deployment, live ATS endpoint verification, real board verification/activation, scheduler change, polling, Telegram notification or production change occurred. The merge makes the feature available in code; it does not deploy it or run the import.
+**The Company Watch manifest has NOT been imported into a shared dev/QA or production database.** Import/idempotency/API behavior was tested only against disposable temporary SQLite databases. PR #76 has not been deployed to a shared runtime. No Company Watch ATS endpoint verification, registry-board verification/activation, Company Watch scheduler entry, Company Watch board polling, Telegram notification or production change occurred. The existing Naukri relay is independently scanning and its V2 ingestion path passed an isolated temp-DB test as recorded above; this does not prove the running production app is consuming it. The merge makes Phase 1 code available in GitHub; it does not deploy it or run the manifest import.
 
 ### Next implementation gate — Phase 2 readiness, no work started
 The delivery sequence in section 8 below remains controlling:
@@ -47,7 +75,7 @@ The delivery sequence in section 8 below remains controlling:
 **Target integration branch:** `v2-live-radar`
 **Merged implementation branch:** `feat/company-watch-manifest-import-20261117` (merged by PR #76)
 **Original V2 source-audit commit:** `5c28d97ea39edfa8af13d9686f7b97c3997901f3`
-**Current `v2-live-radar` HEAD after merged PR #76:** `0220eef1044e042d3041adb97c2d4648afed56a0`
+**PR #76 merge commit:** `0220eef1044e042d3041adb97c2d4648afed56a0`. Docs-only follow-ups: `de83e0f`, `d5b6971`, `4867367`; fetch latest branch HEAD before work.
 **Status:** PR #74 and PR #76 are merged. Phase 1 code is merged and exact-head CI #1501 is green; no shared runtime import or deployment has occurred. Phase 2 requires isolated QA and an owner-reviewed sample.
 
 > **Primary direction:** Use Company Watch as a curated source-discovery input. Do not run it as a second production job pipeline. Reconcile verified company/board records into the existing V2 directory, then use V2 collectors, JD enrichment, SQLite, canonical dedupe, per-user preferences/evaluations and per-user Telegram delivery.
