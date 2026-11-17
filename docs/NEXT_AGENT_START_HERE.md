@@ -1,4 +1,7 @@
-# CURRENT HANDOVER — 2026-11-17 Phase 1 merged
+# CURRENT HANDOVER — 2026-11-18 reliability work in progress
+
+**Read first:** [18 November overnight handover](OVERNIGHT_HANDOVER_2026-11-18.md). It supersedes older execution status below where dates or runtime state differ. The active plan remains [Fetcher and Feed Reliability](FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md).
+
 
 ## CURRENT SOURCE OF TRUTH — 17 November 2026, 18:30 UTC
 
