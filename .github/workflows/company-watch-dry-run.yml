@@ -51,12 +51,13 @@ jobs:
           --remember-dry-run
           --state-file company_watch/.state/seen.json
           --report-json company_watch/.state/latest_report.json
+          --report-md company_watch/.state/latest_report.md
 
       - name: Upload scan report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: company-watch-report-${{ github.run_number }}
-          path: company_watch/.state/latest_report.json
+          path: company_watch/.state/latest_report.*
           if-no-files-found: warn
           retention-days: 14
