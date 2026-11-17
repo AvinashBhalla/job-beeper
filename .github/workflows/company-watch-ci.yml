@@ -1,0 +1,31 @@
+name: Company Watch CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/company-watch-isolated-20261117
+    paths:
+      - "company_watch/**"
+      - ".github/workflows/company-watch-ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "company_watch/**"
+      - ".github/workflows/company-watch-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r company_watch/requirements.txt
+      - run: python -m py_compile company_watch/scan.py company_watch/test_scan.py
+      - run: python -m unittest company_watch.test_scan -v
