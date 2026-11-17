@@ -4,7 +4,36 @@
 > A future agent should read this file before making architectural or product changes.
 > Do not depend on chat history being available.
 
-**Last updated: 2026-11-08 (candidate integration branch; final read-only browser regression recorded; acceptance remains blocked by evidence-only gates; not deployed)**
+
+
+## 2026-11-17 — Company Watch → V2 integration planning and read-only audit
+
+**Current handover:** [Company Watch → V2 integration plan and next-agent checklist](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md)
+
+- **Goal:** improve JD completeness and relevance quality by bringing the curated Company Watch company list into the existing V2 source/registry path. Do not expand source count indiscriminately or create a second matcher/notification system.
+- **Branch boundary:** Company Watch PR #72 was merged into `main`; PR #73 remains draft/open on `main` at `6a41c8125464c672d3b73e8196faeec077b9c05b`. The mature V2 implementation is now `v2-live-radar` at `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5` after PR #75 merged (parent before this test-only change: `5c28d97ea39edfa8af13d9686f7b97c3997901f3`). Post-merge CI #1495 passed all 485 tests. Do not merge/cherry-pick the Company Watch branch wholesale into V2. PR #74's refreshed exact-base CI #1497 also passed (485 tests); docs PR is ready for owner review.
+- **Read-only code audit:** V2 already has 12 collectors, an employer/ATS registry, review-first candidate staging, explicit verify/activate/deactivate APIs, a persistent per-board scheduler, shared SQLite upsert/canonical dedupe, saved per-user profile preferences/evaluations and per-user opt-in Telegram dispatch.
+- **Company Watch inventory:** PR #73 head contains 100 company rows: 92 enabled for its own canary, 8 manual review. Modes: careers_page 72, Greenhouse 9, Lever 5, SmartRecruiters 3, Ashby 1, Workday 1, Workable 1, manual_review 8. Its enabled flag is not V2 verification or activation.
+- **Key gaps:** V2's unmatched candidate importer currently accepts only Workday/Keka/Darwinbox; the importer needs safe, provider-specific extensions for the other supported Company Watch ATS modes. Generic `careers_page` is not a V2 collector. `jobs` has no first-class JD-completeness state. `upsert_jobs()` can ignore equal/shorter plain-text JD updates because replacement prefers longer content. V2's board scheduler still derives active schedules from config allowlists, not directly from registry rows.
+- **Required design:** Company Watch data becomes a review-only manifest -> resolve real employer identity -> stage/link ATS candidates -> V2 verify -> explicit V2 activate -> existing V2 collector/scheduler -> JD status/hash/enrichment -> shared upsert/canonical dedupe -> existing per-user evaluation -> existing per-user Telegram dispatcher. Use existing preferences; do not copy `company_watch/filters.json` or `judge()`.
+- **Quality rule:** new Company Watch-origin jobs with missing/partial/failed JDs should remain visible for review but must not auto-alert in the initial pilot. Enforce that at notification queue and final-send revalidation, without changing existing source behaviour globally.
+- **Company Watch run #44043855196:** 78 scanned, 8 manual, 14 failed, 1,338 jobs observed, 0 standalone matches, 3 review, 1,318 rejected, 17 seen. Failures: 9 blocked, 3 rate-limited, 1 timeout, 1 TLS. This describes Company Watch's independent matcher/collector only; it is not V2 precision evidence.
+- **Runtime read-only check (2026-11-17):** dev checkout `/home/ubuntu/job-beeper-dev` is `v2-live-radar`, HEAD `7ebc38b7c321847e74895557551478c3ff11bd4a`, 147 commits behind and has local `v2/config.json` modification plus untracked `.env.save`, `.venv/`, and `v2/config.json.backup.20261105-183321`. Production checkout HEAD `61d8271480eaf48b0a6442b62b1b0bb9a032df34`, 613 commits behind. Docker socket access denied to ubuntu; 8000 timed out, 8001 reset, 8010/8006/18011 returned HTTP 200. No deployment/container identity/notification flags could be verified. Preserve files; no pull/reset/clean/restart/sudo.
+- **Changes in this turn:** documentation/plan only. No application code, tests, source config, DB, scheduler, notification, credentials, container or deployment changes. No tests run.
+- **Next action:** PR #75 is merged and post-merge V2 CI #1495 passed 485 tests. PR #74 was synchronized to current base `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`; exact-base CI #1497 passed 485 tests (65.347s), and PR #74 is ready for owner review/merge. After it is merged, start Phase 1 from a fresh safe workspace: idempotent CSV candidate import only (no polling/activation). Keep production untouched. Later owner input is limited to ambiguous company identity and pilot/notification approval.
+
+**Last updated: 2026-11-17 (PR #75 merged; post-merge V2 CI #1495 passed 485 tests; PR #74 awaiting refreshed CI)**
+
+
+## Follow-up — PR #75 merged, V2 base green (2026-11-17)
+
+- Owner merged PR #75 at `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`; `v2-live-radar` now points to this merge commit.
+- Post-merge V2 CI run [#1495](https://github.com/AvinashBhalla/job-beeper/actions/runs/44061666892) passed: 32 focused tests and 485 full-suite tests (64.834s), with compilation and dashboard JS syntax green.
+- The merged change is isolated to notification test fixtures/time. No production notification logic changed.
+- PR #74 remains draft and its previous failures used the old base. Refresh its CI on the new base before implementing Company Watch Phase 1.
+- Next implementation increment remains strict idempotent import of the Company Watch CSV into the V2 employer/ATS review lifecycle, no polling/activation, in a fresh safe workspace. Do not touch the dirty VM dev checkout or production.
+<!-- historical metadata below retained -->
+**Historical last updated: 2026-11-08 (candidate integration branch; final read-only browser regression recorded; acceptance remains blocked by evidence-only gates; not deployed)**
 **Release integration branch:** `v2-live-radar`
 
 **Active candidate branch:** `integration/pr46-v2-rebase-20261108`

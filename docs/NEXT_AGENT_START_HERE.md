@@ -1,4 +1,23 @@
-# CURRENT HANDOVER — 2026-11-09 repository cleanup
+# CURRENT HANDOVER — 2026-11-17 Company Watch → V2 integration
+
+
+## CURRENT HANDOVER — 2026-11-17 (READ THIS BEFORE OLDER SECTIONS)
+
+**Primary handover:** [Company Watch → V2 integration plan](COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md).  
+**Target code branch:** `v2-live-radar`, current remote HEAD `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5` (PR #75 merged).  
+**Planning branch:** `docs/company-watch-v2-integration-handover-20261117`.
+
+The standalone Company Watch is a discovery prototype on `main`, not the integration pipeline. PR #72 is merged into `main`; PR #73 is still draft/open on `main`. The mature V2 branch already has collectors, ATS board registry and candidate staging, explicit verify/activate/deactivate, persistent per-board scheduler, SQLite/canonical dedupe, per-user preferences/evaluations and per-user Telegram dispatch. Reconcile Company Watch's 100-row CSV as review-only candidates; do not copy its duplicate matcher, URL state or Telegram sender. The CSV contains 92 rows enabled in Company Watch and 8 manual-review rows; 72 of the 92 are generic careers pages, not verified V2 ATS boards.
+
+**Immediate next task:** on a fresh safe checkout of `v2-live-radar`, build Phase 1 only: strict idempotent manifest import into the existing employer/ATS candidate lifecycle, with no polling or activation. Then handle JD completeness/hash/update detection and shadow evaluation in separate phases. See the detailed handover for tests and acceptance criteria.
+
+**CI status before Phase 1:** PR #75 is merged into `v2-live-radar` at `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`. Post-merge V2 CI [#1495](https://github.com/AvinashBhalla/job-beeper/actions/runs/44061666892) passed the full 485-test suite (64.834s). PR #74 was synchronized on top of that base, and exact-base V2 CI [#1497](https://github.com/AvinashBhalla/job-beeper/actions/runs/44062624606) passed compile, dashboard JS, focused tests (32/32), and full suite (485 tests, 65.347s). PR #74 is ready for owner review/merge, still draft. After it merges, start Phase 1 from a fresh safe checkout: strict idempotent import of the Company Watch manifest into review-only V2 candidate records; no polling or board activation. No deployment, live scan or Telegram action is authorized by these PRs.
+
+**Operational safety:** read-only Termalin check on 2026-11-17 found `/home/ubuntu/job-beeper-dev` dirty and 147 commits behind, with local `v2/config.json` modified and `.env.save`, `.venv/`, `v2/config.json.backup.20261105-183321` untracked. Production checkout is 613 commits behind. Docker access is denied for ubuntu; ports 8000 timed out, 8001 reset, 8010/8006/18011 returned HTTP 200. Do not pull, reset, clean, overwrite configs, restart containers, change Docker permissions, use sudo or modify production. No runtime state was changed. Older entries below are historical evidence and may refer to previous images/PR states.
+
+---
+
+# HISTORICAL HANDOVER — 2026-11-09 repository cleanup
 
 **Read first:** [Repository cleanup and next-agent handover](REPOSITORY_CLEANUP_2026-11-09.md). It records the current seven open PRs, 16 remote branches, archived/deleted stale docs branches, the closed unmerged PR #35, current dev/QA image and live-feed evidence, owner QA steps, and the ordered next tasks.
 
