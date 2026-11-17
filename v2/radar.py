@@ -82,6 +82,7 @@ WORKDAY_MAX_429_COOLDOWN_SECONDS = 3600
 SMARTRECRUITERS_PAGE_SIZE = 100
 SMARTRECRUITERS_MAX_PAGES_PER_BOARD = 3
 SMARTRECRUITERS_MAX_DETAILS_PER_BOARD = 20
+SMARTRECRUITERS_DETAIL_REFRESH_HOURS = 168
 SMARTRECRUITERS_MAX_BOARDS = 50
 SMARTRECRUITERS_DETAIL_DELAY_SECONDS = 0.1
 WORKABLE_MAX_JOBS_PER_BOARD = 500
@@ -5838,8 +5839,67 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _smartrecruiters_existing_detail_cache(
+    company_identifier: str,
+) -> dict[str, dict[str, str]]:
+    """Reuse recent stored detail lookups instead of re-fetching them every poll.
+
+    Listing pages are still fetched on every scheduled poll. A detail response is
+    reused for seven days after a successful lookup, even when the provider
+    returns no description; failed or expired lookups remain eligible for the
+    per-board detail request budget.
+    """
+    db_path = Path(DB_PATH)
+    if not db_path.exists():
+        return {}
+
+    prefix = f"smartrecruiters-{company_identifier}-"
+    try:
+        with db_lock, connect_sqlite(DB_PATH) as conn:
+            columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
+            }
+            required = {
+                "source", "source_job_id", "source_details_json",
+                "description", "url", "first_seen_at",
+            }
+            if not required.issubset(columns):
+                return {}
+            rows = conn.execute(
+                """SELECT source_job_id, source_details_json, description,
+                          url, first_seen_at
+                   FROM jobs
+                   WHERE source=? AND substr(source_job_id, 1, ?)=?""",
+                ("smartrecruiters", len(prefix), prefix),
+            ).fetchall()
+    except sqlite3.Error:
+        # A new/older test DB must not make a public collector fail. In that
+        # case retain the old behavior and fetch details under the normal cap.
+        return {}
+
+    current = now()
+    cache: dict[str, dict[str, str]] = {}
+    refresh_window = dt.timedelta(hours=SMARTRECRUITERS_DETAIL_REFRESH_HOURS)
+    for source_job_id, raw_details, description, url, first_seen_at in rows:
+        try:
+            details = json.loads(raw_details or "{}")
+        except (TypeError, json.JSONDecodeError):
+            details = {}
+        if not isinstance(details, dict) or not details.get("details_fetched"):
+            continue
+        fetched_at = parse_relative(details.get("details_fetched_at") or first_seen_at)
+        if not fetched_at or current - fetched_at > refresh_window:
+            continue
+        cache[str(source_job_id)] = {
+            "description": str(description or ""),
+            "url": str(url or ""),
+            "details_fetched_at": iso(fetched_at) or "",
+        }
+    return cache
+
+
 def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
-    """Collect active PUBLIC SmartRecruiters postings with bounded detail lookups."""
+    """Collect public SmartRecruiters listings and cache recent detail lookups."""
     boards = config.get("smartrecruiters_boards", [])
     if not isinstance(boards, list) or not boards:
         raise RuntimeError("SmartRecruiters is enabled but no smartrecruiters_boards are configured")
@@ -5847,6 +5907,8 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     seen_ids: set[str] = set()
     successful_boards = 0
     failures: list[str] = []
+    total_detail_attempts = 0
+    total_detail_cache_hits = 0
     headers = {**UA, "Accept": "application/json"}
     for board in boards:
         identifier = str(board.get("company_identifier") or board.get("identifier") or "").strip() if isinstance(board, dict) else ""
@@ -5859,8 +5921,10 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         board_jobs: list[dict[str, Any]] = []
         pages_succeeded = 0
         detail_attempts = 0
+        detail_cache_hits = 0
         total_found = None
         rate_limited = False
+        detail_cache = _smartrecruiters_existing_detail_cache(identifier)
         for page_number in range(SMARTRECRUITERS_MAX_PAGES_PER_BOARD):
             offset = page_number * SMARTRECRUITERS_PAGE_SIZE
             try:
@@ -5914,8 +5978,13 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 published_at = parse_relative(published_raw) if isinstance(published_raw, str) else None
                 precision = "minute" if published_at and re.search(r"\d{2}:\d{2}", str(published_raw)) else "date" if published_at else "unknown"
 
+                source_details_id = source_id
+                cached = detail_cache.get(source_details_id)
+                if cached is not None:
+                    detail_cache_hits += 1
                 detail: dict[str, Any] = {}
-                if detail_attempts < SMARTRECRUITERS_MAX_DETAILS_PER_BOARD:
+                details_fetched_at = cached.get("details_fetched_at") if cached else None
+                if cached is None and detail_attempts < SMARTRECRUITERS_MAX_DETAILS_PER_BOARD:
                     try:
                         if detail_attempts:
                             time.sleep(SMARTRECRUITERS_DETAIL_DELAY_SECONDS)
@@ -5928,6 +5997,7 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                         detail_payload = detail_response.json()
                         if isinstance(detail_payload, dict):
                             detail = detail_payload
+                            details_fetched_at = iso(now())
                     except Exception as exc:
                         failed_response = getattr(exc, "response", None)
                         if getattr(failed_response, "status_code", None) == 429:
@@ -5944,12 +6014,19 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                         text_value = value.get("text") if isinstance(value, dict) else None
                         if isinstance(text_value, str) and text_value.strip():
                             description_parts.append(BeautifulSoup(html_lib.unescape(text_value), "html.parser").get_text(" ", strip=True))
-                description = " ".join(part for part in description_parts if part)
+                description = (
+                    " ".join(part for part in description_parts if part)
+                    or (cached.get("description", "") if cached else "")
+                )
                 department = (item.get("department") or {}).get("label") if isinstance(item.get("department"), dict) else None
                 function = (item.get("function") or {}).get("label") if isinstance(item.get("function"), dict) else None
                 employment_type = (item.get("typeOfEmployment") or {}).get("label") if isinstance(item.get("typeOfEmployment"), dict) else None
                 experience_level = (item.get("experienceLevel") or {}).get("label") if isinstance(item.get("experienceLevel"), dict) else None
-                posting_url = detail.get("postingUrl") or item.get("postingUrl") or detail.get("applyUrl") or item.get("applyUrl")
+                posting_url = (
+                    detail.get("postingUrl") or item.get("postingUrl")
+                    or detail.get("applyUrl") or item.get("applyUrl")
+                    or (cached.get("url") if cached else None)
+                )
                 if not isinstance(posting_url, str) or not posting_url.startswith("https://"):
                     posting_url = f"https://jobs.smartrecruiters.com/{identifier}/{raw_id}"
                 details = {
@@ -5959,7 +6036,8 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     "job_ad_id": item.get("jobAdId"), "ref_number": item.get("refNumber"),
                     "department": department, "function": function,
                     "employment_type": employment_type, "experience_level": experience_level,
-                    "details_fetched": bool(detail),
+                    "details_fetched": bool(detail) or cached is not None,
+                    "details_fetched_at": details_fetched_at,
                 }
                 board_jobs.append(normalize_job(
                     "smartrecruiters", source_id,
@@ -5974,6 +6052,8 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 break
             if total_found is not None and offset + len(content) >= int(total_found):
                 break
+        total_detail_attempts += detail_attempts
+        total_detail_cache_hits += detail_cache_hits
         if pages_succeeded:
             successful_boards += 1
             _record_source_board("smartrecruiters", True)
@@ -5986,7 +6066,12 @@ def smartrecruiters_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
         raise RuntimeError("All configured SmartRecruiters boards failed: " + "; ".join(failures))
     if failures:
         log.warning("smartrecruiters: partial failures=%s successful_boards=%s", len(failures), successful_boards)
-    log.info("smartrecruiters: boards=%s successful=%s failed=%s jobs=%s", len(boards), successful_boards, len(failures), len(jobs))
+    log.info(
+        "smartrecruiters: boards=%s successful=%s failed=%s jobs=%s "
+        "detail_attempts=%s detail_cache_hits=%s",
+        len(boards), successful_boards, len(failures), len(jobs),
+        total_detail_attempts, total_detail_cache_hits,
+    )
     return jobs
 
 

@@ -63,7 +63,10 @@ The runtime config also enables LinkedIn and Naukri as global fetchers. Instahyr
 
 ### P1 — ATS collector request efficiency and completeness
 
-- SmartRecruiters: profile why 11,592 requests were attempted across 504 runs. Keep the existing 251 new jobs while reducing avoidable pagination/detail requests.
+- SmartRecruiters baseline: 508 runs / 11,684 requests in the latest 24-hour query; every run made exactly 23 calls (3 listing pages + 20 detail lookups), 0 failed pages / 0 HTTP 429, 300 postings seen per run and 251 new rows. The repeated 20 detail calls are the optimisation target; keep the 3 listing pages on every poll.
+- A focused implementation is in branch fix/smartrecruiters-detail-cache-20261117: reuse stored successful detail responses (description, URL and fetch timestamp) for 7 days; refresh expired/missing details under the existing 20-detail-per-board cap; log detail_attempts and detail_cache_hits per run. This is not deployed. The first 5 focused tests passed, including normal mapping/429 tests, cache hit, seven-day refresh and a 25-posting request-budget test (20 cache hits, 5 detail calls). Full V2 regression is currently running.
+- Do not claim request savings until exact-head CI, a QA image and post-deployment source telemetry confirm lower detail-call counts while descriptions and listing freshness remain correct. Brand-new / uncached postings can still consume the existing detail budget.
+- Keep the existing 251 new jobs while reducing avoidable pagination/detail requests.
 - Greenhouse/Ashby: verify active board identity, result caps, board-level failures and publication timestamps. Preserve the successful 3/3 and 2/2 board evidence from QA.
 - Workable/Keka/Darwinbox: keep their stable paths; investigate isolated failures and ensure per-board metrics show partial failures rather than marking a provider fully successful.
 - Do not add boards merely to increase counts. Board identity must be validated; activation stays explicit and allowlisted.
@@ -156,3 +159,19 @@ The candidate V2 image was then used to initialize a disposable copy of that sna
 - Temporary cloned DB/config were removed after the check. The production DB was not migrated and its container was not restarted.
 
 This proves schema/config-sync compatibility against a copy of the current production DB. It does not authorize production rollout or scheduled polling. Production rollout still requires reviewed code/CI, final candidate QA, an additive migration review, this verified backup and explicit owner approval.
+
+
+## 17 November 2026 — SmartRecruiters detail-cache optimization in review
+
+Production telemetry showed a fixed 23 requests per SmartRecruiters run: 3 listing-page calls plus 20 detail calls. The collector was making those detail calls on every poll, including for existing postings whose description and URL were already stored.
+
+A separate implementation branch fix/smartrecruiters-detail-cache-20261117 now:
+- reads previously fetched details from this board's existing jobs rows;
+- reuses the stored description/URL for up to 7 days after a successful detail lookup;
+- refreshes missing, failed or expired detail lookups under the existing per-board cap of 20;
+- continues fetching listing pages on every poll so the new-job discovery path is unchanged;
+- logs per-run detail_attempts and detail_cache_hits so a release can be measured.
+
+Five focused SmartRecruiters tests pass, including existing mapping and Retry-After behavior, cached-detail reuse, 7-day refresh, and the 20-call detail budget. The 25-listing test fixture had 20 warm cached detail entries and verified exactly 20 cache hits plus 5 detail calls (one listing request + five detail requests total).
+
+The full V2 suite is still running on this branch. No production or QA source configuration was changed, no live SmartRecruiters collector was invoked, and no production deployment has occurred. Do not merge/deploy until full local regression and exact-head GitHub CI pass, followed by QA image verification.

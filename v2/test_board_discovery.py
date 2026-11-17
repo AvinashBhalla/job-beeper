@@ -557,6 +557,204 @@ class PublicATSCollectorTests(unittest.TestCase):
         self.assertEqual(calls[0][2]["params"]["limit"], 100)
         self.assertEqual(len(calls), 3)
 
+    def test_smartrecruiters_reuses_recent_details_without_repeat_lookup(self):
+        listing = {
+            "totalFound": 1,
+            "content": [{
+                "id": "REQ-CACHED", "name": "Cached Python Engineer",
+                "releasedDate": "2026-11-17T10:00:00.000Z",
+                "location": {"city": "Bengaluru", "country": "India"},
+                "company": {"name": "Acme"},
+            }],
+        }
+        calls = []
+        def tracked(source, endpoint, **kwargs):
+            calls.append(endpoint)
+            if endpoint.endswith("/postings"):
+                return self.Response(listing)
+            raise AssertionError("A fresh cached detail must not be requested again")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "jobs.sqlite3"
+            fetched_at = radar.iso(radar.now())
+            import json as json_lib
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""CREATE TABLE jobs (
+                    source TEXT NOT NULL,
+                    source_job_id TEXT NOT NULL,
+                    source_details_json TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    first_seen_at TEXT NOT NULL
+                )""")
+                conn.execute(
+                    """INSERT INTO jobs
+                       (source,source_job_id,source_details_json,description,url,first_seen_at)
+                       VALUES (?,?,?,?,?,?)""",
+                    (
+                        "smartrecruiters",
+                        "smartrecruiters-Acme-REQ-CACHED",
+                        json_lib.dumps({
+                            "details_fetched": True,
+                            "details_fetched_at": fetched_at,
+                        }),
+                        "Previously fetched full job description.",
+                        "https://jobs.smartrecruiters.com/Acme/REQ-CACHED",
+                        fetched_at,
+                    ),
+                )
+            with patch.object(radar, "DB_PATH", db_path), patch.object(
+                radar, "_tracked_source_get", side_effect=tracked
+            ):
+                jobs = radar.smartrecruiters_collect({
+                    "smartrecruiters_boards": [
+                        {"company_identifier": "Acme", "company": "Acme", "registry_id": 27}
+                    ],
+                })
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["description"], "Previously fetched full job description.")
+        self.assertEqual(jobs[0]["url"], "https://jobs.smartrecruiters.com/Acme/REQ-CACHED")
+        self.assertTrue(jobs[0]["source_details"]["details_fetched"])
+        self.assertEqual(jobs[0]["source_details"]["details_fetched_at"], fetched_at)
+
+    def test_smartrecruiters_refreshes_details_after_seven_day_cache_expiry(self):
+        listing = {
+            "totalFound": 1,
+            "content": [{
+                "id": "REQ-EXPIRED", "name": "Expired Python Engineer",
+                "releasedDate": "2026-11-17T10:00:00.000Z",
+                "location": {"city": "Bengaluru", "country": "India"},
+                "company": {"name": "Acme"},
+            }],
+        }
+        detail = {
+            "jobAd": {"sections": {
+                "jobDescription": {"text": "<p>Fresh full description.</p>"}
+            }},
+            "postingUrl": "https://jobs.smartrecruiters.com/Acme/REQ-EXPIRED",
+        }
+        calls = []
+        def tracked(source, endpoint, **kwargs):
+            calls.append(endpoint)
+            return self.Response(listing if endpoint.endswith("/postings") else detail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "jobs.sqlite3"
+            expired_at = radar.iso(radar.now() - radar.dt.timedelta(days=8))
+            import json as json_lib
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""CREATE TABLE jobs (
+                    source TEXT NOT NULL,
+                    source_job_id TEXT NOT NULL,
+                    source_details_json TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    first_seen_at TEXT NOT NULL
+                )""")
+                conn.execute(
+                    """INSERT INTO jobs
+                       (source,source_job_id,source_details_json,description,url,first_seen_at)
+                       VALUES (?,?,?,?,?,?)""",
+                    (
+                        "smartrecruiters",
+                        "smartrecruiters-Acme-REQ-EXPIRED",
+                        json_lib.dumps({
+                            "details_fetched": True,
+                            "details_fetched_at": expired_at,
+                        }),
+                        "Old full job description.",
+                        "https://jobs.smartrecruiters.com/Acme/REQ-EXPIRED",
+                        expired_at,
+                    ),
+                )
+            with patch.object(radar, "DB_PATH", db_path), patch.object(
+                radar, "_tracked_source_get", side_effect=tracked
+            ):
+                jobs = radar.smartrecruiters_collect({
+                    "smartrecruiters_boards": [
+                        {"company_identifier": "Acme", "company": "Acme", "registry_id": 27}
+                    ],
+                })
+
+        self.assertEqual(len(calls), 2)
+        self.assertIn("Fresh full description", jobs[0]["description"])
+        self.assertTrue(jobs[0]["source_details"]["details_fetched"])
+        fetched_at = radar.parse_relative(jobs[0]["source_details"]["details_fetched_at"])
+        self.assertIsNotNone(fetched_at)
+        self.assertLess((radar.now() - fetched_at).total_seconds(), 5)
+
+    def test_smartrecruiters_detail_cache_preserves_per_board_budget(self):
+        listing = {
+            "totalFound": 25,
+            "content": [
+                {
+                    "id": f"REQ-{index:03d}",
+                    "name": f"Python Engineer {index}",
+                    "releasedDate": "2026-11-17T10:00:00.000Z",
+                    "location": {"city": "Bengaluru", "country": "India"},
+                    "company": {"name": "Acme"},
+                }
+                for index in range(25)
+            ],
+        }
+        calls = []
+        def tracked(source, endpoint, **kwargs):
+            calls.append(endpoint)
+            if endpoint.endswith("/postings"):
+                return self.Response(listing)
+            return self.Response({
+                "jobAd": {"sections": {
+                    "jobDescription": {"text": "<p>New detail text.</p>"}
+                }}
+            })
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "jobs.sqlite3"
+            fetched_at = radar.iso(radar.now())
+            import json as json_lib
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""CREATE TABLE jobs (
+                    source TEXT NOT NULL,
+                    source_job_id TEXT NOT NULL,
+                    source_details_json TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    first_seen_at TEXT NOT NULL
+                )""")
+                for index in range(20):
+                    conn.execute(
+                        """INSERT INTO jobs
+                           (source,source_job_id,source_details_json,description,url,first_seen_at)
+                           VALUES (?,?,?,?,?,?)""",
+                        (
+                            "smartrecruiters",
+                            f"smartrecruiters-Acme-REQ-{index:03d}",
+                            json_lib.dumps({
+                                "details_fetched": True,
+                                "details_fetched_at": fetched_at,
+                            }),
+                            f"Cached description {index}.",
+                            f"https://jobs.smartrecruiters.com/Acme/REQ-{index:03d}",
+                            fetched_at,
+                        ),
+                    )
+            with patch.object(radar, "DB_PATH", db_path), patch.object(
+                radar, "_tracked_source_get", side_effect=tracked
+            ), self.assertLogs("job-radar", level="INFO") as captured:
+                jobs = radar.smartrecruiters_collect({
+                    "smartrecruiters_boards": [
+                        {"company_identifier": "Acme", "company": "Acme", "registry_id": 27}
+                    ],
+                })
+
+        self.assertEqual(len(jobs), 25)
+        self.assertEqual(len(calls), 1 + 5)
+        self.assertEqual(sum("detail_attempts=5 detail_cache_hits=20" in item for item in captured.output), 1)
+        self.assertEqual(jobs[0]["description"], "Cached description 0.")
+        self.assertIn("New detail text.", jobs[20]["description"])
+
     def test_smartrecruiters_429_honours_retry_after(self):
         limited = self.Response({}, 429, {"Retry-After": "90"})
         with patch.object(radar, "source_state", {}), patch.object(
