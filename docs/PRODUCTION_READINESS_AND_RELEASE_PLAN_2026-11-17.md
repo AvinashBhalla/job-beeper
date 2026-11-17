@@ -1,4 +1,14 @@
 # JobBeeper — production readiness, delivery plan and next-agent handover
+
+## Latest execution update — 18 November 2026, release qualification
+
+The current execution checkpoint is `docs/OVERNIGHT_HANDOVER_2026-11-18.md`; the active reliability plan is `docs/FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md`. PR #80 merged at application head `69a204a7349b67d6439e50e27f673834be4d4971`; exact-head CI #1522 passed and the full local V2 suite passed 507/507. Documentation PR #81 merged as `472c2eef80bf34e0c87e9b1e65967181a7e698f5`.
+
+A fresh pre-release backup exists at `/var/backups/job-radar-daily/production-pre-release-20261118.sqlite3` (135,303,168 bytes, mode 0600, SQLite integrity ok; 27,534 jobs, 2 users, 10 ATS registry boards, 51,920 source runs; SHA-256 `55b7402ad1a1fb3ebe871afee0c03008c1f7b5ecc25caf8689b399ff973b3e1c`). Candidate image `job-radar-v2-qa:472c2ee` (image ID `sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c`) is running isolated on port 8013 with a separate copy of that backup, all source flags disabled and notifications disabled. Candidate startup preserved core row counts and passed SQLite integrity; schema changes were additive only. Candidate scheduler tests passed 15/15 and the actual two-poll Coinbase Greenhouse scheduler smoke passed with 259 first-poll inserts, 0 second-poll inserts and no duplicate source IDs.
+
+**Production is still unchanged** on `job-radar-prod-canary:6e5becb`, HTTP 200. Do not claim the new scheduler, Workday cooldown, SmartRecruiters cache or V2 dashboard changes are live until the controlled promotion is completed and post-deployment telemetry is observed. The owner has already authorized production promotion once all gates pass; do not ask for that approval again.
+
+---
 ## Latest execution update — 17 November 2026, 18:30 UTC
 
 This is the current source of truth. The earlier 17:18 status and 15:15 rollout table are superseded by docs/FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md.
