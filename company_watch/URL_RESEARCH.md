@@ -37,6 +37,6 @@ The following rows remain out of automatic scanning until the intended entity or
 
 ## Additional verification after initial build
 
-- The Standard: the Workday search path was verified from an employer job page at https://standard.wd1.myworkdayjobs.com/en-US/search/job/Portland-OR/Graphic-Designer_REQ006681. The root search page is the populated destination; no Workday adapter is enabled here.
+- The Standard: the Workday search path was verified from an employer job page at https://standard.wd1.myworkdayjobs.com/en-US/search/job/Portland-OR/Graphic-Designer_REQ006681. The registry now points to the root search page and uses the Workday adapter for dry-run collection.
 - ARKO Corp: an ARKO India career microsite is available at https://talent500.com/arko/. It is retained for manual validation and not automatically scanned.
 - Equiti Group: JobBeeper's own collected result identifies the source as SuccessFactors, but this pass did not recover the public employer board URL. The row now distinguishes confirmed employer identity from an unverified board destination.
