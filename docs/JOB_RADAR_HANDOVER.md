@@ -5,6 +5,7 @@
 **Detailed plan:** docs/COMPANY_WATCH_V2_INTEGRATION_HANDOVER_2026-11-17.md.
 **Base:** v2-live-radar c3cffebbaa847337ebd442f873d2af54ca279097 (PR #74 merged).
 **Feature branch:** feat/company-watch-manifest-import-20261117.
+**Draft PR #76:** https://github.com/AvinashBhalla/job-beeper/pull/76. Implementation head: 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c. Exact implementation-head GitHub CI #1500 passed all steps, including 495 tests in 61.641s.
 
 - Source: main@29cbb17190b26829d49e1458137d75f2e8f286aa:company_watch/companies.csv; SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd.
 - Manifest: 100 rows, 90 enabled / 10 disabled (supersedes earlier 92/8). 72 are generic careers pages. Strict parser stages 19 enabled, mode-matching ATS candidates (10 Greenhouse, 6 Lever, 3 SmartRecruiters) and preserves 81 records for manual review. Candidate confidence remains low pending live and identity review.
@@ -13,7 +14,7 @@
 - Full V2 suite: **495 passed, 0 failed, exit 0 in 751.869s** (/tmp/company-watch-phase1-final-tests.log). Focused Phase 1 tests: **10 passed**. Python compileall, Node v20 dashboard syntax, and git diff check passed. CI compile step was expanded to include the new parser and test modules.
 - Isolated temporary DB verified 100 ledger rows, 19 candidate rows, zero employer/board/scheduler rows, repeat-import idempotency, preservation of rejected status and existing discovery provenance. Dry-run wrote nothing; non-admin API access returned 403; manifest hash mismatch returned 409.
 - Work is in fresh /tmp/job-beeper-phase1-20261117; existing dirty dev checkout and production checkout were not touched. No polling, endpoint probing, activation, Telegram, deployment or runtime config/DB changes.
-- Next: final diff review, commit/push branch, create PR against v2-live-radar and verify exact-head CI. Owner review is the merge gate. No Phase 2 verification/activation work in this increment.
+- Draft PR #76 is open against v2-live-radar (https://github.com/AvinashBhalla/job-beeper/pull/76). GitHub CI #1500 passed the 495-test suite on implementation head 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c. Check the latest PR head/CI after the documentation-only update before marking ready for owner review. Owner review is the merge gate. No Phase 2 verification/activation work in this increment.
 
 ---
 

@@ -4,6 +4,8 @@
 
 **Merged base:** v2-live-radar at c3cffebbaa847337ebd442f873d2af54ca279097 (PR #74 merged).
 **Feature branch:** feat/company-watch-manifest-import-20261117.
+**Draft PR:** #76 — https://github.com/AvinashBhalla/job-beeper/pull/76.
+**Implementation head:** 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c (implementation commit 200f34b8b04ee7dd14dfe1e61333739f860ba17c plus CI workflow commit 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c).
 **Source manifest:** main@29cbb17190b26829d49e1458137d75f2e8f286aa, company_watch/companies.csv.
 **Manifest SHA-256:** 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd.
 
@@ -12,7 +14,7 @@
 - 72 rows are generic careers_page records; 10 rows have scan_mode=manual_review.
 - Strict local validation classifies **19 supported direct ATS rows as candidate-stageable** and **81 rows for manual review**.
 - The 19 direct ATS candidates are 10 Greenhouse, 6 Lever and 3 SmartRecruiters. Workday and Workable rows in this manifest are explicitly marked manual review/disabled and remain held; they are not promoted based on URL shape alone.
-- Staged company names: Mistral AI, Anthropic, Figma, Skild AI, Scale AI, SoundHound AI, Cresta, Toku, Canva, Duolingo, GitLab, Abercrombie & Fitch, Axiado, Cyderes (listed as Cydeces), Amtech Software, Warner Music, Kobie, SpaceX and Mythic AI. Candidate confidence remains low because no live endpoint probe or employer-domain verification was performed.
+- Staged company names: Mistral AI, Anthropic, Figma, Skild AI, Scale AI, SoundHound AI, Cresta, Toku, Canva, Duolingo, GitLab, Abercrombie & Fitch, Axiado, Cyderes (listed as Cydeces), Amtech Software, Warner Music, Kobie, SpaceX and Mythic AI. 15 of the 19 manifest rows are labelled provided_url_needs_live_validation and 4 are labelled verified_ats_board. Every imported V2 candidate still starts low-confidence and unlinked; this phase does not perform live URL verification or independently assert employer ownership.
 - Company Watch's enabled flag is preserved as source metadata and never becomes a V2 source enablement flag.
 - Manual-review reason flags (overlapping, not additive): 72 generic-careers-page records, 10 manifest-disabled records, 10 identity-ambiguous records, 10 explicit manual_review scan modes, and 2 board_type/scan_mode mismatches. No record is silently discarded; the ledger retains all original evidence.
 
@@ -26,7 +28,7 @@
 - .github/workflows/v2-ci.yml now compiles the new parser and regression-test modules in CI.
 
 ### Safety and test evidence
-- Full V2 suite: **495 tests passed, 0 failed**, 751.869 seconds, exit code 0. Command: PYTHONUNBUFFERED=1 PYTHONPATH=. /tmp/job-beeper-phase1-venv/bin/python -m unittest discover -s v2 -p 'test_*.py' -v. Log: /tmp/company-watch-phase1-final-tests.log.
+- Full V2 suite: **495 tests passed, 0 failed**, 751.869 seconds locally, exit code 0. GitHub PR CI run #1500 also passed all steps and **495 tests in 61.641 seconds** on implementation head 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c. Command: PYTHONUNBUFFERED=1 PYTHONPATH=. /tmp/job-beeper-phase1-venv/bin/python -m unittest discover -s v2 -p 'test_*.py' -v. Log: /tmp/company-watch-phase1-final-tests.log.
 - Focused Phase 1 tests: **10 passed** (9 manifest/parser/UI tests plus 1 admin API test).
 - Python compileall passed; dashboard JS syntax passed under Node v20.20.2 (npx --yes node@20 --check dashboard/auth.js and dashboard/app.js); git diff --check passed.
 - Temporary SQLite DB received 100 manifest audit rows and 19 discovered ATS candidates. It created **zero** employer rows, board-registry rows, scheduler rows, verified boards, active boards or notifications.
@@ -35,7 +37,7 @@
 - Work is in a fresh /tmp/job-beeper-phase1-20261117 clone. The dirty /home/ubuntu/job-beeper-dev checkout and production checkout remain untouched. No deployment, polling, ATS endpoint probing, board activation, scheduler changes or Telegram sends occurred.
 
 ### Phase 1 acceptance and next action
-Local implementation and complete V2 suite are green. Finish final diff review, commit and push the feature branch, open a PR targeting v2-live-radar, then verify exact-head GitHub CI before requesting owner review. Do not merge without the owner's review. After Phase 1 is merged, pause for separate design/review of Phase 2; do not poll or activate any board in this increment.
+Implementation is committed and pushed. Draft PR #76 is open against v2-live-radar: https://github.com/AvinashBhalla/job-beeper/pull/76. GitHub CI run #1500 passed on implementation head 640c23b72ad2dedb12ddad467df2bdcbe96b0c0c. A documentation-only handover follow-up is being added; check the latest PR head and latest CI run before marking ready for owner review. Do not merge without the owner's review. After Phase 1 is merged, pause for separate design/review of Phase 2; do not poll or activate any board in this increment.
 
 **Phase boundary remains strict:** no polling, no board activation, no Telegram notifications, no production deployment. The isolated temporary SQLite DB is test evidence only, not the dev or production DB.
 

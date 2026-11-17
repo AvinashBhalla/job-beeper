@@ -4,13 +4,13 @@
 **Base:** v2-live-radar at c3cffebbaa847337ebd442f873d2af54ca279097 (PR #74 merged).
 **Active branch:** feat/company-watch-manifest-import-20261117.
 
-Phase 1 is implemented in a fresh isolated checkout. Manifest: 100 rows / 90 enabled / 10 disabled, SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd. Parser stages 19 supported direct ATS candidates and retains 81 records for manual review. Earlier 92/8 figures are stale and superseded. Candidate confidence stays low pending separate live and identity review.
+Phase 1 is implemented in a fresh isolated checkout. Manifest: 100 rows / 90 enabled / 10 disabled, SHA-256 706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd. Parser stages 19 supported direct ATS candidates and retains 81 records for manual review. Earlier 92/8 figures are stale and superseded. 15 of the 19 manifest ATS rows are labelled provided_url_needs_live_validation and 4 verified_ats_board; all V2 candidates still start low-confidence and unlinked. Phase 1 performs no live URL check or independent employer-ownership assertion.
 
 Files: v2/company_watch_manifest.py, v2/data/company_watch_companies_2026-11-17.csv, v2/radar.py, dashboard/index.html, dashboard/app.js, v2/test_company_watch_manifest.py, v2/test_global_discovery_hirebase.py and .github/workflows/v2-ci.yml. Admin Source Health page has a dry-run/confirm import flow, manual-review table and candidate identity context. New admin endpoints: POST /api/discovery/company-watch/import (dry-run: {"dry_run":true}) and GET /api/discovery/company-watch/manifest.
 
-**Validation:** full V2 suite 495 passed, 0 failed in 751.869s (exit 0); focused Phase 1 tests 10 passed; Python compileall, Node v20 dashboard JS syntax and git diff check passed. Exact-head GitHub CI is pending until push/PR. No deployment, polling, board activation, scheduler changes or Telegram notifications occurred. Temporary SQLite DBs only; existing dirty dev checkout and production checkout were not touched.
+**Validation:** full V2 suite 495 passed, 0 failed in 751.869s (exit 0); focused Phase 1 tests 10 passed; Python compileall, Node v20 dashboard JS syntax and git diff check passed. Draft PR #76 is open and implementation-head CI #1500 passed all steps, including 495 tests; verify the latest head/run after documentation-only updates before marking ready. No deployment, polling, board activation, scheduler changes or Telegram notifications occurred. Temporary SQLite DBs only; existing dirty dev checkout and production checkout were not touched.
 
-**Next action:** final diff review, commit and push feature branch, open PR targeting v2-live-radar, then verify exact-head GitHub CI and hand it to owner for review. Do not merge. Keep scope frozen: no polling, no board activation, no Telegram notifications and no production deployment. Do not touch /home/ubuntu/job-beeper-dev or /home/ubuntu/job-beeper.
+**Next action:** check PR #76's latest head and CI after the documentation-only handover commit. When all latest-head checks are green, mark PR #76 ready for owner review. Do not merge. Keep scope frozen: no polling, no board activation, no Telegram notifications and no production deployment. Do not touch /home/ubuntu/job-beeper-dev or /home/ubuntu/job-beeper.
 
 ---
 
