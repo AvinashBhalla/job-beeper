@@ -1,0 +1,1 @@
+"""Isolated Company Watcher package."""
