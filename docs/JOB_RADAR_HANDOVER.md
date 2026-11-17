@@ -1,22 +1,22 @@
 ## 2026-11-17 — Phase 1 merged; Phase 2 readiness is next
 
-## CURRENT RELEASE STATE — 2026-11-17 17:06 UTC
+## CURRENT RELEASE STATE — 2026-11-17 17:18 UTC
 
-**Canonical handover:** [Production readiness, delivery plan and next-agent handover](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
+**Canonical handover:** [Production readiness, delivery plan and next-agent checklist](PRODUCTION_READINESS_AND_RELEASE_PLAN_2026-11-17.md).
 
-- Existing V2 pipeline is the priority; Company Watch Phase 2 remains paused.
-- Production is unchanged on job-radar-prod-canary:6e5becb, port 8000, health 200. Current V2 QA from PR #77 application source cc2087e runs separately on port 8013.
-- Cleanup is complete: legacy QA runtimes and unused image tags removed after archiving old QA databases/configuration; only production and current QA containers remain. Production Docker volume is preserved.
-- The daily production snapshot job has been repaired and a production DB snapshot passed SQLite integrity. Offsite encrypted backup/restore drill remains outstanding.
-- Production contains admin only; no member account or linked member Telegram. Google sign-in is disabled and the bot webhook/per-user settings are not configured. Owner member email and Telegram bot access are required for the real canary.
-- Naukri live relay was consumed in current V2 QA: 312 seen / 2 new first poll; 312 seen / 0 new on second poll. Notifications were disabled.
-- Per-user tests: 61 passed. Full V2 suite: 497 passed, 0 failed.
-- Workday adaptive 429 backoff is committed in PR #77 (cc2087e); exact-head GitHub CI #1511 passed 497 tests. Candidate image job-radar-v2-qa:cc2087e runs on QA port 8013; health 200 and scheduler suite 12/12. PR #77 is open; production unchanged.
-- Fastest safe path: PR/CI → candidate QA rebuild → real member account/preferences → real Telegram webhook/link/canary → offsite backup/restore → explicit production approval and rollout → 24–72h monitoring.
-- Current estimate to first production canary: 6–10 focused engineering hours remaining, approximately 1 day if external access is available. See the canonical plan for assumptions and blockers.
+- PR #77 is merged into v2-live-radar as 5b80499; post-merge CI #1513 passed the full 497-test suite.
+- Candidate QA image job-radar-v2-qa:cc2087e is running on loopback port 8013. The merged application tree matches the candidate; health is HTTP 200 and scheduler tests pass 12/12.
+- Live two-pass QA ingest/dedupe passed for Naukri (312 seen, 2 then 0 new), Greenhouse (346 seen, 2 then 0 new on 3/3 boards) and Ashby (848 seen, 4 then 0 new on 2/2 boards). All runs were manual QA invocations; all 12 source flags and notifications remained off.
+- Latest QA snapshot is qa-after-ats-smoke-20261117.sqlite3: 27,379 jobs, SQLite integrity ok, no member chats/settings/per-user notification rows. Its SHA-256 and path are in the canonical plan.
+- Production remains unchanged on job-radar-prod-canary:6e5becb, port 8000, public and local health 200. No member account, Telegram webhook or real per-user delivery exists yet.
+- Production DB contains admin only. Google sign-in is disabled. Telegram bot token identity check succeeded, but webhook and per-user bot username/webhook secret are not configured.
+- Daily local snapshot job is repaired and verified; encrypted offsite backup/restore drill remains a release gate.
+- TLS cert for 130.210.27.197 expires 23 Nov 2026; Certbot timer is active and its staging dry-run renewal succeeded. Live certificate was not changed by the dry run.
+- VM cleanup is complete: two running JobBeeper containers, one production volume, five retained images, zero Docker build cache, disk 28% used. Legacy QA state is archived.
+- Workday progressive 5/10/20/40/60-minute backoff is merged in V2 but is not deployed in production. Company Watch Phase 2 stays paused.
+- Remaining estimate: 6–10 focused engineering hours to a controlled member canary once owner email, bot access and offsite backup access are ready, then 24–72 hours monitoring.
 
-Older timestamped checkpoints below are historical. Do not treat prior statements that Docker inventory was unavailable, that the snapshot service remained broken, or that four QA services were still running as current.
-
+Next: provision a separate member account; complete that member's saved preferences; set up Telegram webhook, private-chat link and explicit opt-in; prove one real matching delivery and duplicate suppression; finish offsite backup/restore; only then deploy with explicit owner approval.
 ---
 
 **Merged PR #76:** https://github.com/AvinashBhalla/job-beeper/pull/76

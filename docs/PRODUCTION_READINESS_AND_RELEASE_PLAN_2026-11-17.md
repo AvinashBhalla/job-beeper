@@ -1,19 +1,42 @@
 # JobBeeper — production readiness, delivery plan and next-agent handover
-## Latest execution update — 17 November 2026, 17:06 UTC
+## Latest execution update — 17 November 2026, 17:18 UTC
 
-This is the newest checkpoint; the earlier 15:15 UTC status below records what was true at that point.
+PR #77 is merged into v2-live-radar. This is a code merge only; it is not a production deployment.
 
-- Workday adaptive 429 backoff and its regression test are committed and pushed in PR #77: https://github.com/AvinashBhalla/job-beeper/pull/77.
-- PR head: cc2087efc4af4c00696a40ce1ecdc2ec415e27a6, targeting v2-live-radar at base 54fad216ca016e6f2f8b994c2e07f9d625558bd1.
-- Exact-head GitHub Actions run #1511 succeeded. Full V2 suite: 497 passed, 0 failed (76.049 seconds); compile, dashboard JavaScript syntax and focused router/extractor tests also passed.
-- Candidate image built from the exact PR head: job-radar-v2-qa:cc2087e, image ID sha256:741245d98b894ef99add44407632369c6f76e9ce75eaf95e32f42c0006a81422.
-- The isolated QA container job-radar-current-v2-qa was replaced with that image on loopback port 8013. /health returned HTTP 200; scheduler synchronized zero boards; process is not OOM-killed.
-- Before the QA swap, the QA DB was backed up to /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3; SQLite integrity ok, 27,373 jobs, SHA-256 6237a548e2f5a0278a02275a283532d23f6ea35672c93a34edf2578ffecc2e1f.
-- Inside the candidate image, the board-scheduler suite passed 12/12 tests. QA database remains at 27,373 jobs, integrity ok, all source flags false, legacy notifications false, one copied admin only, and zero linked member chats/settings/per-user notification ledger rows.
-- Production remains unchanged on job-radar-prod-canary:6e5becb at port 8000; health HTTP 200. No member account was created; no Telegram webhook was configured; no real member message was sent; no production deployment was performed.
-- PR #77 is still open and mergeable at this checkpoint. Merge is the next engineering action after this documentation update's exact-head CI passes; deployment remains a separate owner-approved gate.
+- PR #77: https://github.com/AvinashBhalla/job-beeper/pull/77
+- Merge commit: 5b80499d42046cbadc7570171944346d9bf57fb9.
+- Post-merge GitHub Actions run #1513 passed the full V2 suite: 497 passed, 0 failed (64.807 seconds); focused router/extractor tests passed 32/32.
+- Exact merged application source tree: 313838340b030eac08866d0b173f4085e69a50a4. This matches the tree used to build the candidate QA image.
+- Candidate image: job-radar-v2-qa:cc2087e, image ID sha256:741245d98b894ef99add44407632369c6f76e9ce75eaf95e32f42c0006a81422.
+- Candidate QA container job-radar-current-v2-qa is running on loopback port 8013; /health returns HTTP 200. All 12 QA source flags and legacy notifications remain disabled. The in-container scheduler suite passed 12/12 tests.
+- Live candidate QA source proofs (manual run_source calls; all writes confined to QA):
+  - Naukri: 312 seen, 2 new first pass; 312 seen, 0 new second pass.
+  - Greenhouse: 3/3 boards succeeded, 346 seen, 2 new first pass; 346 seen, 0 new second pass.
+  - Ashby: 2/2 boards succeeded, 848 seen, 4 new first pass; 848 seen, 0 new second pass.
+  - All six inserted jobs were written only into the copied QA database. No Telegram send occurred. These manual collector calls do not turn on source scheduling.
+- Latest QA snapshot: /var/backups/job-radar-daily/qa-after-ats-smoke-20261117.sqlite3; 27,379 jobs, SQLite integrity ok, 12 source switches false, notifications false, one copied admin, zero member Telegram chats/settings/per-user notification ledger rows. Size 121,507,840 bytes; SHA-256 8d14fa852b7e53ec795b6811273b171c49684602acc2da42c40a54d3994cf884.
+- Production remains unchanged on image job-radar-prod-canary:6e5becb at port 8000. Public HTTPS and loopback /health both return HTTP 200. No member account was created, no Telegram webhook was registered, no real member message was sent, and no production deployment was performed.
+- VM: two running JobBeeper containers, one production Docker volume, five retained images including prior QA rollback, zero build cache, root disk 28% used, about 407 MB available RAM at last sample.
+- HTTPS certificate for IP 130.210.27.197 expires 23 November 2026. The Certbot snap renewal timer is active, and a staging dry-run renewal completed successfully on 17 November. The live certificate was not changed by the dry run.
+- A documentation-only PR #78 is open to carry this final post-merge/source-smoke/certificate update into the current branch; its exact-head CI is the final documentation gate.
 
-Revised remaining estimate: with code, exact-head CI and isolated QA candidate now complete, budget about 6–10 focused engineering hours to reach the first controlled production canary, provided the owner email, bot-owner access, HTTPS/webhook configuration and offsite backup/restore access are available. Then monitor for 24–72 hours. External dependencies or waiting for a genuinely new matching job can extend the calendar time. Company Watch Phase 2 remains a later project and is not included.
+## Remaining work and revised delivery estimate
+
+The code, tests, PR #77 merge, QA image, three-source collector/dedupe proof, scheduler regression proof and TLS renewal simulation are complete. Remaining work is the real member journey and production controls:
+
+1. Obtain the email address to use for a separate normal member account. Production currently has admin only; do not convert the admin.
+2. Provision the member and complete that member's own saved preferences.
+3. Configure the per-user Telegram bot username and webhook secret in the production secret/environment store; register the public webhook at https://130.210.27.197/api/telegram/webhook; link the member's private chat; explicitly enable notifications.
+4. Prove a genuinely new matching job reaches this member's saved preferences, queues to that member only, is sent to that linked private chat, records Telegram ok=true and is not sent twice. No historical backlog may be delivered.
+5. Configure encrypted offsite backup and complete a restore drill on an isolated database.
+6. Prepare a release image from merged commit 5b80499, compare effective non-secret config and DB migration expectations, then deploy only after explicit owner approval. Production remains on 6e5becb until that gate.
+7. Monitor source health, matching and member delivery for 24–72 hours after the canary.
+
+**Revised remaining estimate:** about **6–10 focused engineering hours** to reach a controlled production canary once the member email, Telegram bot-owner access, HTTPS/webhook configuration and offsite-backup route are available. Allow another **24–72 hours** of monitoring before calling the rollout stable. A genuinely new matching job may take longer to arrive. This estimate excludes Company Watch Phase 2.
+
+Company Watch Phase 2 remains paused until the existing member pipeline passes a real canary. It is a later project, not a prerequisite for proving the existing source-to-member pipeline.
+
+---
 
 ---
 
@@ -156,10 +179,9 @@ The legacy global Telegram sender is separate from the member sender. The admin 
 
 The most urgent reliability issue is Workday. It was making a request about every five minutes despite repeated 429 responses: 284 of 355 requests were 429s, with 243 failed pages out of 285 runs. It still found 17 jobs, so the source should not be globally disabled without a deliberate product decision.
 
-### 3.4 Workday rate-limit fix prepared and tested
+### 3.4 Workday rate-limit fix — merged and validated
 
-A change is prepared on local branch:
-fix/ats-board-rate-limit-backoff-20261117
+The change was developed on branch fix/ats-board-rate-limit-backoff-20261117 and merged into v2-live-radar in PR #77 as commit 5b80499.
 
 It changes the persistent ATS board scheduler so consecutive rate-limited outcomes progressively increase per-board/per-host cooldown:
 - first 429: 5 minutes;
@@ -170,9 +192,9 @@ It changes the persistent ATS board scheduler so consecutive rate-limited outcom
 
 A longer server-provided Retry-After is still honoured. A successful poll resets the consecutive failure count. Host-level isolation remains: one Workday tenant's cooldown must not pause another tenant on another host or unrelated ATS providers.
 
-The focused board scheduler suite passed 12/12 tests. The full V2 suite passed 497 tests, 0 failures locally and on exact-head GitHub CI run #1511. PR #77 contains the reviewed patch and the QA candidate image was rebuilt from the exact PR source. The new QA container is healthy on port 8013; its in-container board-scheduler suite passes 12/12. Production has not been changed.
+The focused board scheduler suite passed 12/12 tests. The full V2 suite passed 497 tests, 0 failures locally, on PR exact-head CI #1512 and post-merge CI #1513. The candidate QA image was rebuilt from the merged application tree. The new QA container is healthy on port 8013; its in-container board-scheduler suite passes 12/12.
 
-Remaining: merge PR #77 after the documentation follow-up CI is green; then the Workday fix becomes part of v2-live-radar. It is still not a production deployment.
+The change is now part of v2-live-radar, but it is not active in production until a separately approved production image is deployed. Production remains on image 6e5becb.
 
 ## 4. Work actually proven in the current V2 QA service
 
@@ -206,6 +228,10 @@ The V2 collector run_source("naukri") was invoked explicitly inside the QA appli
 
 This proves the relay-to-V2 collector, normalization/upsert, evaluation and repeat-poll dedupe path against this live sample. It is not yet proof of continuous production polling on the new image or member Telegram delivery.
 
+The same candidate image was also tested manually with Greenhouse and Ashby collectors against the isolated QA database. Greenhouse returned 346 listings from 3/3 successful boards (2 inserted first pass, 0 on repeat); Ashby returned 848 listings from 2/2 successful boards (4 inserted first pass, 0 on repeat). All source flags remained off, notifications remained off, and there were no Telegram deliveries. These are controlled manual collector invocations, not scheduler enablement.
+
+After the three-source smoke, the QA database contains 27,379 jobs and passes SQLite integrity_check. A fresh QA snapshot is saved at /var/backups/job-radar-daily/qa-after-ats-smoke-20261117.sqlite3 (SHA-256 8d14fa852b7e53ec795b6811273b171c49684602acc2da42c40a54d3994cf884).
+
 ### 4.3 Per-user pipeline automated tests
 
 The focused user-preferences, per-user notification, Telegram-linking and user-preferences API suites passed **61/61 tests**. Coverage includes:
@@ -227,7 +253,7 @@ These tests mock Telegram where appropriate. They do not constitute a real bot-t
 The full V2 unittest discovery run on the Workday-backoff working tree passed:
 **497 tests, 0 failures**, exit code 0.
 
-Exact-head GitHub Actions run #1511 on PR #77 passed all 497 tests. The candidate image was rebuilt from PR source cc2087e and health-checked after the isolated QA container swap. PR #77 is open at this checkpoint; merge is the next engineering step.
+Exact-head GitHub Actions run #1512 on PR #77 passed all 497 tests (63.506 seconds); post-merge run #1513 also passed all 497 tests (64.807 seconds) on merge commit 5b80499. The candidate image was built from the same application tree as the merged branch and health-checked after the isolated QA container swap. PR #77 is merged; the merge does not deploy to production.
 
 ## 5. Production blockers and pre-release acceptance gates
 
@@ -235,7 +261,7 @@ Do not mark the release ready until all P0 gates are met.
 
 ### P0 — Must complete before production rollout
 
-1. **Workday rate-limit fix:** PR #77 contains the adaptive backoff change, exact-head CI #1511 is green and the candidate QA image passes the 12-test scheduler suite. Merge PR #77, then preserve the merge SHA and use the same reviewed application tree for release qualification.
+1. **Workday rate-limit fix:** completed. PR #77 merged as 5b80499; post-merge CI #1513 passed 497 tests; candidate QA image passes the 12-test scheduler suite. The merged code is not in production yet.
 2. **Member account:** provision one normal user account for the owner using the intended email; sign in; complete role/location/preferences. Do not reuse the admin role.
 3. **Telegram member linking:** provide the per-user bot username and webhook secret via secret management; configure the production HTTPS webhook; verify Telegram reports the correct webhook endpoint and no persistent delivery errors.
 4. **Real personal matching:** with the member's saved preferences, verify existing Naukri/ATS listings produce the expected member-specific match results. Check both positive and negative samples; admin/global matching is not a substitute.
@@ -268,15 +294,15 @@ Do not mark the release ready until all P0 gates are met.
 
 This is the shortest critical path. Work can proceed in parallel where noted, but do not skip release gates.
 
-| Order | Workstream | Owner | Exit condition | Planning estimate |
+| Order | Workstream | Owner | Exit condition | Status / planning estimate |
 |---|---|---|---|---:|
-| 1 | Commit Workday backoff change, push branch, PR, exact-head CI | Engineering | Green CI and reviewed patch | 1–2 hours |
-| 2 | Rebuild current V2 QA image from that exact commit; re-run source/member smoke checks | Engineering | QA image digest and evidence attached to handover | 2–3 hours |
+| 1 | Workday backoff code, PR and exact-head/post-merge CI | Engineering | Merged as 5b80499; CI #1512/#1513 green, 497 tests each | Complete |
+| 2 | Candidate V2 QA image and isolated runtime validation | Engineering | Image cc2087e healthy on 8013; 12 scheduler tests pass; sources/notifications off | Complete |
 | 3 | Provision owner member account | Owner + engineering | Member can log in and has completed preferences | 30–60 minutes after email is supplied |
 | 4 | Configure per-user Telegram webhook and link private chat | Owner + engineering | Telegram link status connected; webhook secret validated | 1–2 hours if bot/domain access is ready |
 | 5 | Real member match + Telegram canary; re-poll idempotency test | Engineering + owner | One expected alert delivered and duplicate prevented | 1–2 hours plus wait for a genuinely new matching job |
-| 6 | Offsite backup/restore drill; candidate manifest and rollback verification | Engineering | Restore evidence and rollback runbook | 2–4 hours |
-| 7 | Explicit owner-approved production rollout | Owner authorizes; engineering executes | Health checks pass, monitored first cohort | 1–2 hours plus 24–72 hours observation |
+| 6 | Encrypted offsite backup/restore drill; production candidate and rollback verification | Engineering | Restore evidence and rollback runbook | 2–4 hours |
+| 7 | Explicit owner-approved production rollout | Owner authorizes; engineering executes | Reviewed image deployed; health checks pass; monitored first cohort | 1–2 hours plus 24–72 hours observation |
 
 **Initial estimate at 15:15 UTC:** approximately 8–14 focused engineering hours. **Revised estimate at 17:06 UTC after PR CI and QA candidate completion:** approximately **6–10 focused engineering hours** to reach a controlled production canary, assuming the member email, bot ownership, webhook/domain configuration, offsite backup/restore access and production access are available without delay. In calendar terms, plan for **1–2 days of focused day/night work** to reach the first production canary, then **another 24–72 hours of monitoring** before calling the rollout stable.
 
@@ -295,9 +321,9 @@ No other owner input is required for the code, QA rebuild, source health work or
 ## 8. Next-agent checklist — continue from here
 
 1. Read this document first. Treat older timestamps/claims in REPOSITORY_CLEANUP_AND_VM_HEALTH_2026-11-17.md, NEXT_AGENT_START_HERE.md, JOB_RADAR_HANDOVER.md and JOB_RADAR_KNOWLEDGE_TRANSFER.md as historical where they conflict with this current state.
-2. Inspect git status, git log, and PR #77 before touching the branch. Worktree: /tmp/job-beeper-perf-v2. Branch: fix/ats-board-rate-limit-backoff-20261117. The code/docs are committed and pushed in commit cc2087e; exact-head CI #1511 is green. The PR is still open at this checkpoint.
-3. Next: verify the docs follow-up CI, merge PR #77, and confirm the updated v2-live-radar SHA. Do not deploy to production as part of this merge.
-4. Candidate QA is already rebuilt from cc2087e as job-radar-v2-qa:cc2087e and running in job-radar-current-v2-qa on port 8013. Keep QA source polling and notifications disabled by default. Keep production Telegram and Google OAuth credentials out of QA.
+2. Read the latest execution update above. PR #77 is merged as 5b80499 on v2-live-radar; post-merge CI #1513 passed 497 tests. The QA candidate image was built from the identical application tree.
+3. Do not attempt to merge PR #77 again. The next workstream is member provisioning and Telegram setup, followed by offsite backup/restore; do not deploy to production until the owner explicitly approves the release.
+4. Candidate QA is already rebuilt from the merged application tree as job-radar-v2-qa:cc2087e and running in job-radar-current-v2-qa on port 8013. Keep QA source polling and notifications disabled by default. Keep production Telegram and Google OAuth credentials out of QA.
 5. Complete the member provisioning and real Telegram linking gates once the owner supplies the member email and bot access.
 6. Attach QA test outputs, source-run evidence, Telegram canary ledger evidence, image digest and backup/restore evidence to this handover.
 7. Deploy only after the owner explicitly approves the release. Preserve job-radar-production-rollback:20261108 until the new release passes its monitoring window.
@@ -339,3 +365,9 @@ No other owner input is required for the code, QA rebuild, source health work or
 - QA pre-swap database backup verified at /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3 (SHA-256 recorded above). Production container remains unchanged on image 6e5becb and returns HTTP 200.
 - Build cache was pruned again after image export. Final Docker inventory: two running containers, one production volume, five retained images (including prior QA rollback tag) and zero build cache.
 - PR #77 remains open at this checkpoint. Next: green CI for this docs-only follow-up, merge PR #77, then provision the real member and configure Telegram canary. No production deployment.
+
+### 2026-11-17 17:11 UTC — PR #77 merge and post-merge verification
+- PR #77 merged into v2-live-radar as 5b80499d42046cbadc7570171944346d9bf57fb9.
+- Exact post-merge GitHub Actions run #1513 passed 497 V2 tests in 64.807s; focused router/extractor tests passed 32/32.
+- Confirmed the merged branch tree hash is identical to the PR-head tree used for the candidate QA image.
+- Production is still on 6e5becb; no production image, environment, database, Telegram or Nginx changes were made.
