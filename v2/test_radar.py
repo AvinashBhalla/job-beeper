@@ -3465,6 +3465,113 @@ class NaukriRelayFreshnessTests(unittest.TestCase):
         self.assertTrue(naukri["last_feed"]["snapshot_unchanged"])
         self.assertTrue(naukri["last_feed"]["fresh"])
 
+    def test_upsert_reuses_experience_extraction_for_unchanged_job_text(self):
+        job = radar.normalize_job(
+            "naukri",
+            "naukri-experience-cache",
+            "Example Labs",
+            "Software Engineer",
+            "Bengaluru, India",
+            "https://www.naukri.com/job-listings-experience-cache",
+            None,
+            "unknown",
+            "Minimum 2 years of professional experience building Python services.",
+        )
+        with patch.object(
+            radar,
+            "_experience_provenance_details",
+            wraps=radar._experience_provenance_details,
+        ) as extract:
+            self.assertEqual(radar.upsert_jobs([job], BASE_CONFIG), 1)
+            extract.assert_called_once()
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            stored_version = conn.execute(
+                "SELECT experience_extraction_version FROM jobs "
+                "WHERE source='naukri' AND source_job_id='naukri-experience-cache'"
+            ).fetchone()[0]
+        self.assertEqual(stored_version, radar.EXPERIENCE_EXTRACTION_VERSION)
+
+        unchanged = {
+            **job,
+            "discovered_at": radar.iso(radar.now()),
+            "last_seen_at": radar.iso(radar.now()),
+        }
+        with patch.object(
+            radar,
+            "_experience_provenance_details",
+            wraps=radar._experience_provenance_details,
+        ) as extract:
+            self.assertEqual(radar.upsert_jobs([unchanged], BASE_CONFIG), 0)
+            extract.assert_not_called()
+
+        changed_description = {
+            **unchanged,
+            "description": unchanged["description"] + " Experience with distributed systems.",
+        }
+        with patch.object(
+            radar,
+            "_experience_provenance_details",
+            wraps=radar._experience_provenance_details,
+        ) as extract:
+            radar.upsert_jobs([changed_description], BASE_CONFIG)
+            extract.assert_called_once()
+
+        # A parser-version bump forces one fresh extraction even when source
+        # text is unchanged; future parser upgrades can therefore be rolled
+        # out without relying on description edits to refresh stored values.
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            conn.execute(
+                "UPDATE jobs SET experience_extraction_version=0 "
+                "WHERE source='naukri' AND source_job_id='naukri-experience-cache'"
+            )
+        with patch.object(
+            radar,
+            "_experience_provenance_details",
+            wraps=radar._experience_provenance_details,
+        ) as extract:
+            radar.upsert_jobs([unchanged], BASE_CONFIG)
+            extract.assert_called_once()
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            stored_version = conn.execute(
+                "SELECT experience_extraction_version FROM jobs "
+                "WHERE source='naukri' AND source_job_id='naukri-experience-cache'"
+            ).fetchone()[0]
+        self.assertEqual(stored_version, radar.EXPERIENCE_EXTRACTION_VERSION)
+
+        changed_title = {
+            **changed_description,
+            "title": "Senior Software Engineer",
+        }
+        with patch.object(
+            radar,
+            "_experience_provenance_details",
+            wraps=radar._experience_provenance_details,
+        ) as extract:
+            radar.upsert_jobs([changed_title], BASE_CONFIG)
+            extract.assert_called_once()
+
+        verified_result = {
+            **changed_title,
+            "jd_experience_source": "gemini_verified",
+            "jd_experience_min_years": 3,
+            "jd_experience_max_years": 5,
+        }
+        with patch.object(
+            radar,
+            "_experience_provenance_details",
+            wraps=radar._experience_provenance_details,
+        ) as extract:
+            radar.upsert_jobs([verified_result], BASE_CONFIG)
+            extract.assert_called_once()
+
+        with sqlite3.connect(radar.DB_PATH) as conn:
+            stored = conn.execute(
+                "SELECT experience_min_years, experience_max_years, experience_provenance, experience_confidence "
+                "FROM jobs WHERE source='naukri' AND source_job_id='naukri-experience-cache'"
+            ).fetchone()
+        self.assertEqual(stored, (3.0, 5.0, "description", "high"))
+
     def test_unchanged_markdown_observation_does_not_recompute_evaluation(self):
         job = radar.normalize_job(
             "naukri", "naukri-markdown", "Example", "Software Engineer", "Bengaluru, India",
@@ -4537,10 +4644,13 @@ class InitialSourceBaselineMarkerTests(unittest.TestCase):
                         row[1] for row in conn.execute("PRAGMA table_info(jobs)")
                     }
                     value = conn.execute(
-                        "SELECT source_initial_baseline FROM jobs WHERE source_job_id='legacy'"
-                    ).fetchone()[0]
+                        "SELECT source_initial_baseline, experience_extraction_version "
+                        "FROM jobs WHERE source_job_id='legacy'"
+                    ).fetchone()
                 self.assertIn("source_initial_baseline", columns)
-                self.assertEqual(value, 0)
+                self.assertEqual(value[0], 0)
+                self.assertIn("experience_extraction_version", columns)
+                self.assertEqual(value[1], radar.EXPERIENCE_EXTRACTION_VERSION)
             finally:
                 radar.DB_PATH = original
 

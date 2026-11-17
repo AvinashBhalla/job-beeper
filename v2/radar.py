@@ -1088,6 +1088,7 @@ def init_db() -> None:
             experience_max_years REAL,
             experience_provenance TEXT NOT NULL DEFAULT 'unknown',
             experience_confidence TEXT NOT NULL DEFAULT 'unknown',
+            experience_extraction_version INTEGER NOT NULL DEFAULT 1,
             source_details_json TEXT NOT NULL DEFAULT '{}',
             source_initial_baseline INTEGER NOT NULL DEFAULT 0,
             first_seen_at TEXT NOT NULL,
@@ -1365,6 +1366,7 @@ def init_db() -> None:
         _ensure_column(conn, "jobs", "experience_max_years", "REAL")
         _ensure_column(conn, "jobs", "experience_provenance", "TEXT NOT NULL DEFAULT 'unknown'")
         _ensure_column(conn, "jobs", "experience_confidence", "TEXT NOT NULL DEFAULT 'unknown'")
+        _ensure_column(conn, "jobs", "experience_extraction_version", "INTEGER NOT NULL DEFAULT 1")
         _ensure_column(conn, "jobs", "source_details_json", "TEXT NOT NULL DEFAULT '{}'")
         _ensure_column(conn, "jobs", "source_initial_baseline", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
@@ -1442,6 +1444,12 @@ def init_db() -> None:
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
+# Bump when _experience_provenance_details() parsing rules change. Existing
+# rows are migrated with version 1 because their persisted values were produced
+# by the current parser before the unchanged-text reuse optimization.
+EXPERIENCE_EXTRACTION_VERSION = 1
+
+
 def upsert_jobs(
     jobs: list[dict[str, Any]],
     config: dict[str, Any] | None = None,
@@ -1482,11 +1490,6 @@ def upsert_jobs(
         for incoming in jobs:
             j = dict(incoming)
             incoming_description = str(j.get("description") or "")
-            experience_details = _experience_provenance_details(j)
-            j["experience_min_years"] = experience_details["min_years"]
-            j["experience_max_years"] = experience_details["max_years"]
-            j["experience_provenance"] = experience_details["provenance"]
-            j["experience_confidence"] = experience_details["confidence"]
             incoming_description_format = (
                 "markdown"
                 if str(j.get("description_format") or "plain").lower() == "markdown"
@@ -1518,12 +1521,39 @@ def upsert_jobs(
                        source_posted_at, posted_precision, description,
                        description_format, experience_min_years,
                        experience_max_years, experience_provenance,
-                       experience_confidence
+                       experience_confidence, title, experience_extraction_version
                    FROM jobs
                    WHERE source=? AND source_job_id=?""",
                 (j["source"], j["source_job_id"]),
             ).fetchone()
             if existing:
+                # Re-polls commonly return the same long job description. The
+                # experience parser is regex-heavy, so re-running it for every
+                # unchanged observation wastes CPU without changing the stored
+                # result. Reuse the persisted extraction when both title and
+                # description inputs are identical. A fresh verified Gemini
+                # result is still evaluated even when the text is unchanged.
+                experience_inputs_unchanged = (
+                    incoming_description == str(existing[5] or "")
+                    and incoming_description_format == str(existing[6] or "plain")
+                    and str(j.get("title") or "") == str(existing[11] or "")
+                    and int(existing[12] or 0) == EXPERIENCE_EXTRACTION_VERSION
+                    and j.get("jd_experience_source") != "gemini_verified"
+                )
+                if experience_inputs_unchanged:
+                    experience_details = {
+                        "min_years": existing[7],
+                        "max_years": existing[8],
+                        "provenance": existing[9] or "unknown",
+                        "confidence": existing[10] or "unknown",
+                    }
+                else:
+                    experience_details = _experience_provenance_details(j)
+                j["experience_min_years"] = experience_details["min_years"]
+                j["experience_max_years"] = experience_details["max_years"]
+                j["experience_provenance"] = experience_details["provenance"]
+                j["experience_confidence"] = experience_details["confidence"]
+
                 experience_rank = {
                     "unknown": 0,
                     "inferred": 1,
@@ -1590,6 +1620,7 @@ def upsert_jobs(
                         WHEN ?!='unknown' THEN ?
                         ELSE experience_confidence
                     END,
+                    experience_extraction_version=?,
                     source_details_json=CASE
                         WHEN ? <> '{}' THEN ?
                         ELSE source_details_json
@@ -1605,6 +1636,7 @@ def upsert_jobs(
                     j["experience_min_years"], j["experience_max_years"],
                     j["experience_provenance"], j["experience_provenance"],
                     j["experience_confidence"], j["experience_confidence"],
+                    EXPERIENCE_EXTRACTION_VERSION,
                     source_details_json, source_details_json, existing[0],
                 ))
 
@@ -1687,9 +1719,9 @@ def upsert_jobs(
                         source_posted_at, posted_precision, discovered_at,
                         discovery_latency_seconds, description, description_format,
                         experience_min_years, experience_max_years, experience_provenance,
-                        experience_confidence, source_details_json, first_seen_at,
-                        last_seen_at, source_initial_baseline
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                        experience_confidence, experience_extraction_version,
+                        source_details_json, first_seen_at, last_seen_at, source_initial_baseline
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                 """, (
                     j["source"], j["source_job_id"], j["company"], j["title"],
                     j["location"], j["url"], j["source_posted_at"],
@@ -1697,8 +1729,8 @@ def upsert_jobs(
                     j["discovery_latency_seconds"], incoming_description,
                     incoming_description_format, j["experience_min_years"],
                     j["experience_max_years"], j["experience_provenance"],
-                    j["experience_confidence"], source_details_json,
-                    j["discovered_at"], iso(last_seen_at) or j["discovered_at"]
+                    j["experience_confidence"], EXPERIENCE_EXTRACTION_VERSION,
+                    source_details_json, j["discovered_at"], iso(last_seen_at) or j["discovered_at"]
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
                 mark_initial_baseline(int(cur.lastrowid), str(j["source"]))
