@@ -4,8 +4,9 @@
 **Repository:** `AvinashBhalla/job-beeper`  
 **Target integration branch:** `v2-live-radar`  
 **Planning branch:** `docs/company-watch-v2-integration-handover-20261117`  
-**Baseline V2 commit inspected:** `5c28d97ea39edfa8af13d9686f7b97c3997901f3`  
-**Status:** Documentation and read-only audit complete. No application code, source configuration, database, scheduler, deployment or notification setting was changed. PR #74 exact-head GitHub V2 CI is red: 484 tests, 10 failures and 2 errors, all in `v2/test_user_notifications.py`; see the CI section below.
+**Original V2 source-audit commit:** `5c28d97ea39edfa8af13d9686f7b97c3997901f3`  
+**Current `v2-live-radar` head after merged PR #75:** `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`  
+**Status:** Company Watch integration plan and read-only audit are complete. PR #75 is merged; the post-merge V2 CI run #1495 passed all 485 tests. PR #74 remains a draft documentation PR and needs one fresh CI result against the updated base.
 
 > **Primary direction:** Use Company Watch as a curated source-discovery input. Do not run it as a second production job pipeline. Reconcile verified company/board records into the existing V2 directory, then use V2 collectors, JD enrichment, SQLite, canonical dedupe, per-user preferences/evaluations and per-user Telegram delivery.
 
@@ -459,14 +460,14 @@ A listener was present on all five loopback ports. The roles of ports 8010/8006/
 
 **No code, configs, databases, credentials, source schedules, notifications, deployments, containers or running services were changed.** No tests were run locally. The exact-head GitHub CI result is recorded below.
 
-## 12. Exact-head GitHub CI result — 2026-11-17
+## 12. Exact-head GitHub CI and merge result — 2026-11-17
 
-- Documentation PR: [#74](https://github.com/AvinashBhalla/job-beeper/pull/74), targeting `v2-live-radar`. The latest documentation commits record the plan and test-fixture diagnosis; this PR remains draft/unmerged.
-- Initial exact-head V2 CI runs [#1482](https://github.com/AvinashBhalla/job-beeper/actions/runs/44053095028) and [#1484](https://github.com/AvinashBhalla/job-beeper/actions/runs/44056563963) failed with the same 12 errors/failures in `v2/test_user_notifications.py`: 484 tests, 10 failures, 2 errors. Python compilation, dashboard JavaScript syntax and focused router/extractor tests (32/32) passed.
-- **Root cause:** `user_notifications._queue_new_matches()` applies `max_age_hours` (default 72) relative to `user_notifications._now()`. The test fixture's fixed dates were `2026-11-07`, while CI ran on `2026-11-17`; the fixture rows were correctly considered stale. The missing-ledger-row errors were downstream of those rejected queue inserts. This is a test-fixture clock problem, not a production notification regression.
-- **Test-only remediation:** draft [PR #75](https://github.com/AvinashBhalla/job-beeper/pull/75), branch `test/freeze-user-notification-clock-20261117`, current code commit `2671a12959f88e3a054983d7c91123d7d5c929eb`. It freezes the notification test clock at the fixture date and adds a boundary regression test for one second before vs. exactly at the 72-hour cutoff. No production code, schema, notification policy or Telegram behaviour changed.
-- Latest exact-head V2 CI [run #1491](https://github.com/AvinashBhalla/job-beeper/actions/runs/44058184410) on PR #75 **passed**: Python compilation; dashboard JS syntax; focused router/extractor tests (32/32); full V2 suite **485 tests passed in 48.773 seconds**.
-- **Gate:** PR #75 is still draft for owner review. Keep both PRs unmerged until reviewed. Once PR #75 is approved and merged to update the V2 base, re-evaluate PR #74 CI against that updated base; do not change notification behavior or weaken tests to clear CI. No runtime, source, database, scheduler, deployment or Telegram state was changed by this documentation task.
+- PR #75 — [test: make user notification freshness tests deterministic](https://github.com/AvinashBhalla/job-beeper/pull/75) — was merged by the owner at 2026-11-17 10:06:07 UTC. Merge commit: `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`; it is now the exact `v2-live-radar` HEAD.
+- Post-merge push CI [run #1495](https://github.com/AvinashBhalla/job-beeper/actions/runs/44061666892) completed successfully on that merge commit: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32/32), and full V2 unittest suite (**485 tests passed in 64.834 seconds**).
+- The merged change touches only `v2/test_user_notifications.py`: its tests freeze the service clock to the fixed 2026-11-07 fixtures and exercise the default 72-hour freshness boundary. Production queue/dispatch code, schemas, runtime configuration and Telegram behaviour were not changed.
+- The earlier PR #74 runs #1482/#1483/#1484 and their subsequent sync runs #1492/#1493/#1494 were all generated before PR #75's merge, on the old base `5c28d97ea39edfa8af13d9686f7b97c3997901f3`; their notification failures are superseded by the merged test-only correction and green post-merge run #1495.
+- PR #74 remains open/draft with the Company Watch integration handover. Its branch must be rechecked once against the current base `dfc7bb57c3e87f89d3d5f2a9859afbc2ad692eb5`. A documentation-only head update will trigger the fresh pull-request CI run; keep it draft until that run completes green.
+- **Implementation gate:** after the refreshed PR #74 CI is green and the handover is merged/reviewed, start Phase 1 only on a fresh safe workspace: strict/idempotent manifest import into the existing employer/ATS candidate registry, no polling and no activation. Preserve the dirty VM checkout and all production/notification safeguards. No board activation, live scan, Telegram send or deployment is authorized by the PR #75 merge.
 
 ## 13. Next agent — exact ordered checklist
 
