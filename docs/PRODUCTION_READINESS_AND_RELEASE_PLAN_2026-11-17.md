@@ -1,4 +1,22 @@
 # JobBeeper — production readiness, delivery plan and next-agent handover
+## Latest execution update — 17 November 2026, 17:06 UTC
+
+This is the newest checkpoint; the earlier 15:15 UTC status below records what was true at that point.
+
+- Workday adaptive 429 backoff and its regression test are committed and pushed in PR #77: https://github.com/AvinashBhalla/job-beeper/pull/77.
+- PR head: cc2087efc4af4c00696a40ce1ecdc2ec415e27a6, targeting v2-live-radar at base 54fad216ca016e6f2f8b994c2e07f9d625558bd1.
+- Exact-head GitHub Actions run #1511 succeeded. Full V2 suite: 497 passed, 0 failed (76.049 seconds); compile, dashboard JavaScript syntax and focused router/extractor tests also passed.
+- Candidate image built from the exact PR head: job-radar-v2-qa:cc2087e, image ID sha256:741245d98b894ef99add44407632369c6f76e9ce75eaf95e32f42c0006a81422.
+- The isolated QA container job-radar-current-v2-qa was replaced with that image on loopback port 8013. /health returned HTTP 200; scheduler synchronized zero boards; process is not OOM-killed.
+- Before the QA swap, the QA DB was backed up to /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3; SQLite integrity ok, 27,373 jobs, SHA-256 6237a548e2f5a0278a02275a283532d23f6ea35672c93a34edf2578ffecc2e1f.
+- Inside the candidate image, the board-scheduler suite passed 12/12 tests. QA database remains at 27,373 jobs, integrity ok, all source flags false, legacy notifications false, one copied admin only, and zero linked member chats/settings/per-user notification ledger rows.
+- Production remains unchanged on job-radar-prod-canary:6e5becb at port 8000; health HTTP 200. No member account was created; no Telegram webhook was configured; no real member message was sent; no production deployment was performed.
+- PR #77 is still open and mergeable at this checkpoint. Merge is the next engineering action after this documentation update's exact-head CI passes; deployment remains a separate owner-approved gate.
+
+Revised remaining estimate: with code, exact-head CI and isolated QA candidate now complete, budget about 6–10 focused engineering hours to reach the first controlled production canary, provided the owner email, bot-owner access, HTTPS/webhook configuration and offsite backup/restore access are available. Then monitor for 24–72 hours. External dependencies or waiting for a genuinely new matching job can extend the calendar time. Company Watch Phase 2 remains a later project and is not included.
+
+---
+
 **Status date:** 17 November 2026, 15:15 UTC
 **Canonical purpose:** This is the current operational source of truth for the existing JobBeeper pipeline and the next production release. Read this before changing the VM, production database, source configuration, Telegram setup, or Company Watch.
 
@@ -23,16 +41,16 @@ Do not spend the next engineering cycle expanding employer/Company Watch discove
 | Component | Current state | Evidence / notes |
 |---|---|---|
 | Production app | Running, HTTP 200 | v2-radar-1, loopback port 8000, image job-radar-prod-canary:6e5becb; not redeployed |
-| Current V2 QA app | Running, HTTP 200 | job-radar-current-v2-qa, loopback port 8013, built from V2 source commit 54fad21; copied production snapshot, independent data directory |
-| QA source polling | Disabled | All 11 source flags disabled in QA config; live Naukri collector was invoked explicitly for a controlled test |
+| Current V2 QA app | Running, HTTP 200 | job-radar-current-v2-qa, loopback port 8013, image job-radar-v2-qa:cc2087e from PR #77 source commit cc2087e; independent QA data directory |
+| QA source polling | Disabled | All 12 source flags disabled in QA config; live Naukri collector was invoked explicitly for a controlled test |
 | QA legacy notifications | Disabled | notifications_enabled=false; no production bot token, chat ID, Google OAuth credentials, member webhook secret or Telegram webhook configured in QA |
 | Docker containers | 2 running | Production + current V2 QA only |
 | Docker volumes | 1 remaining | v2_radar-data, production volume; QA uses /var/lib/job-radar-current-v2-qa/data bind mount |
-| Docker images | 4 retained | Current QA, current production, explicit production rollback image and Python base image |
-| Docker build cache | 0 | Rebuildable cache removed |
+| Docker images | 5 retained | Current QA candidate, prior QA image retained for quick QA rollback, current production, explicit production rollback image and Python base image |
+| Docker build cache | 0 | Rebuildable cache removed again after the cc2087e image build |
 | Legacy QA archive | Preserved | /var/backups/job-radar-daily/legacy-qa-environments-20261117.tar.gz, 0600, 44.5 MB compressed, 174 entries, SHA-256 f521107f233408cfbcfd420de68ec0ac0b869b54785d06b95bd21c0fb22f0501 |
 | Root disk | 13 GB used / 45 GB, 28% | 33 GB available at 15:10 UTC |
-| RAM | 956 MiB total; about 405 MB available | Swap 2 GiB total, about 789 MB used at 15:10 UTC |
+| RAM | 956 MiB total; about 407 MB available | Swap 2 GiB total, about 807 MB used at 17:06 UTC |
 | Production health | HTTP 200 | /health, version reports 2.0.0 |
 | QA health | HTTP 200 | /health, version reports 2.0.0 |
 
@@ -50,7 +68,7 @@ All operations below were performed on 17 November 2026. Production was not rest
 6. Removed unused historical Docker image tags from the 5–10 November QA/build cycles. Retained the production image, a named production rollback image, the current QA image and Python base image.
 7. Pruned all rebuildable Docker build cache. No production data volume was pruned.
 8. Removed eight exited snapshot container objects and the old idle/Phase 2 test container objects. Persistent data was archived before deleting the legacy QA volumes.
-9. Reduced Docker inventory from 34 images / about 1.687 GB build cache to 4 images / 0 build cache. Docker now has two running containers and one production volume.
+9. Reduced Docker inventory from 34 images / about 1.687 GB build cache to a final 5 retained images / 0 build cache after the PR candidate QA image was built. Docker now has two running containers and one production volume.
 10. Left the current V2 QA app running at port 8013 for release qualification.
 
 **Retained workspaces:** the dirty primary development checkout (/home/ubuntu/job-beeper-dev), dirty global ATS QA checkout (/home/ubuntu/job-beeper-global-ats-test) and dirty source-observability checkout (/tmp/job-radar-source-observability) were preserved. The primary dev checkout still has modified v2/config.json and untracked .env.save, .venv/ and v2/config.json.backup.20261105-183321. Do not reset, clean or overwrite these.
@@ -152,14 +170,14 @@ It changes the persistent ATS board scheduler so consecutive rate-limited outcom
 
 A longer server-provided Retry-After is still honoured. A successful poll resets the consecutive failure count. Host-level isolation remains: one Workday tenant's cooldown must not pause another tenant on another host or unrelated ATS providers.
 
-The focused board scheduler suite passed 12/12 tests. The full V2 suite on the modified source passed **497 tests, 0 failures** in 561.372 seconds. git diff --check passed.
+The focused board scheduler suite passed 12/12 tests. The full V2 suite passed 497 tests, 0 failures locally and on exact-head GitHub CI run #1511. PR #77 contains the reviewed patch and the QA candidate image was rebuilt from the exact PR source. The new QA container is healthy on port 8013; its in-container board-scheduler suite passes 12/12. Production has not been changed.
 
-**Release qualification still required:** commit the patch, push the branch, open a PR against v2-live-radar, wait for exact-head GitHub CI, review the diff, rebuild QA from the merged/release candidate and verify its runtime image includes the change. Do not deploy this uncommitted branch directly to production.
+Remaining: merge PR #77 after the documentation follow-up CI is green; then the Workday fix becomes part of v2-live-radar. It is still not a production deployment.
 
 ## 4. Work actually proven in the current V2 QA service
 
 QA image:
-job-radar-v2-qa:54fad21
+job-radar-v2-qa:cc2087e
 
 QA container:
 job-radar-current-v2-qa, loopback port 8013.
@@ -171,11 +189,11 @@ It uses a copied production snapshot, but has separate writable data. All source
 
 ### 4.1 V2 service startup
 
-- Container built from clean V2 source commit 54fad21.
+- Container built from PR #77 application source commit cc2087e (docs-only follow-up commit does not change the container build context).
 - Startup database migration/reconciliation completed.
-- /health returned HTTP 200.
-- Snapshot database was 121,241,600 bytes and contained 27,371 jobs at the copy point.
-- Existing admin user/preferences are in the copied QA snapshot only; production was not modified by QA tests.
+- /health returns HTTP 200 after the candidate swap.
+- QA database contains 27,373 jobs after the two controlled Naukri test insertions; SQLite integrity_check returns ok.
+- The QA copy contains one copied admin and its preferences/evaluations only; it contains zero member-linked Telegram chats, zero per-user notification settings and zero per-user notification ledger rows. Production was not modified by QA tests.
 
 ### 4.2 Live Naukri relay → V2 ingest → dedupe
 
@@ -209,7 +227,7 @@ These tests mock Telegram where appropriate. They do not constitute a real bot-t
 The full V2 unittest discovery run on the Workday-backoff working tree passed:
 **497 tests, 0 failures**, exit code 0.
 
-This is local VM test evidence. The branch-specific patch still needs a GitHub PR and exact-head CI run, then a QA image rebuilt from the reviewed release commit.
+Exact-head GitHub Actions run #1511 on PR #77 passed all 497 tests. The candidate image was rebuilt from PR source cc2087e and health-checked after the isolated QA container swap. PR #77 is open at this checkpoint; merge is the next engineering step.
 
 ## 5. Production blockers and pre-release acceptance gates
 
@@ -217,7 +235,7 @@ Do not mark the release ready until all P0 gates are met.
 
 ### P0 — Must complete before production rollout
 
-1. **Workday rate-limit fix:** commit and PR the adaptive backoff change; exact-head GitHub CI green; release image built from the approved commit; test Workday host cooldown and ensure healthy providers remain unaffected.
+1. **Workday rate-limit fix:** PR #77 contains the adaptive backoff change, exact-head CI #1511 is green and the candidate QA image passes the 12-test scheduler suite. Merge PR #77, then preserve the merge SHA and use the same reviewed application tree for release qualification.
 2. **Member account:** provision one normal user account for the owner using the intended email; sign in; complete role/location/preferences. Do not reuse the admin role.
 3. **Telegram member linking:** provide the per-user bot username and webhook secret via secret management; configure the production HTTPS webhook; verify Telegram reports the correct webhook endpoint and no persistent delivery errors.
 4. **Real personal matching:** with the member's saved preferences, verify existing Naukri/ATS listings produce the expected member-specific match results. Check both positive and negative samples; admin/global matching is not a substitute.
@@ -260,7 +278,7 @@ This is the shortest critical path. Work can proceed in parallel where noted, bu
 | 6 | Offsite backup/restore drill; candidate manifest and rollback verification | Engineering | Restore evidence and rollback runbook | 2–4 hours |
 | 7 | Explicit owner-approved production rollout | Owner authorizes; engineering executes | Health checks pass, monitored first cohort | 1–2 hours plus 24–72 hours observation |
 
-**Estimate from the current state:** approximately **8–14 focused engineering hours** to reach a controlled production canary, assuming the member email, bot ownership, webhook/domain configuration and production access are available without delay. In calendar terms, plan for **1–2 days of focused day/night work** to reach the first production canary, then **another 24–72 hours of monitoring** before calling the rollout stable.
+**Initial estimate at 15:15 UTC:** approximately 8–14 focused engineering hours. **Revised estimate at 17:06 UTC after PR CI and QA candidate completion:** approximately **6–10 focused engineering hours** to reach a controlled production canary, assuming the member email, bot ownership, webhook/domain configuration, offsite backup/restore access and production access are available without delay. In calendar terms, plan for **1–2 days of focused day/night work** to reach the first production canary, then **another 24–72 hours of monitoring** before calling the rollout stable.
 
 This is not a promise that everything will be live in 8 hours. The main external dependencies are a real member identity, Telegram private-chat linking/webhook setup, GitHub CI, an offsite backup/restore route and explicit production approval. If any one of these is unavailable, the schedule moves by the dependency delay.
 
@@ -277,9 +295,9 @@ No other owner input is required for the code, QA rebuild, source health work or
 ## 8. Next-agent checklist — continue from here
 
 1. Read this document first. Treat older timestamps/claims in REPOSITORY_CLEANUP_AND_VM_HEALTH_2026-11-17.md, NEXT_AGENT_START_HERE.md, JOB_RADAR_HANDOVER.md and JOB_RADAR_KNOWLEDGE_TRANSFER.md as historical where they conflict with this current state.
-2. Inspect git status, git log, and the current PR/CI before touching the branch. Worktree: /tmp/job-beeper-perf-v2. Branch: fix/ats-board-rate-limit-backoff-20261117. The Workday backoff code and test are currently modified/uncommitted at the time this document was drafted; do not assume they are already on GitHub.
-3. Run git diff --check; review the patch in v2/board_scheduler.py and v2/test_board_scheduler.py; commit it; push; open PR against v2-live-radar; wait for exact-head CI.
-4. Rebuild job-radar-current-v2-qa from the reviewed commit. Keep QA source polling and notifications disabled by default. Keep the production bot token and Google OAuth credentials out of QA.
+2. Inspect git status, git log, and PR #77 before touching the branch. Worktree: /tmp/job-beeper-perf-v2. Branch: fix/ats-board-rate-limit-backoff-20261117. The code/docs are committed and pushed in commit cc2087e; exact-head CI #1511 is green. The PR is still open at this checkpoint.
+3. Next: verify the docs follow-up CI, merge PR #77, and confirm the updated v2-live-radar SHA. Do not deploy to production as part of this merge.
+4. Candidate QA is already rebuilt from cc2087e as job-radar-v2-qa:cc2087e and running in job-radar-current-v2-qa on port 8013. Keep QA source polling and notifications disabled by default. Keep production Telegram and Google OAuth credentials out of QA.
 5. Complete the member provisioning and real Telegram linking gates once the owner supplies the member email and bot access.
 6. Attach QA test outputs, source-run evidence, Telegram canary ledger evidence, image digest and backup/restore evidence to this handover.
 7. Deploy only after the owner explicitly approves the release. Preserve job-radar-production-rollback:20261108 until the new release passes its monitoring window.
@@ -288,7 +306,7 @@ No other owner input is required for the code, QA rebuild, source health work or
 ### Paths and retained evidence
 
 - Repository/worktree: /tmp/job-beeper-perf-v2
-- Current QA service: container job-radar-current-v2-qa, 127.0.0.1:8013
+- Current QA service: container job-radar-current-v2-qa, image job-radar-v2-qa:cc2087e, 127.0.0.1:8013
 - Production service: container v2-radar-1, 127.0.0.1:8000
 - QA database: /var/lib/job-radar-current-v2-qa/data/jobs.db
 - Production backup: /var/backups/job-radar-daily/production-jobs.sqlite3
@@ -296,6 +314,7 @@ No other owner input is required for the code, QA rebuild, source health work or
 - Legacy QA archive: /var/backups/job-radar-daily/legacy-qa-environments-20261117.tar.gz
 - Snapshot script pre-edit copy: /var/backups/job-radar-daily/job-radar-sqlite-snapshot.sh.before-optional-dev-20261117
 - Current rollback image: job-radar-production-rollback:20261108
+- QA pre-candidate backup: /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3
 
 ---
 
@@ -309,5 +328,14 @@ No other owner input is required for the code, QA rebuild, source health work or
 - Repaired the daily snapshot service's optional development-target handling and verified a successful production snapshot.
 - Built and started current V2 QA from 54fad21; verified health and a two-pass live Naukri relay ingest/dedupe test.
 - Ran 61 focused per-user/auth/Telegram tests and the 497-test full V2 suite successfully.
-- Prepared an adaptive Workday per-host 429 backoff change. The full test suite passes, but the patch is not yet committed, pushed or deployed.
+- Prepared the adaptive Workday per-host 429 backoff change; later committed it in PR #77. See the latest execution update above for exact-head CI and QA candidate results.
 - Production remained on its existing image and was not restarted or changed.
+
+### 2026-11-17 17:06 UTC — PR/CI and candidate QA update
+- PR #77 opened against v2-live-radar with Workday adaptive backoff and the updated release plan.
+- Exact-head GitHub CI #1511 passed 497 tests in 76.049s; full workflow conclusion success.
+- Candidate image job-radar-v2-qa:cc2087e built from application source cc2087e. The isolated QA container was replaced on port 8013 and /health returned HTTP 200.
+- Candidate QA configuration has all 12 source flags disabled and notifications disabled. SQLite integrity is ok; 27,373 jobs, one copied admin and zero member Telegram chat/per-user notification rows. Scheduler tests inside the candidate container passed 12/12.
+- QA pre-swap database backup verified at /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3 (SHA-256 recorded above). Production container remains unchanged on image 6e5becb and returns HTTP 200.
+- Build cache was pruned again after image export. Final Docker inventory: two running containers, one production volume, five retained images (including prior QA rollback tag) and zero build cache.
+- PR #77 remains open at this checkpoint. Next: green CI for this docs-only follow-up, merge PR #77, then provision the real member and configure Telegram canary. No production deployment.
