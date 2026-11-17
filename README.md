@@ -1,5 +1,10 @@
 # Job Radar
 
+## Current engineering priority — 17 November 2026
+
+The active priority is fetcher and feed reliability: source polling, ATS board scheduling, rate-limit control, pagination, normalization, deduplication, freshness and dashboard visibility. Telegram is optional; users can collect, match and view jobs without linking Telegram. Telegram is only needed when users choose it for notification delivery and opt in. Member-only enhancements and Company Watch expansion are deferred until the current feed is dependable. See the [Fetcher and Feed Reliability Plan](docs/FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md).
+
+
 JobBeeper is evolving into an end-to-end job-search product: discover relevant jobs, evaluate fit and freshness, prepare truthful applications, track progress, and support referrals and follow-ups. Its shared ingestion engine feeds user-scoped matching and notifications; resume assets, applications and outreach remain private to each user.
 
 ## Branch and VM model

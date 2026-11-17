@@ -93,8 +93,8 @@
           </a>
         </div>
 
-        <!-- Group 2: Intelligence -->
-        <div class="nav-group">
+        <!-- Group 2: Admin-only intelligence tools -->
+        <div class="nav-group admin-only-navigation" id="navIntelligenceGroup" hidden>
           <span class="nav-group-title">Intelligence</span>
           <a class="nav-link-item admin-only-navigation" href="#sources" data-section="sourcesSection" id="navSources" hidden>
             <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
@@ -450,7 +450,7 @@
               </div>
             </div>
 
-            <div id="userOnboardingNotice" class="auth-description" hidden>Complete at least one target role and one target location, then save your preferences to unlock your personalized job feed.</div>
+            <div id="userOnboardingNotice" class="auth-description" hidden>Add at least one target role and either a target location or enable Remote only. With no location selected, Remote only searches worldwide.</div>
             <div id="resumeAssistPanel" class="settings-block" hidden>
               <span class="settings-block-title">Prefill from your resume (optional)</span>
               <p class="form-help-text">Upload a PDF or DOCX (up to 5 MB; PDF up to 10 pages). We suggest roles, skills, experience and locations. Review and edit everything before you save. Your file is processed for suggestions and is not retained.</p>
@@ -596,6 +596,7 @@
                 </div>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRemoteOnly"> Remote opportunities only</label>
+                  <span class="form-help-text">Remote only uses explicit remote workplace evidence, excludes hybrid/on-site roles, and intersects with a selected location. With no location selected, explicitly remote jobs worldwide are eligible.</span>
                 </div>
                 <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRequireExp"> Require explicit experience for Telegram alerts</label>

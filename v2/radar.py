@@ -1936,7 +1936,7 @@ def refresh_user_job_evaluations(
     preferences: dict[str, Any],
     job_ids: list[int] | None = None,
 ) -> int:
-    if not preferences.get("target_roles") or not preferences.get("locations"):
+    if not user_preferences.preferences_complete(preferences):
         return 0
     if job_ids and len(job_ids) > 500:
         return sum(
@@ -1979,7 +1979,7 @@ def refresh_user_job_evaluations(
 def ensure_user_job_evaluations_initialized(
     user_id: int, preferences: dict[str, Any]
 ) -> int:
-    if not preferences.get("target_roles") or not preferences.get("locations"):
+    if not user_preferences.preferences_complete(preferences):
         return 0
     with connect_sqlite(DB_PATH) as conn:
         tables = {
@@ -2024,7 +2024,7 @@ def refresh_configured_user_evaluations(job_ids: list[int] | None = None) -> int
         if not isinstance(stored, dict):
             continue
         preferences = {**user_preferences.PREFERENCE_DEFAULTS, **stored}
-        if preferences.get("target_roles") and preferences.get("locations"):
+        if user_preferences.preferences_complete(preferences):
             total += refresh_user_job_evaluations(int(row["id"]), preferences, job_ids)
     return total
 
@@ -3032,7 +3032,9 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
     value = normalize_phrase(location)
     if not value:
         return False
-    is_remote = bool(phrase_hits(["remote"], value))
+    is_remote = bool(phrase_hits(["remote"], value)) and not bool(
+        phrase_hits(["hybrid", "on site", "onsite"], value)
+    )
     if config.get("remote_only") and not is_remote:
         return False
 
@@ -3040,6 +3042,12 @@ def location_allowed(location: str, config: dict[str, Any]) -> bool:
     # every remote job worldwide. Match its qualifier as well as "remote".
     # A plain "Remote" entry intentionally remains a global remote filter.
     configured_locations = config.get("locations", [])
+    if config.get("remote_only") and is_remote and not configured_locations:
+        # Remote-only without a geographic target intentionally means
+        # remote opportunities worldwide. Missing/unknown location is still
+        # rejected above because it is not explicitly marked Remote.
+        return True
+
     for raw in configured_locations:
         parts = str(raw).split(",", 1)
         primary = normalize_phrase(parts[0])
@@ -3084,12 +3092,49 @@ def extract_explicit_work_location(description: str) -> str | None:
     return value
 
 
-def job_location_for_matching(job: dict[str, Any]) -> str:
-    """Prefer an explicit work location over broad aggregator metadata."""
-    return (
+def job_location_for_matching(
+    job: dict[str, Any],
+    remote_only: bool = False,
+) -> str:
+    """Prefer explicit work location and source-provided remote workplace data.
+
+    Structured workplace metadata is consulted only for remote-only profiles so
+    the normal high-volume matcher does not pay a JSON parsing cost.
+    """
+    location = (
         extract_explicit_work_location(str(job.get("description") or ""))
         or str(job.get("location") or "")
     )
+    if not remote_only:
+        return location
+
+    source_details = job.get("source_details")
+    if not isinstance(source_details, dict):
+        raw_details = job.get("source_details_json")
+        if isinstance(raw_details, str) and raw_details:
+            try:
+                parsed = json.loads(raw_details)
+            except (TypeError, json.JSONDecodeError):
+                parsed = {}
+            source_details = parsed if isinstance(parsed, dict) else {}
+        else:
+            source_details = {}
+
+    workplace = str(
+        source_details.get("workplace_type")
+        or job.get("workplace_type")
+        or ""
+    ).strip().casefold().replace("-", "_").replace(" ", "_")
+    if workplace in {"hybrid", "on_site", "onsite"}:
+        label = "Hybrid" if workplace == "hybrid" else "On-site"
+        return f"{location} ({label})".strip()
+    is_remote = workplace in {
+        "remote", "fully_remote", "fullyremote", "work_from_home", "wfh"
+    } or source_details.get("telecommuting") is True
+
+    if is_remote and not phrase_hits(["remote"], location):
+        return f"Remote - {location}".strip(" -")
+    return location
 
 
 
@@ -3494,7 +3539,10 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
             "experience_max_years": None,
         }
 
-    if not location_allowed(job_location_for_matching(job), config):
+    if not location_allowed(
+        job_location_for_matching(job, remote_only=bool(config.get("remote_only"))),
+        config,
+    ):
         return {
             "match": False,
             "score": 0,
@@ -9534,7 +9582,7 @@ def jobs(
     if not preferences["onboarding_complete"]:
         raise HTTPException(
             status_code=403,
-            detail="Complete your target role and location preferences before opening the job feed.",
+            detail="Complete a target role and either choose a location or enable Remote only before opening the job feed.",
         )
     ensure_user_job_evaluations_initialized(user["id"], preferences)
     minutes = max(1, min(minutes, 10080))
@@ -9829,7 +9877,7 @@ def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
     if not preferences["onboarding_complete"]:
         raise HTTPException(
             status_code=403,
-            detail="Complete your target role and location preferences before opening the job feed.",
+            detail="Complete a target role and either choose a location or enable Remote only before opening the job feed.",
         )
     ensure_user_job_evaluations_initialized(user["id"], preferences)
     cutoff = iso(current_day_start_utc())
@@ -9881,7 +9929,7 @@ def job_detail(
     if not preferences["onboarding_complete"]:
         raise HTTPException(
             status_code=403,
-            detail="Complete your target role and location preferences before opening job details.",
+            detail="Complete a target role and either choose a location or enable Remote only before opening job details.",
         )
     ensure_user_job_evaluations_initialized(user["id"], preferences)
     with connect_sqlite(DB_PATH) as conn:

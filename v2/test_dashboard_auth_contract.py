@@ -123,6 +123,7 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             self.assertIn(required, source, f"shared dashboard must implement {required}")
         html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="navSources" hidden', html)
+        self.assertIn('id="navIntelligenceGroup" hidden', html)
         self.assertIn('class="workspace-page admin-only-section"', html)
         self.assertIn('class="mobile-tab-btn admin-only-navigation"', html)
         self.assertIn("admin-only-setting", html)
@@ -131,6 +132,8 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
         css = (ROOT / "dashboard" / "styles.css").read_text(encoding="utf-8")
         self.assertIn('class="nav-link-item admin-only-navigation"', html)
+        self.assertIn('class="nav-group admin-only-navigation"', html)
+        self.assertIn('id="navIntelligenceGroup" hidden', html)
         self.assertIn('class="mobile-tab-btn admin-only-navigation"', html)
         self.assertIn("[hidden] {\n  display: none !important;\n}", css)
         self.assertIn(".nav-link-item {\n  display: flex;", css)
@@ -151,13 +154,15 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             "const rendered = readRenderedTags()",
             "if (input.value.trim()) addTag(input.value)",
             "if (!payload.target_roles?.length) missing.push('at least one target role')",
-            "if (!payload.locations?.length) missing.push('at least one target location')",
+            "if (!payload.locations?.length && !payload.remote_only) missing.push('a target location or enable Remote only for worldwide remote jobs')",
             "const errorData = await response.json().catch(() => ({}))",
             "const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : ''",
             "showToast(message, 'error', 7000)",
             "saveStatusMessage",
         ):
             self.assertIn(required, source, f"preferences save must implement {required}")
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("With no location selected, Remote only searches worldwide.", html)
 
     def test_dashboard_feed_polling_is_bounded_and_skips_hidden_tabs(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
