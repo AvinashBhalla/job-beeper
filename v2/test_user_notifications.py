@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,6 +15,12 @@ from v2 import sqlite_store, telegram, radar
 
 class UserNotificationServiceTests(unittest.TestCase):
     def setUp(self):
+        self.clock_patcher = patch.object(
+            user_notifications,
+            "_now",
+            return_value=datetime(2026, 11, 7, 12, 0, tzinfo=timezone.utc),
+        )
+        self.clock_patcher.start()
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Path(self.tmp.name) / 'notifications.sqlite3'
         with user_notifications._connect(self.db) as conn:
@@ -62,6 +69,7 @@ class UserNotificationServiceTests(unittest.TestCase):
             conn.execute("INSERT INTO user_job_evaluations VALUES(?,?,?,?,?,?)", (1, 3, fingerprint, 1, 99, '[]'))
 
     def tearDown(self):
+        self.clock_patcher.stop()
         self.tmp.cleanup()
 
     def test_dispatch_does_not_open_claim_write_transaction_without_opted_in_users(self):
@@ -232,6 +240,30 @@ class UserNotificationServiceTests(unittest.TestCase):
                 "INSERT INTO notification_ledger(canonical_opportunity_id,baseline_suppressed,status) VALUES(101,1,'suppressed')"
             )
         self.assertFalse(user_notifications._still_deliverable(self.db,item))
+
+    def test_max_age_window_excludes_only_jobs_older_than_the_limit(self):
+        with user_notifications._connect(self.db) as conn:
+            # Frozen clock is 2026-11-07 12:00 UTC; the default max age is 72h.
+            conn.execute(
+                "UPDATE jobs SET discovered_at=? WHERE id=1",
+                ("2026-11-04T11:59:59+00:00",),
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, "2026-11-04T00:00:00+00:00"
+                ),
+                0,
+            )
+            conn.execute(
+                "UPDATE jobs SET discovered_at=? WHERE id=1",
+                ("2026-11-04T12:00:00+00:00",),
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, "2026-11-04T00:00:00+00:00"
+                ),
+                1,
+            )
 
     def test_stale_preference_evaluation_is_not_queued(self):
         with user_notifications._connect(self.db) as conn:
