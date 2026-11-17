@@ -17,7 +17,7 @@ This is a self-contained watcher added alongside JobBeeper. It does **not** impo
 - 90 rows are enabled for initial dry-run scanning.
 - 10 rows are held for manual review or exact identity/board confirmation. Some have an official homepage, a partial entity match, or a research-only search pointer. These are not fetched by the workflow.
 - A populated URL does not mean every site exposes a machine-readable job board. Generic career pages may only yield `review` candidates until structured JobPosting data or a supported ATS adapter is available.
-- 11 original career URLs were retained from the updated user-supplied CSV and are marked `provided_url_needs_live_validation`; a successful dry-run request is the next verification step.
+- 26 original career URLs were retained from the updated user-supplied CSV and are marked `provided_url_needs_live_validation`; a successful dry-run request is the next verification step.
 
 Do not convert search pointers or an entity ambiguity into an automatically scanned URL. Confirm the employer identity and update the row's `scan_enabled` only after the official board is verified.
 
