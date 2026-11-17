@@ -461,13 +461,13 @@ A listener was present on all five loopback ports. The roles of ports 8010/8006/
 
 ## 12. Exact-head GitHub CI result — 2026-11-17
 
-- Documentation PR: [#74](https://github.com/AvinashBhalla/job-beeper/pull/74), head `71d5e7ef2b0f6ec80a593bc4281441727f152d7c`; GitHub tested merge commit `3083018bdbe27b02e8cbae61fd6db502447031db` against base `5c28d97ea39edfa8af13d9686f7b97c3997901f3`.
-- [V2 CI run #1482](https://github.com/AvinashBhalla/job-beeper/actions/runs/44053095028) completed with **failure**.
-- Successful steps: Python compilation, dashboard JavaScript syntax, focused router/extractor tests.
-- Full V2 suite: **484 tests in 61.083 seconds; 10 failures and 2 errors**. All 12 are in `v2/test_user_notifications.py`.
+- Documentation PR: [#74](https://github.com/AvinashBhalla/job-beeper/pull/74), current head `2be95c5b5adb3a48dd8c48aa8d0e74da0e1c1f64`; latest tested merge commit `a6ab3bdfe77dd041fb74bfed58fd6d75459c84ab` against base `5c28d97ea39edfa8af13d9686f7b97c3997901f3`.
+- Latest [V2 CI run #1484](https://github.com/AvinashBhalla/job-beeper/actions/runs/44056563963) completed with **failure**. Previous run #1482 on the prior docs head failed with the same test failures.
+- Successful steps: Python compilation, dashboard JavaScript syntax, focused router/extractor tests (32/32).
+- Full V2 suite: **484 tests in 59.473 seconds; 10 failures and 2 errors**. All 12 are in `v2/test_user_notifications.py`.
 - Errors: `test_permanent_telegram_client_error_is_not_retried` and `test_transient_delivery_failure_is_recorded_for_retry` read a missing ledger row (`NoneType`).
-- Failures: baseline-marker suppression/revalidation, queue idempotency and user scoping, stale/nonmatching evaluation cancellation, per-user dispatch and two-user delivery expectations.
-- The PR diff is documentation-only and changes no application or test code. The base SHA had no associated workflow run available through the connected GitHub history, so do not label these failures as proven pre-existing. They are a confirmed red result on the PR's tested merge tree.
+- Failures: `test_baseline_marker_blocks_a_previously_queued_item_before_send`, `test_canonical_baseline_marker_blocks_final_send_revalidation`, `test_canonical_baseline_marker_cancels_previously_queued_member_item`, `test_current_nonmatching_evaluation_cancels_previously_queued_notification`, `test_dispatch_sends_only_to_owner_chat_and_marks_sent`, `test_initial_source_baseline_jobs_are_not_queued_for_any_member`, `test_preference_change_cancels_a_queued_job_that_no_longer_has_a_fresh_evaluation`, `test_queue_is_idempotent_for_same_user_and_opportunity`, `test_queue_is_user_scoped_and_never_replays_pre_opt_in_jobs` and `test_two_users_receive_only_their_own_matching_job_and_chat`.
+- The PR diff is documentation-only and changes no application or test code. No base-SHA workflow run was available through the connected GitHub history, so do not label the failures as proven pre-existing or caused by this docs PR.
 - **Gate:** keep PR #74 draft/unmerged. Before Company Watch code integration, reproduce and diagnose the notification-suite failures on a clean checkout of the exact base SHA, then rerun the full suite. Do not weaken assertions or alter notification behaviour merely to make CI green. No runtime, source, database, scheduler, deployment or Telegram state was changed by this documentation task.
 
 ## 13. Next agent — exact ordered checklist
