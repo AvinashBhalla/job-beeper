@@ -44,6 +44,15 @@ The owner explicitly authorized production promotion without another in-chat app
 - Production still has exactly 10 active ATS registry boards and 10 active schedules. The manifest did not alter source flags or configured board arrays.
 - SQLite integrity check after import: `ok`. Importer tests passed 9/9 in candidate image; isolated throwaway-DB dry-run/import/re-import proved idempotency (first import 19 inserts, second import 0 inserts).
 
+## Post-deploy observation — 21:17 UTC
+
+- Workday attempts after deployment: `21:01:26`, `21:06:34`, `21:16:37` UTC. Each made exactly one request and received one HTTP 429 / one failed page. The scheduler applied progressive host cooldowns of 5, 10 and 20 minutes; next due is `2026-11-17T21:36:38.680292+00:00`. No premature retries occurred. Other hosts continued polling during Workday cooldown; 29 non-Workday source runs completed after the second Workday 429 and before the 10-minute observation checkpoint.
+- Correctly bounded post-deploy observation window (`started_at >= 2026-11-17T20:59:46`, through about 21:08 UTC): Ashby 4 runs / 4 requests / 0 429 / 0 failed pages; Darwinbox 4 / 4 / 0 / 0; Greenhouse 6 / 6 / 0 / 0; Keka 4 / 8 / 0 / 0; LinkedIn 3 / 28 / 0 / 0 (70 seen, 10 new); Naukri 2 / 2 / 0 / 0 (626 seen); SmartRecruiters 2 / 46 / 0 / 0 (600 seen); Workable 4 / 4 / 0 / 0; Workday 2 / 2 / 2 / 2 (0 jobs). No duplicate source IDs; production DB quick check `ok`.
+- Naukri relay workflow #9878 succeeded; the post-deploy V2 collector accepted 317 jobs, 0 new and 0 failed pages. The five-minute systemd timer remains enabled.
+- SmartRecruiters production polls progressed through 20, 40 and 60 cached detail hits while attempting up to 20 uncached details per poll. Each poll retained its three listing requests. Candidate warm-cache simulation showed the steady state: 300 hits, 0 detail attempts, 3 listing requests. Allow cache to warm; do not claim steady-state savings yet.
+- Production dashboard OpenAPI exposes `q`, `search`, `source`, `min_score`, `max_age_hours`, `sort`, `sort_by`, `sort_order`, `alertable_only` and `remote_only`. Dashboard and OpenAPI return HTTP 200. Production jobs count is 27,556; duplicate `(source, source_job_id)` groups are 0; the 10 new post-release rows are LinkedIn jobs.
+- Company Watch review breakdown: 19 staged candidates comprise Greenhouse 10, Lever 6, SmartRecruiters 3. The 81 manual-review rows comprise 71 generic careers pages requiring discovery, 8 disabled/manual/employer-identity confirmation, and 2 additional mixed cases involving board-type/scan-mode mismatch. Four rows carry a CSV `verified_ats_board` label and 15 carry `provided_url_needs_live_validation`; neither label is equivalent to V2 live verification or activation. Keep all 19 candidates and 81 rows review-only.
+
 ## Immediate monitoring and remaining work
 
 1. Confirm Workday did not retry before its persisted five-minute cooldown expired; record the next result. If it receives another 429, confirm the next cooldown escalates to 10 minutes and no unrelated host pauses.

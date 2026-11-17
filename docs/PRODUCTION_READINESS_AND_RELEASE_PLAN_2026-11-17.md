@@ -8,6 +8,8 @@ The 100-row Company Watch manifest is now imported persistently as review-only d
 
 Final pre-deploy backup: `/var/backups/job-radar-daily/production-before-v2-release-20261118T2058Z.sqlite3`, 135,368,704 bytes, mode 0600, integrity ok; 27,546 jobs, 2 users, 10 ATS boards and 51,984 source runs; SHA-256 `6c8fa1f139ea05a081c0f65fefc84540f9d9600febe59f57b71b3a1a0bd9da15`. The previous production image and rollback image remain available. The release is deployed, but reliability acceptance remains pending at least 24 hours of source telemetry and Workday cooldown verification.
 
+First post-release Workday retries at 21:01:26, 21:06:34 and 21:16:37 UTC each received 429; persisted cooldown escalated 5 → 10 → 20 minutes with no early retry. Next due is `2026-11-17T21:36:38.680292+00:00`. Other hosts continued polling. SmartRecruiters cache hits grew 20 → 40 → 60 over three production polls; candidate warm-cache QA reached 300 hits / 0 details / 3 listing calls. Naukri relay #9878 succeeded; V2 ingestion accepted 317 jobs with no failures. The 100-row manifest is imported review-only (19 staged, 81 manual); 0 companies/boards were created or activated. Continue 24-hour observation before full reliability acceptance.
+
 ---
 
 ## Latest execution update — 17 November 2026, 18:30 UTC
