@@ -11,7 +11,7 @@
 - Production DB has one admin and no normal member account, linked Telegram chat or per-user notification records. Google sign-in is disabled. Production Telegram token identity check worked, but webhook is not registered and per-user bot username/webhook-secret environment variables are missing.
 - VM cleanup complete: only production and current QA containers remain; one production volume; five retained images; zero Docker build cache; disk 28% used; about 407 MB RAM available at last sample. Legacy QA data is archived.
 - Daily SQLite snapshot service repaired and manually verified. Encrypted offsite backup and isolated restore drill still required.
-- HTTPS certificate for 130.210.27.197 expires 23 Nov 2026; Certbot snap timer is active. A staging dry-run renewal is running and its result is not yet verified.
+- HTTPS certificate for 130.210.27.197 expires 23 Nov 2026; Certbot snap renewal timer is active. A staging dry-run renewal completed successfully on 17 Nov; the live certificate was not changed by the dry run.
 - Revised remaining estimate: 6–10 focused engineering hours to a controlled member canary once owner email, bot-owner access and offsite backup access are available, then 24–72 hours monitoring.
 
 Next steps: provision a separate member account using the owner-provided email; complete that member's preferences; configure Telegram webhook/link private chat/explicit opt-in; verify a real new matching job and one successful per-user Telegram delivery with no duplicates; configure encrypted offsite backup and restore; deploy merged V2 only after explicit owner approval. Do not resume Company Watch Phase 2 before this proof.

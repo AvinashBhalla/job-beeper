@@ -12,7 +12,7 @@ PR #77 is now merged into v2-live-radar. This is a code merge only; it is not a 
 - QA pre-swap DB backup: /var/backups/job-radar-daily/qa-before-cc2087e.sqlite3, 27,373 jobs, SQLite integrity ok, SHA-256 6237a548e2f5a0278a02275a283532d23f6ea35672c93a34edf2578ffecc2e1f.
 - Production remains unchanged on image job-radar-prod-canary:6e5becb at port 8000; both public HTTPS /health and loopback /health return HTTP 200. No member account was created, no webhook was registered and no live member message was sent.
 - Final VM inventory: two running JobBeeper containers, one production Docker volume, five retained images including the prior QA image for QA rollback, zero build cache. Root disk 28% used; about 407 MB RAM available at the last sample.
-- Production HTTPS certificate covers IP 130.210.27.197 and expires 23 November 2026. The snap.certbot.renew timer is active. A staging dry-run renewal is in progress and currently waiting through Certbot's randomized delay; record its final result before declaring renewal verified.
+- Production HTTPS certificate covers IP 130.210.27.197 and expires 23 November 2026. The snap.certbot.renew timer is active. A Certbot staging dry-run renewal for this exact IP certificate completed successfully on 17 November; the current production certificate was not replaced by the dry run.
 
 ## Remaining work and revised delivery estimate
 
