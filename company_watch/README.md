@@ -46,7 +46,7 @@ To persist a local dry-run baseline intentionally:
 python company_watch/scan.py --dry-run --remember-dry-run --state-file company_watch/.state/seen.json
 ```
 
-The workflow does this using an isolated Actions cache. It does not write to Git. Each Actions artifact now contains both a readable Markdown summary and the full JSON report.
+The workflow does this using an isolated Actions cache. It does not write to Git. Each Actions artifact contains both a readable Markdown summary and the full JSON report under `company_watch/reports/`, a non-hidden directory so GitHub's artifact uploader includes the files. The workflow checks that both report files exist and are non-empty before upload, and treats missing files as an error.
 
 ## Schedule
 
