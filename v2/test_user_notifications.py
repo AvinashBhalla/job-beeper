@@ -245,7 +245,7 @@ class UserNotificationServiceTests(unittest.TestCase):
         with user_notifications._connect(self.db) as conn:
             # Frozen clock is 2026-11-07 12:00 UTC; the default max age is 72h.
             conn.execute(
-                "UPDATE jobs SET discovered_at=? WHERE id=1",
+                "UPDATE jobs SET discovered_at=? WHERE id IN (1,3)",
                 ("2026-11-04T11:59:59+00:00",),
             )
             self.assertEqual(
