@@ -4,6 +4,7 @@ import hashlib
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -49,6 +50,21 @@ class BackupRetentionTests(unittest.TestCase):
             for keep in (0, -1):
                 with self.subTest(keep=keep), self.assertRaises(ValueError):
                     rotate_snapshots(temp, keep=keep)
+
+    def test_hash_failure_does_not_prune_old_recovery_points(self):
+        import retention
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for offset in range(9):
+                stamp = f"202611{offset + 1:02d}"
+                (root / f"production-jobs-{stamp}.sqlite3").write_text(str(offset))
+            stale = root / "production-jobs-20261101.sqlite3"
+            with mock.patch.object(retention, "_sha256", side_effect=OSError("read failed")):
+                with self.assertRaises(OSError):
+                    rotate_snapshots(root, keep=7)
+            self.assertTrue(stale.exists())
+            self.assertFalse((root / "SHA256SUMS").exists())
 
     def test_rejects_missing_directory(self):
         with tempfile.TemporaryDirectory() as temp:
