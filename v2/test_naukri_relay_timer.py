@@ -15,8 +15,8 @@ class NaukriRelayTimerUnitTests(unittest.TestCase):
         cls.timer = TIMER_PATH.read_text(encoding="utf-8")
         cls.service = SERVICE_PATH.read_text(encoding="utf-8")
 
-    def test_timer_uses_five_minute_calendar_cadence(self):
-        self.assertIn("OnCalendar=*-*-* *:0/5:00", self.timer)
+    def test_timer_uses_ten_minute_calendar_cadence(self):
+        self.assertIn("OnCalendar=*-*-* *:0/10:00", self.timer)
 
     def test_timer_catches_up_after_downtime(self):
         self.assertIn("Persistent=true", self.timer)
