@@ -274,3 +274,28 @@ This is an interim snapshot, not the final 24-hour acceptance decision. Continue
 ### Company Watch offline dry-run qualification — 18 November 2026
 
 The corrected pinned manifest was dry-run from the current merged V2 checkout inside the production app image with container networking disabled. Exact hash matched `146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd`; parser returned 100 rows, 19 candidate_staged and 81 manual_review. The guarded dry-run reported zero company creates, links, verifications, activations, schedules, network requests or notifications. No SQLite file was created. This qualifies parsing/classification only; no runtime deploy or manifest import was performed, and production's current old candidates have not been altered.
+
+### Source reliability refresh — 18 November 2026, 12:02 UTC
+
+Read-only aggregate since the assessment start (17 November 20:59:46 UTC); final window cutoff remains 18 November 20:59:46 UTC:
+
+| Source | Runs | Success | Non-success | HTTP 429 | Jobs seen | New jobs |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 345 | 344 | 1 | 0 | 145,543 | 5 |
+| Darwinbox | 439 | 439 | 0 | 0 | 17,558 | 4 |
+| Greenhouse | 531 | 531 | 0 | 0 | 61,003 | 2 |
+| Keka | 433 | 433 | 0 | 0 | 50,278 | 1 |
+| LinkedIn | 104 | 99 | 5 | 5 | 1,394 | 169 |
+| Naukri | 180 | 142 | 38 | 0 | 44,259 | 102 |
+| SmartRecruiters | 175 | 175 | 0 | 0 | 52,499 | 86 |
+| Workable | 442 | 442 | 0 | 0 | 2,652 | 0 |
+| Workday | 18 | 0 | 18 | 18 | 0 | 0 |
+| **Total** | **2,667** | **2,605** | **62** | **23** | **375,186** | **369** |
+
+- Workday continues to receive HTTP 429 on every observed run; the latest persisted cooldown is 300 seconds and runs have been about hourly. Leave the scheduler's rate-limit state untouched.
+- LinkedIn's five 429s remain five within 104 runs; no manual probe or cooldown reset.
+- Naukri's 38 non-successes are stale-feed rejections after the owner-paused publisher. Its latest three polls failed closed with `RuntimeError`; the publisher timer is still intentionally disabled. Do not treat these as failures in the independent ATS collectors or bypass the 15-minute freshness guard.
+- Ashby has one isolated failure and 344 successes. Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable remain successful in all runs in the window.
+- JobBeeper health is HTTP 200; DB integrity is `ok`; active board/schedule counts remain 10/10; local snapshot checksums all verify.
+
+This remains an interim checkpoint. Do not issue a final 24-hour acceptance until the window closes at 20:59:46 UTC.
