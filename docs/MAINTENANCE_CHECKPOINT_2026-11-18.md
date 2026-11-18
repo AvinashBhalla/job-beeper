@@ -233,3 +233,14 @@ No production file, database, service, backup job or account setting was modifie
 ### Repository branch hygiene after SERP merges
 
 After confirming PRs #90–#95 were merged and no PRs remained open, deleted the four remaining merged topic branches for PRs #90–#93, plus the branches for PRs #94 and #95. The two long-lived branches are retained: `main` and `v2-live-radar`. The local production checkout was not pulled, reset, rebuilt or deployed.
+
+### Owner-paused Naukri relay — 18 November 2026, 09:03 UTC
+
+The owner stopped the Naukri relay to reduce frequent GitHub Actions activity. A read-only check showed the production timer was still enabled and had a next five-minute dispatch queued, so it was disabled/stopped to enforce the owner's intent. Verified post-change state: `ActiveState=inactive`, `SubState=dead`, `UnitFileState=disabled`, with no future trigger. The last public relay run (09:00:14 UTC) had completed successfully. No running workflow remained.
+
+Important billing distinction: the relay's repository `AvinashBhalla/job-beeper-naukri-relay` is public and runs on the standard `ubuntu-latest` GitHub-hosted runner. GitHub documentation says standard runners for public repositories are free and unlimited. The private JobBeeper repository's PR CI is the activity blocked by the account billing/spending notice; that is separate from the public relay workflow. No paid spend is needed to keep the standard public relay running.
+
+The five-minute cadence still generated up to 288 runs/day, with recent run duration around 2m–2m30s. This is a lot of workflow/query activity even at no monetary runner cost. The recommended future compromise, only if explicitly resumed, is every ten minutes (up to 144 runs/day) with the existing 15-minute app freshness validation kept unchanged. PR #96 now carries that lower-frequency timer template, offline contract test and updated deployment instructions. It is not deployed.
+
+The app-side Naukri collector is still configured to poll its raw relay feed every five minutes. Once the last published feed exceeds the existing 15-minute freshness threshold, the collector will fail closed; these failures are expected while the publisher is paused. No app config, database state, other ATS source or production application service was changed. Health Watch now treats the paused relay as expected and will not alert on stale-feed failures unless they materially affect overall app health or create noise.
+
