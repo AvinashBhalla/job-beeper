@@ -1,8 +1,30 @@
 """Tests for licensed SERP-to-ATS candidate normalization."""
 import datetime as dt
 import unittest
+from unittest.mock import patch
 
 from v2 import radar, serp_board_discovery as serp
+
+
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self.payload
+
+
+class FakeRequester:
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = []
+
+    def post(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return FakeResponse(self.payload)
 
 
 class SerpBoardDiscoveryTests(unittest.TestCase):
@@ -64,6 +86,42 @@ class SerpBoardDiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0]["board_url"], "https://jobs.lever.co/acme")
+
+    def test_dataforseo_client_uses_secret_credentials_and_one_live_request(self):
+        requester = FakeRequester({"tasks": []})
+        result = serp.search_dataforseo_live(
+            "workday", username="user", password="secret", requester=requester
+        )
+        self.assertEqual(result, {"tasks": []})
+        self.assertEqual(len(requester.calls), 1)
+        url, kwargs = requester.calls[0]
+        self.assertEqual(url, serp.DATAFORSEO_LIVE_ENDPOINT)
+        self.assertEqual(kwargs["auth"], ("user", "secret"))
+        self.assertEqual(kwargs["json"][0]["target"], "*myworkdayjobs.com*")
+        self.assertEqual(kwargs["timeout"], serp.SEARCH_TIMEOUT_SECONDS)
+
+    def test_serper_client_uses_secret_key_and_india_english_locale(self):
+        requester = FakeRequester({"organic": []})
+        result = serp.search_serper(
+            "ashby", api_key="test-key", requester=requester
+        )
+        self.assertEqual(result, {"organic": []})
+        self.assertEqual(len(requester.calls), 1)
+        url, kwargs = requester.calls[0]
+        self.assertEqual(url, serp.SERPER_ENDPOINT)
+        self.assertEqual(kwargs["headers"]["X-API-KEY"], "test-key")
+        self.assertEqual(kwargs["json"]["gl"], "in")
+        self.assertEqual(kwargs["json"]["hl"], "en")
+        self.assertIn("site:ashbyhq.com", kwargs["json"]["q"])
+
+    def test_provider_clients_fail_without_credentials_and_do_not_send_requests(self):
+        requester = FakeRequester({"organic": []})
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(RuntimeError):
+                serp.search_serper("ashby", requester=requester)
+            with self.assertRaises(RuntimeError):
+                serp.search_dataforseo_live("ashby", requester=requester)
+        self.assertEqual(requester.calls, [])
 
     def test_candidate_importer_accepts_serp_provenance_method(self):
         self.assertIn("search_engine_serp", radar.GLOBAL_DISCOVERY_METHODS)
