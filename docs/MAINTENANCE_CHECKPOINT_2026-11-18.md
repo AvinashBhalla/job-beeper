@@ -175,3 +175,25 @@ This qualifies the parser and candidate-only importer in an isolated production-
 - The benchmark now has an offline summarizer for coverage, unique boards, duplicate appearances, cross-engine overlap, actual DataForSEO task costs and Serper credit estimates.
 - Optional manual labels distinguish verified employer-owned boards from false positives; unreviewed candidates and conflicting labels remain explicit.
 - No network calls are made by the summarizer. The 50-pair benchmark itself remains unrun pending provider credentials and owner spend approval.
+
+### Source reliability checkpoint — 18 November 2026, 06:09 UTC
+
+The 24-hour window is still in progress. Current aggregate since 17 November 20:59:46 UTC:
+
+| Source | Runs | Success | Non-success | HTTP 429 | Jobs seen | New jobs |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 211 | 210 | 1 | 0 | 88,861 | 5 |
+| Darwinbox | 268 | 268 | 0 | 0 | 10,452 | 0 |
+| Greenhouse | 324 | 324 | 0 | 0 | 37,267 | 2 |
+| Keka | 264 | 264 | 0 | 0 | 30,650 | 1 |
+| LinkedIn | 101 | 98 | 3 | 3 | 1,354 | 151 |
+| Naukri | 110 | 105 | 5 | 0 | 33,061 | 17 |
+| SmartRecruiters | 107 | 107 | 0 | 0 | 32,100 | 21 |
+| Workable | 269 | 269 | 0 | 0 | 1,614 | 0 |
+| Workday | 12 | 0 | 12 | 12 | 0 | 0 |
+
+Naukri's five failures all correspond to the stale relay window after reboot. It has since succeeded on three consecutive app polls (05:57:46, 06:02:50, 06:07:50 UTC), with 319, 314 and 317 jobs respectively. The relay workflow dispatched by the timer at 05:59 and 06:04 completed successfully. The timer remains active/waiting and next scheduled at 06:14:19 UTC.
+
+Workday remains in adaptive 429 backoff; no manual probes or resets. LinkedIn's 3 rate-limited runs are retained in the assessment; do not infer continuous failure from the aggregate because successful scans also occurred. Ashby had one isolated runtime failure; subsequent polls are succeeding. Other six sources have no non-success runs in this window.
+
+This is an interim snapshot, not the final 24-hour acceptance decision. Continue monitoring until 20:59:46 UTC.
