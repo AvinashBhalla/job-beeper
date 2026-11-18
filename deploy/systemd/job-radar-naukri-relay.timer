@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Naukri Relay GitHub workflow every five minutes
+
+[Timer]
+# Calendar-based scheduling gives a stable wall-clock cadence. Persistent=true
+# catches one missed run when the timer is reactivated after downtime/reboot.
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+AccuracySec=15s
+Unit=job-radar-naukri-relay.service
+
+[Install]
+WantedBy=timers.target
