@@ -22,6 +22,15 @@ def _db_path() -> str:
 
 def run_once(db_path: str | None = None) -> dict[str, Any]:
     """Run a single due cycle; disabled/missing-cap state makes zero requests."""
+    state = coordinator.status(db_path or _db_path())["control"]
+    if not state.get("enabled"):
+        return coordinator.run_once(
+            db_path or _db_path(),
+            searcher=lambda _provider: {},
+            importer=lambda _payload: {},
+        )
+    if not os.getenv("DATAFORSEO_LOGIN") or not os.getenv("DATAFORSEO_PASSWORD"):
+        raise ValueError("SERP discovery is enabled but DataForSEO credentials are missing.")
     from v2 import radar
 
     def searcher(provider: str) -> dict[str, Any]:
