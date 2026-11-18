@@ -270,3 +270,7 @@ This is an interim snapshot, not the final 24-hour acceptance decision. Continue
 - Its repo-managed systemd timer/service templates target a ten-minute calendar cadence and are accompanied by seven offline contract tests.
 - Validation on the exact rebased PR head: **7/7 focused timer tests and 557/557 full V2 tests passed locally** (351.012 seconds). `systemd-analyze calendar` parsed the ten-minute expression. `systemd-analyze verify` emitted only unrelated host warnings for netplan/snapd units.
 - This merge only adds templates, tests and documentation. It does **not** install or enable the timer. Production Naukri timer remains inactive/dead/disabled with no future trigger, by owner choice. The app's 15-minute freshness guard remains unchanged. No relay workflow dispatch was triggered.
+
+### Company Watch offline dry-run qualification — 18 November 2026
+
+The corrected pinned manifest was dry-run from the current merged V2 checkout inside the production app image with container networking disabled. Exact hash matched `146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd`; parser returned 100 rows, 19 candidate_staged and 81 manual_review. The guarded dry-run reported zero company creates, links, verifications, activations, schedules, network requests or notifications. No SQLite file was created. This qualifies parsing/classification only; no runtime deploy or manifest import was performed, and production's current old candidates have not been altered.
