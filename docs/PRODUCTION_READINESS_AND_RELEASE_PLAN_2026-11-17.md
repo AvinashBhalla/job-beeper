@@ -467,4 +467,4 @@ Workday remains degraded but controlled at a 60-minute cooldown; its naturally s
 
 ### Controls and delivery
 
-Naukri relay stays disabled; SERP coordinator remains inactive with zero runs, no host budget entries, no credentials and no paid calls. No paid API, GitHub plan upgrade or Termalin subscription was used. The exact-head local V2 suite passed 557/557; hosted GitHub Actions could not start due the private repository billing restriction. The ten commits after the candidate changed documentation only. Member-submitted career URL issue #99 remains P2 next release. No new ATS boards or source flag changes.
+Naukri relay stays disabled; SERP coordinator remains inactive with zero runs, no host budget entries, no credentials and no paid calls. No paid API, GitHub plan upgrade or Termalin subscription was used. The exact-head local V2 suite passed 557/557; hosted GitHub Actions could not start due the private repository billing restriction. All commits after the candidate changed documentation only. Member-submitted career URL issue #99 remains P2 next release. No new ATS boards or source flag changes.
