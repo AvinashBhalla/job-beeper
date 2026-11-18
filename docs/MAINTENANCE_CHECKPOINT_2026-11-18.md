@@ -167,3 +167,11 @@ Using a temporary shallow checkout of the exact `v2-live-radar` head (`cfb095d1d
 - The two stale live candidates remain `lever/mistral` (id 1) and `greenhouse/soundhoundinc` (id 6), both still `discovered`. They must be rejected through the guarded admin review route after the corrected manifest is deployed/imported. Do not alter them before that release step.
 
 This qualifies the parser and candidate-only importer in an isolated production-like database. It does not authorize deployment or live import.
+
+### SERP benchmark reporting follow-up
+
+- PR #95 merged into `v2-live-radar` as `267d6138055217d8e5931b3497584e58ad1a8477`.
+- CI passed: **539 V2 tests**.
+- The benchmark now has an offline summarizer for coverage, unique boards, duplicate appearances, cross-engine overlap, actual DataForSEO task costs and Serper credit estimates.
+- Optional manual labels distinguish verified employer-owned boards from false positives; unreviewed candidates and conflicting labels remain explicit.
+- No network calls are made by the summarizer. The 50-pair benchmark itself remains unrun pending provider credentials and owner spend approval.
