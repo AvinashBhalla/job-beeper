@@ -7,6 +7,7 @@ responses. Candidate identity is always derived from the existing ATS URL parser
 from __future__ import annotations
 
 import datetime as dt
+import math
 import os
 from typing import Any
 
@@ -349,10 +350,23 @@ def monthly_budget_allows_request(
     monthly_cap_usd: float | None,
 ) -> bool:
     """Fail closed unless a positive cap is explicitly configured."""
-    if monthly_cap_usd is None or monthly_cap_usd <= 0:
+    if (
+        monthly_cap_usd is None
+        or isinstance(monthly_cap_usd, bool)
+        or not isinstance(monthly_cap_usd, (int, float))
+        or not math.isfinite(float(monthly_cap_usd))
+        or monthly_cap_usd <= 0
+    ):
         return False
-    if spent_usd < 0 or next_request_cost_usd < 0:
-        raise ValueError("Spend values cannot be negative.")
+    values = (spent_usd, next_request_cost_usd)
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or value < 0
+        for value in values
+    ):
+        raise ValueError("Spend values must be finite, numeric and non-negative.")
     return spent_usd + next_request_cost_usd <= monthly_cap_usd
 
 
@@ -379,7 +393,13 @@ def discover_provider_candidates(
         query = keyword
         costs = [
             task.get("cost") for task in payload.get("tasks", [])
-            if isinstance(task, dict) and isinstance(task.get("cost"), (int, float))
+            if (
+                isinstance(task, dict)
+                and isinstance(task.get("cost"), (int, float))
+                and not isinstance(task.get("cost"), bool)
+                and math.isfinite(float(task.get("cost")))
+                and task.get("cost") >= 0
+            )
         ]
         actual_cost = round(sum(costs), 6) if costs else None
     elif engine == "serper":
