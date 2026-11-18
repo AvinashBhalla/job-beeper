@@ -222,11 +222,11 @@ The app-side Naukri collector is still configured to poll its raw relay feed eve
 
 - PR #97 was merged into `v2-live-radar` as `d48e324b17d0ba5a9a5ed770da1e3f9404e8c3ea`. A follow-up production safety fix for immutable SQLite verification and sidecar cleanup was committed to the same branch.
 - The seven-day local snapshot script/helper are now installed on production. The previous installed script is preserved for rollback.
-- The first verified dated snapshot for 18 November contains 27,888 jobs (138,387,456 bytes); integrity check `ok`. The pre-upgrade rolling snapshot (27,656 jobs) and pre-reboot snapshot (27,673 jobs) are preserved and independently integrity-checked.
+- The first verified dated snapshot for 18 November contains 27,891 jobs (138,420,224 bytes); integrity check `ok`. The pre-upgrade rolling snapshot (27,656 jobs) and pre-reboot snapshot (27,673 jobs) are preserved and independently integrity-checked.
 - The current `production-jobs.sqlite3` compatibility alias is a hard link to `production-jobs-20261118.sqlite3`. The first seven-day run also created dated production config/token snapshots, with mode 0600.
 - The SHA-256 manifest contains five entries and all five passed `sha256sum -c`. No temp files or SQLite WAL/SHM sidecars remained after the final run. The backup directory is root:root mode 0700.
 - Backup-specific tests: **6 passed** on the VM's disposable checkout; shell syntax and helper compile passed. Hosted CI remains unavailable because the private repository runner is blocked before startup by the account billing/spending restriction.
-- The daily snapshot timer remains enabled. The app returned HTTP 200 before and after the snapshot; it was not restarted. Disk free space was about 33 GB and the backup directory about 1.6 GB at final verification.
+- The daily snapshot timer remains enabled. The installed systemd oneshot service was also started once after installation; `Result=success`, exit status 0, with both SQLite integrity checks ok and the snapshot published at 10:16:41 UTC. The app returned HTTP 200 before and after the snapshot and was not restarted. Disk free space was about 33 GB and the backup directory about 1.6 GB at final verification.
 - PR #96 remains an optional ten-minute relay timer proposal only. The production Naukri relay timer remains disabled/inactive/dead by owner request; no paid runner, account upgrade or additional workflow dispatch is being pursued.
 - No off-site archive exists. These snapshots remain on the same VM/disk and cannot recover from VM/disk loss.
 
