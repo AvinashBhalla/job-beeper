@@ -7,9 +7,9 @@ Bring the V2-pinned Company Watch snapshot into line with the latest reviewed so
 ## Source and integrity
 
 - Source: company_watch/companies.csv
-- Source ref: main@fced495fdb83e8b0029f57431879beb06e88d8ff
+- Source ref: main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6
 - Pinned snapshot: v2/data/company_watch_companies_2026-11-18.csv
-- SHA-256: bdda2a9e527a7ad298790635b050108c49f950183e390f773b54a5a8c1252d3c
+- SHA-256: 146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd
 - Rows: 100; enabled: 92; disabled: 8
 - Expected V2 classification: 21 candidate_staged; 79 manual_review
 
