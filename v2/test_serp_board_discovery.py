@@ -88,17 +88,25 @@ class SerpBoardDiscoveryTests(unittest.TestCase):
         self.assertEqual(candidates[0]["board_url"], "https://jobs.lever.co/acme")
 
     def test_dataforseo_client_uses_secret_credentials_and_one_live_request(self):
-        requester = FakeRequester({"tasks": []})
+        requester = FakeRequester({"tasks": [{"status_code": 20000, "result": []}]})
         result = serp.search_dataforseo_live(
             "workday", username="user", password="secret", requester=requester
         )
-        self.assertEqual(result, {"tasks": []})
+        self.assertEqual(result, {"tasks": [{"status_code": 20000, "result": []}]})
         self.assertEqual(len(requester.calls), 1)
         url, kwargs = requester.calls[0]
         self.assertEqual(url, serp.DATAFORSEO_LIVE_ENDPOINT)
         self.assertEqual(kwargs["auth"], ("user", "secret"))
         self.assertEqual(kwargs["json"][0]["target"], "*myworkdayjobs.com*")
         self.assertEqual(kwargs["timeout"], serp.SEARCH_TIMEOUT_SECONDS)
+
+    def test_dataforseo_client_rejects_task_level_errors(self):
+        requester = FakeRequester({"tasks": [{"status_code": 40100}]})
+        with self.assertRaisesRegex(RuntimeError, "task failed"):
+            serp.search_dataforseo_live(
+                "workday", username="user", password="secret", requester=requester
+            )
+        self.assertEqual(len(requester.calls), 1)
 
     def test_serper_client_uses_secret_key_and_india_english_locale(self):
         requester = FakeRequester({"organic": []})
