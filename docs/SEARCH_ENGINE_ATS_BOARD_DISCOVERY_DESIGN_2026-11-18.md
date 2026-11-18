@@ -192,7 +192,7 @@ The provider-client layer is also merged (PR #91, merge commit `1503b6e35c635e5d
 - The monthly spend guard refuses requests when no positive cap is configured.
 - V2 CI passed: 526 tests.
 
-The next engineering stage is the persistent, disabled-by-default coordinator, actual monthly spend ledger, and fixed 50-query comparison harness. It must not be scheduled or enabled until provider and spend approval are explicit. Production remains untouched.
+The coordinator, spend ledger, operator-invoked worker and fixed 50-pair benchmark harness are now implemented and merged. Remaining work without spend is limited to local/mock validation and operational integration behind explicit disabled defaults. A real provider comparison cannot be completed without vendor credentials and paid calls; under the current no-spend constraint, do not request or initiate these. The coordinator has not been connected to a production timer or API endpoint and remains disabled. Production remains untouched.
 
 
 The persistent coordinator is now merged as PR #93 (merge commit `7d34451f48f92180d63b9e52b2c460e1ced48106`):
@@ -203,7 +203,7 @@ The persistent coordinator is now merged as PR #93 (merge commit `7d34451f48f921
 - Two-provider rotation and conservative cost reservation on request failures.
 - V2 CI passed: 533 tests.
 
-The coordinator is not connected to a timer, admin endpoint or production runtime. It has not made a paid request. It is ready for controlled QA and a disabled-by-default scheduler integration; owner approval is still required before enabling the provider or setting a spend cap.
+The coordinator is not connected to a timer, admin endpoint or production runtime. It has not made a paid request. The operator worker provides status/enable/disable/run-once commands but remains disabled unless explicitly configured with a positive cap and DataForSEO credentials. Under the current no-spend direction, keep it disabled; do not set a spend cap or provision credentials.
 
 ### Operator-invoked worker and matched benchmark — 18 November 2026
 
@@ -225,3 +225,13 @@ PR #95 adds offline benchmark reporting. After a run, summarize the JSONL withou
 `python -m v2.serp_benchmark --summarize data/serp-provider-benchmark.jsonl`
 
 The report calculates per-engine organic-result coverage, candidate query coverage, candidate appearances, deduplicated board identities, duplicate appearances, cross-engine overlap, actual DataForSEO task cost, estimated Serper credits, and yield per 1,000 requests. Reviewers can annotate individual candidate objects with `manual_verdict: "verified"` or `manual_verdict: "false_positive"` after checking the official employer careers page and board ownership; unreviewed and conflicting labels remain separate. Automated SERP discovery is not employer verification.
+
+
+## No-spend project status — 18 November 2026, 11:10 UTC
+
+- All implementation PRs #90–#95 are merged. The SERP adapter, provider clients, monthly spend ledger, disabled coordinator, operator worker and 50-pair benchmark plus offline report are implemented.
+- The actual 50-pair paid provider benchmark is **not run**. It remains optional and blocked by the owner's no-spend decision; no credentials or paid calls are used.
+- PR #97 is merged and the free seven-day local backup retention script is installed and verified on production.
+- Naukri publisher relay is intentionally paused. PR #96 remains an optional ten-minute timer template, not installed.
+- Remaining engineering focus: use only offline/mock data to further test SERP coordinator/worker failure paths and keep the candidate importer review-only; finish the 24-hour production source reliability assessment at 20:59:46 UTC; qualify the corrected Company Watch manifest for a future release, without changing production boards or schedules.
+- No GitHub billing change, Termalin plan, search API spend or other paid service is required to continue these tasks.
