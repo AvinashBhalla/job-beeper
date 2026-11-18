@@ -13,7 +13,7 @@ The candidate contains the merged V2 branch through commit `dda6d5757f4701ce916a
 
 The branch also includes the already reviewed/merged SERP discovery adapter, clients, disabled coordinator/worker, offline benchmark and test modules; these are disabled/not scheduled and have no credentials. No paid requests have been made. The Naukri ten-minute timer template is repository-only and is not installed or enabled. The member-submitted shared career URL feature is P2/next-release issue #99 and is excluded.
 
-No production database, source flags, board allowlist, member preference, Telegram setting or notification configuration has been changed during this qualification.
+No production database, source flags, board allowlist, member preference, Telegram setting or notification configuration was changed during the pre-release qualification. The guarded Company Watch import performed after promotion is recorded in section 8.
 
 ## 2. Exact-head validation
 
