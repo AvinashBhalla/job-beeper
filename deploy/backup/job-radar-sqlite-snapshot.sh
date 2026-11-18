@@ -111,13 +111,15 @@ snapshot_file() {
   local current_name="$3"
   local tmp="$BACKUP_DIR/.$dated_name.tmp.$$"
   local alias_tmp="$BACKUP_DIR/.$current_name.tmp.$"
-  trap 'rm -f "$tmp" "$alias_tmp"' RETURN
-  cp -- "$source" "$tmp"
-  chown root:root "$tmp"
-  chmod 0600 "$tmp"
-  mv -f "$tmp" "$BACKUP_DIR/$dated_name"
-  ln "$BACKUP_DIR/$dated_name" "$alias_tmp"
-  mv -f "$alias_tmp" "$BACKUP_DIR/$current_name"
+  (
+    trap 'rm -f "$tmp" "$alias_tmp"' EXIT
+    cp -- "$source" "$tmp"
+    chown root:root "$tmp"
+    chmod 0600 "$tmp"
+    mv -f "$tmp" "$BACKUP_DIR/$dated_name"
+    ln "$BACKUP_DIR/$dated_name" "$alias_tmp"
+    mv -f "$alias_tmp" "$BACKUP_DIR/$current_name"
+  )
 }
 
 # Pair the DB snapshot with the runtime configuration and its token.
