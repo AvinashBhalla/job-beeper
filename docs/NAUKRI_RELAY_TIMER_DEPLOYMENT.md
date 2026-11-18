@@ -44,3 +44,17 @@ Validate the actual unit syntax on a host with systemd installed:
 systemd-analyze verify deploy/systemd/job-radar-naukri-relay.service deploy/systemd/job-radar-naukri-relay.timer
 systemd-analyze calendar '*-*-* *:0/5:00'
 ```
+
+
+### Validation record — 18 November 2026
+
+The production-host independent test run used a temporary shallow checkout of this PR and a disposable Python virtual environment. Results:
+- Timer contract tests: **7 passed**.
+- Full V2 suite: **546 passed**, 0 failures, 368.112 seconds.
+- `systemd-analyze calendar '*-*-* *:0/5:00'` parsed the expression and returned the next five-minute boundary.
+- `systemd-analyze verify` completed, with two unrelated host-level warnings: permission denied while reading `/run/systemd/system/netplan-ovs-cleanup.service`, and the host's installed `snapd.service` has an unrecognized `RestartMode` key. Neither warning referred to the proposed units.
+- The temporary checkout and venv were removed after validation.
+
+GitHub Actions did not start this PR's workflow. The check annotation reports an account billing/spending-limit block before any test process was started. This is not a test result; independent local validation above is evidence only from the production-host environment.
+
+The production timer was not replaced. Its existing `active/waiting` schedule and successful Naukri ingestion remain under the current Health Watch.
