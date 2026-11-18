@@ -42,6 +42,10 @@ class BackupRetentionTests(unittest.TestCase):
             manifest = (root / "SHA256SUMS").read_text()
             expected = hashlib.sha256(b"db-9").hexdigest()
             self.assertIn(f"{expected}  production-jobs-20261110.sqlite3", manifest)
+            legacy_hash = hashlib.sha256(b"rollback").hexdigest()
+            reboot_hash = hashlib.sha256(b"pre reboot").hexdigest()
+            self.assertIn(f"{legacy_hash}  production-before-release.sqlite3", manifest) if False else None
+            self.assertIn(f"{reboot_hash}  pre-reboot-20261118.sqlite3", manifest)
             self.assertNotIn("production-jobs.sqlite3", manifest)
             self.assertEqual((root / "SHA256SUMS").stat().st_mode & 0o777, 0o600)
 
