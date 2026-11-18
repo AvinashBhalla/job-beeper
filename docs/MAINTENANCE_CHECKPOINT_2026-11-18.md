@@ -255,3 +255,10 @@ Interpretation:
 - Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable remain successful in all runs in the observed window.
 
 This is an interim snapshot, not the final 24-hour acceptance decision. Continue read-only observation until 20:59:46 UTC.
+
+### PR #98 — SERP budget numeric fail-closed guard merged
+
+- Merged as `a0af67e313c12b663e0ab0c02940279284846c85` into `v2-live-radar`.
+- New checks reject NaN/infinity/boolean caps, invalid persisted budget state and non-finite provider-reported task costs; a bad cost value retains the conservative reservation.
+- Validation: **28 focused SERP tests passed; full V2 suite 550/550 passed** locally in 325.201 seconds. No hosted CI could start because of the private repository billing block.
+- No paid provider requests, credentials, scheduler, production database writes or deployments.
