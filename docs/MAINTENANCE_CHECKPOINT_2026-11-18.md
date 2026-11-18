@@ -230,3 +230,28 @@ The app-side Naukri collector is still configured to poll its raw relay feed eve
 - PR #96 remains an optional ten-minute relay timer proposal only. The production Naukri relay timer remains disabled/inactive/dead by owner request; no paid runner, account upgrade or additional workflow dispatch is being pursued.
 - No off-site archive exists. These snapshots remain on the same VM/disk and cannot recover from VM/disk loss.
 
+### Interim 24-hour source reliability update — 18 November 2026, 11:01 UTC
+
+Aggregated source runs since the assessment start at 17 November 20:59:46 UTC (window still open; final cutoff 18 November 20:59:46 UTC):
+
+| Source | Runs | Success | Non-success | HTTP 429 | Jobs seen | New jobs |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 321 | 320 | 1 | 0 | 135,391 | 5 |
+| Darwinbox | 409 | 409 | 0 | 0 | 16,268 | 4 |
+| Greenhouse | 494 | 494 | 0 | 0 | 56,807 | 2 |
+| Keka | 404 | 404 | 0 | 0 | 46,914 | 1 |
+| LinkedIn | 104 | 99 | 5 | 5 | 1,394 | 169 |
+| Naukri | 168 | 142 | 26 | 0 | 44,259 | 102 |
+| SmartRecruiters | 163 | 163 | 0 | 0 | 48,899 | 74 |
+| Workable | 412 | 412 | 0 | 0 | 2,472 | 0 |
+| Workday | 17 | 0 | 17 | 17 | 0 | 0 |
+| **Total** | **2,492** | **2,443** | **49** | **22** | **352,404** | **357** |
+
+Interpretation:
+- Workday remains the clear source reliability failure: 17/17 runs in this window received HTTP 429; adaptive backoff remains intact, with no manual probes/resets.
+- LinkedIn had five 429 events but 99 successful runs and 169 new jobs; do not classify it as continuously down.
+- Ashby had one isolated failure among 321 runs; subsequent scans succeeded.
+- Naukri's 26 non-success runs include the five post-reboot stale-feed failures and additional stale snapshot failures after the owner paused the relay. The publisher is intentionally disabled, so further stale-feed rejection is expected. Do not re-enable the relay or change the app's 15-minute freshness guard as part of this reliability assessment.
+- Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable remain successful in all runs in the observed window.
+
+This is an interim snapshot, not the final 24-hour acceptance decision. Continue read-only observation until 20:59:46 UTC.
