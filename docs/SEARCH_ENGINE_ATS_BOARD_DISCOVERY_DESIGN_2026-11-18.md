@@ -204,3 +204,18 @@ The persistent coordinator is now merged as PR #93 (merge commit `7d34451f48f921
 - V2 CI passed: 533 tests.
 
 The coordinator is not connected to a timer, admin endpoint or production runtime. It has not made a paid request. It is ready for controlled QA and a disabled-by-default scheduler integration; owner approval is still required before enabling the provider or setting a spend cap.
+
+### Operator-invoked worker and matched benchmark — 18 November 2026
+
+The next implementation slice is available on PR #94:
+
+- `v2/serp_discovery_worker.py` exposes `status`, `enable`, `disable` and `run-once` commands. It reuses the persistent coordinator and the existing candidate-only import function. It does not install a timer or add a background scheduler. The worker checks the persisted enabled flag before importing the application or reading credentials.
+- The worker remains disabled unless an operator explicitly enables it with a positive monthly cap. Runtime DataForSEO credentials are required only after that gate is open. Example commands from the repository root:
+  - `python -m v2.serp_discovery_worker status`
+  - `python -m v2.serp_discovery_worker enable --monthly-cap-usd 6`
+  - `python -m v2.serp_discovery_worker run-once`
+  - `python -m v2.serp_discovery_worker disable`
+- `v2/serp_benchmark.py` creates 50 matched provider/keyword pairs and runs each against DataForSEO Live and Serper (100 requests total). It requires both credentials and the explicit `--confirm-paid` flag. At the published DataForSEO estimate of $0.002 per request, the expected DataForSEO portion is about $0.10 before taxes; Serper consumes 50 prepaid credits. Actual per-task DataForSEO cost, latency, result counts, normalized candidates and errors are retained as JSONL. No candidates are imported into the production database.
+- The benchmark intentionally uses a bounded 50-pair sample, spread across the eight ATS providers. It is a first comparative signal, not statistical proof of long-term precision. Review candidate ownership against official employer career pages before any manual onboarding.
+
+PR #94 is awaiting CI. No credentials, paid calls, scheduler installation, production database writes, candidate activation or deployment have been performed.
