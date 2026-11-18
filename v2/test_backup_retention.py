@@ -24,6 +24,7 @@ class BackupRetentionTests(unittest.TestCase):
                 (root / f"production-config-token-{stamp}").write_text("token")
             (root / "production-jobs.sqlite3").write_bytes(b"current alias")
             (root / "production-before-release.sqlite3").write_bytes(b"rollback")
+            (root / "production-jobs-legacy-pre-retention.sqlite3").write_bytes(b"legacy")
             (root / "pre-reboot-20261118.sqlite3").write_bytes(b"pre reboot")
             (root / "development-jobs.sqlite3").write_bytes(b"dev")
             (root / "production-jobs-20260230.sqlite3").write_bytes(b"invalid date")
@@ -44,7 +45,8 @@ class BackupRetentionTests(unittest.TestCase):
             self.assertIn(f"{expected}  production-jobs-20261110.sqlite3", manifest)
             legacy_hash = hashlib.sha256(b"rollback").hexdigest()
             reboot_hash = hashlib.sha256(b"pre reboot").hexdigest()
-            self.assertIn(f"{legacy_hash}  production-before-release.sqlite3", manifest) if False else None
+            legacy_hash = hashlib.sha256(b"legacy").hexdigest()
+            self.assertIn(f"{legacy_hash}  production-jobs-legacy-pre-retention.sqlite3", manifest)
             self.assertIn(f"{reboot_hash}  pre-reboot-20261118.sqlite3", manifest)
             self.assertNotIn("production-jobs.sqlite3", manifest)
             self.assertEqual((root / "SHA256SUMS").stat().st_mode & 0o777, 0o600)
