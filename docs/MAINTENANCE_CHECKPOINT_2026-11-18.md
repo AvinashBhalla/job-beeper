@@ -350,7 +350,7 @@ A guarded one-time JobBeeper Release Gate task is scheduled for 19 November 2026
 
 **Outcome: promoted successfully.** The exact candidate was promoted at 2026-11-19 02:45:35 IST. Production container v2-radar-1 now runs job-radar-prod-release:dda6d57, image ID/digest sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d. The previous production image remains available as rollback: job-radar-prod-release:472c2ee, sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c.
 
-The ten commits after candidate commit dda6d5757f4701ce916a94a48f7ec94d6297e51a changed docs only. No runtime, test, dashboard, deploy or CSV file changed. Full V2 suite on exact candidate: 557 passed, 0 failed. Hosted GitHub Actions remained blocked before any job step by the private-repository billing/spending restriction; no plan upgrade or spending was performed.
+All commits after candidate commit dda6d5757f4701ce916a94a48f7ec94d6297e51a changed docs only. No runtime, test, dashboard, deploy or CSV file changed. Full V2 suite on exact candidate: 557 passed, 0 failed. Hosted GitHub Actions remained blocked before any job step by the private-repository billing/spending restriction; no plan upgrade or spending was performed.
 
 ### Final source window
 
