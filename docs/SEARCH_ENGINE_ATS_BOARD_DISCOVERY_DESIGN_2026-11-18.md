@@ -235,3 +235,7 @@ The report calculates per-engine organic-result coverage, candidate query covera
 - Naukri publisher relay is intentionally paused. PR #96 remains an optional ten-minute timer template, not installed.
 - Remaining engineering focus: use only offline/mock data to further test SERP coordinator/worker failure paths and keep the candidate importer review-only; finish the 24-hour production source reliability assessment at 20:59:46 UTC; qualify the corrected Company Watch manifest for a future release, without changing production boards or schedules.
 - No GitHub billing change, Termalin plan, search API spend or other paid service is required to continue these tasks.
+
+### Spend guard merged — PR #98
+
+PR #98 merged into `v2-live-radar` as `a0af67e313c12b663e0ab0c02940279284846c85`. It rejects non-finite or boolean monthly caps, fails closed on invalid persisted spend/cap values, and ignores non-finite provider-reported cost in favor of the conservative reservation. **28 focused SERP tests and the full V2 suite (550 tests) passed locally** on the exact implementation branch. Hosted private-repo CI remained blocked before startup by the account billing/spend restriction. No credentials, paid API requests or activation were used.
