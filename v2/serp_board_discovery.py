@@ -354,3 +354,54 @@ def monthly_budget_allows_request(
     if spent_usd < 0 or next_request_cost_usd < 0:
         raise ValueError("Spend values cannot be negative.")
     return spent_usd + next_request_cost_usd <= monthly_cap_usd
+
+
+def discover_provider_candidates(
+    provider: str,
+    *,
+    engine: str,
+    keyword: str = "software engineer India",
+    role_terms: tuple[str, ...] | list[str] = DEFAULT_ROLE_TERMS,
+    location: str = "India",
+    username: str | None = None,
+    password: str | None = None,
+    api_key: str | None = None,
+    requester: Any = requests,
+) -> dict[str, Any]:
+    """Execute one explicitly requested provider query and normalize its board candidates."""
+    provider = _provider_name(provider)
+    engine = str(engine or "").strip().lower()
+    if engine == "dataforseo_live":
+        payload = search_dataforseo_live(
+            provider, keyword=keyword, username=username, password=password,
+            requester=requester,
+        )
+        query = keyword
+        costs = [
+            task.get("cost") for task in payload.get("tasks", [])
+            if isinstance(task, dict) and isinstance(task.get("cost"), (int, float))
+        ]
+        actual_cost = round(sum(costs), 6) if costs else None
+    elif engine == "serper":
+        query = build_serper_query(provider, role_terms=role_terms, location=location)
+        payload = search_serper(
+            provider, role_terms=role_terms, location=location,
+            api_key=api_key, requester=requester,
+        )
+        # Serper's prepaid credit model is not a per-response USD invoice.
+        actual_cost = None
+    else:
+        raise ValueError("engine must be dataforseo_live or serper.")
+
+    candidates = normalize_serp_candidates(
+        payload, provider, engine=engine, query=query,
+    )
+    return {
+        "provider": provider,
+        "engine": engine,
+        "query": query,
+        "organic_results": len(_organic_items(payload)),
+        "candidate_count": len(candidates),
+        "actual_cost_usd": actual_cost,
+        "candidates": candidates,
+    }
