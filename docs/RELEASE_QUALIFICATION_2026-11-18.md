@@ -1,6 +1,6 @@
 # JobBeeper V2 production release qualification — 18 November 2026
 
-**Status: RELEASE CANDIDATE STAGED — NOT YET PROMOTED**  
+**Status: PROMOTED — FINAL GATE PASSED (19 November 2026, 02:45 IST)**  
 **Release commit:** `dda6d5757f4701ce916a94a48f7ec94d6297e51a`  
 **Release tag:** `job-radar-prod-release:dda6d57`  
 **Production baseline:** `job-radar-prod-release:472c2ee`
@@ -92,7 +92,7 @@ Directory mode is 0700 and files are 0600. Existing production data volume `v2_r
 
 Rollback: restore the old compose file/image tag with the same `runtime.env` and external `v2_radar-data` volume, then verify app health and DB integrity. The pre-release DB is preserved separately and should not be restored unless there is actual DB corruption; a normal image rollback must reuse the current DB.
 
-## 7. Live production and 24-hour reliability gate
+## 7. Live production and 24-hour reliability gate (interim pre-cutoff snapshot)
 
 Production was not restarted or promoted during this qualification. Latest live check at 18 November 2026 16:47:21 UTC:
 - App HTTP 200; container `v2-radar-1`, still on `job-radar-prod-release:472c2ee`.
@@ -127,31 +127,86 @@ Interpretation:
 - Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable were successful in every observed run; Ashby had one isolated non-success.
 - Continue read-only observation to the exact cutoff. The final assessment must preserve Naukri's intentional-pause distinction and report Workday as degraded if the 429s continue. Do not use this gate to justify manual probes or cooldown resets.
 
-## 8. Promotion decision and exact remaining work
+## 8. Final promotion result — 19 November 2026
 
-The technical release candidate is built, unit-tested, smoke-tested, backed up and has a validated rollback config. GitHub-hosted CI is unavailable because of the account billing restriction; local exact-head validation is 557/557.
+**Gate decision: PASS. The candidate was promoted; no rollback was required.** This section supersedes the pre-cutoff interim roll-up and staged-only decision above.
 
-**Do not promote before the 24-hour source window closes at 20:59:46 UTC.** At/after the cutoff:
-1. Read the final exact source-run roll-up and verify the Workday cooldown/next due, LinkedIn status, other ATS success rates, Naukri intentional pause, and production app/DB health.
-2. If no new material regression exists, promote with the prevalidated candidate compose. Preserve the same external data volume and runtime.env. The existing production image remains the rollback target.
-3. After startup, verify `/health`, dashboard, OpenAPI, DB quick_check, 10 active registry boards, 10 active schedules, source flags and persisted cooldowns. Do not change any source allowlist or schedule.
-4. Run corrected Company Watch dry-run against production and verify the exact pinned hash, then import the 100-row manifest. Reject only the old `lever/mistral` and `greenhouse/soundhoundinc` candidates through the guarded review path (look up by provider/key; never rely on hard-coded IDs). Verify 10 companies, 10 active boards, 10 active schedules; zero activated candidates/new schedules/notifications.
-5. Watch logs and source_runs after promotion. Keep Naukri paused, SERP coordinator disabled, no paid credentials/calls, and member-submitted URL P2 feature out of release.
+### Promotion and runtime verification
 
-If the final reliability report shows a new material regression or the candidate fails its post-start checks, do not promote; keep the current healthy production image running and document the blocker.
+- Promotion completed: 2026-11-18 21:15:35 UTC / 2026-11-19 02:45:35 IST.
+- Production container: v2-radar-1.
+- Image: job-radar-prod-release:dda6d57.
+- Image ID/digest: sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d.
+- Rollback image retained: job-radar-prod-release:472c2ee, sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c.
+- Startup completed; scheduler synchronized exactly 10 configured boards.
+- /health, /dashboard/, /openapi.json: HTTP 200.
+- Container running, restart count 0, OOMKilled false.
+- Live SQLite quick_check: ok.
+- Final live inventory: 28,048 jobs, 2 users, 10 employer companies, 10 active registry boards, 10 active schedules, 21 global ATS candidates.
+- Active registry and schedule key sets match the pre-release backup exactly. No board, employer, source flag or schedule was added or removed.
+- Runtime config SHA-256 remains ec78fbf2607b9b9b06b4dd0e0bcdfb5417324dda3f498916c86760a0a6804e81.
+- Candidate and rollback Compose files had both passed docker compose config validation before promotion. External volume v2_radar-data, loopback port 127.0.0.1:8000 and unless-stopped policy were preserved.
 
-## 9. Activity log
+### Final exact 24-hour source window
 
-- Reviewed current production image and V2 release diff against the exact base commit.
-- Ran exact-head full V2 suite: 557/557 passed.
-- Built candidate image on the production VM and recorded image ID/digest.
-- Ran candidate in network-isolated container; with sanitized real production config it initialized and synchronized exactly 10 configured boards; health, dashboard and OpenAPI all returned HTTP 200; no board was due and no request was sent.
-- Removed the isolated smoke container, copied database and config.
-- Created root-only production database/config/runtime/compose/inspection backup and verified all checksums.
-- Validated both candidate and rollback Compose configurations with the exact production volume/port/restart behavior.
-- Simulated corrected Company Watch dry-run/import/rejection against a production DB copy; no live DB writes were made.
-- Verified production remains healthy and unchanged at the current release base.
+Query bounds: started_at >= 2026-11-17T20:59:46Z AND started_at < 2026-11-18T20:59:46Z. Window closed at 2026-11-18 20:59:46 UTC / 2026-11-19 02:29:46 IST. These are the final live DB results, not the earlier 16:47 UTC interim snapshot.
 
-### Scheduled final gate
+| Source | Runs | Success | Non-success | HTTP 429 | Request errors | Jobs seen | New rows |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Ashby | 549 | 548 | 1 | 0 | 1 | 231,905 | 11 |
+| Darwinbox | 701 | 701 | 0 | 0 | 0 | 29,215 | 6 |
+| Greenhouse | 846 | 846 | 0 | 0 | 0 | 97,050 | 5 |
+| Keka | 692 | 692 | 0 | 0 | 0 | 80,322 | 1 |
+| LinkedIn | 111 | 104 | 7 | 7 | 0 | 1,503 | 231 |
+| Naukri | 287 | 142 | 145 | 0 | 0 | 44,259 | 102 |
+| SmartRecruiters | 280 | 280 | 0 | 0 | 0 | 83,997 | 145 |
+| Workable | 706 | 706 | 0 | 0 | 0 | 4,236 | 0 |
+| Workday | 27 | 0 | 27 | 27 | 0 | 0 | 0 |
+| **Total** | **4,199** | **4,019** | **180** | **34** | **1** | **572,487** | **501** |
 
-A one-time JobBeeper Release Gate task is scheduled for **19 November 2026, 02:40 IST** (10 minutes after the 24-hour cutoff). Task ID: `6afdd8f95b208191857e3074d1f49db6`. It will recalculate the final source-run window, verify the exact staged candidate and pre-release backup, and promote/import only if every explicit gate passes. Any material regression, incomplete window, checksum failure, code change beyond docs after the candidate build, or post-start failure must stop the release without changing production. Naukri stays paused and paid SERP stays disabled.
+Interpretation and persisted state:
+- Workday is still degraded, not recovered. All 27 window attempts returned HTTP 429. The persisted host cooldown remained capped at 3,600 seconds. The first naturally scheduled post-promotion poll ran at 21:18:45 UTC, returned another 429, and set cooldown_until and next_due_at to 2026-11-18T22:18:46.345895Z. The host counter is now 28. No manual probe or cooldown reset was made.
+- LinkedIn had 7 HTTP 429 events (5 partial-rate-limited and 2 rate-limited) and 104 successful runs. Its latest persisted event is 2026-11-18T18:16:04.375728Z with a 14,400-second cooldown. Candidate startup logged successful restoration of the persisted breaker with 3,612 seconds remaining at boot. No cooldown was reset.
+- Naukri had 145 RuntimeError failures after the owner-paused publisher stopped refreshing its feed, plus 142 earlier successful runs and 102 new rows. The persisted source feed reports an unchanged snapshot; the Naukri relay timer and service remain inactive/dead and the timer remains disabled. These are treated as the known owner-pause/stale-feed condition, not a new release regression. The 15-minute freshness guard was not changed.
+- Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable were 100% successful. Ashby had one isolated RuntimeError and 548 successful runs.
+- Jobs seen is poll observation volume, not unique inventory.
+
+### Company Watch production correction
+
+Candidate runtime reported the exact pinned path /app/v2/data/company_watch_companies_2026-11-18.csv, source ref main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6 and SHA-256 146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd.
+
+The production runtime dry-run used payload {"dry_run": true} and returned 100 rows: 19 candidate_staged, 81 manual_review, 0 invalid. It reported zero companies created, boards linked, verified, activated, scheduled, network requests or notifications.
+
+Before production import, the same candidate code was run against a fresh online-backup copy of the current production DB. The complete simulated import/rejection sequence passed, including preservation checks for all existing candidates. Production import then ran at 2026-11-18 21:17:20.785205 UTC / 2026-11-19 02:47:20.785 IST via radar.import_company_watch_manifest({}):
+
+- Candidate inserted: 2.
+- Candidate updated: 17.
+- Terminal candidates preserved: 0.
+- Audit: 100 rows, 19 candidate_staged, 81 manual_review, 0 invalid.
+- Replacement candidates present and still review-only/discovered: ashby/mistral.ai and workday/standard:search.
+- The only two obsolete candidates rejected through radar.review_global_ats_candidate after resolving IDs by provider and board_key: lever/mistral and greenhouse/soundhoundinc. Both returned activated=false.
+- Final candidate statuses: 19 discovered, 2 rejected. All other existing candidate IDs, statuses and linkage fields were unchanged; the two replacements remain unlinked.
+- Employers remain 10; active boards/schedules remain 10/10 with exact original keys.
+- Company records created, boards linked, verified, activated, schedules created, network requests and notifications: all 0.
+- Notification ledger remained at 27,725 rows.
+- Manifest audit and all 100 row records match the pinned SHA; SQLite quick_check remains ok.
+
+### Preserved controls and recovery
+
+- Naukri relay timer: inactive/dead/disabled; service inactive/dead. No relay dispatch.
+- SERP coordinator: no crawl/run recorded, zero discovery runs, no host budget entries, no SERP/search API credential variables present, and no paid requests or spend.
+- Member-submitted career URL feature issue #99 remains P2 for a later release.
+- Source flags and runtime config are unchanged; LinkedIn, Naukri and the nine approved ATS source flags retain their pre-release values.
+- Release recovery bundle remains root-only at /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST. All nine SHA256SUMS entries verify. The consistent pre-release SQLite backup has integrity ok and 28,001 jobs, 2 users, 10 employers, 10 active boards and 10 active schedules.
+- Daily snapshot manifest was independently verified from /var/backups/job-radar-daily; all five entries pass.
+- The old production image remains tagged and available for image rollback. No DB restore was needed.
+
+### Final activity log
+
+- Confirmed the six commits after the candidate changed documentation only; no runtime, test, dashboard, deploy or CSV file changed.
+- Rechecked exact rollback/candidate image IDs, both Compose files, the nine-entry recovery manifest, five-entry daily snapshot manifest, config hash, source flags, exact board/schedule keys, timers and health endpoints.
+- Recomputed the complete source_runs window using the exact requested inclusive/exclusive timestamps.
+- Re-ran the corrected Company Watch import and rejection simulation on a fresh disposable copy of the current production DB using the candidate image.
+- Promoted the exact candidate image and verified startup, HTTP endpoints, SQLite integrity, board scheduler, config hash and persisted LinkedIn/Workday cooldown state.
+- Executed the production Company Watch dry-run, import and two guarded rejections; verified no activation, linking, schedule, employer, network or notification side effects.
+- Final verification at 2026-11-18 21:19:06 UTC / 2026-11-19 02:49:06 IST: candidate running, zero restarts/OOM, endpoints 200, DB integrity ok, 10 active boards and schedules, Naukri paused, SERP disabled, rollback image retained.
