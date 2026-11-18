@@ -113,3 +113,44 @@ The owner approved the reboot without a scheduled maintenance window because the
 - A transient Termalin "server restarted" warning is expected for this approved reboot and should clear; it is not a production incident.
 
 The reboot did not deploy the merged Company Watch changes or modify the production allowlist. The production application image and active board/schedule configuration remain unchanged.
+
+## Follow-up engineering and post-reboot relay recovery — 18 November 2026, 05:59 UTC
+
+### SERP discovery implementation
+
+- PR #90: SERP-to-ATS URL normalizer merged into `v2-live-radar`.
+- PR #91: credential-backed DataForSEO Live and Serper clients merged.
+- PR #92: Company Watch candidate-rejection safety tests merged.
+- PR #93: persistent disabled-by-default SERP discovery coordinator merged.
+- PR #94: operator-invoked worker and matched 50-query DataForSEO/Serper benchmark merged as `67126335b3124760464fae4ae390c2f757fb7f26`.
+- PR #94 CI passed: **537 V2 tests**.
+- The worker has no installed timer. It requires an explicit persisted enable plus positive monthly cap and runtime DataForSEO credentials. The benchmark requires `--confirm-paid` and both provider credentials; it makes 100 requests (50 matched query pairs) and writes local JSONL evidence without importing candidates.
+- No paid SERP requests, credentials, production deployment, SERP database writes, candidate activation or spend approval have occurred.
+
+### Naukri relay timer recovery
+
+The hourly health-watch inspection correctly identified a post-reboot relay issue. The systemd timer was `active/elapsed` with no future trigger, despite the service unit being enabled. This caused the relay feed to age past the application's 15-minute freshness limit. Naukri app fetches continued receiving HTTP 200, but failed closed with `RuntimeError` and zero jobs; this was a stale-feed problem, not an HTTP 429.
+
+Recovery performed:
+- Manually started the already-configured oneshot service `job-radar-naukri-relay.service` once at 05:53:59 UTC. Its configured action dispatches the existing workflow in the public relay repository; the service exited successfully at 05:54:01 UTC.
+- GitHub workflow run [44247426037](https://github.com/AvinashBhalla/job-beeper-naukri-relay/actions/runs/44247426037) completed successfully at 05:56:18 UTC.
+- Relay feed refreshed to 319 jobs at 05:56:13 UTC.
+- The app's next Naukri poll at 05:57:46 UTC succeeded: 319 jobs seen, 5 new.
+- The systemd timer returned to `active/waiting` with a next scheduled trigger at 05:58:59 UTC, and it triggered again at 05:59:17 UTC. This verifies the five-minute timer has re-armed after the manual service invocation.
+- No app restart, cooldown reset, DB edit or production deploy was performed.
+
+The JobBeeper Health Watch automation prompt has been updated to verify the timer's future trigger, relay workflow, feed freshness and successful app ingestion independently. It is explicitly read-only and must not trigger/restart the relay service.
+
+### Current production state
+
+- App health HTTP 200; SQLite `quick_check=ok`.
+- Active registry: 10/10; active poll schedules: 10/10.
+- All ten registered boards remain unchanged. Workday remains in its existing 429 backoff; do not probe or reset it.
+- Naukri recovered after the relay refresh. The earlier five consecutive stale-feed failures remain part of the reliability-window evidence and should not be erased from the assessment.
+- The 24-hour source reliability window remains open until **2026-11-18 20:59:46 UTC** (2026-11-19 02:29:46 IST). Do not block other engineering on this gate.
+
+### Outstanding owner decisions
+
+1. DataForSEO pilot and monthly spend cap approval (no paid requests until explicitly approved).
+2. Confirmation of the Termalin off-host backup draft. It remains a draft; no off-site archive exists.
+3. Company Watch correction remains merged but not deployed. Do not import/activate candidates until release qualification and owner approval.
