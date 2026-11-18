@@ -299,3 +299,13 @@ Read-only aggregate since the assessment start (17 November 20:59:46 UTC); final
 - JobBeeper health is HTTP 200; DB integrity is `ok`; active board/schedule counts remain 10/10; local snapshot checksums all verify.
 
 This remains an interim checkpoint. Do not issue a final 24-hour acceptance until the window closes at 20:59:46 UTC.
+
+### Next-release P2 feature documented — member-submitted shared career sources
+
+- Created [issue #99](https://github.com/AvinashBhalla/job-beeper/issues/99) and `docs/MEMBER_SUBMITTED_SHARED_CAREER_SOURCES_NEXT_RELEASE.md`.
+- Scope: any member can suggest a public careers URL; after validation and review it becomes one shared source in a global catalogue, polled once for all members. Submission attribution is retained separately; it must not create a per-member scraper.
+- Initial fixtures recorded: Oracle Candidate Experience `egug.fa.us2.oraclecloud.com / CX_1` and `jpmc.fa.oraclecloud.com / CX_1001`.
+- Static test against current V2 `detect_ats_board` returned `None` for both URLs. No live requests or job ingestion were made.
+- Current manual candidate staging remains admin-only and candidate-only; it does not ingest jobs. Current member preferences contain no source URL list. Existing cross-source canonical-opportunity matching and one-per-canonical notification ledger are useful foundations, but `GET /api/jobs` still returns raw job rows without grouping by canonical opportunity, so duplicate cards are not yet guaranteed to collapse.
+- Oracle integration caveat documented: Oracle's official HCM REST page labels `recruitingCEJobRequisitions` internal-use only and `recruitingJobSitePostedJobs` approved-Marketplace-partner only. A third-party October 28, 2026 write-up describes the unauthenticated Candidate Experience UI requests, but this is not an Oracle-supported public API guarantee. Terms/stability must be resolved before any production adapter.
+- **Priority P2 / next release. Not current release and not P1.** No code, DB, member UI/API, provider registry, source schedule, production or deployment change was made for this request.
