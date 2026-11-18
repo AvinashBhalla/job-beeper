@@ -159,6 +159,36 @@ class SerpBoardDiscoveryTests(unittest.TestCase):
             spent_usd=6, next_request_cost_usd=0.002, monthly_cap_usd=6
         ))
 
+    def test_end_to_end_serper_discovery_returns_review_only_board_candidates(self):
+        requester = FakeRequester({"organic": [
+            {"link": "https://jobs.ashbyhq.com/example", "title": "Software Engineer"}
+        ]})
+        result = serp.discover_provider_candidates(
+            "ashby", engine="serper", api_key="test-key", requester=requester
+        )
+        self.assertEqual(result["candidate_count"], 1)
+        self.assertEqual(result["organic_results"], 1)
+        self.assertIsNone(result["actual_cost_usd"])
+        self.assertEqual(result["candidates"][0]["discovery_method"], "search_engine_serp")
+        self.assertEqual(len(requester.calls), 1)
+
+    def test_end_to_end_dataforseo_discovery_records_actual_task_cost(self):
+        requester = FakeRequester({"tasks": [{
+            "status_code": 20000,
+            "cost": 0.002,
+            "result": [{"items": [
+                {"type": "organic", "url": "https://jobs.ashbyhq.com/example"}
+            ]}],
+        }]})
+        result = serp.discover_provider_candidates(
+            "ashby", engine="dataforseo_live",
+            username="user", password="secret", requester=requester,
+        )
+        self.assertEqual(result["candidate_count"], 1)
+        self.assertEqual(result["actual_cost_usd"], 0.002)
+        self.assertEqual(result["candidates"][0]["discovery_method"], "search_engine_serp")
+        self.assertEqual(len(requester.calls), 1)
+
     def test_candidate_importer_accepts_serp_provenance_method(self):
         self.assertIn("search_engine_serp", radar.GLOBAL_DISCOVERY_METHODS)
 
