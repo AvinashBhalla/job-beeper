@@ -239,3 +239,8 @@ The report calculates per-engine organic-result coverage, candidate query covera
 ### Spend guard merged — PR #98
 
 PR #98 merged into `v2-live-radar` as `a0af67e313c12b663e0ab0c02940279284846c85`. It rejects non-finite or boolean monthly caps, fails closed on invalid persisted spend/cap values, and ignores non-finite provider-reported cost in favor of the conservative reservation. **28 focused SERP tests and the full V2 suite (550 tests) passed locally** on the exact implementation branch. Hosted private-repo CI remained blocked before startup by the account billing/spend restriction. No credentials, paid API requests or activation were used.
+
+
+### PR #96 merged — optional ten-minute relay timer template
+
+PR #96 is merged as `2f45b947074b4221bc338ccfd2410394b881416c`. Its systemd unit templates define a ten-minute optional cadence with persistent catch-up; the templates are **not installed or enabled** in production. The owner-requested relay pause remains in force. Validation on the rebased head: 7/7 timer contract tests and 557/557 full V2 tests passed locally. No Naukri publisher workflow was dispatched and the app's 15-minute stale-feed guard was not changed.
