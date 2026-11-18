@@ -18,6 +18,10 @@ _PATTERNS = {
     "config": re.compile(r"^production-config-(\d{8})\.json$"),
     "config_token": re.compile(r"^production-config-token-(\d{8})$"),
 }
+_PRESERVED_PATTERNS = (
+    re.compile(r"^production-jobs-legacy-pre-retention\.sqlite3$"),
+    re.compile(r"^pre-reboot-\d{8}\.sqlite3$"),
+)
 
 
 def _dated_files(directory: Path, pattern: re.Pattern[str]) -> list[Path]:
@@ -62,6 +66,12 @@ def rotate_snapshots(directory: str | Path, keep: int = 7) -> dict[str, int]:
 
     # Build and fsync the checksum manifest before deleting any recovery point.
     # A read/hash/write error must never prune snapshots first.
+    # Include the one-time legacy snapshot and pre-reboot recovery points in
+    # the checksum manifest, but never prune them as part of daily retention.
+    for path in root.iterdir():
+        if path.is_file() and any(pattern.fullmatch(path.name) for pattern in _PRESERVED_PATTERNS):
+            retained.append(path)
+
     retained.sort(key=lambda path: path.name)
     manifest_tmp = root / ".SHA256SUMS.tmp"
     manifest = root / "SHA256SUMS"
