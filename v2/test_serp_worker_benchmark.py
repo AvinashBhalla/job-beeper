@@ -33,7 +33,7 @@ class SerpBenchmarkTests(unittest.TestCase):
                     {"board_url": "https://jobs.ashbyhq.com/gamma"},
                 ]},
             ]
-            path.write_text("\\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+            path.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
             report = serp_benchmark.summarize_benchmark(str(path))
         dataforseo = report["engines"]["dataforseo_live"]
         self.assertEqual(dataforseo["candidate_appearances"], 3)
