@@ -7,7 +7,10 @@ responses. Candidate identity is always derived from the existing ATS URL parser
 from __future__ import annotations
 
 import datetime as dt
+import os
 from typing import Any
+
+import requests
 from urllib.parse import parse_qs, urlsplit
 
 from v2 import board_discovery
@@ -223,3 +226,66 @@ def normalize_serp_candidates(
             "source_captured_at": captured_text,
         })
     return list(candidates.values())
+
+
+DATAFORSEO_LIVE_ENDPOINT = "https://api.dataforseo.com/v3/serp/google/organic/live/advanced"
+SERPER_ENDPOINT = "https://google.serper.dev/search"
+SEARCH_TIMEOUT_SECONDS = 20
+
+
+def search_dataforseo_live(
+    provider: str,
+    *,
+    keyword: str = "software engineer India",
+    username: str | None = None,
+    password: str | None = None,
+    requester: Any = requests,
+) -> dict[str, Any]:
+    """Perform exactly one DataForSEO Live query using credentials from the secret store.
+
+    Credentials are read from DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD when not
+    supplied by the caller. No retries are performed because a retry is another
+    billable SERP request. This function is not scheduled or called at import.
+    """
+    username = username if username is not None else os.getenv("DATAFORSEO_LOGIN")
+    password = password if password is not None else os.getenv("DATAFORSEO_PASSWORD")
+    if not username or not password:
+        raise RuntimeError("DataForSEO credentials are not configured in the runtime secret store.")
+    payload = [build_dataforseo_live_payload(provider, keyword=keyword)]
+    response = requester.post(
+        DATAFORSEO_LIVE_ENDPOINT,
+        json=payload,
+        auth=(username, password),
+        timeout=SEARCH_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    result = response.json()
+    if not isinstance(result, dict) or not isinstance(result.get("tasks"), list):
+        raise ValueError("DataForSEO response did not contain a tasks array.")
+    return result
+
+
+def search_serper(
+    provider: str,
+    *,
+    role_terms: tuple[str, ...] | list[str] = DEFAULT_ROLE_TERMS,
+    location: str = "India",
+    api_key: str | None = None,
+    requester: Any = requests,
+) -> dict[str, Any]:
+    """Perform exactly one Serper Google query; never retries a billable request."""
+    api_key = api_key if api_key is not None else os.getenv("SERPER_API_KEY")
+    if not api_key:
+        raise RuntimeError("Serper API key is not configured in the runtime secret store.")
+    query = build_serper_query(provider, role_terms=role_terms, location=location)
+    response = requester.post(
+        SERPER_ENDPOINT,
+        headers={"X-API-KEY": api_key},
+        json={"q": query, "gl": "in", "hl": "en", "num": 10},
+        timeout=SEARCH_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    result = response.json()
+    if not isinstance(result, dict) or not isinstance(result.get("organic", []), list):
+        raise ValueError("Serper response did not contain an organic results array.")
+    return result
