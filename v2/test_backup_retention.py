@@ -56,5 +56,23 @@ class BackupRetentionTests(unittest.TestCase):
                 rotate_snapshots(Path(temp) / "missing", keep=7)
 
 
+class BackupScriptContractTests(unittest.TestCase):
+    def test_snapshot_script_uses_verified_online_backup_and_expected_volume(self):
+        script = (Path(__file__).resolve().parents[1] / "deploy" / "backup" / "job-radar-sqlite-snapshot.sh").read_text()
+        self.assertIn("v2_radar-data/_data", script)
+        self.assertIn("source.backup(destination", script)
+        self.assertGreaterEqual(script.count('PRAGMA integrity_check'), 2)
+        self.assertIn("production-jobs-legacy-pre-retention.sqlite3", script)
+        self.assertIn('RETENTION_HELPER=/usr/local/lib/job-radar-backup/retention.py', script)
+
+    def test_snapshot_script_keeps_legacy_snapshot_as_hard_link_before_replacing_alias(self):
+        script = (Path(__file__).resolve().parents[1] / "deploy" / "backup" / "job-radar-sqlite-snapshot.sh").read_text()
+        self.assertLess(
+            script.index('ln "$current_db" "$legacy_tmp"'),
+            script.index('mv -f "$alias_staged" "$current_db"'),
+        )
+        self.assertIn('ln "$dated_db" "$alias_staged"', script)
+
+
 if __name__ == "__main__":
     unittest.main()
