@@ -7,7 +7,10 @@ responses. Candidate identity is always derived from the existing ATS URL parser
 from __future__ import annotations
 
 import datetime as dt
+import os
 from typing import Any
+
+import requests
 from urllib.parse import parse_qs, urlsplit
 
 from v2 import board_discovery
@@ -223,3 +226,182 @@ def normalize_serp_candidates(
             "source_captured_at": captured_text,
         })
     return list(candidates.values())
+
+
+DATAFORSEO_LIVE_ENDPOINT = "https://api.dataforseo.com/v3/serp/google/organic/live/advanced"
+SERPER_ENDPOINT = "https://google.serper.dev/search"
+SEARCH_TIMEOUT_SECONDS = 20
+
+
+def search_dataforseo_live(
+    provider: str,
+    *,
+    keyword: str = "software engineer India",
+    username: str | None = None,
+    password: str | None = None,
+    requester: Any = requests,
+) -> dict[str, Any]:
+    """Perform exactly one DataForSEO Live query using credentials from the secret store.
+
+    Credentials are read from DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD when not
+    supplied by the caller. No retries are performed because a retry is another
+    billable SERP request. This function is not scheduled or called at import.
+    """
+    username = username if username is not None else os.getenv("DATAFORSEO_LOGIN")
+    password = password if password is not None else os.getenv("DATAFORSEO_PASSWORD")
+    if not username or not password:
+        raise RuntimeError("DataForSEO credentials are not configured in the runtime secret store.")
+    payload = [build_dataforseo_live_payload(provider, keyword=keyword)]
+    response = requester.post(
+        DATAFORSEO_LIVE_ENDPOINT,
+        json=payload,
+        auth=(username, password),
+        timeout=SEARCH_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    result = response.json()
+    tasks = result.get("tasks") if isinstance(result, dict) else None
+    if not isinstance(tasks, list) or not tasks or not all(isinstance(task, dict) for task in tasks):
+        raise ValueError("DataForSEO response did not contain a valid tasks array.")
+    for task in tasks:
+        if task.get("status_code") != 20000:
+            raise RuntimeError(
+                f"DataForSEO task failed with status {task.get('status_code')!r}."
+            )
+    return result
+
+
+def search_serper(
+    provider: str,
+    *,
+    role_terms: tuple[str, ...] | list[str] = DEFAULT_ROLE_TERMS,
+    location: str = "India",
+    api_key: str | None = None,
+    requester: Any = requests,
+) -> dict[str, Any]:
+    """Perform exactly one Serper Google query; never retries a billable request."""
+    api_key = api_key if api_key is not None else os.getenv("SERPER_API_KEY")
+    if not api_key:
+        raise RuntimeError("Serper API key is not configured in the runtime secret store.")
+    query = build_serper_query(provider, role_terms=role_terms, location=location)
+    response = requester.post(
+        SERPER_ENDPOINT,
+        headers={"X-API-KEY": api_key},
+        json={"q": query, "gl": "in", "hl": "en", "num": 10},
+        timeout=SEARCH_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    result = response.json()
+    if not isinstance(result, dict) or not isinstance(result.get("organic", []), list):
+        raise ValueError("Serper response did not contain an organic results array.")
+    return result
+
+
+SERP_PROVIDER_ORDER = tuple(PROVIDER_TARGETS)
+DEFAULT_PROVIDER_BATCH_SIZE = 2
+DEFAULT_DISCOVERY_INTERVAL_MINUTES = 30
+DATAFORSEO_LIVE_ESTIMATED_COST_USD = 0.002
+
+
+def select_provider_batch(cursor: int, batch_size: int = DEFAULT_PROVIDER_BATCH_SIZE) -> tuple[list[str], int]:
+    """Select a deterministic rotating provider batch and return the next cursor."""
+    if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0:
+        raise ValueError("cursor must be a non-negative integer.")
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int):
+        raise ValueError("batch_size must be an integer.")
+    if not 1 <= batch_size <= len(SERP_PROVIDER_ORDER):
+        raise ValueError("batch_size must be between one and the supported provider count.")
+    start = cursor % len(SERP_PROVIDER_ORDER)
+    selected = [
+        SERP_PROVIDER_ORDER[(start + offset) % len(SERP_PROVIDER_ORDER)]
+        for offset in range(batch_size)
+    ]
+    return selected, (start + batch_size) % len(SERP_PROVIDER_ORDER)
+
+
+def estimate_monthly_search_usage(
+    *,
+    providers_per_cycle: int = DEFAULT_PROVIDER_BATCH_SIZE,
+    interval_minutes: int = DEFAULT_DISCOVERY_INTERVAL_MINUTES,
+    days: int = 30,
+    unit_cost_usd: float = DATAFORSEO_LIVE_ESTIMATED_COST_USD,
+) -> dict[str, float | int]:
+    """Estimate request volume and cost; this is planning data, not billing."""
+    if not 1 <= providers_per_cycle <= len(SERP_PROVIDER_ORDER):
+        raise ValueError("providers_per_cycle is outside the supported range.")
+    if interval_minutes <= 0 or 1440 % interval_minutes:
+        raise ValueError("interval_minutes must be a positive divisor of 1,440.")
+    if days <= 0 or unit_cost_usd < 0:
+        raise ValueError("days must be positive and unit_cost_usd cannot be negative.")
+    cycles_per_day = 1440 // interval_minutes
+    requests = providers_per_cycle * cycles_per_day * days
+    return {
+        "cycles_per_day": cycles_per_day,
+        "requests_per_month": requests,
+        "estimated_monthly_cost_usd": round(requests * unit_cost_usd, 4),
+    }
+
+
+def monthly_budget_allows_request(
+    *,
+    spent_usd: float,
+    next_request_cost_usd: float,
+    monthly_cap_usd: float | None,
+) -> bool:
+    """Fail closed unless a positive cap is explicitly configured."""
+    if monthly_cap_usd is None or monthly_cap_usd <= 0:
+        return False
+    if spent_usd < 0 or next_request_cost_usd < 0:
+        raise ValueError("Spend values cannot be negative.")
+    return spent_usd + next_request_cost_usd <= monthly_cap_usd
+
+
+def discover_provider_candidates(
+    provider: str,
+    *,
+    engine: str,
+    keyword: str = "software engineer India",
+    role_terms: tuple[str, ...] | list[str] = DEFAULT_ROLE_TERMS,
+    location: str = "India",
+    username: str | None = None,
+    password: str | None = None,
+    api_key: str | None = None,
+    requester: Any = requests,
+) -> dict[str, Any]:
+    """Execute one explicitly requested provider query and normalize its board candidates."""
+    provider = _provider_name(provider)
+    engine = str(engine or "").strip().lower()
+    if engine == "dataforseo_live":
+        payload = search_dataforseo_live(
+            provider, keyword=keyword, username=username, password=password,
+            requester=requester,
+        )
+        query = keyword
+        costs = [
+            task.get("cost") for task in payload.get("tasks", [])
+            if isinstance(task, dict) and isinstance(task.get("cost"), (int, float))
+        ]
+        actual_cost = round(sum(costs), 6) if costs else None
+    elif engine == "serper":
+        query = build_serper_query(provider, role_terms=role_terms, location=location)
+        payload = search_serper(
+            provider, role_terms=role_terms, location=location,
+            api_key=api_key, requester=requester,
+        )
+        # Serper's prepaid credit model is not a per-response USD invoice.
+        actual_cost = None
+    else:
+        raise ValueError("engine must be dataforseo_live or serper.")
+
+    candidates = normalize_serp_candidates(
+        payload, provider, engine=engine, query=query,
+    )
+    return {
+        "provider": provider,
+        "engine": engine,
+        "query": query,
+        "organic_results": len(_organic_items(payload)),
+        "candidate_count": len(candidates),
+        "actual_cost_usd": actual_cost,
+        "candidates": candidates,
+    }
