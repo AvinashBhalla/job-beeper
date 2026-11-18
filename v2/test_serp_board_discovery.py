@@ -123,6 +123,34 @@ class SerpBoardDiscoveryTests(unittest.TestCase):
                 serp.search_dataforseo_live("ashby", requester=requester)
         self.assertEqual(requester.calls, [])
 
+    def test_provider_rotation_covers_all_eight_targets_in_four_cycles(self):
+        cursor = 0
+        seen = []
+        for _ in range(4):
+            batch, cursor = serp.select_provider_batch(cursor, 2)
+            self.assertEqual(len(batch), 2)
+            seen.extend(batch)
+        self.assertEqual(cursor, 0)
+        self.assertEqual(set(seen), set(serp.SERP_PROVIDER_ORDER))
+        self.assertEqual(len(seen), len(set(seen)))
+
+    def test_monthly_usage_estimate_matches_two_targets_every_thirty_minutes(self):
+        estimate = serp.estimate_monthly_search_usage()
+        self.assertEqual(estimate["cycles_per_day"], 48)
+        self.assertEqual(estimate["requests_per_month"], 2880)
+        self.assertEqual(estimate["estimated_monthly_cost_usd"], 5.76)
+
+    def test_monthly_budget_guard_fails_closed_without_approved_cap(self):
+        self.assertFalse(serp.monthly_budget_allows_request(
+            spent_usd=0, next_request_cost_usd=0.002, monthly_cap_usd=None
+        ))
+        self.assertTrue(serp.monthly_budget_allows_request(
+            spent_usd=5.758, next_request_cost_usd=0.002, monthly_cap_usd=6
+        ))
+        self.assertFalse(serp.monthly_budget_allows_request(
+            spent_usd=6, next_request_cost_usd=0.002, monthly_cap_usd=6
+        ))
+
     def test_candidate_importer_accepts_serp_provenance_method(self):
         self.assertIn("search_engine_serp", radar.GLOBAL_DISCOVERY_METHODS)
 
