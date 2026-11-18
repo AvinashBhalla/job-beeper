@@ -219,3 +219,9 @@ The next implementation slice is available on PR #94:
 - The benchmark intentionally uses a bounded 50-pair sample, spread across the eight ATS providers. It is a first comparative signal, not statistical proof of long-term precision. Review candidate ownership against official employer career pages before any manual onboarding.
 
 PR #94 is awaiting CI. No credentials, paid calls, scheduler installation, production database writes, candidate activation or deployment have been performed.
+
+PR #95 adds offline benchmark reporting. After a run, summarize the JSONL without making any additional requests:
+
+`python -m v2.serp_benchmark --summarize data/serp-provider-benchmark.jsonl`
+
+The report calculates per-engine organic-result coverage, candidate query coverage, candidate appearances, deduplicated board identities, duplicate appearances, cross-engine overlap, actual DataForSEO task cost, estimated Serper credits, and yield per 1,000 requests. Reviewers can annotate individual candidate objects with `manual_verdict: "verified"` or `manual_verdict: "false_positive"` after checking the official employer careers page and board ownership; unreviewed and conflicting labels remain separate. Automated SERP discovery is not employer verification.
