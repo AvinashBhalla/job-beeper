@@ -15,6 +15,18 @@
 
 **Company Watch validation:** 17/19 candidate provider APIs returned 200 (Greenhouse 9/10, Lever 5/6, SmartRecruiters 3/3). Mistral's Lever slug returned 404; its official careers page links to Ashby `mistral.ai` (public API 200, 254 jobs) — replacement not yet written. SoundHound's Greenhouse slug returned 404 and official careers page has no verifiable ATS slug in rendered content. Keep all 19 candidates unlinked/unverified and 81 manual rows held until canonical company/board mapping is confirmed. See morning observation section in overnight handover.
 
+
+## Current checkpoint — 18 November 2026, 04:28 UTC
+
+- Production remains on `job-radar-prod-release:472c2ee`; `/health` is HTTP 200. Read-only DB checks: 27,663 jobs, `PRAGMA quick_check=ok`, 0 duplicate `(source, source_job_id)` groups.
+- Persistent scheduler still has exactly 10 active registry boards and 10 active schedules. All 19 Company Watch candidates remain `discovered`; the 81 manual-review manifest rows remain held. No new boards were linked, verified, activated or scheduled.
+- Since the 17 Nov 20:59:46 UTC deployment, source rollup at 04:28 UTC: Ashby 175 runs / 175 requests / 0 429 / 0 failed pages / 5 new rows; Darwinbox 222 / 222 / 0 / 0 / 0; Greenhouse 267 / 267 / 0 / 0 / 2; Keka 219 / 438 / 0 / 0 / 0; LinkedIn 88 / 525 / 2 / 1 / 93; Naukri 91 / 91 / 0 / 0 / 2; SmartRecruiters 88 / 556 / 0 / 0 / 15; Workable 223 / 223 / 0 / 0 / 0; Workday 11 / 11 / 11 / 11 / 0. Seen counts are observations, not unique vacancies; new counts are inserted rows.
+- Workday last returned 429 at 04:16:57 UTC; next due approximately 05:16:57 UTC. LinkedIn's persisted 9,600-second cooldown after its 02:40:43 UTC partial rate-limited run expires approximately 05:20:43 UTC. Do not force either fetcher or reset cooldowns.
+- The 24-hour post-release reliability window is not complete until 20:59:46 UTC on 18 Nov (02:29:46 IST on 19 Nov). Do not declare full reliability acceptance before reviewing the whole window.
+- Mistral remains a pending candidate correction: official careers page evidence points to Ashby `mistral.ai`, while the pinned manifest currently stages an invalid Lever slug. SoundHound's supplied Greenhouse slug returned 404 and remains manual. Do not patch production tables directly.
+- New research/design: [Search-engine-assisted ATS board discovery](SEARCH_ENGINE_ATS_BOARD_DISCOVERY_DESIGN_2026-11-18.md). Proposed as candidate-only discovery using a licensed SERP API. No search API credentials are configured, no search worker is implemented or scheduled, and production discovery run count remains zero. Do not imply 30-minute discovery is already running.
+
+
 ---
 
 ## Current release and cleanup status — 2026-11-17
