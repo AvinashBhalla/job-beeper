@@ -169,3 +169,15 @@ Do not integrate search directly into the job collector loop. Keep search API us
 - Exa Search API domain filters: https://exa.ai/
 - Google Search spam policies: https://developers.google.com/search/docs/essentials/spam-policies
 - Google Custom Search JSON API sunset notice: https://developers.google.com/custom-search/v1/overview
+
+
+## Implementation progress — 18 November 2026
+
+The first offline integration seam is merged in `v2-live-radar` (PR #90, merge commit `6af370c45dd8ccc5bc67a0abf0aaf0f0db1e5bd2`):
+
+- `v2/serp_board_discovery.py` builds provider-scoped Serper queries and DataForSEO Live payloads using structured ATS targets.
+- It normalizes Serper and DataForSEO organic result shapes through the existing ATS URL parser, deduplicates board identities, and resolves only the narrow Google `/url?q=` redirect shape.
+- Candidates carry search-engine/query/rank provenance and use the existing `search_engine_serp` importer method. They remain review-only; snippets are not accepted as proof of employer identity.
+- Regression tests cover provider scoping, DataForSEO structured targets, both response shapes, deduplication, redirect safety and fail-closed validation. V2 CI passed: 515 tests.
+
+This is intentionally not a running discovery worker. No paid provider requests, credentials, recurring schedule, production DB writes or board activations were added. Remaining engineering work is the credential-backed provider client, hard monthly spend accounting, persistent two-provider rotation, and controlled benchmark harness. Do not enable scheduled calls until the owner has approved the provider, spend cap and supplied credentials through the secret store.
