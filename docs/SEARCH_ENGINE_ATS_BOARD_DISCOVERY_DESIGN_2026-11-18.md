@@ -244,3 +244,9 @@ PR #98 merged into `v2-live-radar` as `a0af67e313c12b663e0ab0c02940279284846c85`
 ### PR #96 merged — optional ten-minute relay timer template
 
 PR #96 is merged as `2f45b947074b4221bc338ccfd2410394b881416c`. Its systemd unit templates define a ten-minute optional cadence with persistent catch-up; the templates are **not installed or enabled** in production. The owner-requested relay pause remains in force. Validation on the rebased head: 7/7 timer contract tests and 557/557 full V2 tests passed locally. No Naukri publisher workflow was dispatched and the app's 15-minute stale-feed guard was not changed.
+
+## P2 next-release backlog: member-submitted shared career URLs
+
+Issue #99 and `docs/MEMBER_SUBMITTED_SHARED_CAREER_SOURCES_NEXT_RELEASE.md` capture the proposal to let any member submit a public career URL that, once validated and approved, becomes one globally shared source for all members. The source must not be scoped to the submitting member; repeated submissions must resolve to one catalogue record and scheduler entry. Canonical opportunities should ensure employer ATS + LinkedIn/Naukri observations become one member-facing card and one notification while preserving source links/provenance.
+
+The current implementation has admin-only candidate staging and canonical-match/notification foundations, but no member submission path, Oracle adapter, or canonical-grouped member feed. The two Oracle Candidate Experience URLs were statically checked and are not recognized by the current provider detector. This is P2 / next release only; no current-release development or production change is authorized.
