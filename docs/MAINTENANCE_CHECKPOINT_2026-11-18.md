@@ -197,3 +197,39 @@ Naukri's five failures all correspond to the stale relay window after reboot. It
 Workday remains in adaptive 429 backoff; no manual probes or resets. LinkedIn's 3 rate-limited runs are retained in the assessment; do not infer continuous failure from the aggregate because successful scans also occurred. Ashby had one isolated runtime failure; subsequent polls are succeeding. Other six sources have no non-success runs in this window.
 
 This is an interim snapshot, not the final 24-hour acceptance decision. Continue monitoring until 20:59:46 UTC.
+
+### Termalin backup confirmation troubleshooting and configuration review — 18 November 2026, 08:05 UTC
+
+Owner attempted to confirm the existing Termalin draft in the web cabinet. The UI button became disabled/unresponsive. Rechecked Termalin server-side with `backup_list` after the attempt and again after inspecting the account page:
+
+- Existing job `JobBeeper production recovery snapshot` remains **DRAFT**.
+- Termalin still says it is waiting for owner confirmation.
+- No backup archives exist and the account still shows 0 B used for backups.
+- Therefore the browser click did not complete the server-side confirmation. No encryption key or scheduled run can be assumed to exist yet.
+- The draft has not expired; its displayed expiry is 25 November 2026. No duplicate draft was created.
+
+The live account form shows the intended configuration:
+
+- Server: `job-radar`.
+- Paths: `/var/backups/job-radar-daily` and `/var/lib/docker/volumes/v2_radar-data/_data`.
+- Daily at 03:00 UTC; keep 7; Termalin storage; read limit 20 MB/s.
+- Excludes: `development-*`, `dev-*`, `qa-*`, `legacy-*`, `job-radar-sqlite-snapshot.sh*`, `production-before-*`, `production-pre-release-*`, `production-compose-*`, `production-config-*`, `production-rootfs-*`, `jobs.db*`, `*.shm`, `*.wal`.
+
+Read-only path/size audit:
+- `/var/backups/job-radar-daily` is about 1.48 GB total, but the configured excludes remove about 1.21 GB of development, QA, legacy and historical rollback artifacts.
+- The files left in that folder are the current `production-jobs.sqlite3` snapshot (136,712,192 bytes) and `pre-reboot-20261118.sqlite3` snapshot (136,978,432 bytes), plus their small SQLite sidecar files.
+- The live volume contains `jobs.db` (about 138 MB), `jobs.db-wal`, and `jobs.db-shm`; all are excluded by `jobs.db*`. The volume also contains `pre-reboot-20261118.sqlite3` (about 137 MB), `config.json` and `config_token`, which remain included.
+- Thus the active DB file itself is intentionally excluded; recovery relies on the consistent SQLite backup `production-jobs.sqlite3` created by `job-radar-sqlite-snapshot.timer` at 02:45 UTC. The Termalin backup is scheduled for 03:00 UTC, 15 minutes after that snapshot. The snapshot service last succeeded on 18 November at 02:45 UTC with integrity=ok.
+- Estimated selected input is roughly 411 MB uncompressed before archive overhead. Seven copies at this size would be about 2.9 GB, below the current 5 GB trial backup allowance shown in the account page; this is an estimate, not a completed archive measurement. Account storage was 0 B used at inspection.
+
+Owner action:
+- Refresh the Termalin Account page once to clear the stuck pending state. Re-open the existing draft; if it still shows DRAFT and Confirm is enabled, submit it once. Do not create another draft or repeatedly click.
+- Success must be verified by `backup_list` showing a confirmed job and, after its first scheduled execution, at least one successful archive. A draft alone is not disaster recovery.
+- Do not share the master password or encryption key. Termalin creates the private backup key in the owner's browser and protects it with the owner's master password.
+- The account page also showed the Pro trial ending **19 November 2026 at 19:31** and moving to Free. Termalin documentation lists encrypted backups as a Pro/Team feature. Continued daily off-site backups therefore require the account to remain on a plan that includes backups after the trial; confirming the draft alone does not settle that longer-term entitlement. The next scheduled 03:00 UTC run would be 19 November 2026 at 08:30 IST if the job is confirmed before then.
+
+No production file, database, service, backup job or account setting was modified during this review.
+
+### Repository branch hygiene after SERP merges
+
+After confirming PRs #90–#95 were merged and no PRs remained open, deleted the four remaining merged topic branches for PRs #90–#93, plus the branches for PRs #94 and #95. The two long-lived branches are retained: `main` and `v2-live-radar`. The local production checkout was not pulled, reset, rebuilt or deployed.
