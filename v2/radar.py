@@ -8073,8 +8073,8 @@ def import_global_ats_candidates(payload: dict[str, Any]):
 
 
 COMPANY_WATCH_MANIFEST_PATH = Path(__file__).with_name("data") / "company_watch_companies_2026-11-18.csv"
-COMPANY_WATCH_MANIFEST_SOURCE_REF = "main@fced495fdb83e8b0029f57431879beb06e88d8ff"
-COMPANY_WATCH_MANIFEST_SHA256 = "bdda2a9e527a7ad298790635b050108c49f950183e390f773b54a5a8c1252d3c"
+COMPANY_WATCH_MANIFEST_SOURCE_REF = "main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6"
+COMPANY_WATCH_MANIFEST_SHA256 = "146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd"
 
 
 @app.post("/api/discovery/company-watch/import", dependencies=[Depends(require_admin)])
