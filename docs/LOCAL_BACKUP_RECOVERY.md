@@ -50,14 +50,15 @@ PR #97 was merged into `v2-live-radar`. The script and helper were installed wit
 - Installed script SHA-256: `14a6ca249bc4ae47bdca95d280eabc70fbcb2605990b22d1b8f99bae920555d0`.
 - Installed helper SHA-256: `39ab0b085a72caa217ceef5045b2cb309a4f9c882d12b15927564c455f1f0a65`.
 - Local backup tests: **6 passed**; shell syntax check and Python compilation passed.
-- Snapshot generated: `production-jobs-20261118.sqlite3`, 138,387,456 bytes, 27,888 jobs, integrity `ok`.
+- Snapshot generated: `production-jobs-20261118.sqlite3`, 138,420,224 bytes, 27,891 jobs, integrity `ok`.
 - The compatibility alias and dated file share the same inode (hard link).
 - Preserved legacy snapshot: 27,656 jobs, integrity `ok`.
 - Pre-reboot recovery snapshot: 27,673 jobs, integrity `ok`.
 - Dated config and token snapshots created; both mode 0600.
 - `SHA256SUMS` contains five entries (pre-reboot DB, legacy DB, new DB and the two dated config files); all five verified with `sha256sum -c`.
 - No staging files or SQLite sidecars remained after the final run.
-- The app health endpoint returned HTTP 200 before and after the backup. The application was not restarted.
+- The installed systemd oneshot `job-radar-sqlite-snapshot.service` was started once after installation and completed with `Result=success`, exit status 0. Journal records both integrity checks as ok and the dated snapshot publication at 10:16:41 UTC.
+- The app health endpoint returned HTTP 200 before and after both manual and systemd-triggered snapshots. The application was not restarted.
 - The VM had about 33 GB free disk after installation; the local backup directory used about 1.6 GB at the check.
 - The daily snapshot timer remains enabled. Naukri's separate relay timer remains intentionally disabled.
 
