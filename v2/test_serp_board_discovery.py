@@ -148,6 +148,39 @@ class SerpBoardDiscoveryTests(unittest.TestCase):
         self.assertEqual(estimate["requests_per_month"], 2880)
         self.assertEqual(estimate["estimated_monthly_cost_usd"], 5.76)
 
+    def test_monthly_budget_guard_rejects_non_finite_caps_and_values(self):
+        for invalid_cap in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(cap=invalid_cap):
+                self.assertFalse(serp.monthly_budget_allows_request(
+                    spent_usd=0, next_request_cost_usd=0.002,
+                    monthly_cap_usd=invalid_cap,
+                ))
+        for invalid_value in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(value=invalid_value), self.assertRaisesRegex(ValueError, "finite"):
+                serp.monthly_budget_allows_request(
+                    spent_usd=invalid_value, next_request_cost_usd=0.002,
+                    monthly_cap_usd=6.0,
+                )
+        self.assertFalse(serp.monthly_budget_allows_request(
+            spent_usd=0, next_request_cost_usd=0.002,
+            monthly_cap_usd=float("nan"),
+        ))
+
+    def test_end_to_end_dataforseo_ignores_non_finite_task_cost(self):
+        requester = FakeRequester({"tasks": [{
+            "status_code": 20000,
+            "cost": float("inf"),
+            "result": [{"items": [
+                {"type": "organic", "url": "https://jobs.ashbyhq.com/example"}
+            ]}],
+        }]})
+        result = serp.discover_provider_candidates(
+            "ashby", engine="dataforseo_live",
+            username="user", password="secret", requester=requester,
+        )
+        self.assertIsNone(result["actual_cost_usd"])
+        self.assertEqual(result["candidate_count"], 1)
+
     def test_monthly_budget_guard_fails_closed_without_approved_cap(self):
         self.assertFalse(serp.monthly_budget_allows_request(
             spent_usd=0, next_request_cost_usd=0.002, monthly_cap_usd=None

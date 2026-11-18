@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 import sqlite3
 import tempfile
 import unittest
@@ -46,6 +47,60 @@ class SerpDiscoveryCoordinatorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             coordinator.configure(self.db, enabled=True, monthly_cap_usd=0)
         self.assertEqual(self.state()[0], 0)
+
+    def test_enable_rejects_non_finite_and_boolean_monthly_caps(self):
+        for invalid in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(cap=invalid), self.assertRaisesRegex(ValueError, "finite number"):
+                coordinator.configure(self.db, enabled=True, monthly_cap_usd=invalid)
+        self.assertEqual(self.state()[0], 0)
+
+    def test_run_once_fails_closed_on_non_finite_stored_cap_or_spend(self):
+        calls = []
+        coordinator.configure(self.db, enabled=False, monthly_cap_usd=None)
+        with sqlite3.connect(self.db) as conn:
+            conn.execute(
+                "UPDATE serp_discovery_control SET enabled=1,monthly_cap_usd=? WHERE id=1",
+                (float("inf"),),
+            )
+            conn.commit()
+        result = coordinator.run_once(
+            self.db,
+            searcher=lambda provider: calls.append(provider) or {},
+            importer=lambda payload: {},
+            at=self.now,
+        )
+        self.assertEqual(result["outcome"], "budget_not_configured")
+        self.assertEqual(calls, [])
+
+        with sqlite3.connect(self.db) as conn:
+            conn.execute(
+                "UPDATE serp_discovery_control SET monthly_cap_usd=6,monthly_spend_usd=? WHERE id=1",
+                (float("inf"),),
+            )
+            conn.commit()
+        result = coordinator.run_once(
+            self.db,
+            searcher=lambda provider: calls.append(provider) or {},
+            importer=lambda payload: {},
+            at=self.now,
+        )
+        self.assertEqual(result["outcome"], "budget_invalid")
+        self.assertEqual(calls, [])
+
+    def test_non_finite_provider_cost_keeps_conservative_reservation(self):
+        coordinator.configure(self.db, enabled=True, monthly_cap_usd=6.0)
+        result = coordinator.run_once(
+            self.db,
+            searcher=lambda provider: {
+                "candidates": [], "actual_cost_usd": math.inf,
+            },
+            importer=lambda payload: {},
+            at=self.now,
+            providers_per_cycle=1,
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNone(result["runs"][0]["actual_cost_usd"])
+        self.assertEqual(self.state()[2], 0.002)
 
     def test_enabled_cycle_rotates_two_providers_and_imports_review_candidates(self):
         coordinator.configure(self.db, enabled=True, monthly_cap_usd=6.0)

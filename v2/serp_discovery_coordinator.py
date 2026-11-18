@@ -10,6 +10,7 @@ benchmark, with its prepaid-credit economics handled outside this worker.
 from __future__ import annotations
 
 import datetime as dt
+import math
 import uuid
 from typing import Any, Callable
 
@@ -110,12 +111,17 @@ def configure(
     """Explicitly enable/disable the coordinator and set its hard monthly cap."""
     if not isinstance(enabled, bool):
         raise ValueError("enabled must be a boolean.")
-    if enabled and (
-        monthly_cap_usd is None or monthly_cap_usd <= 0
-    ):
+    if monthly_cap_usd is not None:
+        if (
+            isinstance(monthly_cap_usd, bool)
+            or not isinstance(monthly_cap_usd, (int, float))
+            or not math.isfinite(float(monthly_cap_usd))
+        ):
+            raise ValueError("monthly_cap_usd must be a finite number.")
+        if monthly_cap_usd < 0:
+            raise ValueError("monthly_cap_usd cannot be negative.")
+    if enabled and (monthly_cap_usd is None or monthly_cap_usd <= 0):
         raise ValueError("A positive monthly spend cap is required before enabling SERP discovery.")
-    if monthly_cap_usd is not None and monthly_cap_usd < 0:
-        raise ValueError("monthly_cap_usd cannot be negative.")
     init_schema(db_path)
     timestamp = _iso()
     with DB_LOCK, connect(db_path) as conn:
@@ -168,7 +174,12 @@ def run_once(
             conn.rollback()
             return {"outcome": "disabled", "requests_attempted": 0}
         cap = control["monthly_cap_usd"]
-        if cap is None or float(cap) <= 0:
+        if (
+            cap is None
+            or not isinstance(cap, (int, float))
+            or not math.isfinite(float(cap))
+            or float(cap) <= 0
+        ):
             conn.rollback()
             return {"outcome": "budget_not_configured", "requests_attempted": 0}
         lease_until = _parse_iso(control.get("lease_until"))
@@ -182,6 +193,9 @@ def run_once(
         spend = float(control["monthly_spend_usd"] or 0)
         if control["budget_month"] != month:
             spend = 0.0
+        elif not math.isfinite(spend) or spend < 0:
+            conn.rollback()
+            return {"outcome": "budget_invalid", "requests_attempted": 0}
         providers, next_cursor = serp.select_provider_batch(
             int(control["provider_cursor"] or 0), providers_per_cycle
         )
@@ -242,7 +256,12 @@ def run_once(
             if not isinstance(result, dict):
                 raise ValueError("SERP searcher must return a result dictionary.")
             raw_cost = result.get("actual_cost_usd")
-            if isinstance(raw_cost, (int, float)) and raw_cost >= 0:
+            if (
+                isinstance(raw_cost, (int, float))
+                and not isinstance(raw_cost, bool)
+                and math.isfinite(float(raw_cost))
+                and raw_cost >= 0
+            ):
                 actual_cost = float(raw_cost)
             candidates.extend(
                 item for item in result.get("candidates", [])
