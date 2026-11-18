@@ -5,7 +5,7 @@ set -Eeuo pipefail
 umask 077
 
 BACKUP_DIR=/var/backups/job-radar-daily
-DATA_DIR=/var/lib/docker/volumes/v2-radar-data/_data
+DATA_DIR=/var/lib/docker/volumes/v2_radar-data/_data
 CONTAINER=v2-radar-1
 RETENTION_HELPER=/usr/local/lib/job-radar-backup/retention.py
 KEEP_DAILY=7
