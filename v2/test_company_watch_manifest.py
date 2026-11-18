@@ -33,8 +33,8 @@ class CompanyWatchManifestTests(unittest.TestCase):
         self.assertEqual(manifest["rows_total"], 100)
         self.assertEqual(manifest["manifest_sha256"], "146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd")
         self.assertEqual(manifest["counts"], {
-            "candidate_staged": 21,
-            "manual_review": 79,
+            "candidate_staged": 19,
+            "manual_review": 81,
         })
         self.assertEqual(sum(row["scan_enabled"] for row in manifest["rows"]), 92)
         self.assertEqual(sum(not row["scan_enabled"] for row in manifest["rows"]), 8)
@@ -58,7 +58,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
         self.assertEqual(by_number[32]["classification"], "manual_review")
         self.assertIn("identity", by_number[32]["review_reason"])
         self.assertEqual(by_number[36]["classification"], "candidate_staged")
-        self.assertEqual(by_number[43]["classification"], "candidate_staged")
+        self.assertEqual(by_number[43]["classification"], "manual_review")
         self.assertEqual(by_number[51]["classification"], "manual_review")
 
     def test_corrected_company_watch_rows_use_current_official_board_evidence(self):
@@ -80,7 +80,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
         self.assertEqual(soundhound["careers_url"], "https://www.soundhound.com/careers")
 
         self.assertEqual(by_number[36]["candidate"]["provider"], "workday")
-        self.assertEqual(by_number[43]["candidate"]["provider"], "workable")
+        self.assertIsNone(by_number[43]["candidate"])
         self.assertEqual(by_number[64]["classification"], "manual_review")
         self.assertEqual(by_number[70]["classification"], "manual_review")
 
@@ -166,8 +166,8 @@ class CompanyWatchManifestTests(unittest.TestCase):
 
     def test_import_is_atomic_idempotent_and_never_links_or_activates(self):
         first = radar.import_company_watch_manifest({})
-        self.assertEqual(first["candidate_inserted"], 21)
-        self.assertEqual(first["manual_review_rows"], 79)
+        self.assertEqual(first["candidate_inserted"], 19)
+        self.assertEqual(first["manual_review_rows"], 81)
         self.assertEqual(first["company_records_created"], 0)
         self.assertEqual(first["boards_linked"], 0)
         self.assertEqual(first["verified"], 0)
@@ -178,7 +178,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
 
         with sqlite3.connect(self.db) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_rows").fetchone()[0], 100)
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates").fetchone()[0], 21)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates").fetchone()[0], 19)
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM employer_companies").fetchone()[0], 0)
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0], 0)
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_poll_schedule").fetchone()[0], 0)
@@ -189,22 +189,22 @@ class CompanyWatchManifestTests(unittest.TestCase):
 
         second = radar.import_company_watch_manifest({})
         self.assertEqual(second["candidate_inserted"], 0)
-        self.assertEqual(second["candidate_updated"], 20)
+        self.assertEqual(second["candidate_updated"], 18)
         self.assertEqual(second["candidate_preserved_terminal"], 1)
         with sqlite3.connect(self.db) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_rows").fetchone()[0], 100)
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates").fetchone()[0], 21)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates").fetchone()[0], 19)
             self.assertEqual(
                 conn.execute("SELECT COUNT(*) FROM ats_global_discovery_candidates WHERE review_status='rejected'").fetchone()[0],
                 1,
             )
         status = radar.company_watch_manifest_status()
         self.assertEqual(status["classification_counts"], {
-            "candidate_staged": 21, "manual_review": 79,
+            "candidate_staged": 19, "manual_review": 79,
         })
-        self.assertEqual(len(status["manual_review_rows"]), 79)
+        self.assertEqual(len(status["manual_review_rows"]), 81)
         candidates = radar.list_global_ats_candidates(limit=50)["candidates"]
-        self.assertEqual(len(candidates), 21)
+        self.assertEqual(len(candidates), 19)
         self.assertTrue(all(row["manifest_company_name"] for row in candidates))
         self.assertTrue(all(row["manifest_careers_url"] for row in candidates))
         self.assertTrue(all(row["manifest_sha256"] == radar.COMPANY_WATCH_MANIFEST_SHA256 for row in candidates))
@@ -236,7 +236,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
             conn.commit()
 
         result = radar.import_company_watch_manifest({})
-        self.assertEqual(result["candidate_inserted"], 20)
+        self.assertEqual(result["candidate_inserted"], 18)
         self.assertEqual(result["candidate_updated"], 1)
         with sqlite3.connect(self.db) as conn:
             stored = conn.execute(
@@ -254,7 +254,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
                 """SELECT COUNT(*) FROM company_watch_manifest_rows
                    WHERE candidate_id IS NOT NULL""",
             ).fetchone()[0]
-            self.assertEqual(linked, 21)
+            self.assertEqual(linked, 19)
 
     def test_admin_source_health_ui_exposes_import_and_manual_review_evidence(self):
         root = Path(__file__).resolve().parents[1]
