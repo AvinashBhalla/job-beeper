@@ -75,6 +75,30 @@ PY
 
 dated_db="$BACKUP_DIR/production-jobs-$TODAY.sqlite3"
 current_db="$BACKUP_DIR/production-jobs.sqlite3"
+
+# Preserve the last pre-retention snapshot once. This is a hard link (no extra
+# database bytes) and is deliberately outside the dated retention pattern.
+legacy_db="$BACKUP_DIR/production-jobs-legacy-pre-retention.sqlite3"
+if [[ -f "$current_db" && ! -e "$legacy_db" ]]; then
+  legacy_tmp="$BACKUP_DIR/.production-jobs-legacy-pre-retention.tmp.$"
+  ln "$current_db" "$legacy_tmp"
+  chown root:root "$legacy_tmp"
+  chmod 0600 "$legacy_tmp"
+  mv -f "$legacy_tmp" "$legacy_db"
+  python3 - "$legacy_db" <<'PY'
+import sqlite3
+import sys
+
+db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True, timeout=30)
+try:
+    integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
+    if integrity != "ok":
+        raise RuntimeError(f"legacy snapshot integrity check failed: {integrity}")
+    print("legacy_snapshot_preserved=ok")
+finally:
+    db.close()
+PY
+fi
 mv -f "$staged" "$dated_db"
 ln "$dated_db" "$alias_staged"
 mv -f "$alias_staged" "$current_db"
@@ -86,7 +110,8 @@ snapshot_file() {
   local dated_name="$2"
   local current_name="$3"
   local tmp="$BACKUP_DIR/.$dated_name.tmp.$$"
-  local alias_tmp="$BACKUP_DIR/.$current_name.tmp.$$"
+  local alias_tmp="$BACKUP_DIR/.$current_name.tmp.$"
+  trap 'rm -f "$tmp" "$alias_tmp"' RETURN
   cp -- "$source" "$tmp"
   chown root:root "$tmp"
   chmod 0600 "$tmp"
