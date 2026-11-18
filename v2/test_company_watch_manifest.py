@@ -31,7 +31,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
             radar._normalise_global_ats_candidate_url,
         )
         self.assertEqual(manifest["rows_total"], 100)
-        self.assertEqual(manifest["manifest_sha256"], "bdda2a9e527a7ad298790635b050108c49f950183e390f773b54a5a8c1252d3c")
+        self.assertEqual(manifest["manifest_sha256"], "146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd")
         self.assertEqual(manifest["counts"], {
             "candidate_staged": 21,
             "manual_review": 79,
