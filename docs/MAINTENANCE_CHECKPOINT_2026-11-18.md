@@ -244,3 +244,11 @@ The five-minute cadence still generated up to 288 runs/day, with recent run dura
 
 The app-side Naukri collector is still configured to poll its raw relay feed every five minutes. Once the last published feed exceeds the existing 15-minute freshness threshold, the collector will fail closed; these failures are expected while the publisher is paused. No app config, database state, other ATS source or production application service was changed. Health Watch now treats the paused relay as expected and will not alert on stale-feed failures unless they materially affect overall app health or create noise.
 
+### No-cost backup and relay follow-up PRs — 18 November 2026
+
+- PR #96 prepares an optional, persistent **10-minute** Naukri relay timer. It is not installed or enabled. Production relay remains intentionally paused after the owner's request.
+- PR #97 prepares a **seven-day local snapshot retention** path, including SQLite online backup integrity checks, paired config/token snapshots, a strict retention helper, and SHA-256 manifest. It is repository code only; the production snapshot script has not been replaced.
+- PR #97 validation on a disposable VM checkout: **5/5** retention/script contract tests pass; shell `bash -n` passes; helper compile and retention smoke test pass.
+- The existing production snapshot service continues to run daily at 02:45 UTC. Current installed script still writes the single rolling `production-jobs.sqlite3` snapshot; do not claim seven-day retention until PR #97 is reviewed and its script is installed.
+- Local snapshots remain on the same VM disk. They help recover from database corruption or accidental changes but are not off-site disaster recovery. Termalin remains intentionally unused because the owner does not want a paid plan and its confirmation UI hangs.
+- No new spend, paid API request, GitHub plan upgrade, or Termalin subscription is being requested or initiated.
