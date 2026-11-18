@@ -8072,9 +8072,9 @@ def import_global_ats_candidates(payload: dict[str, Any]):
     }
 
 
-COMPANY_WATCH_MANIFEST_PATH = Path(__file__).with_name("data") / "company_watch_companies_2026-11-17.csv"
-COMPANY_WATCH_MANIFEST_SOURCE_REF = "main@29cbb17190b26829d49e1458137d75f2e8f286aa"
-COMPANY_WATCH_MANIFEST_SHA256 = "706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd"
+COMPANY_WATCH_MANIFEST_PATH = Path(__file__).with_name("data") / "company_watch_companies_2026-11-18.csv"
+COMPANY_WATCH_MANIFEST_SOURCE_REF = "main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6"
+COMPANY_WATCH_MANIFEST_SHA256 = "146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd"
 
 
 @app.post("/api/discovery/company-watch/import", dependencies=[Depends(require_admin)])

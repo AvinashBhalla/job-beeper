@@ -31,13 +31,13 @@ class CompanyWatchManifestTests(unittest.TestCase):
             radar._normalise_global_ats_candidate_url,
         )
         self.assertEqual(manifest["rows_total"], 100)
-        self.assertEqual(manifest["manifest_sha256"], "706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd")
+        self.assertEqual(manifest["manifest_sha256"], "146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd")
         self.assertEqual(manifest["counts"], {
             "candidate_staged": 19,
             "manual_review": 81,
         })
-        self.assertEqual(sum(row["scan_enabled"] for row in manifest["rows"]), 90)
-        self.assertEqual(sum(not row["scan_enabled"] for row in manifest["rows"]), 10)
+        self.assertEqual(sum(row["scan_enabled"] for row in manifest["rows"]), 92)
+        self.assertEqual(sum(not row["scan_enabled"] for row in manifest["rows"]), 8)
         self.assertTrue(all(row["candidate"] for row in manifest["rows"] if row["classification"] == "candidate_staged"))
         self.assertTrue(all(not row["candidate"] for row in manifest["rows"] if row["classification"] == "manual_review"))
         self.assertTrue(all(
@@ -57,9 +57,30 @@ class CompanyWatchManifestTests(unittest.TestCase):
         self.assertIn("identity", by_number[24]["review_reason"])
         self.assertEqual(by_number[32]["classification"], "manual_review")
         self.assertIn("identity", by_number[32]["review_reason"])
-        self.assertEqual(by_number[36]["classification"], "manual_review")
+        self.assertEqual(by_number[36]["classification"], "candidate_staged")
         self.assertEqual(by_number[43]["classification"], "manual_review")
         self.assertEqual(by_number[51]["classification"], "manual_review")
+
+    def test_corrected_company_watch_rows_use_current_official_board_evidence(self):
+        manifest = company_watch_manifest.parse_manifest(
+            radar.COMPANY_WATCH_MANIFEST_PATH,
+            radar._normalise_global_ats_candidate_url,
+        )
+        by_number = {row["row_number"]: row for row in manifest["rows"]}
+
+        mistral = by_number[2]
+        self.assertEqual(mistral["company_name"], "Mistral AI")
+        self.assertEqual(mistral["candidate"]["provider"], "ashby")
+        self.assertEqual(mistral["candidate"]["board_key"], "mistral.ai")
+        self.assertEqual(mistral["verification_source"], "https://mistral.ai/careers/")
+
+        soundhound = by_number[13]
+        self.assertEqual(soundhound["classification"], "manual_review")
+        self.assertIsNone(soundhound["candidate"])
+        self.assertEqual(soundhound["careers_url"], "https://www.soundhound.com/careers")
+
+        self.assertEqual(by_number[36]["candidate"]["provider"], "workday")
+        self.assertIsNone(by_number[43]["candidate"])
         self.assertEqual(by_number[64]["classification"], "manual_review")
         self.assertEqual(by_number[70]["classification"], "manual_review")
 
