@@ -66,7 +66,7 @@ Admin `GET /api/source-status` returns `last_feed` for Naukri (age, age at poll,
 
 ## Owner pause — 18 November 2026, 09:03 UTC
 
-The owner intentionally paused the Naukri relay to reduce frequent workflow activity. The production timer `job-radar-naukri-relay.timer` was found still enabled after the owner's attempt to stop it, so it was explicitly disabled and stopped. Verification showed `ActiveState=inactive`, `SubState=dead`, `UnitFileState=disabled`, and no next trigger. The last scheduled publisher workflow at 09:00:14 UTC completed successfully; no in-progress workflow remained at the time of the pause.
+The owner requested the pause at approximately 09:03 UTC. The timer was still enabled at the first check and dispatched one final already-due service at 09:05:18 UTC; public workflow 44272634864 completed successfully at 09:05:20 UTC. The timer was then disabled/stopped. Verification showed `ActiveState=inactive`, `SubState=dead`, `UnitFileState=disabled`, and no next trigger. No later public workflow runs appeared through the 09:23 UTC check.
 
 The Naukri app consumer is separate from the publisher timer. It may continue its five-minute raw-feed poll and begin rejecting the stale snapshot after the existing 15-minute freshness threshold. This is expected while paused; do not keep dispatching the publisher to avoid stale status. No other JobBeeper source is disabled.
 
