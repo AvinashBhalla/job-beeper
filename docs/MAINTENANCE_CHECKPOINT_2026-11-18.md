@@ -309,3 +309,22 @@ This remains an interim checkpoint. Do not issue a final 24-hour acceptance unti
 - Current manual candidate staging remains admin-only and candidate-only; it does not ingest jobs. Current member preferences contain no source URL list. Existing cross-source canonical-opportunity matching and one-per-canonical notification ledger are useful foundations, but `GET /api/jobs` still returns raw job rows without grouping by canonical opportunity, so duplicate cards are not yet guaranteed to collapse.
 - Oracle integration caveat documented: Oracle's official HCM REST page labels `recruitingCEJobRequisitions` internal-use only and `recruitingJobSitePostedJobs` approved-Marketplace-partner only. A third-party October 28, 2026 write-up describes the unauthenticated Candidate Experience UI requests, but this is not an Oracle-supported public API guarantee. Terms/stability must be resolved before any production adapter.
 - **Priority P2 / next release. Not current release and not P1.** No code, DB, member UI/API, provider registry, source schedule, production or deployment change was made for this request.
+
+### Current development checkpoint — 18 November 2026, 12:21 UTC
+
+- The full V2 suite passed **557/557** locally on the rebased PR #96 head (351.012 seconds). PR #96 merged as `2f45b947074b4221bc338ccfd2410394b881416c`; its ten-minute relay timer is a repository template only. Production Naukri relay remains disabled by owner choice.
+- PR #98's SERP non-finite budget/cost guard is merged as `a0af67e313c12b663e0ab0c02940279284846c85`; its focused 28 SERP tests and full 550-test suite passed on that PR head. No paid SERP API calls or credentials.
+- The Company Watch corrected manifest was dry-run offline at exact pinned hash: 100 rows, 19 candidate_staged, 81 manual_review; no DB file or side effects. Production import and stale-candidate rejection remain pending the current release gate.
+- The seven-day local recovery snapshot script is installed. Latest checksum verification: 5/5 entries pass; daily snapshot timer is enabled/waiting. First dated generation is present; retention accumulates over the next six daily runs. No off-site backup exists.
+- New feature request #99 was created as **P2 / next release** and documented at `docs/MEMBER_SUBMITTED_SHARED_CAREER_SOURCES_NEXT_RELEASE.md`. Exact Oracle CX_1 and CX_1001 URLs are captured; static provider detection currently returns unsupported for both. No live API calls or code changes for this feature.
+- Production at 12:21 UTC: app health HTTP 200, SQLite `quick_check=ok`, active registry/schedules 10/10. Naukri timer disabled/inactive/dead; snapshot timer active/waiting. Workday continues returning 429; Naukri stale-feed errors are expected while the publisher is paused.
+- Remote branches: `main`, `v2-live-radar`; open PRs: 0.
+- Current 24-hour source reliability window still ends at **20:59:46 UTC on 18 November** (02:29:46 IST on 19 November). Keep the final acceptance report pending until the exact cutoff.
+
+### Next execution order
+
+1. Complete and document the 24-hour source-by-source reliability assessment; preserve the Workday 429 and Naukri intentional-pause history.
+2. Decide the Company Watch release qualification against production safety; do not import/activate candidates automatically.
+3. Continue read-only checks of the local snapshot generations, SHA-256 manifest, SQLite integrity, disk headroom and production health.
+4. Keep Naukri publisher and SERP paid discovery disabled under the no-spend direction.
+5. Carry issue #99 into next-release planning after the current reliability and Company Watch work is closed. It is P2 and does not enter the current release.
