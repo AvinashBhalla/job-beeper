@@ -200,7 +200,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
             )
         status = radar.company_watch_manifest_status()
         self.assertEqual(status["classification_counts"], {
-            "candidate_staged": 19, "manual_review": 79,
+            "candidate_staged": 19, "manual_review": 81,
         })
         self.assertEqual(len(status["manual_review_rows"]), 81)
         candidates = radar.list_global_ats_candidates(limit=50)["candidates"]
