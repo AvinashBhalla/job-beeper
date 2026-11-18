@@ -1,0 +1,14 @@
+[Unit]
+Description=Job Radar - Trigger Naukri GitHub Relay
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu
+Environment=HOME=/home/ubuntu
+Environment=GH_CONFIG_DIR=/home/ubuntu/.config/gh
+ExecStart=/usr/bin/gh workflow run naukri-relay.yml --repo AvinashBhalla/job-beeper-naukri-relay --ref main
+TimeoutStartSec=300
