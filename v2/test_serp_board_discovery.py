@@ -2,7 +2,7 @@
 import datetime as dt
 import unittest
 
-from v2 import serp_board_discovery as serp
+from v2 import radar, serp_board_discovery as serp
 
 
 class SerpBoardDiscoveryTests(unittest.TestCase):
@@ -64,6 +64,9 @@ class SerpBoardDiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0]["board_url"], "https://jobs.lever.co/acme")
+
+    def test_candidate_importer_accepts_serp_provenance_method(self):
+        self.assertIn("search_engine_serp", radar.GLOBAL_DISCOVERY_METHODS)
 
     def test_invalid_provider_and_engine_fail_closed(self):
         with self.assertRaises(ValueError):
