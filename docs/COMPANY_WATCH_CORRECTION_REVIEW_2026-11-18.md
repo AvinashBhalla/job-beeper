@@ -52,4 +52,24 @@ The current merged `v2-live-radar` checkout was cloned into a disposable directo
 - Rows: **100**; candidate_staged: **19**; manual_review: **81**.
 - Reported side effects: companies created 0; boards linked 0; verified 0; activated 0; scheduled 0; network requests 0; notifications 0.
 - The dry-run assertion suite passed. No dry-run SQLite file was created, confirming this path did not open or mutate a DB.
-- This is offline manifest/parser qualification, not a deployment, import, endpoint verification or production change. The corrected manifest has **not** been imported into production; stale old candidates remain pending guarded admin review after a future approved deployment/import.
+- This is offline manifest/parser qualification, not a deployment, import, endpoint verification or production change. At the time of this pre-release offline checkpoint, the corrected manifest had not yet been imported; the subsequent production execution is recorded in the final section below.
+
+
+## Production import and guarded correction — 19 November 2026
+
+The earlier offline-only section above records the state before promotion. The correction has since been deployed and imported into production under the approved final release gate.
+
+- Candidate runtime path: /app/v2/data/company_watch_companies_2026-11-18.csv
+- Source ref: main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6
+- SHA-256: 146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd
+- Production runtime dry-run with payload {"dry_run": true}: 100 rows, 19 candidate_staged, 81 manual_review, 0 invalid; companies created 0, boards linked 0, verified 0, activated 0, scheduled 0, network requests 0, notifications 0.
+- Production import via radar.import_company_watch_manifest({}) completed at 2026-11-18 21:17:20.785205 UTC / 2026-11-19 02:47:20.785 IST.
+- Import result: 2 candidates inserted, 17 updated, 0 terminal candidates preserved. The result was recalculated first against a fresh online-backup copy of the current production DB using the exact candidate image; all pre-existing candidate IDs, statuses and linkage fields were verified unchanged by import.
+- New review-only candidates: ashby/mistral.ai (jobs.ashbyhq.com) and workday/standard:search (standard.wd1.myworkdayjobs.com). Both remain discovered and unlinked.
+- The two obsolete candidates were resolved by provider + board_key at execution time and rejected only through radar.review_global_ats_candidate: lever/mistral and greenhouse/soundhoundinc. Both function results returned activated=false.
+- Final candidate table: 21 rows total; 19 discovered and 2 rejected. No unrelated candidate status or linkage changed.
+- Manifest audit: 100 rows / 19 staged / 81 manual / 0 invalid; all 100 manifest audit rows persisted under the exact pinned hash.
+- Employers remain 10; active registry boards remain 10; active schedules remain 10; exact keys unchanged. No employer, board, link, verification, activation or schedule was created.
+- Notification ledger stayed at 27,725; importer reported zero network requests and zero notifications. SQLite quick_check: ok.
+
+Production is running job-radar-prod-release:dda6d57 (image ID sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d). Health, dashboard and OpenAPI are HTTP 200; no restart/OOM. The rollback image remains available. Naukri relay remains disabled; SERP remains inactive with no credentials or paid requests. Issue #99 remains P2 next release.
