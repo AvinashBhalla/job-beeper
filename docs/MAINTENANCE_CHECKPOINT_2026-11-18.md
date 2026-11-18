@@ -60,7 +60,7 @@ The V2 production database still contains the old pinned manifest (19 candidate_
 - The Standard: Workday candidate now supported.
 - Caxton Associates: Workable candidate now supported.
 
-PR #87 updates the V2 pin and regression tests. Expected result: 100 rows, 92 enabled / 8 disabled, 19 candidate_staged / 81 manual_review. Old production candidates lever/mistral and greenhouse/soundhoundinc still need admin rejection after the corrected manifest is deployed and imported. No production import, SQL patch, link, verification, activation, or polling change has been made.
+PR #87 has now merged into v2-live-radar as e1617dd50cb7970b2e7677eae990b37cfde87a3c. It updates the V2 pin and regression tests. Expected dry-run result: 100 rows, 92 enabled / 8 disabled, 19 candidate_staged / 81 manual_review. This merge is not deployed to production. Old production candidates lever/mistral and greenhouse/soundhoundinc still need admin rejection after the corrected manifest is deployed and imported. No production import, SQL patch, link, verification, activation, or polling change has been made.
 
 ## Search-engine-assisted ATS discovery
 
@@ -79,7 +79,7 @@ Six remote branches associated with already-merged PRs #80–#85 were deleted af
 - feat/fetcher-feed-reliability-20261118
 - fix/smartrecruiters-detail-cache-20261117
 
-Six merged remote branches were deleted after verifying PRs #80–#85 were merged. The temporary source-fix branch for PR #89 was deleted after merge. Current remote branch count: five — main, v2-live-radar, docs/search-engine-ats-discovery-design-20261118 (PR #86), fix/company-watch-manifest-corrections-20261118 (PR #87), and docs/maintenance-checkpoint-20261118 (PR #88). Main and v2-live-radar were retained. The local production checkout was fetch-pruned but not pulled or reset.
+Six merged remote branches were deleted after verifying PRs #80–#85 were merged. The temporary source-fix branch for PR #89 was deleted after merge. Current remote branch count: four — main, v2-live-radar, docs/search-engine-ats-discovery-design-20261118 (PR #86), and docs/maintenance-checkpoint-20261118 (PR #88). PR #87 and PR #89 branches were deleted after their merges. Main and v2-live-radar were retained. The local production checkout was fetch-pruned but not pulled or reset.
 
 ## Checkouts intentionally preserved
 
@@ -89,10 +89,10 @@ Six merged remote branches were deleted after verifying PRs #80–#85 were merge
 
 ## Open work
 
-1. Wait for exact-head CI on PR #87 after the corrected source CSV; fix any failures before merging.
-2. Review/merge PR #86 after the updated discovery design CI passes.
-3. Do not deploy PR #87 or import its manifest until normal release gates and owner approval are satisfied.
-4. When deployed, dry-run and import the corrected manifest, verify 10 registry boards / 10 schedules remain unchanged, then reject the two stale candidate keys through the admin review API.
+1. Confirm exact-head CI for PR #86 after the latest endpoint/cost correction; merge the design doc when green.
+2. Confirm exact-head CI for PR #88; merge the maintenance checkpoint when green.
+3. PR #87 is merged but not deployed. Do not deploy or import its manifest until the 24-hour source reliability gate and owner approval are satisfied.
+4. After deployment, dry-run and import the corrected manifest, verify 10 registry boards / 10 schedules remain unchanged, then reject the two stale candidate keys through the admin review API.
 5. Complete the 24-hour source reliability assessment at 20:59:46Z on 18 November.
 6. Ask the owner to confirm the off-host backup draft and approve a maintenance reboot window.
-7. Continue daily read-only VM, database, scheduler, source and GitHub monitoring. Keep Telegram/member-feature expansion out of scope.
+7. Continue hourly read-only VM, database, scheduler, source and GitHub monitoring. Keep Telegram/member-feature expansion out of scope.
