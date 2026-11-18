@@ -55,6 +55,14 @@ Illustrative Priority cost, before taxes or any account-specific charges:
 
 These are base-price estimates only. The 5x operator multiplier, number of returned SERP pages, extra tasks, and live account pricing can change the actual cost. The first pilot must save and inspect the API's returned cost field before any recurring schedule is enabled.
 
+### Other search API candidates
+
+**Serper (Google SERP API)** is the strongest price/performance alternative to benchmark against DataForSEO. Its current pricing lists a $50 prepaid pack for 50,000 credits (six-month validity), then $375 for 500,000 credits, $1,250 for 2.5 million, and $3,750 for 12.5 million. That works out to about $1.00, $0.75, $0.50 and $0.30 per 1,000 requests respectively. It accepts regular Google query syntax, including site-style queries, and reports typical response times around 1–2 seconds. Its trade-off is that this design would encode provider domains in the query rather than use DataForSEO's structured wildcard target filter. Run a fixed 50-query comparison before selecting the vendor; compare verified unique boards per 1,000 requests, latency, coverage and actual billed credits.
+
+**SerpApi** also exposes structured Google SERP results and supports normal Google query operators and geographic localization. Its listed entry plan is $25/month for 1,000 searches, then $75 for 5,000 and $150 for 15,000. That is substantially more expensive for a recurring discovery worker, so it is not a first choice unless its support/compliance terms or result quality prove materially better.
+
+**Exa** is a useful independent semantic discovery candidate rather than a direct Google replacement. It supports per-request includeDomains/excludeDomains filters, wildcard subdomains and path prefixes. Its documented Lite mode is $4 per 1,000 requests and Auto mode is $7 per 1,000. It may surface employer careers pages missed by exact keyword SERPs, but its neural ranking is less directly comparable to Google operator searches. Evaluate it later as a coverage-expansion source, not as the initial board enumerator.
+
 ### Secondary option: Brave Search API
 
 Brave's independent web index is a useful future cross-check, especially if Google-index coverage misses a provider or the primary vendor becomes unavailable. Its public pricing is listed at $5 per 1,000 requests, with a monthly credit for eligible accounts. Do not integrate two engines at once in the first release. Add Brave only after the Google-index adapter has demonstrated useful, unique board discovery.
