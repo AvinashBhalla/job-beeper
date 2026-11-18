@@ -28,11 +28,11 @@ Google documents operators such as `site:`, quoted exact phrases, exclusions, an
 
 Automated scraping of Google Search result pages is not an acceptable production integration. Google's policies prohibit automated querying/scraping without express permission. Google Custom Search JSON API is also a poor new dependency: it is closed to new customers and the published migration timeline ends on 1 January 2027.
 
-### Preferred first adapter: DataForSEO Google Organic SERP API
+### Provider-neutral first pilot: DataForSEO Live target vs Serper
 
-DataForSEO exposes Google's organic result page as structured API output. Its documentation supports a structured `target` domain/subdomain/webpage filter with wildcard matching. This should be evaluated in preference to embedding `site:` inside every keyword: DataForSEO documents a 5x price multiplier for search operators such as `site:`, `inurl:` and `intitle:`.
+DataForSEO exposes Google's organic results as structured API output and supports a wildcard `target` domain/subdomain/webpage filter. Critical endpoint limitation: the structured `target` parameter is supported on the Live Google Organic endpoints, but not the queued Standard/Priority Task POST endpoint. Therefore `target` plus a strict 30-minute cadence means using Live mode. If using Standard/Priority queues, put the provider restriction in the keyword with `site:`; DataForSEO documents a 5x multiplier for operators such as `site:`, `inurl:` and `intitle:`. Do not model Priority plus structured target as a supported combination.
 
-The API offers Standard, Priority and Live queues. Current documentation lists Standard normal priority at about 5 minutes on average but gives a 45-minute target turnaround (extended processing may occur); Standard high priority is about one minute on average; Live averages up to about six seconds. A strict 30-minute worker should start with Priority, not Standard, because the Standard normal target can exceed the discovery interval. Treat all turnaround figures as vendor processing targets, not guarantees of search-index freshness. Record the API-returned cost per task and enforce a hard monthly/daily budget; do not assume the wildcard `target` parameter is free of operator-related billing until a live pilot confirms actual charged cost.
+Current published timings: Standard normal priority averages about 5 minutes but has a 45-minute target (extended processing may occur); Standard high priority averages about one minute; Live averages about six seconds. A 30-minute worker can use Live + structured target, or Priority + `site:` query, but not Priority + structured target. Search-index freshness remains outside our control. Preserve actual task cost and enforce a hard budget.
 
 Candidate target patterns to test:
 
@@ -49,11 +49,13 @@ Candidate target patterns to test:
 
 The actual API request should use the role-family keyword and India location/language fields, with the ATS target as a separate structured parameter. Validate that returned organic URLs are actually constrained to the intended ATS provider domain. Preserve the exact query, target, engine, region, device, result URL, title, snippet, rank, response timestamp and API task cost for audit.
 
-Illustrative Priority cost, before taxes or any account-specific charges:
-- Two SERP tasks every 30 minutes: 2,880 tasks per 30-day month × $0.0012 ≈ **$3.46/month**.
-- Eight provider targets every 30 minutes: 11,520 tasks per month × $0.0012 ≈ **$13.82/month**.
+Illustrative monthly costs for one SERP per provider target (30-day month; before taxes/account-specific terms):
+- DataForSEO Live + structured target: 2 targets every 30 minutes = 2,880 SERPs × $0.002 ≈ **$5.76/month**; all 8 targets every 30 minutes = 11,520 SERPs × $0.002 ≈ **$23.04/month**.
+- DataForSEO Priority + `site:` query (5x operator multiplier): 2,880 × ($0.0012 × 5) ≈ **$17.28/month**; 11,520 × ($0.0012 × 5) ≈ **$69.12/month**.
+- DataForSEO Standard + `site:` query: approximately **$8.64/month** for 2 targets or **$34.56/month** for 8 targets, but the 45-minute target turnaround is too loose for a strict 30-minute cycle.
+- Serper: nominal usage is about **$2.88/month** for 2 targets or **$11.52/month** for 8 targets at the $1/1k starter rate, but its current entry purchase is a $50 prepaid 50k-credit pack valid for six months. The effective cost at low cadence is therefore affected by the prepaid minimum and expiry.
 
-These are base-price estimates only. The 5x operator multiplier, number of returned SERP pages, extra tasks, and live account pricing can change the actual cost. The first pilot must save and inspect the API's returned cost field before any recurring schedule is enabled.
+These are estimates, not a spend authorization. The first 50-query benchmark must save actual returned cost/credits, direct ATS URL coverage, duplicates and verified-board yield. Do not enable a recurring schedule until a monthly cap and provider are explicitly approved.
 
 ### Other search API candidates
 
@@ -89,7 +91,7 @@ Do not add DNS/certificate-transparency enumeration, arbitrary web crawling, or 
 ## Proposed 30-minute discovery cycle
 
 1. **Select a bounded query batch.** Keep role-family seeds configurable, e.g. Software Developer, Software Engineer, Backend Engineer, Frontend Engineer, Full Stack Engineer, Python Developer and Automation Engineer. Do not multiply every role synonym by every ATS target on every cycle.
-2. **Rotate provider targets.** A low-cost starting plan is two provider targets per 30-minute cycle, rotating through all eight providers. That checks each provider approximately every two hours. If measured unique discovery value justifies it, move to all eight targets each cycle.
+2. **Rotate provider targets.** A low-cost starting plan is two provider targets per 30-minute cycle, rotating through all eight providers. That checks each provider approximately every two hours. Compare DataForSEO Live + target against Serper site: queries on the same 50-query set before choosing a vendor. If measured unique discovery value justifies it, move to all eight targets each cycle.
 3. **Query a licensed SERP API.** Use India and English locale settings. Store API task ID, query, target, execution time, returned result count and actual charged cost.
 4. **Extract candidate URLs only.** Accept HTTPS public URLs; reject credentials, non-standard ports, arbitrary schemes, unrelated hosts and overly long URLs. Deduplicate by normalized `(provider, candidate_host, board_key)`.
 5. **Normalize with existing code.** Reuse `board_discovery.detect_ats_board()` and `_normalise_global_ats_candidate_url()`. Do not create a second URL parser or a separate board identity format.
@@ -124,16 +126,16 @@ The current production app already has candidate-only Common Crawl and robots-aw
 
 ### Gate 0 — no production writes
 
-- Use a DataForSEO trial/API account or a separately provisioned secret in the QA environment. Never paste credentials into chat, source files, docs or command history.
-- Manually test the wildcard `target` filter on all eight provider domains using a small number of role seeds.
-- Compare returned URLs with the manual `site:` query and verify result-domain containment.
+- Provision a trial/API account only for the selected vendor in QA. Never paste credentials into chat, source files, docs or command history.
+- Manually test DataForSEO Live `target` filtering on all eight provider domains and Serper `site:` queries using the same role seeds.
+- Compare returned URLs with manual `site:` queries; verify exact ATS host/path containment and check for Google redirect-wrapped result URLs.
 - Save the real per-task cost, result count, duplicates, malformed URLs and valid candidate count.
 - Compare Google results with official employer careers links and existing Common Crawl/sitemap discovery.
 - Do not add any result to the production database during this stage.
 
 ### Gate 1 — deterministic QA worker
 
-- Implement the DataForSEO adapter behind an interface so it can be disabled independently.
+- Implement the selected SERP vendor behind a provider-neutral adapter interface so it can be disabled or swapped independently.
 - Add parser/normalizer tests for all eight ATS providers, result pagination caps, malicious URLs, duplicate board identity, stale results, 429/Retry-After, API errors, timeout, budget exhaustion and idempotent replays.
 - Add worker lease, persistent due times and bounded target rotation.
 - Test that discovery imports candidates only and has zero side effects on employer records, registry activation, schedule count, job inventory and notifications.
@@ -159,11 +161,11 @@ Do not integrate search directly into the job collector loop. Keep search API us
 
 ## External references
 
-- Google Search operators: https://support.google.com/websearch/answer/2466433
-- Google Search spam policies / machine-generated traffic: https://developers.google.com/search/docs/essentials/spam-policies
-- Google Custom Search JSON API overview and migration notice: https://developers.google.com/custom-search/v1/overview
 - DataForSEO Google Organic SERP API pricing: https://dataforseo.com/pricing/google-serp/google-organic-serp-api
-- DataForSEO Google Organic SERP API reference: https://docs.dataforseo.com/v3/serp/google/organic/live/advanced/
-- Brave Search API documentation: https://api-dashboard.search.brave.com/app/documentation/web-search
+- DataForSEO Live Advanced endpoint and target parameter: https://docs.dataforseo.com/v3/serp/google/organic/live/advanced/
+- DataForSEO target filter limitations and redirect caveat: https://dataforseo.com/help-center/how-to-get-google-rankings-with-python-a-dataforseo-serp-api-tutorial
+- Serper Google SERP API pricing: https://serper.dev/
 - Brave Search API pricing: https://brave.com/search/api/
-- Google Agent Development Kit overview: https://docs.cloud.google.com/gemini-enterprise-agent-platform/build/adk
+- Exa Search API domain filters: https://exa.ai/
+- Google Search spam policies: https://developers.google.com/search/docs/essentials/spam-policies
+- Google Custom Search JSON API sunset notice: https://developers.google.com/custom-search/v1/overview
