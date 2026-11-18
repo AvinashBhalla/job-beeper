@@ -328,3 +328,15 @@ This remains an interim checkpoint. Do not issue a final 24-hour acceptance unti
 3. Continue read-only checks of the local snapshot generations, SHA-256 manifest, SQLite integrity, disk headroom and production health.
 4. Keep Naukri publisher and SERP paid discovery disabled under the no-spend direction.
 5. Carry issue #99 into next-release planning after the current reliability and Company Watch work is closed. It is P2 and does not enter the current release.
+
+### Release candidate staged — 18 November 2026, 16:47 UTC
+
+See `docs/RELEASE_QUALIFICATION_2026-11-18.md` for the exact-head test evidence, candidate image identity, isolated real-config smoke, Company Watch production-DB simulation, pre-release backup and rollback recipe.
+
+The candidate is built/tagged as `job-radar-prod-release:dda6d57` (image `sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d`). The full local V2 suite passed **557/557** on exact commit `dda6d5757f4701ce916a94a48f7ec94d6297e51a`; a candidate container using a sanitized copy of the real production config initialized and synchronized exactly 10 configured ATS schedules, with health/dashboard/OpenAPI all HTTP 200 and networking disabled.
+
+Pre-release DB/config/rollback artifacts are stored in root-only directory `/var/backups/job-radar-daily/release-dda6d57-20261118T2210IST`. The SQLite snapshot contains 28,001 jobs, two users, 10 active boards and 10 active schedules, integrity `ok`; nine backup artifacts pass the checksum manifest. Both candidate and rollback Compose files pass validation and preserve external volume `v2_radar-data`, loopback port 8000 and restart policy `unless-stopped`.
+
+Corrected Company Watch import/rejection behavior was simulated successfully on a disposable production DB copy: 100 manifest rows (19 candidate / 81 manual), 2 inserted / 17 updated, old `lever/mistral` and `greenhouse/soundhoundinc` rejected with `activated:false`, zero employers/boards/schedules/notifications created. Live production still has the old manifest and unchanged candidates.
+
+Current live source roll-up through 16:47 UTC: Workday 23/23 429 with 60-minute cooldown; LinkedIn 101 success / 6 429; Naukri 95 expected stale-feed failures after owner pause; Darwinbox/Greenhouse/Keka/SmartRecruiters/Workable fully successful; Ashby one isolated failure. The exact 24-hour observation cutoff remains `2026-11-18T20:59:46Z` (19 November 02:29:46 IST). **Do not promote or import the corrected Company Watch manifest before this cutoff.** At/after cutoff, produce final source assessment; if no material regression, proceed with the prevalidated promotion and guarded manifest import/rejection sequence. Production has not been restarted or changed for this release candidate.
