@@ -28,7 +28,7 @@ Current production was observed to have the older unit:
 - `OnUnitActiveSec=5min`
 - `Persistent=true`
 
-After the 18 November 2026 reboot, this timer was found in `active/elapsed` with no future trigger. A one-time start of the existing service restored its ten-minute next trigger and subsequent runs. The exact underlying systemd state transition was not independently proven, so this template is a preventive hardening proposal, not a claim that a specific systemd defect has been isolated.
+After the 18 November 2026 reboot, this timer was found in `active/elapsed` with no future trigger. A one-time start of the existing service restored its original five-minute next trigger and subsequent runs. This PR's template is a ten-minute option for any future approved restart. The exact underlying systemd state transition was not independently proven, so this template is a preventive hardening proposal, not a claim that a specific systemd defect has been isolated.
 
 ## Validation
 
@@ -51,13 +51,13 @@ systemd-analyze calendar '*-*-* *:0/10:00'
 The production-host independent test run used a temporary shallow checkout of this PR and a disposable Python virtual environment. Results:
 - Timer contract tests: **7 passed**.
 - Full V2 suite: **546 passed**, 0 failures, 368.112 seconds.
-- `systemd-analyze calendar '*-*-* *:0/5:00'` parsed the expression and returned the next five-minute boundary.
+- `systemd-analyze calendar '*-*-* *:0/10:00'` parsed the proposed expression and returned the next ten-minute boundary.
 - `systemd-analyze verify` completed, with two unrelated host-level warnings: permission denied while reading `/run/systemd/system/netplan-ovs-cleanup.service`, and the host's installed `snapd.service` has an unrecognized `RestartMode` key. Neither warning referred to the proposed units.
 - The temporary checkout and venv were removed after validation.
 
 GitHub Actions did not start this PR's workflow. The check annotation reports an account billing/spending-limit block before any test process was started. This is not a test result; independent local validation above is evidence only from the production-host environment.
 
-The production timer was not replaced. Its existing `active/waiting` schedule and successful Naukri ingestion remain under the current Health Watch.
+At this validation checkpoint (08:30 UTC), the existing production timer was still `active/waiting`; no unit replacement was made. It was subsequently disabled at the owner's request after one final already-due dispatch at 09:05:18 UTC. The current disabled state is recorded in the later pause section.
 
 
 ## Cost and cadence decision — 18 November 2026
