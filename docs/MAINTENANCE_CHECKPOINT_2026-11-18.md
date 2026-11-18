@@ -154,3 +154,16 @@ The JobBeeper Health Watch automation prompt has been updated to verify the time
 1. DataForSEO pilot and monthly spend cap approval (no paid requests until explicitly approved).
 2. Confirmation of the Termalin off-host backup draft. It remains a draft; no off-site archive exists.
 3. Company Watch correction remains merged but not deployed. Do not import/activate candidates until release qualification and owner approval.
+
+### Company Watch release qualification — isolated QA only
+
+Using a temporary shallow checkout of the exact `v2-live-radar` head (`cfb095d1d470a8b5f791d94c802a61f29ed0de21`) and the existing production image's Python dependencies, I ran the pinned manifest parser and importer without deploying or modifying the live database.
+
+- Read-only dry run: 100 rows; SHA-256 matched the pinned value; 19 `candidate_staged`, 81 `manual_review`, 0 invalid. The dry-run response reported zero company creation, linking, verification, activation, scheduling, network requests or notifications.
+- Full import simulation ran only against a temporary SQLite backup of production. Result: 2 candidates inserted, 17 existing candidates updated, 0 terminal candidates altered; 100 manifest rows recorded for the new hash.
+- Before/after on the temporary database: active registry stayed 10/10 and active poll schedules stayed 10/10. No company records were created, no board was linked/verified/activated, and no schedule or notification was emitted.
+- The temporary database copy was removed after inspection.
+- Live production remains unchanged: its manifest-import table still contains only the prior hash `706ea1d6204cd80379aa57d8dd2b041f5c3f1f7af6666c7140c2c216ce2049bd`; the corrected hash has not been imported.
+- The two stale live candidates remain `lever/mistral` (id 1) and `greenhouse/soundhoundinc` (id 6), both still `discovered`. They must be rejected through the guarded admin review route after the corrected manifest is deployed/imported. Do not alter them before that release step.
+
+This qualifies the parser and candidate-only importer in an isolated production-like database. It does not authorize deployment or live import.
