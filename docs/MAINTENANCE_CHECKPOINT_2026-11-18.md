@@ -53,14 +53,14 @@ The 24-hour window is not complete. It ends at 2026-11-18T20:59:46Z (2026-11-19 
 
 ## Company Watch correction
 
-The V2 production database still contains the old pinned manifest (19 candidate_staged / 81 manual_review). The main source CSV formatting fix is merged in PR #89 (main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6); V2 correction PR #87 now pins its validated 100-row snapshot:
+The V2 production database still contains the old pinned manifest (19 candidate_staged / 81 manual_review). The main source CSV formatting fix is merged in PR #89 (main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6); V2 correction PR #87 now pins its validated 100-row snapshot. Mistral AI changes from Lever to Ashby, SoundHound moves to manual review, The Standard is staged as Workday, and Caxton remains manual because V2 deliberately treats verified_workable_board as an ambiguous status.
 
 - Mistral AI: Lever mistral → Ashby mistral.ai.
 - SoundHound AI: invalid Greenhouse soundhoundinc → official careers page; keep manual.
 - The Standard: Workday candidate now supported.
 - Caxton Associates: Workable candidate now supported.
 
-PR #87 updates the V2 pin and regression tests. Expected result: 100 rows, 92 enabled / 8 disabled, 21 candidate_staged / 79 manual_review. Old production candidates lever/mistral and greenhouse/soundhoundinc still need admin rejection after the corrected manifest is deployed and imported. No production import, SQL patch, link, verification, activation, or polling change has been made.
+PR #87 updates the V2 pin and regression tests. Expected result: 100 rows, 92 enabled / 8 disabled, 19 candidate_staged / 81 manual_review. Old production candidates lever/mistral and greenhouse/soundhoundinc still need admin rejection after the corrected manifest is deployed and imported. No production import, SQL patch, link, verification, activation, or polling change has been made.
 
 ## Search-engine-assisted ATS discovery
 
