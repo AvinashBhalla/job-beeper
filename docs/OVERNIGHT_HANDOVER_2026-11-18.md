@@ -115,3 +115,45 @@ Official source references checked: `https://mistral.ai/careers/` (Apply now lin
 ## Explicit non-goals
 
 No Telegram linking/webhooks/member-alert work, notification redesign, member-only feature expansion, new providers, broad refactors or Company Watch activation were part of this release. The one legacy notification described above came from the existing unchanged global notification path.
+
+
+## 18 November 2026 — 04:28 UTC checkpoint and search-engine discovery research
+
+### Production checkpoint
+
+Read-only observation at 04:28:01 UTC: production image `job-radar-prod-release:472c2ee` is running and `/health` returns HTTP 200. SQLite quick check is `ok`; jobs table contains 27,663 rows and duplicate `(source, source_job_id)` groups remain zero.
+
+Post-release source totals through the checkpoint:
+
+| Source | Runs | Requests | HTTP 429 | Failed pages | Jobs seen (observations) | New rows |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 175 | 175 | 0 | 0 | 73,633 | 5 |
+| Darwinbox | 222 | 222 | 0 | 0 | 8,658 | 0 |
+| Greenhouse | 267 | 267 | 0 | 0 | 30,724 | 2 |
+| Keka | 219 | 438 | 0 | 0 | 25,404 | 0 |
+| LinkedIn | 88 | 525 | 2 | 1 | 1,163 | 93 |
+| Naukri | 91 | 91 | 0 | 0 | 28,812 | 2 |
+| SmartRecruiters | 88 | 556 | 0 | 0 | 26,400 | 15 |
+| Workable | 223 | 223 | 0 | 0 | 1,338 | 0 |
+| Workday | 11 | 11 | 11 | 11 | 0 | 0 |
+
+These are source-run observations, not unique open-job counts. New rows are insertions, not a measure of unique currently-open vacancies.
+
+Workday's last attempt was 04:16:57 UTC and returned one HTTP 429; next due is about 05:16:57 UTC. LinkedIn's latest attempt was 02:40:43 UTC and ended `partial_rate_limited`; persisted 9,600-second cooldown expires at about 05:20:43 UTC. No manual retries or breaker resets. The 24-hour production observation window ends at 20:59:46 UTC on 18 November (02:29:46 IST on 19 November); full reliability acceptance remains pending.
+
+The active registry and scheduler remain exactly 10 boards/schedules. The global ATS candidate queue remains 19 `discovered` candidates. Production `global_ats_discovery_runs` has zero rows: Common Crawl/sitemap discovery code exists behind admin-triggered routes, but there is no autonomous recurring discovery worker yet.
+
+### Search-engine-assisted ATS board discovery
+
+The proposed direction is to use search engines to discover *employer ATS board URLs*, not to collect or filter individual jobs. Once an individual board is validated and manually onboarded, the existing provider collector can fetch all public open postings; JobBeeper applies its own role, experience, location and other filters.
+
+Research summary:
+- Google supports `site:` and exact-phrase search operators, but direct automated scraping of Google result pages is not an appropriate production method.
+- Google Custom Search JSON API is closed to new customers and has a published migration deadline of 1 January 2027.
+- DataForSEO Google Organic SERP API is the preferred first adapter to pilot. It returns structured organic SERP results and documents a separate wildcard `target` domain filter. Its documentation also says operators such as `site:` can trigger a 5x charge multiplier, so test the structured target filter and inspect each task's actual returned cost before choosing a production cadence.
+- Priority queue is the sensible starting point for 30-minute cycles (published average around one minute); Standard is documented at around 45 minutes and is not suitable for a dependable half-hour schedule.
+- Brave Search API can be evaluated later as an independent-index cross-check. Google ADK is not needed for the first deterministic search/normalize/probe/import workflow.
+
+A detailed proposal and gate checklist is in [Search-engine-assisted ATS board discovery](SEARCH_ENGINE_ATS_BOARD_DISCOVERY_DESIGN_2026-11-18.md). The design suggests rotating two provider targets every 30 minutes (all eight targets are covered about every two hours), then increasing frequency only if unique verified-board yield justifies the spend. Published base Priority pricing gives an illustrative $3.46/month for two tasks per half-hour or $13.82/month for all eight targets per half-hour; actual task cost, operator multiplier, taxes and account pricing must be confirmed in a QA pilot.
+
+**No search provider credentials are currently configured. No API calls, recurring search schedule, production candidate imports or board activations were performed as part of this research.** The next implementation gate is a small QA-only target-filter experiment with a spend cap, followed by a deterministic Python worker and 24-hour isolated QA. Stage only candidates through the existing review queue; do not create employer records, link, verify, activate or schedule boards automatically. Do not add Telegram/member-notification work.
