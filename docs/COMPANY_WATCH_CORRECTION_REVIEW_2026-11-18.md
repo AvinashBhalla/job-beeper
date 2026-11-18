@@ -43,3 +43,13 @@ Use provider/key rather than hard-coded IDs when performing the review; IDs can 
 ## Explicit non-goals
 
 No production database write is part of this PR. No direct SQL patching, board activation, source allowlist changes, polling changes, search API integration, recurring discovery worker, Telegram, or member-feature work is included. The production 24-hour source reliability window remains a separate acceptance gate.
+
+## Offline dry-run qualification — 18 November 2026
+
+The current merged `v2-live-radar` checkout was cloned into a disposable directory and the pinned manifest dry-run was executed inside the existing production application image with Docker networking disabled. This calls the same `radar.import_company_watch_manifest({dry_run: True})` path as the admin route but returns before any DB write.
+
+- Manifest SHA-256: `146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd` (exact pinned hash).
+- Rows: **100**; candidate_staged: **19**; manual_review: **81**.
+- Reported side effects: companies created 0; boards linked 0; verified 0; activated 0; scheduled 0; network requests 0; notifications 0.
+- The dry-run assertion suite passed. No dry-run SQLite file was created, confirming this path did not open or mutate a DB.
+- This is offline manifest/parser qualification, not a deployment, import, endpoint verification or production change. The corrected manifest has **not** been imported into production; stale old candidates remain pending guarded admin review after a future approved deployment/import.
