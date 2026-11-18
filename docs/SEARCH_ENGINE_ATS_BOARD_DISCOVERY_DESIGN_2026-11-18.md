@@ -181,3 +181,15 @@ The first offline integration seam is merged in `v2-live-radar` (PR #90, merge c
 - Regression tests cover provider scoping, DataForSEO structured targets, both response shapes, deduplication, redirect safety and fail-closed validation. V2 CI passed: 515 tests.
 
 This is intentionally not a running discovery worker. No paid provider requests, credentials, recurring schedule, production DB writes or board activations were added. Remaining engineering work is the credential-backed provider client, hard monthly spend accounting, persistent two-provider rotation, and controlled benchmark harness. Do not enable scheduled calls until the owner has approved the provider, spend cap and supplied credentials through the secret store.
+
+
+The provider-client layer is also merged (PR #91, merge commit `1503b6e35c635e5d5e806d6c761bea31ae063520`):
+
+- DataForSEO Live and Serper clients use runtime secrets, 20-second timeouts and no automatic retries.
+- DataForSEO task-level errors fail closed; actual task cost is retained when returned. Serper's prepaid-credit cost is deliberately not misrepresented as an invoice amount.
+- A composed one-provider discovery function runs one search and normalizes its board candidates.
+- Deterministic rotation helpers select two of eight ATS providers per cycle. The usage estimator reports 2,880 requests / approximately $5.76 per 30-day month at the published $0.002 Live estimate.
+- The monthly spend guard refuses requests when no positive cap is configured.
+- V2 CI passed: 526 tests.
+
+The next engineering stage is the persistent, disabled-by-default coordinator, actual monthly spend ledger, and fixed 50-query comparison harness. It must not be scheduled or enabled until provider and spend approval are explicit. Production remains untouched.
