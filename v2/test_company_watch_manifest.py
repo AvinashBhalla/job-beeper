@@ -327,7 +327,7 @@ class CompanyWatchManifestTests(unittest.TestCase):
                 "SELECT id FROM ats_global_discovery_candidates WHERE provider='ashby' AND board_key='example'"
             ).fetchone()[0]
             conn.execute(
-                "UPDATE ats_global_discovery_candidates SET review_status='linked',linked_company_id=1 WHERE id=?",
+                "UPDATE ats_global_discovery_candidates SET review_status='linked' WHERE id=?",
                 (candidate_id,),
             )
             conn.commit()
