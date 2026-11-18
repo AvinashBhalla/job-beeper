@@ -260,8 +260,14 @@ def search_dataforseo_live(
     )
     response.raise_for_status()
     result = response.json()
-    if not isinstance(result, dict) or not isinstance(result.get("tasks"), list):
-        raise ValueError("DataForSEO response did not contain a tasks array.")
+    tasks = result.get("tasks") if isinstance(result, dict) else None
+    if not isinstance(tasks, list) or not tasks or not all(isinstance(task, dict) for task in tasks):
+        raise ValueError("DataForSEO response did not contain a valid tasks array.")
+    for task in tasks:
+        if task.get("status_code") != 20000:
+            raise RuntimeError(
+                f"DataForSEO task failed with status {task.get('status_code')!r}."
+            )
     return result
 
 
