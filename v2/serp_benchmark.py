@@ -31,7 +31,7 @@ def build_benchmark_plan() -> list[dict[str, str]]:
     for index in range(BENCHMARK_QUERY_COUNT):
         plan.append({
             "provider": providers[index % len(providers)],
-            "keyword": f"{ROLE_SEEDS[index % len(ROLE_SEEDS)]} India",
+            "keyword": f"{ROLE_SEEDS[(index // len(providers)) % len(ROLE_SEEDS)]} India",
         })
     return plan
 
