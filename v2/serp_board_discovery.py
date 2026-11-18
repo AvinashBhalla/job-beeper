@@ -289,3 +289,62 @@ def search_serper(
     if not isinstance(result, dict) or not isinstance(result.get("organic", []), list):
         raise ValueError("Serper response did not contain an organic results array.")
     return result
+
+
+SERP_PROVIDER_ORDER = tuple(PROVIDER_TARGETS)
+DEFAULT_PROVIDER_BATCH_SIZE = 2
+DEFAULT_DISCOVERY_INTERVAL_MINUTES = 30
+DATAFORSEO_LIVE_ESTIMATED_COST_USD = 0.002
+
+
+def select_provider_batch(cursor: int, batch_size: int = DEFAULT_PROVIDER_BATCH_SIZE) -> tuple[list[str], int]:
+    """Select a deterministic rotating provider batch and return the next cursor."""
+    if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0:
+        raise ValueError("cursor must be a non-negative integer.")
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int):
+        raise ValueError("batch_size must be an integer.")
+    if not 1 <= batch_size <= len(SERP_PROVIDER_ORDER):
+        raise ValueError("batch_size must be between one and the supported provider count.")
+    start = cursor % len(SERP_PROVIDER_ORDER)
+    selected = [
+        SERP_PROVIDER_ORDER[(start + offset) % len(SERP_PROVIDER_ORDER)]
+        for offset in range(batch_size)
+    ]
+    return selected, (start + batch_size) % len(SERP_PROVIDER_ORDER)
+
+
+def estimate_monthly_search_usage(
+    *,
+    providers_per_cycle: int = DEFAULT_PROVIDER_BATCH_SIZE,
+    interval_minutes: int = DEFAULT_DISCOVERY_INTERVAL_MINUTES,
+    days: int = 30,
+    unit_cost_usd: float = DATAFORSEO_LIVE_ESTIMATED_COST_USD,
+) -> dict[str, float | int]:
+    """Estimate request volume and cost; this is planning data, not billing."""
+    if not 1 <= providers_per_cycle <= len(SERP_PROVIDER_ORDER):
+        raise ValueError("providers_per_cycle is outside the supported range.")
+    if interval_minutes <= 0 or 1440 % interval_minutes:
+        raise ValueError("interval_minutes must be a positive divisor of 1,440.")
+    if days <= 0 or unit_cost_usd < 0:
+        raise ValueError("days must be positive and unit_cost_usd cannot be negative.")
+    cycles_per_day = 1440 // interval_minutes
+    requests = providers_per_cycle * cycles_per_day * days
+    return {
+        "cycles_per_day": cycles_per_day,
+        "requests_per_month": requests,
+        "estimated_monthly_cost_usd": round(requests * unit_cost_usd, 4),
+    }
+
+
+def monthly_budget_allows_request(
+    *,
+    spent_usd: float,
+    next_request_cost_usd: float,
+    monthly_cap_usd: float | None,
+) -> bool:
+    """Fail closed unless a positive cap is explicitly configured."""
+    if monthly_cap_usd is None or monthly_cap_usd <= 0:
+        return False
+    if spent_usd < 0 or next_request_cost_usd < 0:
+        raise ValueError("Spend values cannot be negative.")
+    return spent_usd + next_request_cost_usd <= monthly_cap_usd
