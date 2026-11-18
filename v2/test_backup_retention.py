@@ -84,6 +84,9 @@ class BackupScriptContractTests(unittest.TestCase):
         self.assertIn("v2_radar-data/_data", script)
         self.assertIn("source.backup(destination", script)
         self.assertGreaterEqual(script.count('PRAGMA integrity_check'), 2)
+        self.assertIn("mode=ro&immutable=1", script)
+        self.assertIn('"$staged-wal" "$staged-shm"', script)
+        self.assertIn('"$inside-wal" "$inside-shm"', script)
         self.assertIn("production-jobs-legacy-pre-retention.sqlite3", script)
         self.assertIn('RETENTION_HELPER=/usr/local/lib/job-radar-backup/retention.py', script)
 
