@@ -219,3 +219,54 @@ The full V2 suite is still running on this branch. No production or QA source co
 - SmartRecruiters detail-cache hits progressed 20 → 40 → 60 across three production polls, with up to 20 uncached detail attempts per poll and three listing requests. A candidate warm-cache simulation reached 300 hits / 0 detail attempts / 3 listing requests. Continue observing until organic cache warm-up is complete.
 - Production dashboard OpenAPI exposes `q`, `search`, `source`, `min_score`, `max_age_hours`, `sort`, `sort_by`, `sort_order`, `alertable_only`, `remote_only`. Post-release jobs count 27,556, duplicate source-ID groups 0, and production DB quick check `ok`.
 - Company Watch manual-review reasons: 71 generic careers pages need discovery; 8 disabled/manual/employer-identity rows; 2 mixed board-type/scan-mode cases. The 19 staged candidates are Greenhouse 10, Lever 6, SmartRecruiters 3. CSV `verified_ats_board` labels are not V2 live verification; keep all candidates review-only.
+
+
+## 18 November 2026 — morning production observation (03:50 UTC)
+
+Observation window: production deployment at `2026-11-17T20:59:46Z` through `2026-11-18T03:50:39Z` (about 6h51m). This is an early post-release window, not a completed 24-hour acceptance period.
+
+### Live source metrics since deployment
+
+| Source | Runs | Requests | HTTP 429 | Failed pages | Jobs seen | New rows |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 159 | 159 | 0 | 0 | 66,865 | 5 |
+| Darwinbox | 201 | 201 | 0 | 0 | 7,839 | 0 |
+| Greenhouse | 243 | 243 | 0 | 0 | 27,964 | 2 |
+| Keka | 198 | 396 | 0 | 0 | 22,968 | 0 |
+| LinkedIn | 88 | 525 | 2 | 1 | 1,163 | 93 |
+| Naukri | 82 | 82 | 0 | 0 | 25,949 | 2 |
+| SmartRecruiters | 80 | 530 | 0 | 0 | 24,000 | 13 |
+| Workable | 202 | 202 | 0 | 0 | 1,212 | 0 |
+| Workday | 10 | 10 | 10 | 10 | 0 | 0 |
+
+`jobs_seen` is an observation count across polls, not unique vacancies. `new rows` counts inserted records, not necessarily unique active vacancies.
+
+### Reliability interpretation
+
+- **Workday:** 10 requests in 6h51m, all HTTP 429, one request per due attempt, no jobs returned. The old baseline was 4,894 requests and 417 HTTP 429 in 24h. At the current capped hourly cadence, the observed request rate annualizes to roughly 35 requests/day, about 99.3% below the old 24-hour request count. This is a request-storm reduction, not a source recovery. The scheduler has reached its 60-minute cooldown cap; latest failure streak 10, next due `2026-11-18T04:16:55.329405Z`.
+- **LinkedIn:** 525 requests, 2 HTTP 429, 1 failed page and 93 new rows. Latest partial-rate-limited run at `02:40:43Z` triggered a persisted 9,600-second (160-minute) global cooldown after the sixth consecutive 429 in the persisted history. No LinkedIn requests should resume before the cooldown expires (approximately `05:20:43Z`). Keep the breaker intact; do not reset it manually. Earlier scans before the 429 continued returning results.
+- **SmartRecruiters:** 80 polls / 530 requests / 24,000 seen / 13 new / 0 failed pages. The 7-hour average is 6.6 requests per poll versus the old 23-request pattern (3 listing + 20 detail calls), approximately 71% fewer requests at the observed poll count. Most recent poll used 3 listing requests, 300 detail-cache hits and 0 detail attempts. This confirms the cache is now warm and listings continue to refresh.
+- **Naukri:** 82 successful relay ingestions, 82 requests, 25,949 seen, 2 new rows, no 429 or failed pages. Five-minute systemd relay timer is active.
+- **ATS peers:** Greenhouse, Ashby, Keka, Darwinbox and Workable have zero 429s and zero failed pages in this window. One Ashby board poll had a transient `ConnectionError` at `02:52:28Z`; subsequent polls succeeded.
+- **Database/feed:** 27,661 job rows, 115 rows inserted since release, zero duplicate `(source, source_job_id)` groups, `PRAGMA quick_check=ok`. There are still exactly 10 active ATS registry boards and 10 active schedules. One schedule remains `baseline_pending` (Workday); the other nine are past baseline.
+- **Host:** latest sample at `03:49Z`: CPU 5.1%, memory 67.1%, disk 30.6%, load1 0.07, no OOM kills. Twelve-hour average CPU 14.7%, peak 90%; memory average 64.8%, peak 77.1%; disk average 29.7%. No resource-driven reason to alter the release.
+
+### Company Watch candidate endpoint verification (read-only)
+
+Nineteen direct ATS candidates were checked with one read-only public provider API request each (no production DB changes, no linking, no activation, no scheduled polling):
+
+- 17 endpoints returned HTTP 200 with a valid provider response: Greenhouse 9/10, Lever 5/6, SmartRecruiters 3/3.
+- Two CSV-derived provider slugs returned 404: Lever `mistral` and Greenhouse `soundhoundinc`.
+- The Mistral official careers page links to `jobs.ashbyhq.com/mistral.ai`; the Ashby public posting API returned HTTP 200 and 254 jobs. This is a well-supported replacement candidate, but it has not been written to production or linked to a company record.
+- SoundHound's official careers page is live, but the failed Greenhouse slug is not valid. The page's rendered content did not expose a verifiable replacement provider slug. Keep it for manual review.
+- All 19 existing manifest candidates remain `discovered`/low confidence; 81 other manifest rows remain manual review. API endpoint response alone does not prove canonical employer identity, so no candidate is promoted to verified/active.
+
+Official source references checked: `https://mistral.ai/careers/` (Apply now links to `https://jobs.ashbyhq.com/mistral.ai`) and `https://www.soundhound.com/careers/`.
+
+### Next actions
+
+1. Keep Workday at the 60-minute cap and verify the next attempt only when due; do not send manual probes while it is throttled.
+2. Let LinkedIn's persisted 160-minute cooldown expire naturally. Inspect the first post-cooldown request count/result and retain conservative pacing. If it 429s again, allow the exponential breaker to escalate; do not bypass it.
+3. Correct the Mistral candidate through the supported global-candidate import workflow after review of the official Ashby source; reject or retain the stale Lever slug as rejected/manual review. Do not create/activate an employer board until the company mapping is approved.
+4. Keep SoundHound manual until its actual ATS provider and board key are confirmed from official source evidence.
+5. Continue the 24-hour source comparison before marking the release reliability-accepted. Recheck source freshness, user feed, canonical dedupe and notification decisions; preserve the current 10-board allowlist.
