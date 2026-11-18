@@ -24,7 +24,7 @@ The PR's \`deploy/backup/job-radar-sqlite-snapshot.sh\`:
 - Removes the optional development-container snapshot from the production backup's success path, so a stopped development container cannot turn a valid production snapshot into a failed backup job.
 - Preserves the existing pre-release checksum manifest.
 
-Retention logic is isolated in \`deploy/backup/retention.py\` and covered by unit tests. Seven 138 MB database snapshots require roughly 966 MB, plus small configuration files; hard-linking the current alias does not create an eighth database copy.
+Retention logic is isolated in \`deploy/backup/retention.py\` and covered by unit tests. Seven 138 MB database snapshots require roughly 966 MB, plus small configuration files. The one-time legacy hard link preserves the previous recovery point without an extra database copy; the current alias is also a hard link and does not create an eighth daily copy.
 
 ## Installation / rollback
 
