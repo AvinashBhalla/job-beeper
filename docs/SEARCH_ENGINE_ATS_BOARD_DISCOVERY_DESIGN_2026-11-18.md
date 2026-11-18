@@ -47,7 +47,7 @@ Candidate target patterns to test:
 | Keka | `*keka.com*` | tenant + careers portal |
 | Darwinbox | `*darwinbox.in*` | tenant + public candidate careers path |
 
-The actual API request should use the role-family keyword and India location/language fields, with the ATS target as a separate structured parameter. Validate that returned organic URLs are actually constrained to the intended ATS provider domain. Preserve the exact query, target, engine, region, device, result URL, title, snippet, rank, response timestamp and API task cost for audit.
+For DataForSEO Live, use the role-family keyword and India location/language fields, with the ATS target as a separate structured parameter. Validate that returned organic URLs are actually constrained to the intended ATS provider domain. DataForSEO also warns that Google may wrap result URLs in redirect/goto links; if the returned URL/domain is google.com, the target filter may not expose the underlying ATS URL. Measure this failure mode in the benchmark and safely resolve only well-formed Google redirects. Preserve the exact query, target, engine, region, device, result URL, title, snippet, rank, response timestamp and API task cost for audit.
 
 Illustrative monthly costs for one SERP per provider target (30-day month; before taxes/account-specific terms):
 - DataForSEO Live + structured target: 2 targets every 30 minutes = 2,880 SERPs × $0.002 ≈ **$5.76/month**; all 8 targets every 30 minutes = 11,520 SERPs × $0.002 ≈ **$23.04/month**.
