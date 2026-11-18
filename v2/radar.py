@@ -7874,7 +7874,7 @@ def latency_summary(hours: int = 24):
 
 GLOBAL_DISCOVERY_METHODS = frozenset({
     "commoncrawl_cdx", "commoncrawl_url_index", "sitemap", "career_link",
-    "licensed_seed", "manual", "company_watch_manifest",
+    "licensed_seed", "manual", "company_watch_manifest", "search_engine_serp",
 })
 GLOBAL_DISCOVERY_PROVIDERS = frozenset({
     "workday", "keka", "darwinbox", "greenhouse", "ashby", "lever",
