@@ -86,6 +86,14 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(len(manual), 8)
         self.assertTrue(all(row["scan_mode"] == "manual_review" for row in manual))
 
+    def test_company_registry_csv_has_consistent_column_count(self):
+        path = Path(scan.__file__).with_name("companies.csv")
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.reader(handle))
+        self.assertEqual(len(rows), 101)
+        self.assertEqual(len(rows[0]), 11)
+        self.assertTrue(all(len(row) == len(rows[0]) for row in rows[1:]))
+
     def test_search_pointers_are_not_scanned(self):
         rows = scan.load_companies()
         search_rows = [row for row in rows if "google.com/search" in row["careers_url"]]
