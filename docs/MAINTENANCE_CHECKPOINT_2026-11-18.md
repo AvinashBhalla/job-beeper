@@ -236,7 +236,7 @@ After confirming PRs #90–#95 were merged and no PRs remained open, deleted the
 
 ### Owner-paused Naukri relay — 18 November 2026, 09:03 UTC
 
-The owner stopped the Naukri relay to reduce frequent GitHub Actions activity. A read-only check showed the production timer was still enabled and had a next five-minute dispatch queued, so it was disabled/stopped to enforce the owner's intent. Verified post-change state: `ActiveState=inactive`, `SubState=dead`, `UnitFileState=disabled`, with no future trigger. The last public relay run (09:00:14 UTC) had completed successfully. No running workflow remained.
+The owner requested the Naukri relay pause at approximately 09:03 UTC. The first check still found the production timer enabled; one already-due final dispatch occurred at 09:05:18 UTC, with public workflow 44272634864 completing successfully at 09:05:20 UTC. The timer was then disabled/stopped to enforce the owner's intent. Verified post-change state: `ActiveState=inactive`, `SubState=dead`, `UnitFileState=disabled`, with no future trigger. No later public workflow runs appeared through the 09:23 UTC check.
 
 Important billing distinction: the relay's repository `AvinashBhalla/job-beeper-naukri-relay` is public and runs on the standard `ubuntu-latest` GitHub-hosted runner. GitHub documentation says standard runners for public repositories are free and unlimited. The private JobBeeper repository's PR CI is the activity blocked by the account billing/spending notice; that is separate from the public relay workflow. No paid spend is needed to keep the standard public relay running.
 
