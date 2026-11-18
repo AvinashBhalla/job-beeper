@@ -53,13 +53,15 @@ def rotate_snapshots(directory: str | Path, keep: int = 7) -> dict[str, int]:
 
     removed: dict[str, int] = {}
     retained: list[Path] = []
+    stale_files: list[Path] = []
     for family, pattern in _PATTERNS.items():
         dated = _dated_files(root, pattern)
-        for stale in dated[keep:]:
-            stale.unlink()
         retained.extend(dated[:keep])
+        stale_files.extend(dated[keep:])
         removed[family] = max(0, len(dated) - keep)
 
+    # Build and fsync the checksum manifest before deleting any recovery point.
+    # A read/hash/write error must never prune snapshots first.
     retained.sort(key=lambda path: path.name)
     manifest_tmp = root / ".SHA256SUMS.tmp"
     manifest = root / "SHA256SUMS"
@@ -67,7 +69,13 @@ def rotate_snapshots(directory: str | Path, keep: int = 7) -> dict[str, int]:
         with manifest_tmp.open("w", encoding="utf-8", newline="\n") as stream:
             for path in retained:
                 stream.write(f"{_sha256(path)}  {path.name}\n")
+            stream.flush()
+            os.fsync(stream.fileno())
         os.chmod(manifest_tmp, 0o600)
+
+        for stale in stale_files:
+            stale.unlink()
+
         os.replace(manifest_tmp, manifest)
     finally:
         manifest_tmp.unlink(missing_ok=True)
