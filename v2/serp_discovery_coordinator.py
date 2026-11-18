@@ -125,8 +125,8 @@ def configure(
             WHERE id=1
         """, (int(enabled), monthly_cap_usd, timestamp))
         conn.commit()
-        row = conn.execute("SELECT * FROM serp_discovery_control WHERE id=1").fetchone()
-        return _row_dict(conn.execute("SELECT * FROM serp_discovery_control WHERE id=1"), row)
+        cursor = conn.execute("SELECT * FROM serp_discovery_control WHERE id=1")
+        return _row_dict(cursor, cursor.fetchone())
 
 
 def status(db_path: str, history_limit: int = 20) -> dict[str, Any]:
@@ -233,7 +233,6 @@ def run_once(
             conn.commit()
 
         requests_attempted += 1
-        started = _utc()
         outcome = "success"
         error_type = None
         result: dict[str, Any] = {}
