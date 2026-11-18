@@ -198,37 +198,11 @@ Workday remains in adaptive 429 backoff; no manual probes or resets. LinkedIn's 
 
 This is an interim snapshot, not the final 24-hour acceptance decision. Continue monitoring until 20:59:46 UTC.
 
-### Termalin backup confirmation troubleshooting and configuration review — 18 November 2026, 08:05 UTC
+### Termalin backup decision — 18 November 2026
 
-Owner attempted to confirm the existing Termalin draft in the web cabinet. The UI button became disabled/unresponsive. Rechecked Termalin server-side with `backup_list` after the attempt and again after inspecting the account page:
+The owner does not want to spend on backup subscriptions. The Termalin confirmation form repeatedly became unresponsive and its server-side job remains DRAFT with no archives. The owner has explicitly chosen not to retry or subscribe. The existing draft is left untouched; it is not counted as a backup. No further owner action is requested for Termalin.
 
-- Existing job `JobBeeper production recovery snapshot` remains **DRAFT**.
-- Termalin still says it is waiting for owner confirmation.
-- No backup archives exist and the account still shows 0 B used for backups.
-- Therefore the browser click did not complete the server-side confirmation. No encryption key or scheduled run can be assumed to exist yet.
-- The draft has not expired; its displayed expiry is 25 November 2026. No duplicate draft was created.
-
-The live account form shows the intended configuration:
-
-- Server: `job-radar`.
-- Paths: `/var/backups/job-radar-daily` and `/var/lib/docker/volumes/v2_radar-data/_data`.
-- Daily at 03:00 UTC; keep 7; Termalin storage; read limit 20 MB/s.
-- Excludes: `development-*`, `dev-*`, `qa-*`, `legacy-*`, `job-radar-sqlite-snapshot.sh*`, `production-before-*`, `production-pre-release-*`, `production-compose-*`, `production-config-*`, `production-rootfs-*`, `jobs.db*`, `*.shm`, `*.wal`.
-
-Read-only path/size audit:
-- `/var/backups/job-radar-daily` is about 1.48 GB total, but the configured excludes remove about 1.21 GB of development, QA, legacy and historical rollback artifacts.
-- The files left in that folder are the current `production-jobs.sqlite3` snapshot (136,712,192 bytes) and `pre-reboot-20261118.sqlite3` snapshot (136,978,432 bytes), plus their small SQLite sidecar files.
-- The live volume contains `jobs.db` (about 138 MB), `jobs.db-wal`, and `jobs.db-shm`; all are excluded by `jobs.db*`. The volume also contains `pre-reboot-20261118.sqlite3` (about 137 MB), `config.json` and `config_token`, which remain included.
-- Thus the active DB file itself is intentionally excluded; recovery relies on the consistent SQLite backup `production-jobs.sqlite3` created by `job-radar-sqlite-snapshot.timer` at 02:45 UTC. The Termalin backup is scheduled for 03:00 UTC, 15 minutes after that snapshot. The snapshot service last succeeded on 18 November at 02:45 UTC with integrity=ok.
-- Estimated selected input is roughly 411 MB uncompressed before archive overhead. Seven copies at this size would be about 2.9 GB, below the current 5 GB trial backup allowance shown in the account page; this is an estimate, not a completed archive measurement. Account storage was 0 B used at inspection.
-
-Owner action:
-- Refresh the Termalin Account page once to clear the stuck pending state. Re-open the existing draft; if it still shows DRAFT and Confirm is enabled, submit it once. Do not create another draft or repeatedly click.
-- Success must be verified by `backup_list` showing a confirmed job and, after its first scheduled execution, at least one successful archive. A draft alone is not disaster recovery.
-- Do not share the master password or encryption key. Termalin creates the private backup key in the owner's browser and protects it with the owner's master password.
-- The account page also showed the Pro trial ending **19 November 2026 at 19:31** and moving to Free. Termalin documentation lists encrypted backups as a Pro/Team feature. Continued daily off-site backups therefore require the account to remain on a plan that includes backups after the trial; confirming the draft alone does not settle that longer-term entitlement. The next scheduled 03:00 UTC run would be 19 November 2026 at 08:30 IST if the job is confirmed before then.
-
-No production file, database, service, backup job or account setting was modified during this review.
+Off-site backup is therefore **not configured**. The recovery plan is local snapshots on the production VM's disk. This is not protection against VM/disk loss; that limitation is accepted under the current no-spend decision. Do not prompt the owner to retry the Termalin flow or upgrade a plan unless they ask to revisit off-site backup.
 
 ### Repository branch hygiene after SERP merges
 
@@ -244,11 +218,15 @@ The five-minute cadence still generated up to 288 runs/day, with recent run dura
 
 The app-side Naukri collector is still configured to poll its raw relay feed every five minutes. Once the last published feed exceeds the existing 15-minute freshness threshold, the collector will fail closed; these failures are expected while the publisher is paused. No app config, database state, other ATS source or production application service was changed. Health Watch now treats the paused relay as expected and will not alert on stale-feed failures unless they materially affect overall app health or create noise.
 
-### No-cost backup and relay follow-up PRs — 18 November 2026
+### No-cost recovery and relay decisions — 18 November 2026
 
-- PR #96 prepares an optional, persistent **10-minute** Naukri relay timer. It is not installed or enabled. Production relay remains intentionally paused after the owner's request.
-- PR #97 prepares a **seven-day local snapshot retention** path, including SQLite online backup integrity checks, paired config/token snapshots, a strict retention helper, and SHA-256 manifest. It is repository code only; the production snapshot script has not been replaced.
-- PR #97 validation on a disposable VM checkout: **5/5** retention/script contract tests pass; shell `bash -n` passes; helper compile and retention smoke test pass.
-- The existing production snapshot service continues to run daily at 02:45 UTC. Current installed script still writes the single rolling `production-jobs.sqlite3` snapshot; do not claim seven-day retention until PR #97 is reviewed and its script is installed.
-- Local snapshots remain on the same VM disk. They help recover from database corruption or accidental changes but are not off-site disaster recovery. Termalin remains intentionally unused because the owner does not want a paid plan and its confirmation UI hangs.
-- No new spend, paid API request, GitHub plan upgrade, or Termalin subscription is being requested or initiated.
+- PR #97 was merged into `v2-live-radar` as `d48e324b17d0ba5a9a5ed770da1e3f9404e8c3ea`. A follow-up production safety fix for immutable SQLite verification and sidecar cleanup was committed to the same branch.
+- The seven-day local snapshot script/helper are now installed on production. The previous installed script is preserved for rollback.
+- The first verified dated snapshot for 18 November contains 27,888 jobs (138,387,456 bytes); integrity check `ok`. The pre-upgrade rolling snapshot (27,656 jobs) and pre-reboot snapshot (27,673 jobs) are preserved and independently integrity-checked.
+- The current `production-jobs.sqlite3` compatibility alias is a hard link to `production-jobs-20261118.sqlite3`. The first seven-day run also created dated production config/token snapshots, with mode 0600.
+- The SHA-256 manifest contains five entries and all five passed `sha256sum -c`. No temp files or SQLite WAL/SHM sidecars remained after the final run. The backup directory is root:root mode 0700.
+- Backup-specific tests: **6 passed** on the VM's disposable checkout; shell syntax and helper compile passed. Hosted CI remains unavailable because the private repository runner is blocked before startup by the account billing/spending restriction.
+- The daily snapshot timer remains enabled. The app returned HTTP 200 before and after the snapshot; it was not restarted. Disk free space was about 33 GB and the backup directory about 1.6 GB at final verification.
+- PR #96 remains an optional ten-minute relay timer proposal only. The production Naukri relay timer remains disabled/inactive/dead by owner request; no paid runner, account upgrade or additional workflow dispatch is being pursued.
+- No off-site archive exists. These snapshots remain on the same VM/disk and cannot recover from VM/disk loss.
+
