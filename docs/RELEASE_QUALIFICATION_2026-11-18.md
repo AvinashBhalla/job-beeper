@@ -151,3 +151,7 @@ If the final reliability report shows a new material regression or the candidate
 - Validated both candidate and rollback Compose configurations with the exact production volume/port/restart behavior.
 - Simulated corrected Company Watch dry-run/import/rejection against a production DB copy; no live DB writes were made.
 - Verified production remains healthy and unchanged at the current release base.
+
+### Scheduled final gate
+
+A one-time JobBeeper Release Gate task is scheduled for **19 November 2026, 02:40 IST** (10 minutes after the 24-hour cutoff). Task ID: `6afdd8f95b208191857e3074d1f49db6`. It will recalculate the final source-run window, verify the exact staged candidate and pre-release backup, and promote/import only if every explicit gate passes. Any material regression, incomplete window, checksum failure, code change beyond docs after the candidate build, or post-start failure must stop the release without changing production. Naukri stays paused and paid SERP stays disabled.
