@@ -63,3 +63,16 @@ Admin `GET /api/source-status` returns `last_feed` for Naukri (age, age at poll,
 - Consumer-side source metrics, Naukri freshness validation, last-good feed metadata, per-job observation timestamp import and monotonic first/last-seen persistence are now merged into `v2-live-radar` via JobBeeper PR #47 (merge `dd4d21e`). GitHub CI #1314 passed all **207 V2 tests** and dashboard JavaScript syntax.
 - Publisher-side emission of `relay_first_observed_at` / `relay_last_observed_at` and fail-closed partial-target behavior is in public relay draft PR #4. Relay validation CI `42442285937` passed all 3 stubbed workflow tests. It is not merged, triggered or published.
 - Existing shared-dev and production runtimes have not been deployed with the new consumer; current public feed has not been changed by this work. The consumer still supports the legacy snapshot-level timestamp.
+
+## Owner pause — 18 November 2026, 09:03 UTC
+
+The owner intentionally paused the Naukri relay to reduce frequent workflow activity. The production timer `job-radar-naukri-relay.timer` was found still enabled after the owner's attempt to stop it, so it was explicitly disabled and stopped. Verification showed `ActiveState=inactive`, `SubState=dead`, `UnitFileState=disabled`, and no next trigger. The last scheduled publisher workflow at 09:00:14 UTC completed successfully; no in-progress workflow remained at the time of the pause.
+
+The Naukri app consumer is separate from the publisher timer. It may continue its five-minute raw-feed poll and begin rejecting the stale snapshot after the existing 15-minute freshness threshold. This is expected while paused; do not keep dispatching the publisher to avoid stale status. No other JobBeeper source is disabled.
+
+### Billing clarification and future cadence
+
+The publisher repository `AvinashBhalla/job-beeper-naukri-relay` is public and its workflow uses a standard `ubuntu-latest` GitHub-hosted runner. GitHub's current billing docs state standard hosted runner use in public repositories is free and unlimited. The payment/spending-limit block observed on PR CI belongs to the private `AvinashBhalla/job-beeper` repository and is a separate issue. See GitHub's [Actions billing](https://docs.github.com/en/actions/concepts/billing-and-usage) and [hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) documentation.
+
+The previous five-minute schedule allowed up to 288 runs/day and recent runs took about 2m–2m30s. Although public standard runner compute is free, this is a high workflow frequency and repeated Naukri query traffic. If the owner later opts to resume, the prepared PR #96 timer template now uses a ten-minute calendar cadence (up to 144 runs/day, half the dispatches) and retains the app's 15-minute feed freshness check. The timer is not installed or enabled; do not reactivate without explicit owner instruction.
+
