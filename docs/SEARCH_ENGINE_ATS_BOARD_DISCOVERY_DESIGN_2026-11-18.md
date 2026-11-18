@@ -193,3 +193,14 @@ The provider-client layer is also merged (PR #91, merge commit `1503b6e35c635e5d
 - V2 CI passed: 526 tests.
 
 The next engineering stage is the persistent, disabled-by-default coordinator, actual monthly spend ledger, and fixed 50-query comparison harness. It must not be scheduled or enabled until provider and spend approval are explicit. Production remains untouched.
+
+
+The persistent coordinator is now merged as PR #93 (merge commit `7d34451f48f92180d63b9e52b2c460e1ced48106`):
+
+- SQLite-backed provider cursor, 30-minute cadence gate, lease, monthly spend ledger and per-provider run history.
+- Disabled by default. It requires an explicit positive monthly cap before it can run.
+- Reserves the estimated DataForSEO Live cost before each call, reconciles against returned task cost, and stops before the next request would exceed the cap.
+- Two-provider rotation and conservative cost reservation on request failures.
+- V2 CI passed: 533 tests.
+
+The coordinator is not connected to a timer, admin endpoint or production runtime. It has not made a paid request. It is ready for controlled QA and a disabled-by-default scheduler integration; owner approval is still required before enabling the provider or setting a spend cap.
