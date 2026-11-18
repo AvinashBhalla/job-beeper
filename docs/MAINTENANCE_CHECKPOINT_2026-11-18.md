@@ -2,7 +2,7 @@
 
 ## Scope
 
-Read-only production inspection, Company Watch correction preparation, ATS discovery research, VM housekeeping, and GitHub branch cleanup. No production application code, configuration, database rows, source flags, scheduler entries, or notifications were changed.
+The 18 November maintenance inspection covered read-only production review, Company Watch correction preparation, ATS discovery research, VM housekeeping, and GitHub branch cleanup; it made no production changes at that time. The later 19 November release and guarded Company Watch import are recorded in the final execution section below.
 
 ## Production VM
 
