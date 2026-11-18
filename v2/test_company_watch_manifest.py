@@ -285,5 +285,56 @@ class CompanyWatchManifestTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM company_watch_manifest_imports").fetchone()[0], 0)
 
 
+    def test_stale_candidate_review_rejection_is_terminal_and_never_activates(self):
+        imported = radar.import_global_ats_candidates({"candidates": [{
+            "board_url": "https://jobs.lever.co/mistral",
+            "discovery_method": "company_watch_manifest",
+            "source_reference": "https://mistral.ai/careers/",
+            "source_captured_at": None,
+        }]})
+        self.assertEqual(imported["inserted"], 1)
+        with sqlite3.connect(self.db) as conn:
+            candidate_id = conn.execute(
+                "SELECT id FROM ats_global_discovery_candidates WHERE provider='lever' AND board_key='mistral'"
+            ).fetchone()[0]
+
+        result = radar.review_global_ats_candidate(candidate_id, {"status": "rejected"})
+        self.assertEqual(result, {
+            "candidate_id": candidate_id, "review_status": "rejected", "activated": False,
+        })
+        with sqlite3.connect(self.db) as conn:
+            stored = conn.execute(
+                "SELECT review_status,linked_company_id,linked_board_registry_id FROM ats_global_discovery_candidates WHERE id=?",
+                (candidate_id,),
+            ).fetchone()
+            self.assertEqual(stored, ("rejected", None, None))
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_registry").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM ats_board_poll_schedule").fetchone()[0], 0)
+
+        with self.assertRaises(radar.HTTPException) as invalid:
+            radar.review_global_ats_candidate(candidate_id, {"status": "active"})
+        self.assertEqual(invalid.exception.status_code, 422)
+
+    def test_linked_candidate_cannot_be_rejected_through_unmatched_review_route(self):
+        radar.import_global_ats_candidates({"candidates": [{
+            "board_url": "https://jobs.ashbyhq.com/example",
+            "discovery_method": "company_watch_manifest",
+            "source_reference": "https://example.com/careers",
+            "source_captured_at": None,
+        }]})
+        with sqlite3.connect(self.db) as conn:
+            candidate_id = conn.execute(
+                "SELECT id FROM ats_global_discovery_candidates WHERE provider='ashby' AND board_key='example'"
+            ).fetchone()[0]
+            conn.execute(
+                "UPDATE ats_global_discovery_candidates SET review_status='linked',linked_company_id=1 WHERE id=?",
+                (candidate_id,),
+            )
+            conn.commit()
+        with self.assertRaises(radar.HTTPException) as linked:
+            radar.review_global_ats_candidate(candidate_id, {"status": "rejected"})
+        self.assertEqual(linked.exception.status_code, 409)
+
+
 if __name__ == "__main__":
     unittest.main()
