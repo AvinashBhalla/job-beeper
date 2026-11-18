@@ -95,3 +95,21 @@ Six merged remote branches were deleted after verifying PRs #80–#85 were merge
 4. Complete the 24-hour source reliability assessment at 20:59:46Z on 18 November.
 5. Ask the owner to confirm the off-host backup draft and approve a maintenance reboot window.
 6. Continue hourly read-only VM, database, scheduler, source and GitHub monitoring. Keep Telegram/member-feature expansion out of scope.
+
+
+## Post-reboot validation — 18 November 2026, 05:18 UTC
+
+The owner approved the reboot without a scheduled maintenance window because the instance is a personal test environment with no active users. JobBeeper Health Watch was paused before reboot and remained paused during the planned outage; it is to be resumed after validation. The expected downtime must not be reported as an incident.
+
+- Reboot completed: previous boot started 2026-10-07 18:45:42 UTC; new boot started 2026-11-18 05:15:56 UTC.
+- Running kernel is now `6.8.0-1067-oracle`; `/var/run/reboot-required` is cleared.
+- Docker is active and enabled; production container `v2-radar-1` automatically restarted using the existing `unless-stopped` policy and unchanged image `job-radar-prod-release:472c2ee`.
+- Application health endpoint returned HTTP 200, version 2.0.0.
+- SQLite `quick_check`: ok; jobs=27,675; active ATS boards=10; active schedules=10.
+- No failed systemd units. Container restart count=0.
+- Source polling resumed after boot. Latest observed runs: Greenhouse, SmartRecruiters, Keka, Darwinbox, Workable, Naukri and Ashby succeeded; Workday received another HTTP 429 and remains rate-limited. LinkedIn's persisted cooldown was restored at startup; it was not reset.
+- Fresh pre-reboot SQLite snapshot: `/var/backups/job-radar-daily/pre-reboot-20261118.sqlite3`, 136,978,432 bytes; integrity=ok; SHA-256 `7a5e0f6000b38d083d9f0b566dedca639f80298e608c8740bdd3eab3303bf2c6`.
+- The Termalin encrypted backup remains a draft; no off-host archive exists yet. The local pre-reboot snapshot is a recovery point, not off-host disaster recovery.
+- A transient Termalin "server restarted" warning is expected for this approved reboot and should clear; it is not a production incident.
+
+The reboot did not deploy the merged Company Watch changes or modify the production allowlist. The production application image and active board/schedule configuration remain unchanged.
