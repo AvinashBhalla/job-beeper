@@ -344,3 +344,54 @@ Current live source roll-up through 16:47 UTC: Workday 23/23 429 with 60-minute 
 ### One-time release execution scheduled
 
 A guarded one-time JobBeeper Release Gate task is scheduled for 19 November 2026 at 02:40 IST, after the 20:59:46 UTC source observation cutoff. Task ID: `6afdd8f95b208191857e3074d1f49db6`. It will run the final exact window and either promote the verified candidate plus Company Watch review-only correction, or leave production unchanged and report a failed gate. It explicitly preserves the owner-paused Naukri relay, disabled SERP discovery, 10-board allowlist, and no-spend requirement.
+
+
+## Final V2 release execution — 19 November 2026, 02:49 IST
+
+**Outcome: promoted successfully.** The exact candidate was promoted at 2026-11-19 02:45:35 IST. Production container v2-radar-1 now runs job-radar-prod-release:dda6d57, image ID/digest sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d. The previous production image remains available as rollback: job-radar-prod-release:472c2ee, sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c.
+
+The six commits after candidate commit dda6d5757f4701ce916a94a48f7ec94d6297e51a changed docs only. No runtime, test, dashboard, deploy or CSV file changed. Full V2 suite on exact candidate: 557 passed, 0 failed. Hosted GitHub Actions remained blocked before any job step by the private-repository billing/spending restriction; no plan upgrade or spending was performed.
+
+### Final source window
+
+Exact query: started_at >= 2026-11-17T20:59:46Z AND started_at < 2026-11-18T20:59:46Z.
+
+| Source | Runs | Success | Non-success | HTTP 429 | Jobs seen | New rows |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 549 | 548 | 1 | 0 | 231,905 | 11 |
+| Darwinbox | 701 | 701 | 0 | 0 | 29,215 | 6 |
+| Greenhouse | 846 | 846 | 0 | 0 | 97,050 | 5 |
+| Keka | 692 | 692 | 0 | 0 | 80,322 | 1 |
+| LinkedIn | 111 | 104 | 7 | 7 | 1,503 | 231 |
+| Naukri | 287 | 142 | 145 | 0 | 44,259 | 102 |
+| SmartRecruiters | 280 | 280 | 0 | 0 | 83,997 | 145 |
+| Workable | 706 | 706 | 0 | 0 | 4,236 | 0 |
+| Workday | 27 | 0 | 27 | 27 | 0 | 0 |
+| Total | 4,199 | 4,019 | 180 | 34 | 572,487 | 501 |
+
+Workday remains controlled but degraded: 27/27 HTTP 429 in the window. Its host cooldown remained one hour; the naturally scheduled post-promotion poll at 21:18:45 UTC also returned 429 and set the next due time to 22:18:46 UTC. No manual probe or reset. LinkedIn's seven 429s are persisted; candidate startup restored the latest four-hour cooldown with about 3,612 seconds remaining. Naukri's 145 failures are the expected owner-paused stale-feed condition; relay timer/service remain inactive/dead and disabled. Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable were 100% successful; Ashby had one isolated RuntimeError.
+
+### Promotion and post-start checks
+
+- Startup completed and synchronized exactly 10 configured ATS boards.
+- /health, /dashboard/ and /openapi.json all HTTP 200.
+- SQLite quick_check: ok; container running with 0 restarts and OOMKilled=false.
+- Current DB: 28,048 jobs, 2 users, 10 employer companies, 10 active registry boards, 10 active schedules, 21 global candidates.
+- Exact active registry and schedule key sets match the pre-release backup.
+- Runtime config SHA-256 unchanged: ec78fbf2607b9b9b06b4dd0e0bcdfb5417324dda3f498916c86760a0a6804e81.
+- Naukri relay disabled; daily snapshot timer enabled/waiting.
+- SERP discovery remains inactive: zero discovery runs, no host budget entries and no SERP/search API credential variables. No paid API, GitHub upgrade or Termalin subscription.
+
+### Company Watch production import
+
+At 02:47:20.785 IST, candidate runtime confirmed path /app/v2/data/company_watch_companies_2026-11-18.csv, source ref main@da7e42dbaaeee0a89ebdde92799aee8db7543ec6 and exact SHA-256 146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd. Runtime dry-run: 100 rows, 19 staged, 81 manual, 0 invalid, zero side effects.
+
+A fresh disposable copy of the live DB was used to recalculate the exact import effect and simulate the two guarded rejections before production mutation. It passed: 2 inserted, 17 updated, 0 terminal preserved. Production import produced the same result. The two replacements are ashby/mistral.ai and workday/standard:search, both discovered/unlinked. Only lever/mistral and greenhouse/soundhoundinc were rejected by dynamically resolving provider + board_key and calling the guarded review function; both returned activated=false. Final candidates: 19 discovered, 2 rejected. All other pre-existing candidate IDs, statuses and linkage fields remained unchanged.
+
+Manifest audit: 100 rows / 19 candidate_staged / 81 manual_review / 0 invalid. No employers, boards, links, verification, activation or schedules were created. Employers remain 10, boards/schedules 10/10, notification ledger remains 27,725, and SQLite integrity is ok.
+
+### Recovery and scope
+
+The root-only recovery bundle remains at /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST; all nine checksums pass. The daily snapshot manifest at /var/backups/job-radar-daily passes all five checksums. Candidate and rollback Compose files remain valid; rollback image retained. No DB restore was required.
+
+Member-submitted career URL issue #99 remains P2 next release. No new ATS boards, no source flag changes, no Naukri relay activation, no SERP paid calls, and no spending.
