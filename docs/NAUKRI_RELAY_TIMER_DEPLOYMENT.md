@@ -5,9 +5,9 @@ The relay publisher lives in the public repository `AvinashBhalla/job-beeper-nau
 ## Units
 
 - `job-radar-naukri-relay.service`: one-shot `gh workflow run` for the public relay workflow, using the existing Ubuntu user's GitHub CLI configuration.
-- `job-radar-naukri-relay.timer`: a wall-clock five-minute calendar timer with `Persistent=true`.
+- `job-radar-naukri-relay.timer`: a wall-clock ten-minute calendar timer with `Persistent=true`.
 
-The timer uses `OnCalendar=*-*-* *:0/5:00` instead of a repeat interval based only on `OnUnitActiveSec`. systemd documents `Persistent=true` as catch-up behavior for calendar timers; it has no effect for monotonic-only timers. The calendar trigger continues on the next five-minute boundary after boot, and a missed event while the timer is inactive is caught once when it is activated. This is intended to avoid leaving the timer loaded in `active/elapsed` with no future trigger after a reboot.
+The timer uses `OnCalendar=*-*-* *:0/10:00` instead of a repeat interval based only on `OnUnitActiveSec`. systemd documents `Persistent=true` as catch-up behavior for calendar timers; it has no effect for monotonic-only timers. The calendar trigger continues on the next ten-minute boundary after boot, and a missed event while the timer is inactive is caught once when it is activated. This is intended to avoid leaving the timer loaded in `active/elapsed` with no future trigger after a reboot.
 
 ## Install only with an approved production change
 
@@ -28,7 +28,7 @@ Current production was observed to have the older unit:
 - `OnUnitActiveSec=5min`
 - `Persistent=true`
 
-After the 18 November 2026 reboot, this timer was found in `active/elapsed` with no future trigger. A one-time start of the existing service restored its five-minute next trigger and subsequent runs. The exact underlying systemd state transition was not independently proven, so this template is a preventive hardening proposal, not a claim that a specific systemd defect has been isolated.
+After the 18 November 2026 reboot, this timer was found in `active/elapsed` with no future trigger. A one-time start of the existing service restored its ten-minute next trigger and subsequent runs. The exact underlying systemd state transition was not independently proven, so this template is a preventive hardening proposal, not a claim that a specific systemd defect has been isolated.
 
 ## Validation
 
@@ -42,7 +42,7 @@ Validate the actual unit syntax on a host with systemd installed:
 
 ```bash
 systemd-analyze verify deploy/systemd/job-radar-naukri-relay.service deploy/systemd/job-radar-naukri-relay.timer
-systemd-analyze calendar '*-*-* *:0/5:00'
+systemd-analyze calendar '*-*-* *:0/10:00'
 ```
 
 
@@ -58,3 +58,16 @@ The production-host independent test run used a temporary shallow checkout of th
 GitHub Actions did not start this PR's workflow. The check annotation reports an account billing/spending-limit block before any test process was started. This is not a test result; independent local validation above is evidence only from the production-host environment.
 
 The production timer was not replaced. Its existing `active/waiting` schedule and successful Naukri ingestion remain under the current Health Watch.
+
+
+## Cost and cadence decision — 18 November 2026
+
+The owner paused the relay after observing frequent GitHub Actions activity. The configured public publisher repository, `AvinashBhalla/job-beeper-naukri-relay`, is public and uses the standard `ubuntu-latest` hosted runner. GitHub's billing documentation states that standard GitHub-hosted runner usage in public repositories is free and unlimited. The billing block observed on private-repository V2 CI is a separate account-level restriction; successful public relay workflows continued after that private CI block appeared.
+
+The previous five-minute cadence produced up to 288 workflow runs/day. Observed recent workflow durations were approximately 2m–2m30s. This is substantial workflow activity and Naukri query traffic, even though the standard public runner is not billed. For a future opt-in restart, this template now proposes a ten-minute cadence (up to 144 runs/day, 50% fewer runs) while retaining the app's existing 15-minute feed freshness guard. This is a conservative initial compromise; if observed relay duration or feed freshness causes stale rejections, stop and review before widening the guard.
+
+**Current owner decision:** relay intentionally paused at approximately 09:03 UTC on 18 November 2026. Production timer was disabled/inactive/dead at verification. Do not enable it merely by installing this template. Restart requires a separate explicit owner decision. The app's other sources continue to run independently.
+
+Official billing references:
+- https://docs.github.com/en/actions/concepts/billing-and-usage
+- https://docs.github.com/en/actions/reference/runners/github-hosted-runners
