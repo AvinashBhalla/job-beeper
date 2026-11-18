@@ -203,7 +203,7 @@ Before production import, the same candidate code was run against a fresh online
 
 ### Final activity log
 
-- Confirmed all ten commits after the candidate changed documentation only; no runtime, test, dashboard, deploy or CSV file changed.
+- Confirmed all commits after the candidate changed documentation only; no runtime, test, dashboard, deploy or CSV file changed.
 - Rechecked exact rollback/candidate image IDs, both Compose files, the nine-entry recovery manifest, five-entry daily snapshot manifest, config hash, source flags, exact board/schedule keys, timers and health endpoints.
 - Recomputed the complete source_runs window using the exact requested inclusive/exclusive timestamps.
 - Re-ran the corrected Company Watch import and rejection simulation on a fresh disposable copy of the current production DB using the candidate image.
