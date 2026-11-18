@@ -23,9 +23,9 @@ staged="$BACKUP_DIR/.production-jobs-$TODAY.sqlite3.tmp.$$"
 alias_staged="$BACKUP_DIR/.production-jobs.sqlite3.tmp.$$"
 cleanup() {
   if [[ -n "$inside" ]]; then
-    docker exec "$CONTAINER" rm -f "$inside" >/dev/null 2>&1 || true
+    docker exec "$CONTAINER" rm -f "$inside" "$inside-wal" "$inside-shm" >/dev/null 2>&1 || true
   fi
-  rm -f "$staged" "$alias_staged"
+  rm -f "$staged" "$staged-wal" "$staged-shm" "$alias_staged"
 }
 trap cleanup EXIT
 
@@ -62,7 +62,7 @@ import sqlite3
 import sys
 
 path = sys.argv[1]
-db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)
+db = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True, timeout=30)
 try:
     integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
     jobs = db.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
@@ -89,7 +89,7 @@ if [[ -f "$current_db" && ! -e "$legacy_db" ]]; then
 import sqlite3
 import sys
 
-db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True, timeout=30)
+db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro&immutable=1", uri=True, timeout=30)
 try:
     integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
     if integrity != "ok":
@@ -102,8 +102,9 @@ fi
 mv -f "$staged" "$dated_db"
 ln "$dated_db" "$alias_staged"
 mv -f "$alias_staged" "$current_db"
-docker exec "$CONTAINER" rm -f "$inside" >/dev/null
+docker exec "$CONTAINER" rm -f "$inside" "$inside-wal" "$inside-shm" >/dev/null
 inside=""
+rm -f "$staged-wal" "$staged-shm"
 
 snapshot_file() {
   local source="$1"
