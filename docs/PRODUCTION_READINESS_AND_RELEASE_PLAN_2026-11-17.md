@@ -430,3 +430,41 @@ The exact V2 release candidate is commit `dda6d5757f4701ce916a94a48f7ec94d6297e5
 Company Watch dry-run/import/rejection was simulated on a throwaway production DB copy. It returns 100 rows (19 staged / 81 manual), inserts 2 corrected candidates, updates 17, rejects only old `lever/mistral` and `greenhouse/soundhoundinc`, and leaves employer/board/schedule counts unchanged. No live production import has occurred.
 
 The post-promotion 24-hour source observation window ends `2026-11-18T20:59:46Z` (19 Nov 02:29:46 IST). Through 16:47 UTC, Workday had 23 consecutive 429s at the 60-minute cap; LinkedIn 101 successes / 6 429; Naukri's 95 failures are expected because its relay is owner-paused; Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable are fully successful; Ashby has one isolated failure. Keep observing to exact cutoff and do not promote/import before it. If no material regression at cutoff, promote using the prevalidated compose and execute the guarded Company Watch data step; leave Naukri disabled and SERP discovery off.
+
+
+## Final V2 release execution — 19 November 2026, 02:49 IST
+
+**Release gate passed and candidate promoted.** The candidate image job-radar-prod-release:dda6d57, ID/digest sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d, was promoted at 02:45:35 IST. Production container v2-radar-1 is running with 0 restarts and OOMKilled=false. /health, /dashboard/ and /openapi.json return HTTP 200; SQLite quick_check is ok. The previous image job-radar-prod-release:472c2ee remains as rollback.
+
+### Exact final source window
+
+started_at >= 2026-11-17T20:59:46Z AND started_at < 2026-11-18T20:59:46Z:
+
+| Source | Runs | Success | Non-success | HTTP 429 | Jobs seen | New rows |
+|---|---:|---:|---:|---:|---:|---:|
+| Ashby | 549 | 548 | 1 | 0 | 231,905 | 11 |
+| Darwinbox | 701 | 701 | 0 | 0 | 29,215 | 6 |
+| Greenhouse | 846 | 846 | 0 | 0 | 97,050 | 5 |
+| Keka | 692 | 692 | 0 | 0 | 80,322 | 1 |
+| LinkedIn | 111 | 104 | 7 | 7 | 1,503 | 231 |
+| Naukri | 287 | 142 | 145 | 0 | 44,259 | 102 |
+| SmartRecruiters | 280 | 280 | 0 | 0 | 83,997 | 145 |
+| Workable | 706 | 706 | 0 | 0 | 4,236 | 0 |
+| Workday | 27 | 0 | 27 | 27 | 0 | 0 |
+| Total | 4,199 | 4,019 | 180 | 34 | 572,487 | 501 |
+
+Workday remains degraded but controlled at a 60-minute cooldown; its naturally scheduled post-promotion poll also returned 429 and extended cooldown to 22:18:46 UTC. LinkedIn's persisted four-hour cooldown was restored on candidate startup. Naukri's 145 failures are the owner-paused stale-feed condition; timer and service remain inactive/dead, timer disabled. Darwinbox, Greenhouse, Keka, SmartRecruiters and Workable were fully successful; Ashby had one isolated failure.
+
+### Production and Company Watch state
+
+- Current DB: 28,048 jobs, 2 users, 10 employer companies, 10 active registry boards, 10 active schedules.
+- Exact active board and schedule keys match the pre-release snapshot. Runtime config SHA-256 remains ec78fbf2607b9b9b06b4dd0e0bcdfb5417324dda3f498916c86760a0a6804e81.
+- Corrected Company Watch manifest: 100 rows, 19 candidate_staged, 81 manual_review, 0 invalid, exact SHA-256 146582ae4f3d68a9f13eff23b90bcf2ef5f28c9ab2020948d1ffaf82a5e7e4bd.
+- Import: 2 inserted, 17 updated, 0 terminal preserved. Replacement keys ashby/mistral.ai and workday/standard:search remain discovered/unlinked. Only lever/mistral and greenhouse/soundhoundinc were rejected through the guarded review function; both returned activated=false.
+- Final candidates: 19 discovered, 2 rejected. No unrelated candidate status/linkage changes.
+- No employer, board, link, verification, activation, schedule, network or notification side effects. Employers 10, boards/schedules 10/10, notification ledger unchanged at 27,725, SQLite integrity ok.
+- Nine-file release backup manifest and five-file daily snapshot manifest both verify. Root-only rollback bundle and old image retained.
+
+### Controls and delivery
+
+Naukri relay stays disabled; SERP coordinator remains inactive with zero runs, no host budget entries, no credentials and no paid calls. No paid API, GitHub plan upgrade or Termalin subscription was used. The exact-head local V2 suite passed 557/557; hosted GitHub Actions could not start due the private repository billing restriction. The six commits after the candidate changed documentation only. Member-submitted career URL issue #99 remains P2 next release. No new ATS boards or source flag changes.
