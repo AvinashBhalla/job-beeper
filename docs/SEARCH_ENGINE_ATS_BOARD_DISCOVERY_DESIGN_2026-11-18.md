@@ -32,7 +32,7 @@ Automated scraping of Google Search result pages is not an acceptable production
 
 DataForSEO exposes Google's organic result page as structured API output. Its documentation supports a structured `target` domain/subdomain/webpage filter with wildcard matching. This should be evaluated in preference to embedding `site:` inside every keyword: DataForSEO documents a 5x price multiplier for search operators such as `site:`, `inurl:` and `intitle:`.
 
-The API offers Standard, Priority and Live queues. Published approximate turnaround is around 45 minutes for Standard, around one minute for Priority and a few seconds for Live. A strict 30-minute worker should start with Priority, not Standard. Record the API-returned cost per task and enforce a hard monthly/daily budget; do not assume the wildcard `target` parameter is free of operator-related billing until a live pilot confirms actual charged cost.
+The API offers Standard, Priority and Live queues. Current documentation lists Standard normal priority at about 5 minutes on average but gives a 45-minute target turnaround (extended processing may occur); Standard high priority is about one minute on average; Live averages up to about six seconds. A strict 30-minute worker should start with Priority, not Standard, because the Standard normal target can exceed the discovery interval. Treat all turnaround figures as vendor processing targets, not guarantees of search-index freshness. Record the API-returned cost per task and enforce a hard monthly/daily budget; do not assume the wildcard `target` parameter is free of operator-related billing until a live pilot confirms actual charged cost.
 
 Candidate target patterns to test:
 
@@ -65,6 +65,18 @@ Brave's independent web index is a useful future cross-check, especially if Goog
 - Microsoft Bing Search APIs: the standalone Search APIs were retired in 2025; the successor grounding product is an agent-oriented Azure service, not a simple low-friction SERP feed for this pipeline.
 - Direct Google HTML scraping, headless-browser SERP scraping or rotating proxies: fragile, policy-risky and not needed when licensed APIs exist.
 - Google ADK: not required for a repeatable sequence of search → parse URL → verify provider → stage candidate. ADK adds an agent framework, model/tool orchestration and evaluation surface without solving the core deterministic problems. Consider an LLM/ADK helper later only for ambiguous employer identity or evidence summarization, with human review and no authority to link/activate boards.
+
+### Complementary discovery surfaces
+
+Search-engine results should be one source in a source-diverse candidate funnel, not the only discovery mechanism:
+
+- **Official employer career pages:** use the existing bounded, robots-aware crawler to find links to ATS tenants and preserve the canonical employer page as ownership evidence.
+- **Public XML sitemaps and sitemap indexes:** use the existing sitemap scanner for companies already known from a directory, prior search result, customer-provided list, or another discovery source. Sitemap presence is evidence of a page, not proof that a page is a live job board.
+- **Common Crawl CDX:** keep the existing global index query as a broad, low-cost historical discovery source. It can surface ATS URL patterns missed by current search indexes, but results can be stale and must be re-probed.
+- **Independent web indexes:** consider Brave Search only after the first Google-index pilot has a measured unique-board yield. Brave uses its own independent index, so it can add coverage rather than merely duplicate Google results.
+- **Curated directories and provider-native public endpoints:** ingest attributed directories as unverified candidates and use provider APIs only after the exact public board identity is known.
+
+Do not add DNS/certificate-transparency enumeration, arbitrary web crawling, or an autonomous browser agent to the first release. Those sources create a large noisy host set and do not directly prove an employer-to-board relationship. They can be evaluated later against measured incremental candidate yield.
 
 ## Proposed 30-minute discovery cycle
 
