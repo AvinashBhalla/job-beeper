@@ -86,7 +86,7 @@ Contents include:
 - `production-compose.yml`: rollback compose referencing `job-radar-prod-release:472c2ee`.
 - `candidate-compose.yml`: candidate compose referencing `job-radar-prod-release:dda6d57`.
 - `rollback-image-id.txt`.
-- `SHA256SUMS`: all pre-release artifacts verified; eight entries.
+- `SHA256SUMS`: all pre-release artifacts verified; nine entries.
 
 Directory mode is 0700 and files are 0600. Existing production data volume `v2_radar-data`, loopback binding `127.0.0.1:8000`, and `unless-stopped` restart policy are preserved by both compose definitions. Both rollback and candidate compose files pass `docker compose config --quiet`.
 
