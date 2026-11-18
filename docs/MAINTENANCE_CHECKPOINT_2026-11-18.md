@@ -79,7 +79,7 @@ Six remote branches associated with already-merged PRs #80–#85 were deleted af
 - feat/fetcher-feed-reliability-20261118
 - fix/smartrecruiters-detail-cache-20261117
 
-Six merged remote branches were deleted after verifying PRs #80–#85 were merged. The temporary source-fix branch for PR #89 was deleted after merge. Current remote branch count: four — main, v2-live-radar, docs/search-engine-ats-discovery-design-20261118 (PR #86), and docs/maintenance-checkpoint-20261118 (PR #88). PR #87 and PR #89 branches were deleted after their merges. Main and v2-live-radar were retained. The local production checkout was fetch-pruned but not pulled or reset.
+Six merged remote branches were deleted after verifying PRs #80–#85 were merged. The temporary source-fix branch for PR #89 was deleted after merge. PR #86 (search-engine ATS discovery design) and PR #87 (Company Watch correction) have both merged into v2-live-radar. Their remote topic branches were deleted after merge. Current remote branch count: three — main, v2-live-radar, and docs/maintenance-checkpoint-20261118 (PR #88). PR #89's source-fix branch was also deleted after its merge. Main and v2-live-radar were retained. The local production checkout was fetch-pruned but not pulled or reset.
 
 ## Checkouts intentionally preserved
 
@@ -89,10 +89,9 @@ Six merged remote branches were deleted after verifying PRs #80–#85 were merge
 
 ## Open work
 
-1. Confirm exact-head CI for PR #86 after the latest endpoint/cost correction; merge the design doc when green.
-2. Confirm exact-head CI for PR #88; merge the maintenance checkpoint when green.
-3. PR #87 is merged but not deployed. Do not deploy or import its manifest until the 24-hour source reliability gate and owner approval are satisfied.
-4. After deployment, dry-run and import the corrected manifest, verify 10 registry boards / 10 schedules remain unchanged, then reject the two stale candidate keys through the admin review API.
-5. Complete the 24-hour source reliability assessment at 20:59:46Z on 18 November.
-6. Ask the owner to confirm the off-host backup draft and approve a maintenance reboot window.
-7. Continue hourly read-only VM, database, scheduler, source and GitHub monitoring. Keep Telegram/member-feature expansion out of scope.
+1. Confirm exact-head CI for PR #88; merge the maintenance checkpoint when green.
+2. PR #86 and PR #87 are merged but not deployed. Do not deploy the Company Watch correction or import its manifest until the 24-hour source reliability gate and owner approval are satisfied.
+3. After deployment, dry-run and import the corrected manifest, verify 10 registry boards / 10 schedules remain unchanged, then reject the two stale candidate keys through the admin review API.
+4. Complete the 24-hour source reliability assessment at 20:59:46Z on 18 November.
+5. Ask the owner to confirm the off-host backup draft and approve a maintenance reboot window.
+6. Continue hourly read-only VM, database, scheduler, source and GitHub monitoring. Keep Telegram/member-feature expansion out of scope.
