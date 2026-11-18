@@ -262,3 +262,11 @@ This is an interim snapshot, not the final 24-hour acceptance decision. Continue
 - New checks reject NaN/infinity/boolean caps, invalid persisted budget state and non-finite provider-reported task costs; a bad cost value retains the conservative reservation.
 - Validation: **28 focused SERP tests passed; full V2 suite 550/550 passed** locally in 325.201 seconds. No hosted CI could start because of the private repository billing block.
 - No paid provider requests, credentials, scheduler, production database writes or deployments.
+
+
+### PR #96 merged — optional relay timer template only
+
+- PR #96 merged into `v2-live-radar` as `2f45b947074b4221bc338ccfd2410394b881416c` after rebase onto the latest V2 head.
+- Its repo-managed systemd timer/service templates target a ten-minute calendar cadence and are accompanied by seven offline contract tests.
+- Validation on the exact rebased PR head: **7/7 focused timer tests and 557/557 full V2 tests passed locally** (351.012 seconds). `systemd-analyze calendar` parsed the ten-minute expression. `systemd-analyze verify` emitted only unrelated host warnings for netplan/snapd units.
+- This merge only adds templates, tests and documentation. It does **not** install or enable the timer. Production Naukri timer remains inactive/dead/disabled with no future trigger, by owner choice. The app's 15-minute freshness guard remains unchanged. No relay workflow dispatch was triggered.
