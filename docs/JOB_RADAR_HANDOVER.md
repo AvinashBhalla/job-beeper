@@ -1,3 +1,9 @@
+## CURRENT SOURCE OF TRUTH — 20 November 2026, P0 production acceptance
+
+**Latest direct production audit:** [Production acceptance report](PRODUCTION_ACCEPTANCE_2026-11-20.md). Release dda6d57 is confirmed running; 10 active schedules are linked 10/10; SQLite quick_check=ok; duplicate source IDs=0; local daily backup checksums 10/10 pass. Known degradation: Workday 24/24 HTTP 429 with 63 consecutive host failures and 60-minute cooldown; LinkedIn 6/17 HTTP 429; Keka 1 HTTP 429 and 2 failed pages; Naukri 287/287 expected stale-feed failures while publisher remains intentionally paused. Member site/API origin is not yet proven to use this VM's database; per-user notification settings/ledger currently have zero rows. Do not claim full member E2E acceptance until the sanitized member API-origin capture is reviewed.
+
+---
+
 ## 2026-11-17 — Phase 1 merged; Phase 2 readiness is next
 
 ## CURRENT SOURCE OF TRUTH — 17 November 2026, 18:30 UTC
