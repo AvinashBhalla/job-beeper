@@ -45,8 +45,8 @@ Do not force Workday or LinkedIn scans, reset cooldowns, or treat Naukri's stale
 
 ## Current GitHub state
 
-- Target branch: `v2-live-radar`; observed HEAD: `05a08870db345d5d018ce45b3b9a22bf09db659e`.
-- The 19 commits after release commit `dda6d5757f4701ce916a94a48f7ec94d6297e51a` are documentation-only (five docs changed, including this handover update); no runtime, tests, dashboard, deployment or CSV code changed after the image was built.
+- Target branch: `v2-live-radar`. Resolve its current HEAD from GitHub at the start of each session; do not hardcode a branch SHA in future handovers.
+- The latest verified comparison against release commit `dda6d5757f4701ce916a94a48f7ec94d6297e51a` showed only documentation changes after the image was built. Re-run this comparison before any code or deployment work; do not assume later commits are docs-only.
 - Open pull requests: **0**.
 - Open next-release backlog: [#99 — member-submitted shared career URLs and cross-source feed deduplication](https://github.com/AvinashBhalla/job-beeper/issues/99), P2 only.
 
