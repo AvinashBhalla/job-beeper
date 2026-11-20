@@ -59,7 +59,7 @@ Read the complete [production acceptance audit](PRODUCTION_ACCEPTANCE_2026-11-20
 - Exactly 10 active ATS registry rows and 10 active schedules, each schedule linked to a distinct registry row. The registry also contains 9,931 low-confidence discovered (not active/not scheduled) rows. The Company Watch manifest remains separate: 100 rows, 19 candidate staged, 81 manual review.
 - Latest board polls: OpenAI/Ashby 852, PostHog/Ashby 9, Arvind/Darwinbox 44, Coinbase/Greenhouse 253, Graviton/Greenhouse 19, Zocdoc/Greenhouse 65, Bridgestone/Keka 108, Bosch/SmartRecruiters 300 (4 new), Hugging Face/Workable 6; all success. NVIDIA/Workday last poll 0 jobs / rate_limited, 63 consecutive host failures and 3,600-second cooldown.
 - Rolling 24-hour source results: Ashby 552/552 success; Darwinbox 705/705; Greenhouse 843/843; Keka 696/698 (1 HTTP 429 and 2 page/board failures); LinkedIn 11/17 (6 HTTP 429); Naukri 0/287 due intentionally paused stale feed; SmartRecruiters 281/281; Workable 708/708; Workday 0/24 (24 HTTP 429).
-- Daily snapshot timer active; last run Result=success/exit 0. All 10 SHA256SUMS entries pass.
+- Daily snapshot timer active; last run Result=success/exit 0. All 11 SHA256SUMS entries pass.
 - Per-user notification settings and per-user notification ledger both have 0 rows. The 11 legacy/global notifications sent in the rolling 24-hour window do not prove member-specific delivery.
 - Member browser app-to-VM mapping remains unresolved: Desktop tested jobbeeper.com while this VM's Nginx is configured for the IP host; the member's 41,899 result count/detail ID do not match the local jobs DB inventory/ID range. Obtain a sanitized Network capture of the member jobs API origin before declaring member-feed E2E acceptance.
 - Production checkout is 899 commits behind and has untracked .worktrees; do not use it for development. Use a fresh verified checkout.
@@ -68,16 +68,11 @@ Read the complete [production acceptance audit](PRODUCTION_ACCEPTANCE_2026-11-20
 
 ## Immediate next step — close the browser-to-backend feed mapping gap
 
-The owner is checking whether the production boards are being scanned and whether jobs arrive in the feed. Do not start another feature or change production before reviewing that evidence.
+The 10-board scheduler and database checks are now directly verified from the VM; the owner does not need to repeat that test. The remaining evidence gap is whether the separate member browser site consumes this VM's jobs API/database.
 
-For the **10 active boards**, verify:
-1. Registry and scheduler counts are 10/10 and their board keys match.
-2. Each configured board has a recent run, with outcome, last-success time, requests/pages, jobs seen, new rows, failed pages and cooldown clearly visible.
-3. Two consecutive polls preserve stable source IDs and do not insert duplicates. A successful poll with zero new rows is valid when the board inventory has not changed.
-4. Representative fetched jobs appear in the dashboard with correct company, title, location, description, apply URL, source attribution and defensible published/first-seen timestamps.
-5. Feed freshness, canonical duplicates and match/filter behavior are checked separately from raw source-run success.
+Ask for one sanitized browser Network capture from the authenticated member Jobs page: filter to Fetch/XHR, reload the page, and record only the request hostname/path and the response's result-count field. Do not share cookies, authorization headers, session tokens, query parameters containing personal data, or response bodies. The goal is to identify the actual member jobs API origin and verify whether it routes to this VM.
 
-When the owner shares screenshots or observations, classify the failure stage first (schedule/dispatch, provider fetch, normalization/upsert, canonical dedupe, evaluation, or dashboard query) and fix only that stage with focused tests. Do not infer a broken collector merely from zero new rows.
+Once the API origin is established, compare the response count and a representative job ID to the VM database. Only then investigate the possible duplicate card or make feed/deduplication changes. Do not modify production as part of this check.
 
 ## Next development order
 
