@@ -1,30 +1,77 @@
-# CURRENT HANDOVER — 2026-11-18 production release deployed
+# CURRENT HANDOVER — 20 November 2026, post-release production validation
 
-**Read first:** [18 November production release handover](OVERNIGHT_HANDOVER_2026-11-18.md). The active execution plan is [Fetcher and Feed Reliability](FETCHER_AND_FEED_RELIABILITY_PLAN_2026-11-17.md). Older sections below are historical and superseded where runtime state differs.
+**Authoritative release record:** [V2 release qualification and final production promotion](RELEASE_QUALIFICATION_2026-11-18.md). The final Release Gate completed successfully on **19 November 2026 at 02:51 IST**. Older sections below this handover are retained as history; they describe pre-promotion states unless explicitly marked final.
 
-- **Production deployed:** `v2-radar-1` now runs `job-radar-prod-release:472c2ee`, image ID `sha256:55d2de9446b72cb8d3a9f72627bda9a003750acceef7635a609dd0818c08985c`. `/health`, `/dashboard/`, `/openapi.json` return HTTP 200.
-- **Release evidence:** PR #80 application head `69a204a7349b67d6439e50e27f673834be4d4971`; exact-head CI #1522 passed; full local V2 suite 507/507. Docs PR #81 and #82 merged; exact-head CI passed.
-- **Final backup:** `/var/backups/job-radar-daily/production-before-v2-release-20261118T2058Z.sqlite3`, 135,368,704 bytes, mode 0600, integrity ok, 27,546 jobs / 2 users / 10 ATS boards / 51,984 source runs; SHA-256 `6c8fa1f139ea05a081c0f65fefc84540f9d9600febe59f57b71b3a1a0bd9da15`.
-- **Scheduler:** exactly 10 active schedules matching the 10 active registry boards. First pass: 9/10 successful, baseline-suppressed. Workday received three 429s at 21:01:26 / 21:06:34 / 21:16:37 UTC; host cooldown escalated 5 → 10 → 20 minutes with no early retry. Next due `21:36:38.680292Z`. Other providers continued during cooldown.
-- **Global fetchers:** Naukri relay timer active every 5 minutes; workflow #9874 succeeded; post-deploy V2 run accepted 313 jobs, 0 new and 0 page failures. LinkedIn post-deploy scan succeeded (40 seen, 10 new); the unchanged legacy global notification path delivered one notification.
-- **SmartRecruiters:** production polls saw cache hits progress 20 → 40 → 60, with 20 new detail attempts per poll and three listing requests. Candidate warm-cache test confirmed 300 hits / 0 details / 3 listing requests. Cache warms incrementally under the 20-detail cap; keep observing.
-- **Company Watch:** pinned 100-row manifest imported persistently. 19 candidates staged (`Greenhouse 10`, `Lever 6`, `SmartRecruiters 3`) as `discovered`; 81 manual review (71 generic careers pages, 8 disabled/identity confirmation, 2 board-type mismatch cases). 0 companies created, 0 boards linked/verified/activated/scheduled, 0 network requests and 0 notifications. CSV labels do not equal live verification. Registry and scheduler remain exactly 10 boards.
-- **Next:** monitor Workday cooldown and SmartRecruiters cache warm-up; compare 24-hour source metrics to baseline; verify feed freshness/dedupe. Keep all Company Watch candidates review-only until employer/board identity and provider endpoints are individually verified. Do not add Telegram/member features or activate all 100 rows.
+## Production release — verified 19 November
 
-**Morning follow-up — 18 Nov 03:50 UTC:** about 6h51m after deployment, 10 Workday attempts all returned 429 (one per hour at the 60-minute cap); this reduces requests by about 99.3% versus the old 4,894/day baseline but is not source recovery. LinkedIn had 2 429s and entered a persisted 160-minute cooldown after streak 6; next scan must wait until approximately 05:20 UTC. SmartRecruiters: 80 polls, 530 requests, 24k seen, 13 new, 0 failed; most recent poll 300 cache hits / 0 detail attempts / 3 listing requests. Naukri: 82 successful ingestions, 25,949 seen, 2 new. Greenhouse/Ashby/Keka/Darwinbox/Workable had 0 429 and 0 failed pages (one transient Ashby ConnectionError recovered). Database 27,661 jobs, 115 post-release inserts, 0 duplicate source IDs, integrity ok. 10 active schedules/boards preserved. Host resources healthy (CPU 5.1%, memory 67.1%, disk 30.6%).
+- **Running image:** `job-radar-prod-release:dda6d57`
+- **Image ID/digest:** `sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d`
+- **Container:** `v2-radar-1`; promotion at 02:45:35 IST.
+- **Post-start checks:** `/health`, `/dashboard/`, `/openapi.json` all HTTP 200; SQLite quick_check `ok`; zero restarts; OOMKilled=false.
+- **Rollback:** `job-radar-prod-release:472c2ee` retained. The verified nine-entry recovery bundle is `/var/backups/job-radar-daily/release-dda6d57-20261118T2210IST`.
+- **Runtime configuration and allowlist:** unchanged. Exactly **10 active ATS registry boards and 10 active schedules**, with the same keys as the pre-release backup.
 
-**Company Watch validation:** 17/19 candidate provider APIs returned 200 (Greenhouse 9/10, Lever 5/6, SmartRecruiters 3/3). Mistral's Lever slug returned 404; its official careers page links to Ashby `mistral.ai` (public API 200, 254 jobs) — replacement not yet written. SoundHound's Greenhouse slug returned 404 and official careers page has no verifiable ATS slug in rendered content. Keep all 19 candidates unlinked/unverified and 81 manual rows held until canonical company/board mapping is confirmed. See morning observation section in overnight handover.
+## Important: 100 Company Watch rows are not 100 active boards
 
+The corrected 100-row Company Watch manifest was imported as **review-only data**:
+- 19 candidate rows staged; 81 rows retained for manual review; 0 invalid.
+- Corrected candidates include `ashby/mistral.ai` and `workday/standard:search`; the obsolete `lever/mistral` and `greenhouse/soundhoundinc` candidates were rejected.
+- No new employer records, board links, verifications, activations or schedules were created.
+- Production therefore remains at **10 active boards / 10 schedules**. Do not expect all 100 manifest companies to be polled for jobs. Candidate staging is not job ingestion.
 
-## Current checkpoint — 18 November 2026, 04:28 UTC
+## Final 24-hour source baseline from the release gate
 
-- Production remains on `job-radar-prod-release:472c2ee`; `/health` is HTTP 200. Read-only DB checks: 27,663 jobs, `PRAGMA quick_check=ok`, 0 duplicate `(source, source_job_id)` groups.
-- Persistent scheduler still has exactly 10 active registry boards and 10 active schedules. All 19 Company Watch candidates remain `discovered`; the 81 manual-review manifest rows remain held. No new boards were linked, verified, activated or scheduled.
-- Since the 17 Nov 20:59:46 UTC deployment, source rollup at 04:28 UTC: Ashby 175 runs / 175 requests / 0 429 / 0 failed pages / 5 new rows; Darwinbox 222 / 222 / 0 / 0 / 0; Greenhouse 267 / 267 / 0 / 0 / 2; Keka 219 / 438 / 0 / 0 / 0; LinkedIn 88 / 525 / 2 / 1 / 93; Naukri 91 / 91 / 0 / 0 / 2; SmartRecruiters 88 / 556 / 0 / 0 / 15; Workable 223 / 223 / 0 / 0 / 0; Workday 11 / 11 / 11 / 11 / 0. Seen counts are observations, not unique vacancies; new counts are inserted rows.
-- Workday last returned 429 at 04:16:57 UTC; next due approximately 05:16:57 UTC. LinkedIn's persisted 9,600-second cooldown after its 02:40:43 UTC partial rate-limited run expires approximately 05:20:43 UTC. Do not force either fetcher or reset cooldowns.
-- The 24-hour post-release reliability window is not complete until 20:59:46 UTC on 18 Nov (02:29:46 IST on 19 Nov). Do not declare full reliability acceptance before reviewing the whole window.
-- Mistral remains a pending candidate correction: official careers page evidence points to Ashby `mistral.ai`, while the pinned manifest currently stages an invalid Lever slug. SoundHound's supplied Greenhouse slug returned 404 and remains manual. Do not patch production tables directly.
-- New research/design: [Search-engine-assisted ATS board discovery](SEARCH_ENGINE_ATS_BOARD_DISCOVERY_DESIGN_2026-11-18.md). Proposed as candidate-only discovery using a licensed SERP API. No search API credentials are configured, no search worker is implemented or scheduled, and production discovery run count remains zero. Do not imply 30-minute discovery is already running.
+Window: `2026-11-17T20:59:46Z` through (exclusive) `2026-11-18T20:59:46Z`.
+
+| Source | Runs | Successful | Non-success / qualification |
+|---|---:|---:|---|
+| Ashby | 549 | 548 | 1 isolated RuntimeError |
+| Darwinbox | 701 | 701 | 100% successful |
+| Greenhouse | 846 | 846 | 100% successful |
+| Keka | 692 | 692 | 100% successful |
+| LinkedIn | 111 | 104 | 7 HTTP 429 events |
+| Naukri | 287 | 142 | 145 expected stale-feed failures while owner-paused |
+| SmartRecruiters | 280 | 280 | 100% successful |
+| Workable | 706 | 706 | 100% successful |
+| Workday | 27 | 0 | 27 HTTP 429 events; degraded, not recovered |
+
+Do not force Workday or LinkedIn scans, reset cooldowns, or treat Naukri's stale feed as permission to restart its paused publisher. The Naukri relay timer/service remain disabled by owner choice; preserve the 15-minute freshness guard. The SERP discovery coordinator/worker remains disabled with no credentials or paid requests.
+
+## Automation state
+
+- **JobBeeper Release Gate:** one-time run completed successfully; automation is disabled and has no next run.
+- **JobBeeper Health Watch:** latest recorded run completed on 19 November at about 08:38 IST and reported healthy production / verified local backups; the automation is disabled. It is not an active recurring monitor now.
+- Do not recreate or re-enable either task just to repeat the finished release gate. The current session cannot reach the production VM through Termalin because the Termalin Pro trial has ended; do not retry Termalin calls or initiate a paid subscription. Use the owner's production test evidence until server access is available again.
+
+## Current GitHub state
+
+- Target branch: `v2-live-radar`; observed HEAD: `93fcb7a1a16896fda707b5e4245a78c97a4f283c`.
+- The 18 commits after release commit `dda6d5757f4701ce916a94a48f7ec94d6297e51a` are documentation-only (four docs changed); no runtime, tests, dashboard, deployment or CSV code changed after the image was built.
+- Open pull requests: **0**.
+- Open next-release backlog: [#99 — member-submitted shared career URLs and cross-source feed deduplication](https://github.com/AvinashBhalla/job-beeper/issues/99), P2 only.
+
+## Immediate next step — owner-led production acceptance
+
+The owner is checking whether the production boards are being scanned and whether jobs arrive in the feed. Do not start another feature or change production before reviewing that evidence.
+
+For the **10 active boards**, verify:
+1. Registry and scheduler counts are 10/10 and their board keys match.
+2. Each configured board has a recent run, with outcome, last-success time, requests/pages, jobs seen, new rows, failed pages and cooldown clearly visible.
+3. Two consecutive polls preserve stable source IDs and do not insert duplicates. A successful poll with zero new rows is valid when the board inventory has not changed.
+4. Representative fetched jobs appear in the dashboard with correct company, title, location, description, apply URL, source attribution and defensible published/first-seen timestamps.
+5. Feed freshness, canonical duplicates and match/filter behavior are checked separately from raw source-run success.
+
+When the owner shares screenshots or observations, classify the failure stage first (schedule/dispatch, provider fetch, normalization/upsert, canonical dedupe, evaluation, or dashboard query) and fix only that stage with focused tests. Do not infer a broken collector merely from zero new rows.
+
+## Next development order
+
+1. Finish production acceptance of the existing 10-board allowlist and the end-to-end feed path.
+2. Fix only issues evidenced by that test; retain rate limits, cooldowns, source isolation and the explicit allowlist.
+3. After the existing pipeline is reliable, verify a small explicitly reviewed Company Watch sample in isolated QA. Keep the remaining manifest rows in review; never activate all 100 automatically.
+4. Keep issue #99 (member-submitted URLs, including future Oracle Candidate Experience support and canonical-grouped member feed behavior) in P2 planning until the core feed is proven.
+5. Keep paid SERP discovery, Naukri relay activation, new board activation and Telegram expansion out of this increment unless separately approved.
+
+The exact release test evidence is 557/557 local V2 tests passed on the release commit. Private-repository GitHub Actions remained blocked before job steps by the account billing/spending restriction; this was not a code/test failure. No upgrade or spending was performed.
 
 
 ---
