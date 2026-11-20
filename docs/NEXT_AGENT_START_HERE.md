@@ -50,7 +50,23 @@ Do not force Workday or LinkedIn scans, reset cooldowns, or treat Naukri's stale
 - Open pull requests: **0**.
 - Open next-release backlog: [#99 — member-submitted shared career URLs and cross-source feed deduplication](https://github.com/AvinashBhalla/job-beeper/issues/99), P2 only.
 
-## Immediate next step — owner-led production acceptance
+## P0 production inspection — 20 November 2026 (direct VM and database evidence)
+
+Read the complete [production acceptance audit](PRODUCTION_ACCEPTANCE_2026-11-20.md). This supersedes browser-only assumptions where the live DB provides stronger evidence.
+
+- Container image independently matches the release candidate: job-radar-prod-release:dda6d57, image ID sha256:bbf5252047ed2b3bbc8d06f7c51663e6deae4be28d9c82fdfc65e9a8b005ba5d; running, 0 restarts, OOMKilled=false. Health/dashboard/OpenAPI all HTTP 200.
+- Live SQLite PRAGMA quick_check=ok. Jobs=28,465; canonical opportunities=28,142; 0 duplicate (source, source_job_id) groups. There are 230 multi-observation canonical clusters (323 extra observations), none with missing canonical IDs.
+- Exactly 10 active ATS registry rows and 10 active schedules, each schedule linked to a distinct registry row. The registry also contains 9,931 low-confidence discovered (not active/not scheduled) rows. The Company Watch manifest remains separate: 100 rows, 19 candidate staged, 81 manual review.
+- Latest board polls: OpenAI/Ashby 852, PostHog/Ashby 9, Arvind/Darwinbox 44, Coinbase/Greenhouse 253, Graviton/Greenhouse 19, Zocdoc/Greenhouse 65, Bridgestone/Keka 108, Bosch/SmartRecruiters 300 (4 new), Hugging Face/Workable 6; all success. NVIDIA/Workday last poll 0 jobs / rate_limited, 63 consecutive host failures and 3,600-second cooldown.
+- Rolling 24-hour source results: Ashby 552/552 success; Darwinbox 705/705; Greenhouse 843/843; Keka 696/698 (1 HTTP 429 and 2 page/board failures); LinkedIn 11/17 (6 HTTP 429); Naukri 0/287 due intentionally paused stale feed; SmartRecruiters 281/281; Workable 708/708; Workday 0/24 (24 HTTP 429).
+- Daily snapshot timer active; last run Result=success/exit 0. All 10 SHA256SUMS entries pass.
+- Per-user notification settings and per-user notification ledger both have 0 rows. The 11 legacy/global notifications sent in the rolling 24-hour window do not prove member-specific delivery.
+- Member browser app-to-VM mapping remains unresolved: Desktop tested jobbeeper.com while this VM's Nginx is configured for the IP host; the member's 41,899 result count/detail ID do not match the local jobs DB inventory/ID range. Obtain a sanitized Network capture of the member jobs API origin before declaring member-feed E2E acceptance.
+- Production checkout is 899 commits behind and has untracked .worktrees; do not use it for development. Use a fresh verified checkout.
+
+**Decision: CONDITIONALLY ACCEPTED.** Backend scheduling/ingestion for the configured 10 boards is directly evidenced; member browser-to-database feed linkage and member notifications remain unverified. No code, config, DB, service or scheduler changes were made.
+
+## Immediate next step — close the browser-to-backend feed mapping gap
 
 The owner is checking whether the production boards are being scanned and whether jobs arrive in the feed. Do not start another feature or change production before reviewing that evidence.
 
