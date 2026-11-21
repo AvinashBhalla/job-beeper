@@ -18,9 +18,21 @@ Owner-confirmed direction: all 98 Google Alerts arrive in one owner-controlled G
 
 **RSS one-feed pilot:** The owner supplied one feed URL and Atom sample. A read-only live poll returned HTTP 200, `text/xml; charset=UTF-8`, two entries (Shine/Foundit), `Cache-Control: no-cache, must-revalidate`, and no ETag/Last-Modified/Content-Length. The Atom feed `updated` value was `2026-11-20T05:10:07Z`. This feed has no HTTP validators, so every poll downloads the full small response; keep cadence conservative and measure retention before scaling. The other 97 feed URLs and any config changes remain outstanding.
 
-**Parser/poller foundation PR #101:** `v2/google_alerts_rss.py` parses Atom and unwraps Google destinations; `v2/google_alerts_rss_polling.py` provides single-feed polling, bounded reads, Google-only redirects, 304/rate-limit handling, idempotent SQLite checkpoints/results, a protected external JSON feed-config loader, and a one-shot sequential batch runner with persisted Retry-After backoff. `v2/radar.py:init_db()` initializes additive RSS tables on a future deployment. The schema never stores feed URLs. The config loader requires an owner-only regular file (POSIX 0400/0600) outside the repo; it is plaintext filesystem-protected config and is not yet wired into service startup. Tests: **35/35 pass** and syntax compilation passes in a clean clone. GitHub Actions run 44898541310 ended before runner assignment (`runner_id=0`, zero steps), so CI did not run. `v2.test_radar` import was blocked because `bs4` is absent from this clean VM workspace; no dependencies were installed on production. Keep PR #101 draft/unmerged. No schedule/timer, actual feed config file, import of remaining 97 URLs, result-fetcher/SSRF protection, job verification, shared ingestion or production deployment is included.
+**Google Alerts implementation in draft PR #101:** Branch `feat/google-alerts-rss-atom-parser` now contains:
+- Atom parser, Google redirect unwrapping and canonical URL normalization.
+- Single-feed polling, protected external JSON feed-config loader (owner-only POSIX 0400/0600; plaintext, not encrypted), sequential batch spacing and Retry-After backoff.
+- Additive SQLite feed-state/result tables; the schema stores no feed URLs.
+- DNS-pinned HTTPS result fetcher with TLS hostname verification, per-hop DNS/robots checks, bounded size/timeouts, and no proxies/cookies.
+- Schema.org JobPosting extraction and a result queue that sends verified records through V2 `normalize_job()`/`upsert_jobs()`, canonical linking and existing per-user preference evaluations.
+- Manual one-shot `run_google_alerts_rss_batch()` wrapper. No public endpoint or schedule/timer is enabled.
 
-**Estimate withdrawn.** Previous Cloudflare and Gmail API estimates are invalid. Do not estimate the RSS MVP until the 98-feed config, conservative cadence/retention, safe destination fetching, job verification and shared ingestion have been tested.
+**Live sample checks:** one feed fetch returned HTTP 200, 2 entries, no ETag/Last-Modified, Cache-Control no-cache/must-revalidate. Shine returned a robots-allowed HTTP 200 and valid JobPosting (PwC Acceleration Centers in India, Software Engineering - React & Node - Associate (India), All India, IN). Foundit returned HTTP 403 and was classified blocked; no bypass was attempted.
+
+**Validation:** **73/73 focused tests pass** and py_compile passes in the clean Python 3.10.12 workspace. Latest GitHub Actions remains unverified because it fails before runner assignment (`runner_id=0`, zero steps). The existing `v2.test_radar` suite could not import because `bs4` is absent in this clean workspace; no dependencies were installed on production. Keep PR #101 draft/unmerged.
+
+**Still not enabled:** no actual feed-config file, no remaining 97 URLs imported, no scheduler/timer, no full 98-feed batch execution, no production schema migration or deployment. Manual batch function is code only.
+
+**Estimate withdrawn.** Previous Cloudflare and Gmail API estimates are invalid. Do not estimate the RSS MVP until the 98-feed set, cadence/retention, downstream quality and full V2 CI are validated.
 
 Production acceptance constraints remain: member browser/API/database mapping unresolved; per-user notifications unverified; preserve Workday/LinkedIn cooldowns and intentionally paused Naukri relay. Develop/test only in a fresh isolated workspace and DB, never the stale production checkout or live DB.
 
