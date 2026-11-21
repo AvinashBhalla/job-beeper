@@ -1,3 +1,17 @@
+# PRIORITY CHANGE — 21 November 2026
+
+**New P0 next discovery-source increment: [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md).**
+
+Owner-confirmed product direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members will not connect Gmail. A dedicated Gmail label will scope a Gmail API `users.watch`; Cloud Pub/Sub will push notifications to an authenticated JobBeeper HTTPS webhook. The worker will then use Gmail history to fetch new labelled emails, verify destination job pages, ingest valid opportunities once into the shared database, and evaluate each member against their own preferences.
+
+**Estimate:** 6–8 focused engineering working days for the production-ready owner-mailbox MVP, subject to public HTTPS host resolution, Google Cloud setup and any OAuth restricted-scope verification/security-assessment requirements. A 2–3 day proof-of-flow is not production readiness.
+
+**Planning only:** the plan is documented, but no implementation, Google Cloud resource provisioning, Gmail authorization, production configuration or deployment has been approved or performed. Obtain explicit execution approval before coding or changing Cloud/production resources.
+
+Keep the 20 November production-acceptance gates active: member browser/API/database mapping is unresolved; per-user notification delivery is unverified; Workday/LinkedIn cooldowns must be preserved; Naukri relay remains intentionally paused. See the feature plan for the revised P0/P1/P2 backlog and rollout gates.
+
+---
+
 # CURRENT HANDOVER — 20 November 2026, post-release production validation
 
 **Authoritative release record:** [V2 release qualification and final production promotion](RELEASE_QUALIFICATION_2026-11-18.md). The final Release Gate completed successfully on **19 November 2026 at 02:51 IST**. Older sections below this handover are retained as history; they describe pre-promotion states unless explicitly marked final.
