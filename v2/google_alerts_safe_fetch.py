@@ -306,26 +306,7 @@ def fetch_public_job_page(
         raise ValueError("Invalid fetch timeout or size limit.")
 
     current = str(url or "").strip()
-    # Parse once before consulting robots, then revalidate every HTTP hop below.
     _parse_public_https_url(current)
-    if not _skip_robots:
-        try:
-            allowed = (
-                robots_checker(current)
-                if robots_checker is not None
-                else _robots_allows(
-                    current,
-                    timeout=timeout,
-                    resolver=resolver,
-                    connection_factory=connection_factory,
-                )
-            )
-        except SafeFetchError:
-            raise
-        except Exception:
-            raise SafeFetchError("robots_unavailable") from None
-        if not allowed:
-            raise SafeFetchError("robots_disallowed")
     seen: set[str] = set()
     for redirect_count in range(MAX_REDIRECTS + 1):
         if current in seen:
@@ -333,6 +314,27 @@ def fetch_public_job_page(
         seen.add(current)
 
         host, target, original_netloc = _parse_public_https_url(current)
+        # A redirect may change host; every hop must pass its own robots check
+        # before a connection is made to that destination.
+        if not _skip_robots:
+            try:
+                allowed = (
+                    robots_checker(current)
+                    if robots_checker is not None
+                    else _robots_allows(
+                        current,
+                        timeout=timeout,
+                        resolver=resolver,
+                        connection_factory=connection_factory,
+                    )
+                )
+            except SafeFetchError:
+                raise
+            except Exception:
+                raise SafeFetchError("robots_unavailable") from None
+            if not allowed:
+                raise SafeFetchError("robots_disallowed")
+
         addresses = _resolve_public_addresses(host, resolver=resolver)
         last_error = None
         response = None
