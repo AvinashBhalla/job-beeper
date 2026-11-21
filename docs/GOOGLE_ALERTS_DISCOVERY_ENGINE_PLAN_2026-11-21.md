@@ -85,7 +85,9 @@ The owner supplies one private Google Alerts feed URL per rule through a secure 
 6. Persist the feed checkpoint and new entries atomically. Repeated Atom IDs update `last_seen_at` but do not create duplicate queue rows or reset processing state.
 7. Process result rows asynchronously in a separate safe destination-fetch/verification stage. Never fetch arbitrary result URLs inside the polling request.
 
-**Prototype status in draft PR #101:** `v2/google_alerts_rss.py` and `v2/google_alerts_rss_polling.py` implement parsing, single-feed polling, ETag/Last-Modified request support, HTTP 304, bounded reads, Google-only feed redirects, rate-limit Retry-After handling, sanitized errors, and idempotent SQLite checkpoint/result storage. `poll_google_alerts_feed_batch()` adds a one-shot sequential batch across configured feeds, skips feeds inside persisted backoff, and continues after per-feed errors. It is not a scheduler and does not choose a cadence. `load_google_alerts_feed_configs()` reads a JSON config outside the repository, requires a regular non-symlink file with POSIX permissions no broader than owner-only (0400/0600), validates Google feed URLs, and hides URLs from object repr/errors. This config is plaintext protected by OS file permissions, not encrypted. `v2/radar.py:init_db()` initializes the additive tables on a future application deploy. No scheduler/timer, real config file, 98-feed import or result-fetch worker exists yet.
+**Prototype status in draft PR #101:** `v2/google_alerts_rss.py` and `v2/google_alerts_rss_polling.py` implement Atom parsing, single-feed polling, ETag/Last-Modified support, HTTP 304, bounded reads, Google-only feed redirects, Retry-After handling and idempotent SQLite checkpoint/result storage. `poll_google_alerts_feed_batch()` adds a one-shot sequential batch with persisted backoff and configurable request spacing. `load_google_alerts_feed_configs()` reads a JSON file outside the repository, requires a regular non-symlink file with POSIX owner-only permissions (0400/0600), validates Google feed URLs and hides URLs from repr/errors. The config is plaintext protected by filesystem permissions, not encrypted.
+
+The branch also adds `v2/google_alerts_safe_fetch.py` (DNS-pinned HTTPS, per-hop revalidation, robots.txt enforcement, bounded response), `v2/google_alerts_job_extract.py` (conservative Schema.org JobPosting extraction), and `v2/google_alerts_pipeline.py` (bounded result queue, status/backoff, canonical-URL grouping and shared V2 upsert callback). `v2/radar.py` exposes manual one-shot `run_google_alerts_rss_batch()` via `JOB_RADAR_GOOGLE_ALERTS_CONFIG`; no public route or scheduler exists. `v2/radar.py:init_db()` initializes the additive tables on a future deployment. The actual config file and remaining 97 feed URLs have not been installed/imported.
 
 **Live behavior observed on the supplied feed:** HTTP 200; `text/xml; charset=UTF-8`; `Cache-Control: no-cache, must-revalidate`; no ETag, Last-Modified or Content-Length; two entries. Therefore HTTP conditional validators are not currently available for this feed. Polling cadence must stay conservative until feed update cadence and entry retention are measured. Do not assume independent reports of a 20-entry feed window apply to every alert.
 
@@ -100,21 +102,21 @@ The Google Alert subject/body is a hint for mapping an email back to its rule. R
 ### 3.2 URL resolution and safety
 
 - Resolve Google redirect links to their destination and normalize tracking parameters before fingerprinting.
-- Allow only valid public web destinations. Reject localhost, private, loopback, link-local and reserved IP ranges; validate each redirect hop and defend against DNS rebinding/SSRF.
-- Bound redirects, response size, content types, connection/read timeouts and per-host concurrency.
-- Do not follow arbitrary schemes, download executables, or fetch internal network resources.
+- The feature-branch safe fetcher resolves each destination host before connecting and rejects the entire DNS answer if any returned address is non-global (private, loopback, link-local, multicast or reserved).
+- Pin the connection to a validated numeric IP while retaining the original hostname for TLS SNI/certificate verification and the HTTP Host header. Disable automatic redirects and repeat URL validation, DNS checks and robots.txt policy checks on every redirect hop.
+- Apply a bounded redirect count, 12-second default timeout, 2 MB response cap, and HTML/XHTML/plain-text content types only. No cookies, credentials or proxies are used. Never download executables or fetch internal network resources.
+- Robots policy is cached in memory for one hour per host. Missing robots.txt is treated as no rules; 401/403 denies; unavailable robots data fails closed. A 403 or robots denial is recorded as blocked; do not bypass access controls.
 - Use a stable normalized-URL fingerprint so the same posting found by several queries or emails is fetched once, while each query/email observation remains available as provenance.
 
 ### 3.3 Verification and extraction tiers
 
 A Google Alert snippet is incomplete evidence. Only publish a job after checking the destination posting.
 
-Preferred order:
-1. Recognized public ATS posting/API when the result resolves to a known supported ATS.
-2. Schema.org `JobPosting` JSON-LD.
-3. Public RSS/feed/API/sitemap when the site exposes one.
-4. Permitted public HTML extraction.
-5. Review queue when the page is blocked, ambiguous, stale, or cannot be parsed confidently.
+Current MVP:
+1. Schema.org `JobPosting` JSON-LD extraction (implemented on the feature branch).
+2. Otherwise route to `needs_review`; do not infer a job from the Alert snippet alone.
+
+A later increment may add recognized public ATS APIs or permitted HTML extraction as separately reviewed tiers. Blocked/robots-denied destinations are never retried using alternate identities or proxies. Expired postings are rejected. Missing title or hiring organization is insufficient evidence and goes to review.
 
 Capture title, employer, location, description, source URL, application URL, posted/updated/expiry dates when present, employment type, experience when present, extraction method and confidence. Distinguish an actual job detail page from a search page, company homepage, aggregator page, expired posting or irrelevant article.
 
@@ -122,9 +124,10 @@ A page returning 403/429 remains blocked/deferred or needs review; it is not a v
 
 ### 3.4 Shared ingestion and member matching
 
-- Write verified observations to the existing shared `jobs` store with source `google_alerts` and provenance linking alert-rule ID, Gmail message ID reference, original result URL and extraction metadata.
-- Reuse the current URL canonicalization and `canonical_opportunities` deduplication path. If an ATS collector later discovers the same vacancy, attach another observation to the same canonical opportunity instead of creating a duplicate.
-- Evaluate each canonical opportunity independently against each member's saved preferences using the existing user-preference evaluation path.
+- The feature-branch queue worker normalizes verified records through existing V2 `normalize_job()` and delegates to `upsert_jobs()`. It uses the same shared `jobs` store and canonical-opportunity path as the existing sources.
+- The normalized source is `google_alerts`; `source_job_id` is derived from the final canonical URL. Provenance in `source_details` records opaque feed ID/label and Atom entry ID, plus the original Alert snippet and extraction method.
+- Existing `upsert_jobs()` performs canonical deduplication and calls `refresh_configured_user_evaluations(affected_job_ids)`. Each verified posting is evaluated against configured users' own preferences.
+- Multiple Alert entries with the same canonical destination URL are grouped for one fetch per processing batch. Existing source uniqueness and canonical linking handle replays and cross-source dedupe.
 - Do not use the owner's Google Alert query catalogue as a member filter. The owner's queries control discovery coverage; each member's own preferences control visibility.
 - Keep source ingestion and member notification delivery separate. A job can be stored and matched even while Telegram is disabled or unverified.
 
@@ -283,7 +286,7 @@ Google documentation:
 
 ---
 
-**Execution status:** partial implementation in draft PR #101. Parser, conditional single-feed poller, one-shot sequential batch helper, protected external JSON feed-config loader, additive SQLite schema initializer and focused tests exist on a feature branch. The supplied feed was fetched once read-only. The config file itself has not been created; no scheduler/timer, 98-feed import, result fetcher, job verification, shared ingestion, Gmail authorization, Google Cloud topic/subscription, production database migration or deployment has been enabled. The isolated suite passes 35 tests; GitHub Actions is blocked before runner assignment and the full V2 suite remains unverified. See the production-origin correction for live pilot evidence and CI blocker.
+**Execution status:** partial implementation in draft PR #101. The branch contains Atom parsing, protected external feed config loading, one-shot feed polling/batching, DNS-pinned robots-aware destination fetching, Schema.org JobPosting extraction, a result queue and a manual wrapper into existing V2 shared ingestion/per-user evaluation. The supplied feed has been fetched once read-only; Shine returned a verified JobPosting and Foundit returned HTTP 403 (blocked). The actual config file has not been created; the remaining 97 URLs are not loaded; no scheduler/timer or public endpoint is enabled. Focused tests pass 73/73 and py_compile passes in the clean Python 3.10.12 workspace. GitHub Actions remains blocked before runner assignment (runner_id=0, zero steps); the full V2 radar suite remains unverified because bs4 is missing from the clean workspace. No production database migration or deployment has occurred.
 
 
 ## 11. Live VM preflight — 21 November 2026
@@ -295,3 +298,14 @@ See [Google Alerts production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN
 **Google Pub/Sub endpoint gate: NOT YET PROVEN.** The current official documentation says the endpoint must be publicly accessible over HTTPS with a valid CA-signed certificate, but does not explicitly clarify IPv4-literal URL support. No GCP project or `gcloud` CLI is available on the VM, no Pub/Sub resources were provisioned, and the webhook route is not implemented. Verify actual API acceptance/delivery in the owner's GCP project before treating this design as approved.
 
 **No production application, database, Nginx, certificate, Gmail, DNS, Cloudflare or Pub/Sub configuration was changed.** The only external challenge activity was the Certbot staging dry run.
+
+
+## 12. Verification pipeline — implementation status, 21 November 2026
+
+The draft implementation calls the existing V2 `normalize_job()` and `upsert_jobs()` functions; it does not create a parallel job store or preference matcher. Verified records are inserted/updated in the shared jobs table, canonical linking runs through existing functions, and existing `upsert_jobs()` refreshes configured-user evaluations for affected job IDs. Alert rule/feed provenance remains on the shared row in `source_details`.
+
+One read-only sample-destination test through the safe fetcher returned:
+- Shine: robots allowed; HTTP 200; Schema.org JobPosting verified as Software Engineering - React & Node - Associate (India), PwC Acceleration Centers in India, All India, IN.
+- Foundit: HTTP 403; classified blocked and not bypassed.
+
+The feature branch now has **73/73 focused tests passing** and passes syntax compilation. GitHub Actions remains unverified (runner ID 0/no steps), and the full V2 suite was not run due missing bs4. PR #101 remains draft/unmerged. There is no installed config file, no remaining-97 import, no scheduler/timer and no production migration or deployment.
