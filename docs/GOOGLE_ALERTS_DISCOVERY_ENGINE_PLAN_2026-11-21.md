@@ -17,6 +17,18 @@ Live VM preflight on 21 November confirmed that `130.210.27.197` presents a trus
 
 > This document records the approved product direction and proposed engineering plan. It does not authorize code changes, Google Cloud resource creation, OAuth consent, or production deployment. Those remain separate execution/release actions.
 
+
+
+## Alternative intake path discovered — test RSS before Gmail OAuth
+
+Current independent reports from October 2026 show that Google Alerts exposes a `Deliver to → RSS feed` option for signed-in alert rules and returns Atom XML. Google's official Alerts Help page currently documents email delivery, not RSS, so this is an observed UI behavior, not a guaranteed official API contract.
+
+**Preferred next proof-of-concept:** test one separate RSS alert without changing any of the existing 98 email rules. Assess Atom parsing, embedded Google redirect URLs, response headers/ETag, feed retention/entry turnover, and polling volume. Independent 2026 tests observed about 20 recent entries in a feed; that is not a guaranteed cap, but it means missed polling could lose results. RSS appears to replace email delivery for a given alert; exact duplicate-alert behavior is unverified. Do not migrate existing rules until coverage equivalence and the need for parallel email delivery are demonstrated.
+
+RSS is polling, not webhook delivery. It may avoid the Gmail `gmail.readonly` restricted-scope and Pub/Sub gates, but RSS has undocumented support/retention behavior, secret feed URLs, update latency and potential request volume across 98 feeds. See the correction document's RSS evaluation section for the pilot protocol and sources.
+
+Gmail API remains blocked pending a Google policy decision: the current approved Gmail-scope use cases are email clients, email backup, productivity enhancements to email, or reporting/monitoring services that improve the email experience. Job-discovery extraction for a multi-member product is not an obvious fit. Do not request `gmail.readonly` until this specific use is confirmed as permitted.
+
 ## 1. Product outcome
 
 Add Google Alerts as a new shared discovery source. The owner maintains the 98 Google Alert queries and receives their results in one Gmail account. JobBeeper reacts when a new result email arrives, extracts candidate job links, verifies the underlying posting, and ingests valid jobs into the existing shared jobs/canonical-opportunity pipeline.
