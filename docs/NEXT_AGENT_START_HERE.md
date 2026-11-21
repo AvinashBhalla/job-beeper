@@ -1,14 +1,18 @@
 # PRIORITY CHANGE — 21 November 2026
 
-**New P0 next discovery-source increment: [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).**
+**P0 next discovery-source increment:** [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).
 
-Owner-confirmed product direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members will not connect Gmail. A dedicated Gmail label will scope a Gmail API `users.watch`; Cloud Pub/Sub will push notifications to an authenticated JobBeeper HTTPS webhook. The worker will then use Gmail history to fetch new labelled emails, verify destination job pages, ingest valid opportunities once into the shared database, and evaluate each member against their own preferences.
+Owner-confirmed direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members do not connect Gmail. Valid jobs go into the shared jobs/canonical-opportunity database and are evaluated independently against each member's own saved preferences.
 
-**Estimate:** 6–9 focused engineering working days for the production-ready owner-mailbox MVP, subject to public HTTPS host resolution, Google Cloud setup and any OAuth restricted-scope verification/security-assessment requirements. A 2–3 day proof-of-flow is not production readiness.
+**Production origin is `https://130.210.27.197/`**, on the Oracle VM `job-radar`, with Nginx proxying to FastAPI at `127.0.0.1:8000`. There is no evidence that the owner controls `jobbeeper.com` or any custom domain. The member-facing website mentioned in the November 20 report is a separate browser surface whose relationship to this VM/database remains unproven. Do not configure Cloudflare, DNS, email routing or webhooks for `jobbeeper.com`.
 
-**Planning only:** the plan is documented, but no implementation, Google Cloud resource provisioning, Gmail authorization, production configuration or deployment has been approved or performed. Obtain explicit execution approval before coding or changing Cloud/production resources.
+**Google Alerts webhook design is not yet validated.** Candidate ingress: `https://130.210.27.197/api/webhooks/google-pubsub`, only if the existing IP certificate is trusted and includes the IP address as an IP SAN, and Google Pub/Sub authenticated push accepts that IP-literal HTTPS endpoint. Verify those requirements read-only before coding/provisioning. Gmail `gmail.readonly` remains subject to Google's permitted-use-case and restricted-scope approval. Keep existing member Google sign-in scope unchanged.
 
-Keep the 20 November production-acceptance gates active: member browser/API/database mapping is unresolved; per-user notification delivery is unverified; Workday/LinkedIn cooldowns must be preserved; Naukri relay remains intentionally paused. See the feature plan for the revised P0/P1/P2 backlog and rollout gates.
+**Quarantine:** branch `feat/google-alerts-email-routing` was created from an incorrect custom-domain/Cloudflare assumption. It is unmerged, has no PR, and has not changed production. It contains an Email Worker, Cloudflare Queues and a prototype backend webhook; it is **superseded / do not merge / do not deploy**. Do not cherry-pick it. Read [the correction document](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md).
+
+**Estimate withdrawn.** The prior Cloudflare 5–7 day and Gmail API 6–9 day estimates are provisional/withdrawn until IP push compatibility, Gmail OAuth policy and an actual sanitized Alert email have been checked.
+
+Production acceptance constraints remain: member browser/API/database mapping unresolved; per-user notifications unverified; preserve Workday/LinkedIn cooldowns and intentionally paused Naukri relay. Develop/test only in a fresh isolated workspace and DB, never the stale production checkout or live DB.
 
 ---
 
