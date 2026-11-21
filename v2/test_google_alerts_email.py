@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import unittest
+from email import policy
 from email.message import EmailMessage
+from email.parser import BytesParser
 from urllib.parse import urlencode
 
 from v2.google_alerts_email import (
@@ -173,29 +175,18 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "sender_authentication_failed")
 
     def test_rejects_ambiguous_duplicate_authentication_results(self):
-        raw = make_email(
-            authentication_results=None,
-            html_body=structured_html([{
-                "title": "Role",
-                "url": "https://jobs.example.test/role",
-            }]),
-        )
-        message = EmailMessage()
-        # Start from the standard fixture and add two conflicting auth results.
         message_bytes = make_email(
             html_body=structured_html([{
                 "title": "Role",
                 "url": "https://jobs.example.test/role",
             }])
         )
-        from email.parser import BytesParser
-        parsed_message = BytesParser().parsebytes(message_bytes)
-        parsed_message["Authentication-Results"] = (
+        message = BytesParser(policy=policy.default).parsebytes(message_bytes)
+        message["Authentication-Results"] = (
             "mx.google.com; dkim=fail; dmarc=fail"
         )
-        raw = parsed_message.as_bytes()
         with self.assertRaises(GoogleAlertEmailError) as caught:
-            parse_google_alert_email(raw)
+            parse_google_alert_email(message.as_bytes())
         self.assertEqual(caught.exception.code, "sender_authentication_failed")
 
     def test_rejects_non_alert_subject(self):
