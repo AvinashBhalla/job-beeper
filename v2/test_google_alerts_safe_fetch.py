@@ -316,10 +316,10 @@ class RobotsPolicyTests(unittest.TestCase):
         factory = FakeConnectionFactory(FakeResponse(
             200,
             {"Content-Type": "text/plain"},
-            b"User-agent: *\\nDisallow: /private",
+            b"User-agent: *\nDisallow: /private",
         ))
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_google_page = fetch_public_job_page(
+            fetch_public_job_page(
                 "https://jobs.example.com/private/posting",
                 resolver=self._resolver(),
                 connection_factory=factory,
@@ -331,7 +331,7 @@ class RobotsPolicyTests(unittest.TestCase):
     def test_allow_rule_allows_page_and_caches_policy(self):
         robots = FakeResponse(
             200, {"Content-Type": "text/plain"},
-            b"User-agent: *\\nDisallow: /private",
+            b"User-agent: *\nDisallow: /private",
         )
         page1 = FakeResponse(200, {"Content-Type": "text/html"}, b"First page")
         page2 = FakeResponse(200, {"Content-Type": "text/html"}, b"Second page")
