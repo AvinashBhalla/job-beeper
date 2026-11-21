@@ -183,9 +183,9 @@ The root feed ID includes account/Alert identifiers and the root `rel="self"` hr
 Branch: `feat/google-alerts-rss-atom-parser`.
 
 - `v2/google_alerts_rss.py`: Atom parser, HTML-to-text conversion (ignores script/style), Google redirect unwrapping, size limit, UTF-8 requirement, DTD/entity rejection, and static HTTPS/public-host checks. Uses existing `v2.dedupe.canonicalize_url`.
-- `v2/google_alerts_rss_polling.py`: one-feed conditional poller, bounded streamed reads, same-origin Google-only redirects, HTTP 304 handling, sanitized 429/503 Retry-After handling, and idempotent SQLite state/entry persistence.
+- `v2/google_alerts_rss_polling.py`: one-feed conditional poller, bounded streamed reads, Google-only feed redirects, HTTP 304 handling, sanitized 429/503 Retry-After handling, idempotent SQLite state/entry persistence, a sequential one-shot batch runner with retry-backoff skips, and a protected external JSON feed-config loader. The loader requires an owner-only regular file outside the repository and validates each feed URL; it hides URLs from repr/error strings. The config is plaintext protected by filesystem permissions, not encrypted.
 - `v2/radar.py`: V2 `init_db()` now calls the additive schema initializer so feed-state and result-queue tables will be created on a future application deployment.
-- `v2/test_google_alerts_rss.py` and `v2/test_google_alerts_rss_polling.py`: 25 focused tests.
+- `v2/test_google_alerts_rss.py` and `v2/test_google_alerts_rss_polling.py`: 35 focused tests.
 - `.github/workflows/v2-ci.yml`: adds the new files to the syntax-check list.
 
 The new schema stores opaque feed IDs, labels, ETag/Last-Modified values, timestamps, error codes and parsed result metadata. **It does not store feed URLs, root feed IDs or self links.** It does store resolved external job destination URLs and parsed titles/snippets as work-queue data.
@@ -206,11 +206,36 @@ The feed was fetched once through the poller in the isolated feature workspace. 
 ### Validation and remaining limitations
 
 - Python 3.10.12 in a fresh isolated clone: `py_compile` passed for `radar.py`, parser, poller and both test files.
-- Focused tests: **25/25 passed**.
+- Focused tests: **35/35 passed** after adding protected feed-config and batch/backoff cases.
 - The full `v2.test_radar` suite could not be imported in this clean VM workspace because `bs4` is not installed there. I did not install project dependencies on the production VM.
 - Latest GitHub Actions run ended before runner assignment (`runner_id=0`, zero steps). No CI checks executed; repository CI remains unverified.
 - PR #101 remains draft and unmerged.
-- No feed scheduler, poll interval, secure 98-feed config file, result-page network fetcher, DNS/redirect-hop SSRF protection, job extraction/verification, shared job ingestion, preference evaluation, or production deployment is included.
-- The additive schema initializer exists in code but has **not** been applied to the production database.
+- No feed scheduler/timer or poll interval is enabled. The protected config loader exists, but the actual feed config file (including the remaining 97 URLs) has not been created. No result-page network fetcher, DNS/redirect-hop SSRF protection, job extraction/verification, shared job ingestion, preference evaluation, or production deployment is included.
+- The additive schema initializer exists in code but has **not** been applied to the production database. The external feed-config loader has not been integrated into process startup or service configuration.
 
 The supplied RSS URL remains a private bearer-like link. Do not place it in tickets, logs, source control, public dashboards or copied diagnostics.
+
+
+## 11. RSS protected-config and one-shot batch foundation — 21 November 2026
+
+The polling module now also exposes:
+- `load_google_alerts_feed_configs(path)`: loads a JSON file outside the repository, rejects symlinks/non-regular files, requires POSIX owner-only mode (0400/0600), caps file size and feed count at 98, validates Google Alerts feed URL host/path and unique opaque IDs, and avoids including the URL in object repr/error messages.
+- `poll_google_alerts_feed_batch(conn, feeds)`: processes a configured list sequentially with one HTTP session, persists every success/failure, continues to later feeds after one feed fails, and skips feeds until their persisted Retry-After deadline passes.
+
+Expected config shape (use placeholders only; never commit actual feed URLs):
+
+```json
+{
+  "feeds": [
+    {
+      "id": "alert-software-engineer-india",
+      "label": "Software Engineer India React TypeScript",
+      "url": "https://www.google.com/alerts/feeds/REDACTED/REDACTED"
+    }
+  ]
+}
+```
+
+**The actual file has not been created** and should be provided through a separate owner-only deployment secret/configuration path, not GitHub or chat. The loader is not yet wired into service startup. The batch helper is a one-shot function only; no schedule, timer, 98-feed import or automatic polling cadence has been enabled.
+
+After adding config loader and batch/backoff tests, the focused parser/poller suite is **35/35 passing** in the clean isolated workspace. GitHub Actions remains unverified because the runner is not assigned (`runner_id=0`, no steps). The full V2 test suite could not be run on this workspace due missing `bs4`; no packages were installed on the production VM.
