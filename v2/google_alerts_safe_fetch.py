@@ -12,13 +12,20 @@ import ipaddress
 import re
 import socket
 import ssl
+import threading
+import time
 from dataclasses import dataclass
+from urllib.robotparser import RobotFileParser
 from urllib.parse import urljoin, urlsplit
 
 MAX_URL_LENGTH = 2048
 MAX_REDIRECTS = 5
 MAX_BODY_BYTES = 2_000_000
 DEFAULT_TIMEOUT_SECONDS = 12
+ROBOTS_CACHE_TTL_SECONDS = 3600
+ROBOTS_USER_AGENT = "JobBeeper-GoogleAlerts/1.0"
+_ROBOTS_CACHE: dict[str, tuple[float, RobotFileParser]] = {}
+_ROBOTS_CACHE_LOCK = threading.Lock()
 ALLOWED_CONTENT_TYPES = {
     "text/html",
     "application/xhtml+xml",
@@ -200,6 +207,60 @@ def _read_bounded(response, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
+def _robots_allows(
+    url: str,
+    *,
+    timeout: int,
+    resolver=None,
+    connection_factory=None,
+) -> bool:
+    """Read/cached robots policy and fail closed if the policy cannot be read."""
+    parsed = urlsplit(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if not host:
+        raise SafeFetchError("robots_invalid_target")
+    now = time.monotonic()
+    with _ROBOTS_CACHE_LOCK:
+        cached = _ROBOTS_CACHE.get(host)
+        if cached and cached[0] > now:
+            return cached[1].can_fetch(ROBOTS_USER_AGENT, url)
+
+    authority = f"[{host}]" if ":" in host else host
+    robots_url = f"https://{authority}/robots.txt"
+    try:
+        page = fetch_public_job_page(
+            robots_url,
+            timeout=timeout,
+            max_bytes=256_000,
+            resolver=resolver,
+            connection_factory=connection_factory,
+            _skip_robots=True,
+        )
+        if (urlsplit(page.final_url).hostname or "").lower().rstrip(".") != host:
+            raise SafeFetchError("robots_redirect_cross_host")
+        parser = RobotFileParser()
+        parser.set_url(robots_url)
+        parser.parse(page.text.splitlines())
+    except SafeFetchError as exc:
+        if exc.http_status in (404, 410):
+            # A missing robots file has no rules; a 401/403 explicitly denies.
+            parser = RobotFileParser()
+            parser.set_url(robots_url)
+            parser.parse([])
+        elif exc.http_status in (401, 403):
+            parser = RobotFileParser()
+            parser.set_url(robots_url)
+            parser.parse(["User-agent: *", "Disallow: /"])
+        else:
+            raise SafeFetchError(
+                "robots_unavailable", http_status=exc.http_status
+            ) from None
+
+    with _ROBOTS_CACHE_LOCK:
+        _ROBOTS_CACHE[host] = (now + ROBOTS_CACHE_TTL_SECONDS, parser)
+    return parser.can_fetch(ROBOTS_USER_AGENT, url)
+
+
 def fetch_public_job_page(
     url: str,
     *,
@@ -207,6 +268,8 @@ def fetch_public_job_page(
     max_bytes: int = MAX_BODY_BYTES,
     resolver=None,
     connection_factory=None,
+    robots_checker=None,
+    _skip_robots: bool = False,
 ) -> FetchedPublicPage:
     """Fetch one public HTTPS page while pinning each validated IP connection.
 
@@ -218,6 +281,26 @@ def fetch_public_job_page(
         raise ValueError("Invalid fetch timeout or size limit.")
 
     current = str(url or "").strip()
+    # Parse once before consulting robots, then revalidate every HTTP hop below.
+    _parse_public_https_url(current)
+    if not _skip_robots:
+        try:
+            allowed = (
+                robots_checker(current)
+                if robots_checker is not None
+                else _robots_allows(
+                    current,
+                    timeout=timeout,
+                    resolver=resolver,
+                    connection_factory=connection_factory,
+                )
+            )
+        except SafeFetchError:
+            raise
+        except Exception:
+            raise SafeFetchError("robots_unavailable") from None
+        if not allowed:
+            raise SafeFetchError("robots_disallowed")
     seen: set[str] = set()
     for redirect_count in range(MAX_REDIRECTS + 1):
         if current in seen:
