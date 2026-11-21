@@ -354,6 +354,32 @@ class RobotsPolicyTests(unittest.TestCase):
         self.assertEqual(len(factory.connections), 3)
         self.assertEqual(factory.connections[0].request_args[1], "/robots.txt")
 
+    def test_redirect_target_is_checked_against_its_own_robots_policy(self):
+        redirect = FakeResponse(
+            302, {"Location": "https://careers.example.net/private/posting"}
+        )
+        factory = FakeConnectionFactory(redirect)
+        resolver, _ = self._resolver({
+            "jobs.example.com": ["93.184.216.34"],
+            "careers.example.net": ["93.184.216.35"],
+        })
+        checked = []
+
+        def robots_checker(url):
+            checked.append(url)
+            return "careers.example.net/private" not in url
+
+        with self.assertRaises(SafeFetchError) as caught:
+            fetch_public_job_page(
+                "https://jobs.example.com/outbound",
+                resolver=resolver,
+                connection_factory=factory,
+                robots_checker=robots_checker,
+            )
+        self.assertEqual(caught.exception.code, "robots_disallowed")
+        self.assertEqual(len(checked), 2)
+        self.assertEqual(len(factory.connections), 1)
+
     def test_missing_robots_file_allows_page(self):
         factory = FakeConnectionFactory(
             FakeResponse(404, {"Content-Type": "text/plain"}),
