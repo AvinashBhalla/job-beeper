@@ -1,3 +1,9 @@
+## Owner decision — historical Gmail notifications (21 November 2026)
+
+**Owner decision (21 November 2026): send Telegram notifications for eligible jobs from the historical backfill as well as future arrivals.** Implement a Gmail-source-specific backfill delivery mode that bypasses only the generic no-backlog/enabled-at cutoff; retain current user preferences, currently-live public posting verification, canonical dedupe, explicit per-user Telegram opt-in, linked private chat, rate limiting, retry policy and idempotent ledger. Send in controlled batches. Do not change backlog policy for other sources. Never send raw email snippets, query text or mailbox metadata.
+
+---
+
 # CURRENT OWNER DECISIONS — PERSONAL GOOGLE ALERTS GMAIL PUSH (21 NOVEMBER 2026)
 
 The owner selected a **single-user personal integration** on the existing Oracle VM `job-radar`. Trigger: Gmail `users.watch` → Cloud Pub/Sub topic → authenticated OIDC push webhook → durable queue → Gmail `history.list` reconciliation. Results: the owner's existing dashboard plus Telegram, using the existing per-user private-chat path in `v2/user_notifications.py` + `v2/telegram_linking.py`; do not use the legacy global Telegram queue for Gmail-originated alerts.
