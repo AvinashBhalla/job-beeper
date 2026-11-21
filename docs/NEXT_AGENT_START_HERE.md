@@ -1,3 +1,13 @@
+# LATEST GOOGLE ALERTS EMAIL FIXTURE AND PARSER STATUS — 21 NOVEMBER 2026
+
+The owner uploaded one Google Alerts `.eml` message. It is `multipart/alternative` with plain text and HTML; the HTML contains a structured JSON script (`data-scope="inboxmarkup"`, publisher `Google Alerts`) whose `cards[].widgets[]` LINK items contain title, description and Google redirect URL. The sample contains three job results. The plain-text and visible HTML renderings contain the same three items. Do not commit the raw email: it includes mailbox/Message-ID data, alert-management and unsubscribe tokens, and a private RSS link.
+
+**Parser code added:** `v2/google_alerts_email.py`. **Focused tests added:** `v2/test_google_alerts_email.py` (eight synthetic tests; not yet executed). Parser validates Google Alerts sender and subject prefix, prefers structured HTML JSON, falls back to visible HTML result links and then plain-text wrapped links, unwraps bounded Google `/url` links, canonical-deduplicates results and returns only minimal fields plus a SHA-256 message fingerprint. It does not persist raw email, recipient, subject/query, Gmail Message-ID or tracking URLs.
+
+**Local scratch inspection:** the uploaded sample's structured HTML JSON yielded exactly 3 result records; the plain-text fallback also yielded 3. This scratch inspection validates the sample's observed shape, but it is not a run of the committed Python module/tests. No test suite is claimed passed for these latest parser commits.
+
+Next: run `python -m unittest v2.test_google_alerts_email -v`, then the combined focused parser tests and full V2 suite in a fresh non-production checkout/venv. Do not run on the connected `job-radar` production machine. GitHub Actions remain off-limits due exhausted quota. Before real Gmail authorization, resolve Google's Restricted-scope permitted-use-case and Limited Use/data-transfer requirements. No raw email fixture, OAuth token, Gmail connection, production migration, poller/schedule or deployment has been enabled.
+
 # LATEST OWNER DECISION — GOOGLE ALERTS EMAIL VIA GMAIL API
 
 **Confirmed 21 November 2026:** the product requirement is direct reading of the owner's existing Gmail inbox. Multiple Google Alerts rules use different search strings, but all notification emails share the same Google Alerts email structure. Each message can contain multiple result items. Parse every item from each matching message through one generic email parser. Do not ask for RSS URLs; do not create per-alert parsers, feed configurations, or manual-forwarding workflows.
