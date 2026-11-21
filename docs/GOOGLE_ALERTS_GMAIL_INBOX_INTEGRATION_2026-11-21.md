@@ -210,5 +210,9 @@ The owner must still create the Personal Mode OAuth project/client and configure
 - [Gmail API scopes](https://developers.google.com/workspace/gmail/api/auth/scopes) — `gmail.readonly` scope classification.
 - [Google Workspace user data and developer policy](https://developers.google.com/workspace/workspace-api-user-data-developer-policy) — approved Gmail use cases, Limited Use, data transfer and security requirements.
 - [Restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification) — verification exceptions and server-side restricted-data security-assessment requirements.
-- [Gmail push notifications](https://developers.google.com/workspace/gmail/api/guides/push) — optional future low-latency Pub/Sub trigger; not required by the polling MVP.
+- [Google Auth Platform Personal Mode](https://support.google.com/cloud/answer/15544987?hl=en) — creator-only personal projects, Web OAuth client setup, no OAuth verification and one-way project configuration.
+- [Restricted scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification) — personal-use verification exception and separate security-assessment language for restricted data processed through servers.
+- [Gmail push notifications](https://developers.google.com/workspace/gmail/api/guides/push) — label-filtered watch, Pub/Sub topic permissions, watch expiry/renewal, notification payload and history reconciliation.
+- [Pub/Sub push subscriptions](https://cloud.google.com/pubsub/docs/create-push-subscription) — publicly accessible HTTPS endpoint, CA-signed TLS certificate and authenticated push configuration.
+- [Gmail history.list reference](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list) — labelId, historyTypes, pagination, messageAdded/labelAdded records and HTTP 404 recovery.
 
