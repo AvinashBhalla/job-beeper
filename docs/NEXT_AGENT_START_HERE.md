@@ -1,3 +1,27 @@
+# CURRENT OWNER DECISIONS — PERSONAL GOOGLE ALERTS GMAIL PUSH (21 NOVEMBER 2026)
+
+The owner selected a **single-user personal integration** on the existing Oracle VM `job-radar`. Trigger: Gmail `users.watch` → Cloud Pub/Sub topic → authenticated OIDC push webhook → durable queue → Gmail `history.list` reconciliation. Results: the owner's existing dashboard plus Telegram, using the existing per-user private-chat path in `v2/user_notifications.py` + `v2/telegram_linking.py`; do not use the legacy global Telegram queue for Gmail-originated alerts.
+
+OAuth: use a separate Google Cloud **Personal Mode** project and Web application client. It is creator-only, does not require OAuth app verification, and cannot be converted into a multi-user project. Keep member `google_oauth.py` unchanged. Request only `gmail.readonly`.
+
+Mailbox restriction: require Gmail label `JobBeeper/GoogleAlerts`; all application list/watch/history calls must include that exact label ID. No unlabelled mailbox-wide listing, no body retrieval for unlabelled messages, and Spam/Trash remain excluded. The owner applies the label to historical matching conversations and creates the filter for future arrivals.
+
+Initial sync: process **all available labelled messages**; register `watch` first and capture its returned `historyId`, run the full paginated label-scoped backfill, then reconcile `history.list` from that baseline to catch arrivals during the scan. Renew watch daily (mandatory at least every 7 days); run low-frequency history reconciliation as a safety net.
+
+Privacy: Gmail discoveries must be owner-only in the dashboard/evaluations/notifications. The jobs table is shared today, so add source ownership (or equivalent user-scoped observation) and enforce it in every feed query, evaluator and notification queue. Public ATS jobs remain shared. For a URL already represented by a public source, link the owner's discovery to that canonical opportunity without storing private email metadata. Use only the owner's preferences and private Telegram chat.
+
+Telegram: use per-user notification settings, ledger and private chat. Do not route personal Gmail records into legacy `notification_ledger` / `v2/telegram.py`. Recommended default: historical backfill populates the dashboard silently; Telegram sends only for new Gmail arrivals after initial sync completes. Confirm this with the owner before notification activation.
+
+Push endpoint preconditions: the Oracle VM/Nginx callback must be publicly reachable with a valid CA-signed HTTPS certificate and authenticated Pub/Sub OIDC push. Perform read-only certificate SAN/chain/firewall/route preflight first. If current IP origin fails, use an owned hostname and valid certificate; otherwise fall back to a Pub/Sub pull subscriber while keeping Gmail push notifications. Check GCP billing/pricing before creating Pub/Sub resources. Do not make billing changes without approval.
+
+Google guardrail: creator-only Personal Mode avoids OAuth app verification, but `gmail.readonly` remains Restricted and the policy still requires appropriate personal productivity/monitoring use and Limited Use. Google separately says restricted data processed from/through a server may require a security assessment; do not assume the Personal Mode verification exception waives that assessment. Resolve applicability before storing production tokens/processing real mail on the Oracle VM.
+
+**No live Gmail OAuth, Pub/Sub provisioning, token storage, deployment or production changes have occurred.** Do not use the production VM as a development/test runner; do not trigger paid GitHub Actions.
+
+Authoritative design: `docs/GOOGLE_ALERTS_GMAIL_INBOX_INTEGRATION_2026-11-21.md`.
+
+---
+
 ## Owner consent and Gmail data boundary — 21 November 2026
 
 The owner expressly consents to a separate owner-only Gmail connection restricted operationally to Google Alerts. The owner will create a Gmail label named `JobBeeper/GoogleAlerts` and a filter applying it to matching historical conversations and future Google Alerts. The app must use only `labelIds=[label_id]` on `users.messages.list` and `labelId=label_id` on `users.history.list`, excluding Spam/Trash, and must not read unlabelled bodies. Keep Gmail API scope to `gmail.readonly` only; do not request `gmail.labels` or modify mailbox labels/filters in code.
