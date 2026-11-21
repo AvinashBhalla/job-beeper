@@ -85,16 +85,16 @@ def _is_alert_subject(value: str | None) -> bool:
 
 
 def _google_authentication_passes(message) -> bool:
-    """Require Gmail's own authentication result, not just a spoofable From."""
-    for value in message.get_all("Authentication-Results", []):
-        result = re.sub(r"\s+", " ", str(value)).casefold()
-        if (
-            result.startswith("mx.google.com;")
-            and re.search(r"\bdkim=pass\b.*?header\.i=@google\.com", result)
-            and re.search(r"\bdmarc=pass\b.*?header\.from=google\.com", result)
-        ):
-            return True
-    return False
+    """Require one unambiguous Gmail authentication result, not just From."""
+    values = message.get_all("Authentication-Results", [])
+    if len(values) != 1:
+        return False
+    result = re.sub(r"\s+", " ", str(values[0])).casefold()
+    return bool(
+        result.startswith("mx.google.com;")
+        and re.search(r"\bdkim=pass\b.*?header\.i=@google\.com", result)
+        and re.search(r"\bdmarc=pass\b.*?header\.from=google\.com", result)
+    )
 
 
 def _clean_text(value: object, limit: int = 4000) -> str:
