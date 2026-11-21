@@ -381,7 +381,17 @@ def record_feed_success(
         )
 
         for entry in result.entries:
-            cursor = conn.execute(
+            exists_before = conn.execute(
+                """
+                SELECT 1 FROM google_alert_rss_entries
+                WHERE feed_id=? AND entry_id=?
+                """,
+                (feed_id, entry.entry_id),
+            ).fetchone()
+            if exists_before is None:
+                new_entries += 1
+
+            conn.execute(
                 """
                 INSERT INTO google_alert_rss_entries (
                     feed_id, entry_id, title, snippet, destination_url,
@@ -407,32 +417,6 @@ def record_feed_success(
                     entry.published_at, entry.updated_at, now_text, now_text,
                 ),
             )
-            if cursor.rowcount > 0:
-                # SQLite reports one affected row for both insert and update.
-                # Count new IDs explicitly instead of relying on rowcount.
-                pass
-
-            # The INSERT ... ON CONFLICT path is safe to replay. Count only new
-            # entry IDs by using first_seen_at == the current poll timestamp.
-            # The previous existence check is in the same write transaction.
-            # (No raw feed URL is ever written to either table.)
-            exists_before = conn.execute(
-                """
-                SELECT 1 FROM google_alert_rss_entries
-                WHERE feed_id=? AND entry_id=? AND first_seen_at=?
-                """,
-                (feed_id, entry.entry_id, now_text),
-            ).fetchone()
-            if exists_before:
-                prior = conn.execute(
-                    """
-                    SELECT 1 FROM google_alert_rss_entries
-                    WHERE feed_id=? AND entry_id=? AND first_seen_at<>?
-                    """,
-                    (feed_id, entry.entry_id, now_text),
-                ).fetchone()
-                if not prior:
-                    new_entries += 1
 
         total = conn.execute(
             "SELECT COUNT(*) FROM google_alert_rss_entries WHERE feed_id=?",
