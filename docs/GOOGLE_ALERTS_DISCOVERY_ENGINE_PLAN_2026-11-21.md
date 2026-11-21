@@ -12,7 +12,7 @@ Live VM preflight on 21 November confirmed that `130.210.27.197` presents a trus
 
 **Planning date:** 21 November 2026  
 **Priority:** P0 — next major discovery-source increment  
-**Status:** Documented / not implemented  
+**Status:** Partially implemented in draft PR #101; not deployed  
 **Scope decision confirmed by owner:** 98 Google Alert rules; all Alert messages arrive in one owner-controlled Gmail mailbox. Members do not connect Gmail. Valid jobs are stored once in the shared JobBeeper database and evaluated independently against each member's preferences.
 
 > This document records the approved product direction and proposed engineering plan. It does not authorize code changes, Google Cloud resource creation, OAuth consent, or production deployment. Those remain separate execution/release actions.
@@ -23,14 +23,14 @@ Live VM preflight on 21 November confirmed that `130.210.27.197` presents a trus
 
 Current independent reports from October 2026 show that Google Alerts exposes a `Deliver to → RSS feed` option for signed-in alert rules and returns Atom XML. Google's official Alerts Help page currently documents email delivery, not RSS, so this is an observed UI behavior, not a guaranteed official API contract.
 
-**Preferred next proof-of-concept:** test one separate RSS alert without changing any of the existing 98 email rules. Assess Atom parsing, embedded Google redirect URLs, response headers/ETag, feed retention/entry turnover, and polling volume. Independent 2026 tests observed about 20 recent entries in a feed; that is not a guaranteed cap, but it means missed polling could lose results. RSS appears to replace email delivery for a given alert; exact duplicate-alert behavior is unverified. Do not migrate existing rules until coverage equivalence and the need for parallel email delivery are demonstrated.
+**Proof-of-concept progress:** the owner supplied one live RSS URL and an Atom sample for one alert, without changing the remaining rules. A read-only poll returned HTTP 200 and two entries; the response had `Cache-Control: no-cache, must-revalidate`, but no ETag, Last-Modified or Content-Length. This means the current feed cannot use HTTP conditional validators and each poll downloads the full (small) response. Its Atom `<updated>` was `2026-11-20T05:10:07Z`. One fetch does not establish cadence, entry retention or a universal entry cap. Do not migrate or change any of the 98 rules until a controlled retention/cadence pilot demonstrates coverage equivalence and the impact on email delivery.
 
 RSS is polling, not webhook delivery. It may avoid the Gmail `gmail.readonly` restricted-scope and Pub/Sub gates, but RSS has undocumented support/retention behavior, secret feed URLs, update latency and potential request volume across 98 feeds. See the correction document's RSS evaluation section for the pilot protocol and sources.
 
 Gmail API remains blocked pending a Google policy decision: the current approved Gmail-scope use cases are email clients, email backup, productivity enhancements to email, or reporting/monitoring services that improve the email experience. Job-discovery extraction for a multi-member product is not an obvious fit. Do not request `gmail.readonly` until this specific use is confirmed as permitted.
 
 
-**Sample received and parser prototype opened — 21 November 2026:** the supplied feed is Atom 1.0. The sample has a feed title carrying the Alert query, a root feed ID and `rel="self"` URL that must be treated as private, and two entries with stable Atom entry IDs, HTML title/content, UTC published/updated timestamps, and Google `/url` links containing the actual destination in the `url=` parameter. Destinations in this sample are Shine and Foundit. A parser-only implementation and 9 focused tests are in [draft PR #101](https://github.com/AvinashBhalla/job-beeper/pull/101), branch `feat/google-alerts-rss-atom-parser`. The test fixture replaces private feed/user/tracking IDs; no live feed URL is stored. The local scratch test passed 9/9. PR CI run 44896734569 failed before runner execution (runner ID 0, no steps), so repository CI remains unverified. PR #101 is draft/unmerged and must not be deployed. Polling, ETag state, storage of feed secrets, result-fetch/SSRF controls and shared ingestion are not implemented.
+**Parser/polling foundation in draft PR #101 — 21 November 2026:** the supplied sample is Atom 1.0 with two entries (Shine and Foundit), stable entry IDs, HTML title/content, UTC timestamps and Google `/url?url=` destination wrappers. The private root feed ID and `rel="self"` URL are excluded from source and parser output. PR #101 now contains the Atom parser, one-feed conditional poller, sanitized rate-limit/error handling, idempotent SQLite feed-state/result tables, and V2 `init_db()` initialization. The database stores no feed URL. A live read-only fetch of the supplied feed returned HTTP 200, `text/xml; charset=UTF-8`, two entries, no ETag/Last-Modified, and `Cache-Control: no-cache, must-revalidate`. The feed's Atom `updated` was `2026-11-20T05:10:07Z`. The 25 focused tests and syntax compilation passed in the isolated workspace. GitHub Actions run 44898068226 failed before runner assignment (`runner_id=0`, zero steps); no CI steps ran. The V2 radar regression suite could not import because `bs4` is not installed in the clean VM workspace; dependencies were not installed on production. PR #101 remains draft/unmerged. No schedule, 98-feed configuration, result-page fetch/SSRF protection, job verification, shared ingestion or production deployment exists.
 
 ## 1. Product outcome
 
@@ -38,7 +38,7 @@ Add Google Alerts as a new shared discovery source. The owner maintains the 98 G
 
 Members never connect their own Gmail accounts and never see the owner's mailbox, alert emails, query list, or mailbox metadata. Each valid job is evaluated against every member's JobBeeper preferences. A member sees an opportunity only when it satisfies that member's saved filters and matching threshold.
 
-Google Alerts is a supplemental discovery channel, not a replacement for ATS APIs and not a way around destination-site access controls or rate limits.
+Google Alerts is a supplemental discovery channel, not a replacement for ATS APIs and not a way around destination-site access controls or rate limits. The current MVP preference is to consume each alert's Atom RSS feed with conservative polling; Gmail API/PubSub remains a deferred fallback, not the default implementation.
 
 ## 2. Proposed event-driven architecture
 
@@ -72,6 +72,22 @@ The label is the source boundary. Do not subscribe to a broad Gmail tab such as 
 - Handle Pub/Sub redelivery safely. Acknowledge quickly after durable queueing; do not parse pages or crawl destination sites inside the webhook request.
 
 Gmail documents push delivery as typically occurring within seconds, but warns that notifications can be delayed or dropped. The product should be event-driven, with reconciliation for correctness—not marketed as a hard real-time SLA.
+
+### 2.4 RSS polling path — current preferred MVP
+
+The owner supplies one private Google Alerts feed URL per rule through a secure runtime configuration file. JobBeeper does not authenticate to Gmail and members do not connect mailboxes.
+
+1. The worker reads an enabled feed's URL from the protected configuration source. Feed URLs are bearer-like secrets; do not commit them, store them in SQLite, print them, or include them in error messages.
+2. Each feed is identified in the database by an opaque stable ID and a non-sensitive label. The URL remains only in the runtime configuration.
+3. The worker requests the feed over HTTPS from the Google Alerts feed endpoint, with a strict host/path allowlist, bounded timeout, streamed response-size limit and redirects disabled by default.
+4. If Google redirects, follow only a small bounded number of redirects that remain Google Alerts feed URLs. Never forward the private feed URL to another host.
+5. Parse Atom 1.0, extract stable entry IDs and readable title/snippet/date fields, unwrap the Google `/url` destination, and normalize it through the existing canonical URL helper.
+6. Persist the feed checkpoint and new entries atomically. Repeated Atom IDs update `last_seen_at` but do not create duplicate queue rows or reset processing state.
+7. Process result rows asynchronously in a separate safe destination-fetch/verification stage. Never fetch arbitrary result URLs inside the polling request.
+
+**Prototype status:** `v2/google_alerts_rss.py` and `v2/google_alerts_rss_polling.py` implement parsing, single-feed polling, ETag/Last-Modified request support, HTTP 304, bounded reads, rate-limit Retry-After handling, sanitized errors and idempotent SQLite checkpoint/result storage. `v2/radar.py:init_db()` initializes the additive tables on a future application deploy. No feed scheduler, feed configuration loader, secret file, 98-feed import or result-fetch worker exists yet.
+
+**Live behavior observed on the supplied feed:** HTTP 200; `text/xml; charset=UTF-8`; `Cache-Control: no-cache, must-revalidate`; no ETag, Last-Modified or Content-Length; two entries. Therefore HTTP conditional validators are not currently available for this feed. Polling cadence must stay conservative until feed update cadence and entry retention are measured. Do not assume independent reports of a 20-entry feed window apply to every alert.
 
 ## 3. Message and job processing
 
@@ -267,7 +283,7 @@ Google documentation:
 
 ---
 
-**Execution status:** planning only. No source code, database schema, Gmail authorization, Google Cloud topic/subscription, production configuration or deployment has been changed as part of this plan.
+**Execution status:** partial implementation in draft PR #101. Parser, one-feed polling primitive, additive SQLite schema initializer and focused tests exist on a feature branch. The supplied feed was fetched once read-only. No scheduler, secure feed configuration, 98-feed import, result fetcher, job verification, shared ingestion, Gmail authorization, Google Cloud topic/subscription, production database migration or deployment has been enabled. See the production-origin correction for live pilot evidence and CI blocker.
 
 
 ## 11. Live VM preflight — 21 November 2026
