@@ -13,6 +13,7 @@ import os
 import re
 import sqlite3
 import stat
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -608,6 +609,8 @@ def poll_google_alerts_feed_batch(
     session: requests.Session | Any | None = None,
     timeout: tuple[int, int] = DEFAULT_TIMEOUT,
     max_bytes: int = DEFAULT_MAX_FEED_BYTES,
+    min_interval_seconds: float = 1.0,
+    sleeper=time.sleep,
     now: dt.datetime | None = None,
 ) -> FeedBatchSummary:
     """Poll a configured feed set sequentially, persisting every result safely.
@@ -617,11 +620,14 @@ def poll_google_alerts_feed_batch(
     IDs and sanitized status codes. The caller controls when the next batch
     starts and must keep the feed list in a protected runtime configuration.
     """
+    if not 0 <= float(min_interval_seconds) <= 30:
+        raise ValueError("min_interval_seconds must be between 0 and 30.")
     current_time = now or _utc_now()
     checked_at = _utc_iso(current_time)
     client = session or requests.Session()
     owns_session = session is None
     items: list[FeedBatchItem] = []
+    network_requests = 0
 
     try:
         for feed in feeds:
@@ -635,6 +641,10 @@ def poll_google_alerts_feed_batch(
                     FeedBatchItem(feed_id=feed.feed_id, status="skipped_backoff")
                 )
                 continue
+
+            if network_requests and min_interval_seconds:
+                sleeper(float(min_interval_seconds))
+            network_requests += 1
 
             try:
                 result = poll_google_alerts_feed(
