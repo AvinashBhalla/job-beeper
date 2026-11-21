@@ -39,7 +39,7 @@ Observed structure:
 - Each result URL is a Google `/url` redirect with its publisher destination embedded in the `url` query parameter.
 - The sample includes three job result items from two publisher domains. The email footer also contains non-result links such as alert settings, unsubscribe and RSS; these must not be treated as job results.
 
-The primary extraction path is the structured JSON block, validated by the exact Google Alerts sender, the subject prefix, Gmail's own Google DKIM/DMARC authentication results, and the embedded publisher name. If that block is missing/invalid, the parser falls back to Google result anchors in the HTML. If there is no usable HTML result, it falls back to wrapped links in the plain-text part. The plain-text format wraps long titles across lines, so this is a lower-confidence fallback; final job title/employer/location are always verified from the destination posting.
+The primary extraction path is the structured JSON block, validated by the exact Google Alerts sender, the subject prefix, one unambiguous Gmail `mx.google.com` DKIM/DMARC authentication result, and the embedded publisher name. If that block is missing/invalid, the parser falls back to Google result anchors in the HTML. If there is no usable HTML result, it falls back to wrapped links in the plain-text part. The plain-text format wraps long titles across lines, so this is a lower-confidence fallback; final job title/employer/location are always verified from the destination posting.
 
 **Parser implementation added in draft PR #102:**
 - `v2/google_alerts_email.py` accepts raw RFC 5322 bytes (Gmail API `format=raw` response after base64url decoding).
@@ -47,7 +47,7 @@ The primary extraction path is the structured JSON block, validated by the exact
 - Extracts all structured `LINK` widgets (up to the configured per-message limit), removes canonical duplicate destinations and returns only minimal result fields plus a SHA-256 message fingerprint.
 - Does not perform network requests or persist raw email, recipient, query, message ID, Google tracking tokens, alert settings links or RSS footer URL.
 
-Focused test module `v2/test_google_alerts_email.py` was added with ten synthetic tests covering multi-result structured HTML, canonical duplicate collapse, HTML and plain-text fallbacks, sender/subject rejection, invalid redirect handling raw-size limits and rejection (rather than silent truncation) when a message exceeds the per-email result cap. The test file has **not yet been executed** in an isolated project checkout; treat it as added but unverified until the no-cost local test run is completed.
+Focused test module `v2/test_google_alerts_email.py` was added with eleven synthetic tests covering multi-result structured HTML, canonical duplicate collapse, HTML and plain-text fallbacks, sender/subject rejection, invalid redirect handling raw-size limits and rejection (rather than silent truncation) when a message exceeds the per-email result cap. The test file has **not yet been executed** in an isolated project checkout; treat it as added but unverified until the no-cost local test run is completed.
 
 
 Use Gmail API read-only access with a durable, scheduled incremental history poll. Do not introduce Pub/Sub, a public webhook, Cloudflare, a custom domain, or Gmail watch registration in the first MVP.
