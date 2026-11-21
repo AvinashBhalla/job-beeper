@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 from datetime import datetime, timezone
 
 from v2.google_alerts_rss import parse_google_alerts_atom
@@ -12,6 +16,7 @@ from v2.google_alerts_rss_polling import (
     _validate_feed_url,
     get_feed_checkpoint,
     init_google_alerts_rss_schema,
+    load_google_alerts_feed_configs,
     poll_google_alerts_feed,
     record_feed_failure,
     record_feed_success,
@@ -51,6 +56,90 @@ class FakeSession:
 
     def close(self):
         self.closed = True
+
+
+class GoogleAlertsFeedConfigTests(unittest.TestCase):
+    def _write_config(self, directory, document, mode=0o600):
+        path = Path(directory) / "feeds.json"
+        path.write_text(json.dumps(document), encoding="utf-8")
+        os.chmod(path, mode)
+        return path
+
+    def test_loads_owner_only_feed_config_and_hides_url_from_repr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write_config(
+                directory,
+                {
+                    "feeds": [{
+                        "id": "software-engineer-react",
+                        "label": "Software Engineer India React TypeScript",
+                        "url": FEED_URL,
+                    }]
+                },
+            )
+            feeds = load_google_alerts_feed_configs(path)
+        self.assertEqual(len(feeds), 1)
+        self.assertEqual(feeds[0].feed_id, "software-engineer-react")
+        self.assertEqual(feeds[0].label, "Software Engineer India React TypeScript")
+        self.assertNotIn("12345678901234567890", repr(feeds[0]))
+
+    def test_rejects_group_or_world_readable_feed_config(self):
+        if os.name != "posix":
+            self.skipTest("POSIX file permission check")
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write_config(
+                directory, {"feeds": [{"id": "feed-1", "label": "test", "url": FEED_URL}]},
+                mode=0o644,
+            )
+            with self.assertRaises(GoogleAlertsFeedError) as caught:
+                load_google_alerts_feed_configs(path)
+        self.assertEqual(caught.exception.code, "feed_config_permissions_too_open")
+
+    def test_rejects_duplicate_feed_ids_without_echoing_feed_url(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write_config(
+                directory,
+                {"feeds": [
+                    {"id": "same", "label": "first", "url": FEED_URL},
+                    {"id": "same", "label": "second", "url": FEED_URL},
+                ]},
+            )
+            with self.assertRaises(GoogleAlertsFeedError) as caught:
+                load_google_alerts_feed_configs(path)
+        self.assertEqual(caught.exception.code, "feed_config_invalid_entry")
+        self.assertNotIn("12345678901234567890", str(caught.exception))
+
+    def test_rejects_external_feed_url_without_echoing_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            secret_url = "https://attacker.example/private-feed"
+            path = self._write_config(
+                directory,
+                {"feeds": [{"id": "bad", "label": "bad", "url": secret_url}]},
+            )
+            with self.assertRaises(GoogleAlertsFeedError) as caught:
+                load_google_alerts_feed_configs(path)
+        self.assertEqual(caught.exception.code, "invalid_feed_url")
+        self.assertNotIn(secret_url, str(caught.exception))
+
+    def test_rejects_config_path_inside_repository(self):
+        repo_config = Path(__file__).resolve().parent / "test-rejected-feed-config.json"
+        repo_config.write_text('{"feeds":[]}', encoding="utf-8")
+        os.chmod(repo_config, 0o600)
+        try:
+            with self.assertRaises(GoogleAlertsFeedError) as caught:
+                load_google_alerts_feed_configs(repo_config)
+            self.assertEqual(
+                caught.exception.code, "feed_config_must_be_outside_repository"
+            )
+        finally:
+            repo_config.unlink(missing_ok=True)
+
+    def test_rejects_missing_config_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "does-not-exist.json"
+            with self.assertRaises(GoogleAlertsFeedError) as caught:
+                load_google_alerts_feed_configs(missing)
+        self.assertEqual(caught.exception.code, "feed_config_not_found")
 
 
 class GoogleAlertsPollingTests(unittest.TestCase):
