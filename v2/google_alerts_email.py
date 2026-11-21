@@ -74,7 +74,8 @@ def _sender_is_google_alerts(value: str | None) -> bool:
         for _, address in getaddresses([value or ""])
         if address.strip()
     ]
-    return GOOGLE_ALERTS_SENDER in addresses
+    # A trusted address mixed with another From address is ambiguous.
+    return len(addresses) == 1 and addresses[0] == GOOGLE_ALERTS_SENDER
 
 
 def _is_alert_subject(value: str | None) -> bool:
@@ -92,8 +93,14 @@ def _google_authentication_passes(message) -> bool:
     result = re.sub(r"\s+", " ", str(values[0])).casefold()
     return bool(
         result.startswith("mx.google.com;")
-        and re.search(r"\bdkim=pass\b.*?header\.i=@google\.com", result)
-        and re.search(r"\bdmarc=pass\b.*?header\.from=google\.com", result)
+        and re.search(
+            r"\bdkim=pass\b.*?header\.i=@google\.com(?=$|[\\s;])",
+            result,
+        )
+        and re.search(
+            r"\bdmarc=pass\b.*?header\.from=google\.com(?=$|[\\s;])",
+            result,
+        )
     )
 
 
@@ -320,9 +327,11 @@ def parse_google_alert_email(
     except Exception:
         raise GoogleAlertEmailError("invalid_mime_message") from None
 
-    if not _sender_is_google_alerts(message.get("From")):
+    from_headers = message.get_all("From", [])
+    if len(from_headers) != 1 or not _sender_is_google_alerts(from_headers[0]):
         raise GoogleAlertEmailError("unrecognized_sender")
-    if not _is_alert_subject(message.get("Subject")):
+    subject_headers = message.get_all("Subject", [])
+    if len(subject_headers) != 1 or not _is_alert_subject(subject_headers[0]):
         raise GoogleAlertEmailError("unrecognized_subject")
     if not _google_authentication_passes(message):
         raise GoogleAlertEmailError("sender_authentication_failed")
