@@ -94,11 +94,27 @@ A 1–2 day proof-of-flow can demonstrate filtered Gmail forwarding, Cloudflare 
 
 ## 8. Current state and immediate next dependency
 
-- A dedicated code branch has been created: feat/google-alerts-email-routing.
-- No Cloudflare resources, DNS records, Gmail filters, forwarding rules, production settings or services have been changed.
+### Implemented on the isolated feature branch
+
+- Branch: feat/google-alerts-email-routing.
+- v2/google_alert_ingest.py: HMAC-SHA256 verification, strict event validation, public-URL syntax checks, SQLite inbox/result URL tables, global URL fingerprints and per-message URL observations.
+- v2/radar.py: initializes the Google Alert intake schema and exposes POST /api/webhooks/google-alerts. The endpoint enforces HTTPS deployment expectation, JSON content type, a 96 KiB body bound, a five-minute timestamp window, constant-time HMAC validation, and durable persistence before success.
+- v2/test_google_alert_ingest.py: 11 unittest cases covering HMAC, stale signatures, duplicate delivery, event-ID conflict, local/non-HTTP URL rejection, URL deduplication, URL count bounds, boolean schema versions, default ports and IPv6 literals.
+- cloudflare/google-alerts-ingress: TypeScript Email Worker using postal-mime; sender/recipient allowlist; candidate anchor extraction; compact, deterministic queue batches; HMAC-signed queue consumer; Wrangler and setup documentation.
+- The existing v2 upsert_jobs() path is confirmed to refresh per-user evaluations for affected job IDs. The planned posting processor should hand verified jobs to this path rather than duplicate member-matching logic.
+
+### Not yet completed / not yet proven
+
+- Unit tests and TypeScript typecheck have not been executed. No safe non-production runner is currently connected; the connected machine is the live production VM, and it must not be used as a development/test runner.
+- The Worker parser has not yet been validated against a real, redacted Google Alert message. Gmail filter-forwarding may alter MIME wrapping or sender headers; confirm this before enabling the filter.
+- Destination URL fetching, redirect-by-redirect SSRF protection, job-page extraction/verification, URL retry leasing, Admin telemetry and a replayable fixture suite remain to be implemented.
+- Cloudflare account/zone access to jobbeeper.com has not been confirmed. No Cloudflare resources, DNS records, queues, email routes, Gmail filters, forwarding rules, production settings or services have been changed.
+- The webhook public host is not yet selected because the 20 November acceptance audit could not prove which API/database backs the member site. Do not put a guessed host in Wrangler configuration.
 - No Gmail OAuth or Google Cloud Pub/Sub resources are required by the preferred path.
-- Implementation can proceed on the backend and Worker code after preflight, but Cloudflare provisioning and Gmail filter activation must wait for owner confirmation and access.
-- The owner must provide one redacted representative Google Alert email or its headers/subject/body markup to validate parsing. Remove personal email addresses, tokens, tracking IDs and any private content before sharing.
+
+### Immediate preflight dependency
+
+The owner must confirm Cloudflare dashboard access to the jobbeeper.com zone and provide one redacted representative Google Alert email (or its complete headers plus the rendered HTML/text body). Remove personal email addresses, tokens, tracking IDs and private content before sharing. Do not share authentication headers or mailbox credentials.
 
 ## 9. Documentation and reference sources
 
