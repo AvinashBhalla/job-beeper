@@ -237,8 +237,8 @@ def _extract_plain_text(plain: str) -> tuple[GoogleAlertEmailResult, ...]:
     extracted: list[GoogleAlertEmailResult] = []
     # Drop the Google-generated result-count/query banner so it is never
     # mistaken for the first job title.
-    plain = re.sub(r"(?m)^={3}[^\\r\\n]*?={3}\\s*", "", plain, count=1)
-    link_pattern = re.compile(r"<(https://[^<>\\s]+)>", flags=re.IGNORECASE)
+    plain = re.sub(r"(?m)^={3}[^\r\n]*?={3}\s*", "", plain, count=1)
+    link_pattern = re.compile(r"<(https://[^<>\s]+)>", flags=re.IGNORECASE)
     previous_end = 0
 
     for match in link_pattern.finditer(plain):
