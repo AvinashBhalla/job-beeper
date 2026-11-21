@@ -1,16 +1,12 @@
-# PRIORITY CHANGE — 21 November 2026
+# QUARANTINED FEATURE BRANCH — 21 November 2026
 
-**P0 next discovery-source increment:** [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md), [Cloudflare implementation update](GOOGLE_ALERTS_CLOUDFLARE_IMPLEMENTATION_UPDATE_2026-11-21.md), [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).
+**Do not merge, deploy, cherry-pick, or continue implementing this branch.** It was created using the unsupported assumption that the owner controls `jobbeeper.com` and can configure Cloudflare Email Routing there. Repository production records identify the real app origin as `https://130.210.27.197/` on VM `job-radar`, with Nginx proxying to FastAPI at `127.0.0.1:8000`. The member-facing `jobbeeper.com` browser surface is a separate unverified system, not established owner infrastructure.
 
-Owner-confirmed product direction: 98 Google Alerts arrive in one owner-controlled Gmail mailbox; members do not connect Gmail. Preferred event path: Gmail filter (label + forward only matching Alert mail) → Cloudflare Email Routing on a dedicated subdomain → Cloudflare Email Worker → compact event in Cloudflare Queues → timestamped HMAC-signed JobBeeper webhook → durable SQLite inbox/result queue → safe URL extraction and verification → shared jobs/canonical opportunities → independent member-preference evaluation.
+This branch contains Cloudflare Email Worker/Queue code and a backend HMAC/SQLite intake prototype. It is unmerged, has no PR, and has made **no production or external account changes**. The entire branch is quarantined pending independent design review. The prototype code is not production-ready.
 
-**Do not implement the older Gmail API users.watch + Google Pub/Sub design for the MVP.** It requires restricted gmail.readonly access and broad mailbox permissions. The preferred forwarding design does not require Gmail OAuth or Google Cloud Pub/Sub. The Cloudflare approach is conditional on confirming access to the Cloudflare zone for jobbeeper.com and validating a representative redacted Alert email. Do not alter apex MX records or existing mail routing.
+**Current source of truth:** [production-origin correction on v2-live-radar](https://github.com/AvinashBhalla/job-beeper/blob/v2-live-radar/docs/GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md), [production acceptance report](https://github.com/AvinashBhalla/job-beeper/blob/v2-live-radar/docs/PRODUCTION_ACCEPTANCE_2026-11-20.md), and [updated next-agent handover](https://github.com/AvinashBhalla/job-beeper/blob/v2-live-radar/docs/NEXT_AGENT_START_HERE.md).
 
-**Estimate:** 5–7 focused engineering working days after Cloudflare zone access and a sample Alert email are available. This excludes account-access delays or unplanned DNS remediation. A 1–2 day proof-of-flow is not production readiness.
-
-**Isolated branch:** feat/google-alerts-email-routing. Initial implementation is now present: v2/google_alert_ingest.py adds HMAC validation and a durable idempotent SQLite inbox/result-url store; v2/radar.py exposes POST /api/webhooks/google-alerts and initializes the schema; v2/test_google_alert_ingest.py contains 12 focused unit tests; cloudflare/google-alerts-ingress contains the MIME Email Worker and Queue producer/consumer configuration. Tests have not yet been executed because no safe non-production runner is connected. Do not run tests on the production VM. No Cloudflare resources, DNS records, Gmail filters, forwarding rules, production settings or services have been changed.
-
-Keep the 20 November production-acceptance gates active: member browser/API/database mapping is unresolved; per-user notification delivery is unverified; Workday/LinkedIn cooldowns must be preserved; Naukri relay remains intentionally paused. V2 upsert_jobs() already invokes per-user evaluations for affected job IDs; reuse it rather than duplicating member-matching logic.
+Do not use Cloudflare or `jobbeeper.com`. Candidate Gmail/Pub/Sub webhook origin is `https://130.210.27.197/api/webhooks/google-pubsub`, but validate IP SAN certificate and Pub/Sub IP-literal push support before implementation. Also confirm Gmail restricted-scope policy and a representative sanitized Alert email. All previous Cloudflare delivery estimates are withdrawn.
 
 ---
 
