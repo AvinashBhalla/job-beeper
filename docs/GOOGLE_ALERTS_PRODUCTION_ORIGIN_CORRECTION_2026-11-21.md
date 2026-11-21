@@ -84,7 +84,39 @@ The previous estimate of 5–7 days was based on the invalid Cloudflare route an
 
 **Current state:** production preflight and a Let’s Encrypt staging renewal simulation completed; no production runtime/configuration/database changes. The staging test left the live certificate serial unchanged. Documentation is updated with the evidence below. The Cloudflare branch remains quarantined as superseded and must not be merged/deployed.
 
-## 6. Source documents
+
+
+## 8. RSS delivery alternative — evaluate before Gmail API
+
+A lower-permission alternative is to consume Google Alerts' own Atom feed rather than reading Gmail:
+
+- Current independent 2026 guides report that Google Alerts still exposes a `Deliver to → RSS feed` option when editing/creating an alert while signed in. The feed is an Atom XML document with a URL resembling `https://www.google.com/alerts/feeds/<id>/<id>`.
+- Google's current official Google Alerts Help page documents email notifications and the alert settings but does **not** document the RSS option or guarantee feed availability/retention. Treat RSS as an observed UI feature, not a supported API contract.
+- Recent independent observations found entries with HTML title/snippet fields and Google redirect-wrapper links where the publisher URL is embedded in the `url=` query parameter. Two independent reports observed feeds containing about 20 recent entries; this is an observation, not a guaranteed universal cap or retention contract.
+- The feed URL may be fetchable without Google login. Treat it as a bearer secret: do not paste the real URL into tickets, logs, chat, source control or public dashboards.
+- RSS delivery appears to be mutually exclusive with email delivery for an individual alert. If the existing 98 alerts are changed to RSS, email delivery may stop. Preserving email could require a separate near-equivalent duplicate alert; duplicate-query constraints and whether a duplicate produces equivalent coverage are not established.
+
+### Safe proof of concept
+
+1. Do not edit or switch any of the existing 98 production alert rules.
+2. Create a separate low-risk test alert in the owner's account with a query likely to yield a result. Set `Deliver to = RSS feed` and `How many = All results` if that option exists. Leave current email rules untouched.
+3. Copy/export one representative Atom XML item into a local file, redacting the private feed URL and feed IDs. Preserve the Atom element structure, entry ID, Google link host/path/query keys, embedded `url=` destination, title markup and snippet markup. Remove/replace owner identifiers and tracking token values.
+4. Record response headers (status, content-type, ETag, Last-Modified, Cache-Control, Date) with the feed URL itself removed. Do not share the actual feed URL.
+5. Check whether conditional GET works, whether the feed retains entries, and whether repeated polling misses items. Use stable Atom entry IDs for deduplication.
+6. Evaluate a modest conditional polling interval only after observing the update cadence and item turnover. A feed that exposes only a rolling set of recent entries can lose results when polling is too infrequent. With 98 feeds, request volume and Google's undocumented rate limits must be considered; do not assume a one-minute polling loop is acceptable.
+
+RSS would replace the Gmail/Pub/Sub ingestion leg with polling, not create an inbound webhook. It may avoid the Gmail restricted-scope question but introduces feed-secret handling, polling latency, retention/capacity and no official availability guarantee. Do not migrate the existing 98 alerts until the pilot proves that the coverage and delivery trade-offs are acceptable.
+
+Sources reviewed 21 November 2026:
+- Google's [Create an alert Help page](https://support.google.com/websearch/answer/4815696/create-an-alert?hl=en) (official; describes email, does not document RSS).
+- [Feeder's Google Alerts instructions](https://feeder.co/help/rss/add-google-alerts-to-feeder/) (third-party integration guidance; says to disable digest and set `How often` to `As-it-happens` to enable RSS).
+- [Feedmarkdown's October 8, 2026 test](https://feedmarkdown.com/blog/google-alerts-rss-feed/) (third-party empirical observation; Atom structure, URL parsing, sample entry window and redirect wrapper).
+- [Hushread's October 23, 2026 test](https://hushread.com/blog/google-alerts-rss-feed) (third-party empirical observation; confirms destination selection, Atom feed and rolling result examples).
+- Google's [Workspace user-data policy](https://developers.google.com/workspace/workspace-api-user-data-developer-policy) (Gmail scopes only for approved use cases).
+
+**Recommended order:** first test RSS with one separate test alert. Do not start Gmail restricted-scope work until the use case is accepted under Google's policy. Keep authenticated Pub/Sub as a fallback only if Google confirms the policy route and the IP-literal push endpoint is actually accepted.
+
+## 9. Source documents
 
 - `docs/NEXT_AGENT_START_HERE.md`
 - `docs/JOB_RADAR_KNOWLEDGE_TRANSFER.md`
