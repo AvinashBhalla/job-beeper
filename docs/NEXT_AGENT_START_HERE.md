@@ -1,3 +1,11 @@
+## Owner consent and Gmail data boundary — 21 November 2026
+
+The owner expressly consents to a separate owner-only Gmail connection restricted operationally to Google Alerts. The owner will create a Gmail label named `JobBeeper/GoogleAlerts` and a filter applying it to matching historical conversations and future Google Alerts. The app must use only `labelIds=[label_id]` on `users.messages.list` and `labelId=label_id` on `users.history.list`, excluding Spam/Trash, and must not read unlabelled bodies. Keep Gmail API scope to `gmail.readonly` only; do not request `gmail.labels` or modify mailbox labels/filters in code.
+
+Owner consent is not Google's approval for the multi-member product use case. The Google Restricted-scope policy gate remains open; no live OAuth, token storage or production polling until the use case is cleared through Google.
+
+---
+
 ## Owner decision — full initial Gmail backfill (21 November 2026)
 
 The intended Gmail API retrieval sequence is explicit: fetch only `From`, `Subject` and `Authentication-Results` with `format=metadata`; fetch `format=raw` only for authenticated Google Alerts candidates. Use Gmail `internalDate` for inbox-arrival ordering and recovery windows. **Owner decision (21 November 2026): initial sync must backfill all available Google Alerts emails**, with no date cutoff or recent-window limit. Search matching mail across Inbox and archived/All Mail locations; Spam/Trash are excluded by default. Capture the `users.getProfile` history baseline before the full paginated `users.messages.list` scan, durably stage every discovered message ID/page, then catch up all `history.list` pages from that baseline before committing the incremental cursor. Resume safely after interruption and keep message/result dedupe idempotent. See `docs/GOOGLE_ALERTS_GMAIL_INBOX_INTEGRATION_2026-11-21.md` Section 2.3.
