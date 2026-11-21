@@ -1,5 +1,18 @@
 # Updated implementation gate — 21 November 2026
 
+## Owner clarification — multi-feed Atom contract (21 November 2026)
+
+The owner confirmed that the remaining Google Alerts RSS feeds follow the same Atom 1.0 output format as the supplied sample; only the search string configured in each alert differs. Treat every feed as an instance of the same integration. There is no per-alert parser, result schema, scraper or ingestion path.
+
+The implementation contract is one protected configuration record per alert: `id`, non-sensitive `label`, and private `url`. The search query remains configured in Google Alerts and is not duplicated into the runtime config. The same parser, sequential batch poller, per-feed checkpoint store, safe destination fetcher, JobPosting verification and V2 shared `normalize_job()`/`upsert_jobs()` path apply to all feeds. Duplicate canonical postings across different alert queries should be fetched once while preserving each feed observation as provenance.
+
+See [Google Alerts RSS multi-feed operating guide](GOOGLE_ALERTS_RSS_MULTI_FEED_OPERATING_GUIDE_2026-11-21.md) for the exact config contract, security requirements, no-cost validation sequence and release gates.
+
+**Current execution decision:** GitHub Actions quota is exhausted by owner choice. Do not trigger or pay for Actions runs. The reported isolated PR validation remains 73/73 focused RSS tests passed plus Python compilation; the full V2 regression suite remains unverified because the earlier clean workspace lacked `bs4`. Complete that suite locally in a fresh non-production virtual environment using the declared development requirements. No production VM, live database, configuration, timer or service is to be changed for this step.
+
+**Outstanding:** install the owner-only feed file through a secure file-transfer path when the multi-feed pilot is ready; measure actual retention and batch duration before choosing cadence; keep the recurring scheduler and production rollout disabled until the full validation/release gates pass. No owner input is required immediately.
+
+
 This is the initial architecture proposal. Before implementation, read [Google Alerts production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md). The only documented project production origin is `https://130.210.27.197/` on the Oracle VM `job-radar`. Do not assume the owner controls `jobbeeper.com`; do not configure Cloudflare Email Routing or custom-domain workers there.
 
 Live VM preflight on 21 November confirmed that `130.210.27.197` presents a trusted Let's Encrypt certificate with the IP in its IP SAN, HTTPS verification succeeds, and `/health` returns HTTP 200. Certbot 5.10.0 is configured for the shortlived profile with a twice-daily Snap timer and an Nginx reload deploy hook; a forced staging renewal simulation passed and did not change the live certificate. Google Pub/Sub documentation requires a publicly accessible HTTPS endpoint with a CA-signed certificate but does not explicitly settle IPv4-literal URL acceptance. Actual Pub/Sub API acceptance/delivery remains untested because the VM has no `gcloud` CLI/project and the webhook route is not implemented. Gmail `gmail.readonly` remains a restricted scope with a policy/verification gate, and a sanitized Alert fixture is still required. The previously created Cloudflare feature branch is quarantined, unmerged, and must not be deployed or cherry-picked.
