@@ -1,3 +1,5 @@
+> **QUARANTINED — DO NOT DEPLOY OR MERGE.** This worker scaffold was created after an incorrect assumption that the owner controls `jobbeeper.com`. The project's documented production origin is `https://130.210.27.197/` on VM `job-radar`; the repository does not establish owner control of `jobbeeper.com`. No Cloudflare zone, DNS, email routing or Gmail forwarding setup has been authorized. This branch is superseded; see [production-origin correction](../../docs/GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) on `v2-live-radar`. Do not deploy, merge, cherry-pick or create resources from this scaffold.
+
 # JobBeeper Google Alerts Email Worker
 
 This Worker is the inbound email adapter for the owner-controlled Google Alerts mailbox. It does not connect to Gmail APIs. Gmail selectively forwards only Alert messages into a dedicated Cloudflare Email Routing address. The Worker parses MIME, validates the sender/recipient, extracts candidate links and writes compact events to Cloudflare Queues. The queue consumer signs each event and posts it to JobBeeper.
