@@ -8,7 +8,7 @@ Owner-confirmed product direction: 98 Google Alerts arrive in one owner-controll
 
 **Estimate:** 5–7 focused engineering working days after Cloudflare zone access and a sample Alert email are available. This excludes account-access delays or unplanned DNS remediation. A 1–2 day proof-of-flow is not production readiness.
 
-**Isolated branch created:** feat/google-alerts-email-routing. No Cloudflare resources, DNS records, Gmail filters, forwarding rules, production settings or services have been changed.
+**Isolated branch:** feat/google-alerts-email-routing. Initial implementation is now present: v2/google_alert_ingest.py adds HMAC validation and a durable idempotent SQLite inbox/result-url store; v2/radar.py exposes POST /api/webhooks/google-alerts and initializes the schema; v2/test_google_alert_ingest.py contains 11 focused unit tests; cloudflare/google-alerts-ingress contains the MIME Email Worker and Queue producer/consumer configuration. Tests have not yet been executed because no safe non-production runner is connected. Do not run tests on the production VM. No Cloudflare resources, DNS records, Gmail filters, forwarding rules, production settings or services have been changed.
 
 Keep the 20 November production-acceptance gates active: member browser/API/database mapping is unresolved; per-user notification delivery is unverified; Workday/LinkedIn cooldowns must be preserved; Naukri relay remains intentionally paused. V2 upsert_jobs() already invokes per-user evaluations for affected job IDs; reuse it rather than duplicating member-matching logic.
 
