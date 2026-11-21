@@ -12,12 +12,14 @@ from v2.google_alerts_rss import parse_google_alerts_atom
 from v2.google_alerts_rss_polling import (
     FeedCheckpoint,
     FeedPollResult,
+    GoogleAlertsFeedConfig,
     GoogleAlertsFeedError,
     _validate_feed_url,
     get_feed_checkpoint,
     init_google_alerts_rss_schema,
     load_google_alerts_feed_configs,
     poll_google_alerts_feed,
+    poll_google_alerts_feed_batch,
     record_feed_failure,
     record_feed_success,
 )
@@ -273,6 +275,129 @@ class GoogleAlertsPollingTests(unittest.TestCase):
         with self.assertRaises(GoogleAlertsFeedError) as caught:
             poll_google_alerts_feed(FEED_URL, session=FakeSession(response), now=FIXED_NOW)
         self.assertEqual(caught.exception.code, "invalid_atom_feed")
+
+
+class GoogleAlertsFeedBatchTests(unittest.TestCase):
+    def setUp(self):
+        self.conn = sqlite3.connect(":memory:")
+        init_google_alerts_rss_schema(self.conn)
+
+    def tearDown(self):
+        self.conn.close()
+
+    def _feed(self, feed_id):
+        return GoogleAlertsFeedConfig(
+            feed_id=feed_id,
+            label=f"Label {feed_id}",
+            url=FEED_URL,
+        )
+
+    def test_batch_continues_after_rate_limit_and_records_other_feed(self):
+        limited = FakeResponse(429, {"Retry-After": "90"})
+        success = FakeResponse(
+            200,
+            {"Content-Type": "application/atom+xml"},
+            SAMPLE_FEED.encode("utf-8"),
+        )
+        session = FakeSession(limited, success)
+        summary = poll_google_alerts_feed_batch(
+            self.conn,
+            [self._feed("feed-limited"), self._feed("feed-success")],
+            session=session,
+            now=FIXED_NOW,
+        )
+
+        self.assertEqual(summary.checked, 2)
+        self.assertEqual(summary.failed, 1)
+        self.assertEqual(summary.modified, 1)
+        self.assertEqual(summary.new_entries, 2)
+        self.assertEqual(len(session.calls), 2)
+        self.assertEqual(
+            [item.status for item in summary.items], ["failed", "modified"]
+        )
+        self.assertEqual(summary.items[0].error_code, "rate_limited")
+        self.assertEqual(
+            self.conn.execute(
+                "SELECT retry_after_at FROM google_alert_rss_feed_state "
+                "WHERE feed_id='feed-limited'"
+            ).fetchone()[0],
+            "2026-11-21T10:01:30+00:00",
+        )
+        self.assertEqual(
+            self.conn.execute(
+                "SELECT COUNT(*) FROM google_alert_rss_entries "
+                "WHERE feed_id='feed-success'"
+            ).fetchone()[0],
+            2,
+        )
+
+    def test_batch_skips_feed_during_persisted_retry_after_window(self):
+        record_feed_failure(
+            self.conn,
+            feed_id="feed-wait",
+            feed_label="wait",
+            error=GoogleAlertsFeedError(
+                "rate_limited", http_status=429, retry_after_seconds=90
+            ),
+            checked_at="2026-11-21T10:00:00+00:00",
+        )
+        session = FakeSession()
+        summary = poll_google_alerts_feed_batch(
+            self.conn,
+            [self._feed("feed-wait")],
+            session=session,
+            now=datetime(2026, 11, 21, 10, 0, 30, tzinfo=timezone.utc),
+        )
+        self.assertEqual(summary.checked, 0)
+        self.assertEqual(summary.skipped_backoff, 1)
+        self.assertEqual(summary.failed, 0)
+        self.assertEqual(summary.items[0].status, "skipped_backoff")
+        self.assertEqual(session.calls, [])
+
+    def test_batch_records_not_modified_without_duplicate_entries(self):
+        record_feed_success(
+            self.conn,
+            feed_id="feed-existing",
+            feed_label="existing",
+            result=FeedPollResult(
+                status="modified",
+                http_status=200,
+                fetched_at="2026-11-21T09:00:00+00:00",
+                etag='"existing"',
+                last_modified=None,
+                feed=parse_google_alerts_atom(SAMPLE_FEED),
+            ),
+        )
+        response = FakeResponse(304, {"ETag": '"existing"'})
+        session = FakeSession(response)
+        summary = poll_google_alerts_feed_batch(
+            self.conn,
+            [self._feed("feed-existing")],
+            session=session,
+            now=FIXED_NOW,
+        )
+        self.assertEqual(summary.not_modified, 1)
+        self.assertEqual(summary.new_entries, 0)
+        self.assertEqual(summary.failed, 0)
+        self.assertEqual(summary.items[0].status, "not_modified")
+        self.assertEqual(
+            self.conn.execute(
+                "SELECT COUNT(*) FROM google_alert_rss_entries "
+                "WHERE feed_id='feed-existing'"
+            ).fetchone()[0],
+            2,
+        )
+        self.assertEqual(session.calls[0][1]["headers"]["If-None-Match"], '"existing"')
+
+    def test_batch_closes_owned_http_session(self):
+        # A caller-provided session is intentionally not closed by the batch.
+        response = FakeResponse(304)
+        session = FakeSession(response)
+        poll_google_alerts_feed_batch(
+            self.conn, [self._feed("feed-one")], session=session, now=FIXED_NOW
+        )
+        self.assertFalse(session.closed)
+        self.assertTrue(response.closed)
 
 
 class GoogleAlertsFeedStoreTests(unittest.TestCase):
