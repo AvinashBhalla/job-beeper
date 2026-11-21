@@ -1,3 +1,9 @@
+# SUPERSEDED — refer to production-origin correction
+
+This original Gmail API + Cloud Pub/Sub plan was documented against the actual product request, but its production endpoint had not yet been validated. The later Cloudflare implementation branch was based on an unsupported custom-domain assumption and is quarantined. Use [the production-origin correction](https://github.com/AvinashBhalla/job-beeper/blob/v2-live-radar/docs/GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) on `v2-live-radar` as current source of truth. The correct production origin is `https://130.210.27.197/`; validate IP certificate SAN, Pub/Sub IP-literal push support, Gmail OAuth policy and a real redacted Alert email before implementation or estimate.
+
+---
+
 # Architecture update — 21 November 2026
 
 **Use the Cloudflare Email Routing design in [the implementation update](GOOGLE_ALERTS_CLOUDFLARE_IMPLEMENTATION_UPDATE_2026-11-21.md) as the current source of truth.** The Gmail API gmail.readonly + users.watch + Google Pub/Sub architecture described later in this original planning document is superseded for the MVP. Do not implement that path or provision Pub/Sub. Preferred path: Gmail filter forwarding only matching Alert messages → Cloudflare Email Routing on a dedicated subdomain → Email Worker MIME parsing → Cloudflare Queue → HMAC-signed JobBeeper webhook → durable SQLite inbox → safe public URL extraction/verification → shared canonical ingestion and member-specific preference evaluation.
