@@ -162,26 +162,55 @@ The connected VM has no `gcloud` CLI or configured GCP project. No Pub/Sub topic
 
 1. Verify actual Pub/Sub endpoint URL acceptance and authenticated push delivery in the owner's Google Cloud project after the webhook route is built in an isolated development workspace.
 2. Confirm Google's current Gmail restricted-scope permitted-use-case and OAuth verification/security-assessment path for this owner-only mailbox use.
-3. Obtain one sanitized representative Google Alert email to validate the parser and redirect-link handling.
+3. **Completed for one feed:** owner supplied an Atom sample and the live feed returned HTTP 200 with two parsed entries. Retention/entry turnover and update cadence remain unmeasured.
 4. Keep the production checkout out of development; use a fresh isolated workspace and database for implementation/testing.
 5. No production webhook, OAuth consent, Gmail watch, Pub/Sub resource, DB migration, or application deployment has been made.
 
 
 
-## 10. Sample-based parser prototype — 21 November 2026
+## 10. Sample-based parser and live RSS pilot — 21 November 2026
 
-The owner supplied one Google Alerts Atom sample titled `Google Alert - "Software Engineer" India React TypeScript`. It contains two entries (Shine and Foundit), each with:
+The owner supplied a Google Alerts Atom sample titled `Google Alert - "Software Engineer" India React TypeScript`. It contains two entries (Shine and Foundit), each with:
 - stable Atom `entry/id`;
 - HTML `title` and `content`;
 - UTC `published` and `updated` timestamps;
-- an Atom `link` whose href is a Google `/url` wrapper and contains the external job URL in its `url=` query parameter.
+- a Google `/url` link whose `url=` query parameter contains the destination job URL.
 
-The root feed `id` contains a Google Reader user identifier and Alert identifier; the root `link rel="self"` is the private feed URL. Both are credentials/identifiers and must not be persisted in fixtures, logs, source code or normal parser output. The parser test fixture replaces these with redacted values and retains only public structural examples.
+The root feed ID includes account/Alert identifiers and the root `rel="self"` href is the private feed URL. Neither is stored in the test fixture or parser output. The feed URL is not committed to GitHub and is not part of the SQLite schema.
 
-A parser-only implementation is available on branch `feat/google-alerts-rss-atom-parser`, draft [PR #101](https://github.com/AvinashBhalla/job-beeper/pull/101). It parses Atom 1.0, extracts unique entry IDs and readable title/snippet text, unwraps the Google `url=` target, performs static HTTPS/public-host checks and calls the existing canonical URL helper. It deliberately performs no network requests and excludes the feed root ID/self link from output.
+### Implementation in draft PR #101
 
-**Validation status:** 9 focused unit tests passed in an isolated scratch workspace against the parser logic. The PR's V2 CI workflow failed before a runner was assigned (`runner_id=0`, no steps); no CI code checks actually ran. Treat repository CI as unverified. PR #101 remains draft and unmerged.
+Branch: `feat/google-alerts-rss-atom-parser`.
 
-**Not implemented:** feed fetching/polling, ETag/Last-Modified state, secure storage of 98 feed URLs, interval/retention pilot, result URL fetching and DNS/re-direct-hop SSRF protection, job extraction/verification, shared database ingestion, member evaluation or production rollout.
+- `v2/google_alerts_rss.py`: Atom parser, HTML-to-text conversion (ignores script/style), Google redirect unwrapping, size limit, UTF-8 requirement, DTD/entity rejection, and static HTTPS/public-host checks. Uses existing `v2.dedupe.canonicalize_url`.
+- `v2/google_alerts_rss_polling.py`: one-feed conditional poller, bounded streamed reads, same-origin Google-only redirects, HTTP 304 handling, sanitized 429/503 Retry-After handling, and idempotent SQLite state/entry persistence.
+- `v2/radar.py`: V2 `init_db()` now calls the additive schema initializer so feed-state and result-queue tables will be created on a future application deployment.
+- `v2/test_google_alerts_rss.py` and `v2/test_google_alerts_rss_polling.py`: 25 focused tests.
+- `.github/workflows/v2-ci.yml`: adds the new files to the syntax-check list.
 
-The supplied live RSS URL is not copied into GitHub. Treat it as a private bearer-like feed URL; do not place it in tickets, logs, chat, source control or public dashboards.
+The new schema stores opaque feed IDs, labels, ETag/Last-Modified values, timestamps, error codes and parsed result metadata. **It does not store feed URLs, root feed IDs or self links.** It does store resolved external job destination URLs and parsed titles/snippets as work-queue data.
+
+### Read-only live test of the supplied feed
+
+The feed was fetched once through the poller in the isolated feature workspace. The result was:
+- HTTP 200.
+- Content-Type: `text/xml; charset=UTF-8` (accepted by the poller).
+- Cache-Control: `no-cache, must-revalidate`.
+- Expires: `Fri, 01 Jan 1990 00:00:00 GMT`.
+- No ETag, Last-Modified or Content-Length response header.
+- Two entries parsed, with destination hosts `www.shine.com` and `www.foundit.in`.
+- Atom feed `updated`: `2026-11-20T05:10:07Z`.
+
+**Implication:** conditional requests cannot currently save bandwidth for this feed because Google returned neither ETag nor Last-Modified. Each poll is likely to download the full (small) feed response. Keep the initial cadence conservative; do not enable frequent polling across all 98 feeds until request volume, update cadence and entry retention have been measured. This one response contained two entries; it does not establish a universal retention limit.
+
+### Validation and remaining limitations
+
+- Python 3.10.12 in a fresh isolated clone: `py_compile` passed for `radar.py`, parser, poller and both test files.
+- Focused tests: **25/25 passed**.
+- The full `v2.test_radar` suite could not be imported in this clean VM workspace because `bs4` is not installed there. I did not install project dependencies on the production VM.
+- Latest GitHub Actions run ended before runner assignment (`runner_id=0`, zero steps). No CI checks executed; repository CI remains unverified.
+- PR #101 remains draft and unmerged.
+- No feed scheduler, poll interval, secure 98-feed config file, result-page network fetcher, DNS/redirect-hop SSRF protection, job extraction/verification, shared job ingestion, preference evaluation, or production deployment is included.
+- The additive schema initializer exists in code but has **not** been applied to the production database.
+
+The supplied RSS URL remains a private bearer-like link. Do not place it in tickets, logs, source control, public dashboards or copied diagnostics.
