@@ -176,8 +176,8 @@ def _dedupe_results(
     ordered: dict[str, GoogleAlertEmailResult] = {}
     for result in results:
         ordered.setdefault(result.canonical_url, result)
-        if len(ordered) >= MAX_RESULTS_PER_EMAIL:
-            break
+        if len(ordered) > MAX_RESULTS_PER_EMAIL:
+            raise GoogleAlertEmailError("too_many_results")
     return tuple(ordered.values())
 
 
@@ -216,8 +216,6 @@ def _extract_structured_html(html: str) -> tuple[GoogleAlertEmailResult, ...]:
                 )
                 if result:
                     extracted.append(result)
-                    if len(extracted) >= MAX_RESULTS_PER_EMAIL:
-                        return _dedupe_results(extracted)
 
     return _dedupe_results(extracted)
 
@@ -240,8 +238,6 @@ def _extract_html_links(html: str) -> tuple[GoogleAlertEmailResult, ...]:
         result = _make_result(title, "", href, "html_link")
         if result:
             extracted.append(result)
-            if len(extracted) >= MAX_RESULTS_PER_EMAIL:
-                break
     return _dedupe_results(extracted)
 
 
