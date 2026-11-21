@@ -1,3 +1,11 @@
+# Architecture update — 21 November 2026
+
+**Use the Cloudflare Email Routing design in [the implementation update](GOOGLE_ALERTS_CLOUDFLARE_IMPLEMENTATION_UPDATE_2026-11-21.md) as the current source of truth.** The Gmail API gmail.readonly + users.watch + Google Pub/Sub architecture described later in this original planning document is superseded for the MVP. Do not implement that path or provision Pub/Sub. Preferred path: Gmail filter forwarding only matching Alert messages → Cloudflare Email Routing on a dedicated subdomain → Email Worker MIME parsing → Cloudflare Queue → HMAC-signed JobBeeper webhook → durable SQLite inbox → safe public URL extraction/verification → shared canonical ingestion and member-specific preference evaluation.
+
+**Revised estimate: 5–7 focused engineering working days**, pending Cloudflare zone access, one representative redacted Google Alert email and confirmation of the correct public JobBeeper API origin. See the implementation update for current code status and remaining gates.
+
+---
+
 # Google Alerts Discovery Engine — Architecture, Delivery Plan and Priority
 
 **Planning date:** 21 November 2026  
