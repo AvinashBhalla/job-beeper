@@ -47,6 +47,100 @@ class GoogleAlertsFeedError(Exception):
 
 
 @dataclass(frozen=True)
+class GoogleAlertsFeedConfig:
+    """Runtime feed config; hide the bearer-like URL from repr/logging."""
+
+    feed_id: str
+    label: str
+    url: str = field(repr=False)
+
+
+def load_google_alerts_feed_configs(
+    config_path: str | Path,
+    *,
+    max_feeds: int = 98,
+    max_file_bytes: int = 262_144,
+) -> tuple[GoogleAlertsFeedConfig, ...]:
+    """Load private feed URLs from an owner-only file outside the repository.
+
+    Expected JSON shape:
+      {"feeds": [{"id": "alert-001", "label": "Software Engineer India",
+                  "url": "https://www.google.com/alerts/feeds/..."}]}
+
+    The file should be mounted read-only with mode 0400 or 0600. URLs are
+    validated in memory only and are never written to the database.
+    """
+    path = Path(config_path)
+    if not path.is_absolute() or path.is_symlink():
+        raise GoogleAlertsFeedError("invalid_feed_config_path")
+    try:
+        resolved = path.resolve(strict=True)
+        repo_root = Path(__file__).resolve().parents[1]
+        resolved.relative_to(repo_root)
+        raise GoogleAlertsFeedError("feed_config_must_be_outside_repository")
+    except ValueError:
+        # relative_to raises ValueError when the config is outside the repo.
+        pass
+    except FileNotFoundError:
+        raise GoogleAlertsFeedError("feed_config_not_found") from None
+
+    try:
+        metadata = resolved.stat()
+        if not stat.S_ISREG(metadata.st_mode):
+            raise GoogleAlertsFeedError("feed_config_not_regular_file")
+        if metadata.st_size > max_file_bytes:
+            raise GoogleAlertsFeedError("feed_config_too_large")
+        if os.name == "posix" and stat.S_IMODE(metadata.st_mode) & 0o077:
+            raise GoogleAlertsFeedError("feed_config_permissions_too_open")
+        raw = resolved.read_text(encoding="utf-8")
+    except GoogleAlertsFeedError:
+        raise
+    except (OSError, UnicodeError):
+        raise GoogleAlertsFeedError("feed_config_unreadable") from None
+
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError:
+        raise GoogleAlertsFeedError("feed_config_invalid_json") from None
+    if not isinstance(document, dict) or set(document) != {"feeds"}:
+        raise GoogleAlertsFeedError("feed_config_invalid_shape")
+
+    items = document.get("feeds")
+    if not isinstance(items, list) or not items or len(items) > max_feeds:
+        raise GoogleAlertsFeedError("feed_config_invalid_count")
+
+    configs: list[GoogleAlertsFeedConfig] = []
+    seen_ids: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict) or set(item) != {"id", "label", "url"}:
+            raise GoogleAlertsFeedError("feed_config_invalid_entry")
+        feed_id = item.get("id")
+        label = item.get("label")
+        url = item.get("url")
+        if (
+            not isinstance(feed_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", feed_id)
+            or feed_id in seen_ids
+            or not isinstance(label, str)
+            or not label.strip()
+            or len(label.strip()) > 120
+            or not isinstance(url, str)
+        ):
+            raise GoogleAlertsFeedError("feed_config_invalid_entry")
+        validated_url = _validate_feed_url(url)
+        configs.append(
+            GoogleAlertsFeedConfig(
+                feed_id=feed_id,
+                label=label.strip(),
+                url=validated_url,
+            )
+        )
+        seen_ids.add(feed_id)
+
+    return tuple(configs)
+
+
+@dataclass(frozen=True)
 class FeedCheckpoint:
     etag: str | None = None
     last_modified: str | None = None
