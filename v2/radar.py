@@ -35,6 +35,7 @@ from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_sco
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
 from v2.google_alerts_rss_polling import init_google_alerts_rss_schema
+from v2.google_alerts_pipeline import process_google_alert_rss_queue as _process_google_alert_rss_queue
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -1746,6 +1747,23 @@ def upsert_jobs(
     if affected_job_ids:
         refresh_configured_user_evaluations(affected_job_ids)
     return new_count
+
+
+def process_google_alert_rss_queue(limit: int = 10):
+    """Run one bounded Google Alerts result batch through shared V2 ingestion.
+
+    This is an explicit one-shot callable. No scheduler or public endpoint is
+    enabled by this change. Verified jobs flow through normalize_job/upsert_jobs,
+    preserving canonical dedupe and per-user preference evaluations.
+    """
+    with connect_sqlite(DB_PATH) as conn:
+        return _process_google_alert_rss_queue(
+            conn,
+            normalize_job_fn=normalize_job,
+            upsert_jobs_fn=upsert_jobs,
+            limit=limit,
+        )
+
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
