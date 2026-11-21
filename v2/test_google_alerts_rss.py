@@ -54,10 +54,7 @@ class GoogleAlertsAtomTests(unittest.TestCase):
         self.assertEqual(foundit.published_at, "2026-11-20T04:31:52Z")
 
     def test_deduplicates_repeated_atom_entry_id(self):
-        duplicated = SAMPLE_FEED.replace(
-            "  </entry>\\n  <entry>\\n    <id>tag:google.com,2013:googlealerts/feed:ENTRY_TWO</id>",
-            "  </entry>\\n  <entry>\\n    <id>tag:google.com,2013:googlealerts/feed:ENTRY_ONE</id>",
-        )
+        duplicated = SAMPLE_FEED.replace("ENTRY_TWO", "ENTRY_ONE")
         self.assertEqual(len(parse_google_alerts_atom(duplicated).entries), 1)
 
     def test_feed_credentials_and_self_link_are_not_returned(self):
