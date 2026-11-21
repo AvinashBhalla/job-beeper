@@ -10,6 +10,14 @@ Owner-confirmed direction: all 98 Google Alerts arrive in one owner-controlled G
 
 **Quarantine:** branch `feat/google-alerts-email-routing` was created from an incorrect custom-domain/Cloudflare assumption. It is unmerged, has no PR, and has not changed production. It contains an Email Worker, Cloudflare Queues and a prototype backend webhook; it is **superseded / do not merge / do not deploy**. Do not cherry-pick it. Read [the correction document](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md).
 
+
+
+**Latest preflight — 21 November 2026:** VM-side TLS/renewal gate is **PASS**. Live cert at `130.210.27.197:443` has IP SAN `130.210.27.197`, verifies against CA, and the IP health endpoint returns HTTP 200. Certbot 5.10.0 uses the Let's Encrypt `shortlived` profile; twice-daily Snap renewal timer and Nginx reload deploy hook are configured. A forced staging renewal simulation succeeded; live cert serial remained unchanged; `nginx -t` passed and `v2-radar-1` remained up. This was read-only apart from an ACME staging dry-run; no production app/config/DB/service/cert was changed.
+
+**Still open:** Google Pub/Sub docs require public HTTPS with a CA-signed cert but do not explicitly establish whether IPv4-literal push URLs are accepted. The webhook route is not implemented; the VM has no `gcloud` CLI or configured GCP project, and no Pub/Sub resource/delivery test occurred. Gmail `gmail.readonly` is restricted; JobBeeper's job-discovery use is not an obvious fit for Google's approved Gmail use cases and must be confirmed before OAuth work. Do not request the scope yet.
+
+**RSS alternative:** independent 2026 observations show a Google Alerts `Deliver to → RSS feed` option producing Atom XML; Google's official Alerts Help page does not document RSS or guarantee it. Pilot one separate test alert only; do not modify any of the 98 existing email rules. RSS is polling, not webhook; assess private-feed URL handling, entry IDs, feed retention (independent tests observed ~20 entries), conditional GET, and request volume. Per-alert RSS appears to replace email; duplication/equivalent coverage is not verified. See the RSS evaluation in `GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md` and the updated discovery plan.
+
 **Estimate withdrawn.** The prior Cloudflare 5–7 day and Gmail API 6–9 day estimates are provisional/withdrawn until IP push compatibility, Gmail OAuth policy and an actual sanitized Alert email have been checked.
 
 Production acceptance constraints remain: member browser/API/database mapping unresolved; per-user notifications unverified; preserve Workday/LinkedIn cooldowns and intentionally paused Naukri relay. Develop/test only in a fresh isolated workspace and DB, never the stale production checkout or live DB.
