@@ -1,6 +1,6 @@
 # PRIORITY CHANGE — 21 November 2026
 
-**New P0 next discovery-source increment: [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md).**
+**New P0 next discovery-source increment: [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).**
 
 Owner-confirmed product direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members will not connect Gmail. A dedicated Gmail label will scope a Gmail API `users.watch`; Cloud Pub/Sub will push notifications to an authenticated JobBeeper HTTPS webhook. The worker will then use Gmail history to fetch new labelled emails, verify destination job pages, ingest valid opportunities once into the shared database, and evaluate each member against their own preferences.
 
