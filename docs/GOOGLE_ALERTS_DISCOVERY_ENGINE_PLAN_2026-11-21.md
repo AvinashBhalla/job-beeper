@@ -29,6 +29,9 @@ RSS is polling, not webhook delivery. It may avoid the Gmail `gmail.readonly` re
 
 Gmail API remains blocked pending a Google policy decision: the current approved Gmail-scope use cases are email clients, email backup, productivity enhancements to email, or reporting/monitoring services that improve the email experience. Job-discovery extraction for a multi-member product is not an obvious fit. Do not request `gmail.readonly` until this specific use is confirmed as permitted.
 
+
+**Sample received and parser prototype opened — 21 November 2026:** the supplied feed is Atom 1.0. The sample has a feed title carrying the Alert query, a root feed ID and `rel="self"` URL that must be treated as private, and two entries with stable Atom entry IDs, HTML title/content, UTC published/updated timestamps, and Google `/url` links containing the actual destination in the `url=` parameter. Destinations in this sample are Shine and Foundit. A parser-only implementation and 9 focused tests are in [draft PR #101](https://github.com/AvinashBhalla/job-beeper/pull/101), branch `feat/google-alerts-rss-atom-parser`. The test fixture replaces private feed/user/tracking IDs; no live feed URL is stored. The local scratch test passed 9/9. PR CI run 44896734569 failed before runner execution (runner ID 0, no steps), so repository CI remains unverified. PR #101 is draft/unmerged and must not be deployed. Polling, ETag state, storage of feed secrets, result-fetch/SSRF controls and shared ingestion are not implemented.
+
 ## 1. Product outcome
 
 Add Google Alerts as a new shared discovery source. The owner maintains the 98 Google Alert queries and receives their results in one Gmail account. JobBeeper reacts when a new result email arrives, extracts candidate job links, verifies the underlying posting, and ingests valid jobs into the existing shared jobs/canonical-opportunity pipeline.

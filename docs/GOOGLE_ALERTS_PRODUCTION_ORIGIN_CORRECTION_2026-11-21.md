@@ -165,3 +165,23 @@ The connected VM has no `gcloud` CLI or configured GCP project. No Pub/Sub topic
 3. Obtain one sanitized representative Google Alert email to validate the parser and redirect-link handling.
 4. Keep the production checkout out of development; use a fresh isolated workspace and database for implementation/testing.
 5. No production webhook, OAuth consent, Gmail watch, Pub/Sub resource, DB migration, or application deployment has been made.
+
+
+
+## 10. Sample-based parser prototype — 21 November 2026
+
+The owner supplied one Google Alerts Atom sample titled `Google Alert - "Software Engineer" India React TypeScript`. It contains two entries (Shine and Foundit), each with:
+- stable Atom `entry/id`;
+- HTML `title` and `content`;
+- UTC `published` and `updated` timestamps;
+- an Atom `link` whose href is a Google `/url` wrapper and contains the external job URL in its `url=` query parameter.
+
+The root feed `id` contains a Google Reader user identifier and Alert identifier; the root `link rel="self"` is the private feed URL. Both are credentials/identifiers and must not be persisted in fixtures, logs, source code or normal parser output. The parser test fixture replaces these with redacted values and retains only public structural examples.
+
+A parser-only implementation is available on branch `feat/google-alerts-rss-atom-parser`, draft [PR #101](https://github.com/AvinashBhalla/job-beeper/pull/101). It parses Atom 1.0, extracts unique entry IDs and readable title/snippet text, unwraps the Google `url=` target, performs static HTTPS/public-host checks and calls the existing canonical URL helper. It deliberately performs no network requests and excludes the feed root ID/self link from output.
+
+**Validation status:** 9 focused unit tests passed in an isolated scratch workspace against the parser logic. The PR's V2 CI workflow failed before a runner was assigned (`runner_id=0`, no steps); no CI code checks actually ran. Treat repository CI as unverified. PR #101 remains draft and unmerged.
+
+**Not implemented:** feed fetching/polling, ETag/Last-Modified state, secure storage of 98 feed URLs, interval/retention pilot, result URL fetching and DNS/re-direct-hop SSRF protection, job extraction/verification, shared database ingestion, member evaluation or production rollout.
+
+The supplied live RSS URL is not copied into GitHub. Treat it as a private bearer-like feed URL; do not place it in tickets, logs, chat, source control or public dashboards.
