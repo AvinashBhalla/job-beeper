@@ -84,6 +84,19 @@ def _is_alert_subject(value: str | None) -> bool:
     )
 
 
+def _google_authentication_passes(message) -> bool:
+    """Require Gmail's own authentication result, not just a spoofable From."""
+    for value in message.get_all("Authentication-Results", []):
+        result = re.sub(r"\s+", " ", str(value)).casefold()
+        if (
+            result.startswith("mx.google.com;")
+            and re.search(r"\bdkim=pass\b.*?header\.i=@google\.com", result)
+            and re.search(r"\bdmarc=pass\b.*?header\.from=google\.com", result)
+        ):
+            return True
+    return False
+
+
 def _clean_text(value: object, limit: int = 4000) -> str:
     if value is None:
         return ""
@@ -317,6 +330,8 @@ def parse_google_alert_email(
         raise GoogleAlertEmailError("unrecognized_sender")
     if not _is_alert_subject(message.get("Subject")):
         raise GoogleAlertEmailError("unrecognized_subject")
+    if not _google_authentication_passes(message):
+        raise GoogleAlertEmailError("sender_authentication_failed")
 
     html_body = ""
     plain_body = ""
