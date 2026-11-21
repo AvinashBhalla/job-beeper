@@ -406,11 +406,12 @@ def init_google_alerts_rss_schema(conn: sqlite3.Connection) -> None:
             processing_status TEXT NOT NULL DEFAULT 'queued'
                 CHECK (processing_status IN (
                     'queued', 'processing', 'verified', 'rejected',
-                    'needs_review', 'retryable_error', 'dead_letter'
+                    'needs_review', 'blocked', 'retryable_error', 'dead_letter'
                 )),
             attempt_count INTEGER NOT NULL DEFAULT 0,
             next_attempt_at TEXT,
             last_error_code TEXT,
+            last_http_status INTEGER,
             PRIMARY KEY (feed_id, entry_id)
         );
 
