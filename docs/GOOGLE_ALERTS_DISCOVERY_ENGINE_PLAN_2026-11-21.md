@@ -1,3 +1,13 @@
+# Updated implementation gate — 21 November 2026
+
+This is the initial architecture proposal. Before implementation, read [Google Alerts production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md). The only documented project production origin is `https://130.210.27.197/` on the Oracle VM `job-radar`. Do not assume the owner controls `jobbeeper.com`; do not configure Cloudflare Email Routing or custom-domain workers there.
+
+The Gmail API + Pub/Sub design remains a candidate only after confirming the production IP TLS certificate includes the IP as an IP SAN, Google Pub/Sub authenticated push supports an IP-literal HTTPS endpoint, the Gmail restricted-scope use case is permitted, and a real sanitized Alert fixture can be parsed. The previously created Cloudflare feature branch is quarantined, unmerged, and must not be deployed or cherry-picked.
+
+**Previous 6–9 day estimate withdrawn** pending these checks. No Gmail OAuth, watch, Pub/Sub resource or production webhook has been configured.
+
+---
+
 # Google Alerts Discovery Engine — Architecture, Delivery Plan and Priority
 
 **Planning date:** 21 November 2026  
