@@ -172,6 +172,32 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
             parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "sender_authentication_failed")
 
+    def test_rejects_ambiguous_duplicate_authentication_results(self):
+        raw = make_email(
+            authentication_results=None,
+            html_body=structured_html([{
+                "title": "Role",
+                "url": "https://jobs.example.test/role",
+            }]),
+        )
+        message = EmailMessage()
+        # Start from the standard fixture and add two conflicting auth results.
+        message_bytes = make_email(
+            html_body=structured_html([{
+                "title": "Role",
+                "url": "https://jobs.example.test/role",
+            }])
+        )
+        from email.parser import BytesParser
+        parsed_message = BytesParser().parsebytes(message_bytes)
+        parsed_message["Authentication-Results"] = (
+            "mx.google.com; dkim=fail; dmarc=fail"
+        )
+        raw = parsed_message.as_bytes()
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(raw)
+        self.assertEqual(caught.exception.code, "sender_authentication_failed")
+
     def test_rejects_non_alert_subject(self):
         raw = make_email(
             subject="Weekly report",
