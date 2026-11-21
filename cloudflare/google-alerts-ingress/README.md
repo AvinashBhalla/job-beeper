@@ -37,6 +37,12 @@ Run:
 
     npm run typecheck
 
+The backend intake unit tests are in the repository's V2 unittest suite and can be run in a safe development checkout with:
+
+    python -m unittest v2.test_google_alert_ingest
+
+Do not run the application startup path or these tests against the production database.
+
 Deployment is intentionally not included in automated scripts. Review the Cloudflare configuration and deploy manually only after the owner approves the exact resources and routing.
 
 ## Cloudflare Email Routing setup sequence
