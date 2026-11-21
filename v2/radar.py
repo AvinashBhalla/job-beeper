@@ -34,6 +34,7 @@ from v2 import ats_directory, auth, board_discovery, board_scheduler, company_wa
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
+from v2.google_alerts_rss_polling import init_google_alerts_rss_schema
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -1442,6 +1443,8 @@ def init_db() -> None:
     user_applications.init_schema(DB_PATH)
     board_scheduler.init_schema(str(DB_PATH))
     global_ats_discovery.init_schema(str(DB_PATH))
+    with connect_sqlite(DB_PATH) as rss_conn:
+        init_google_alerts_rss_schema(rss_conn)
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
