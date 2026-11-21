@@ -82,7 +82,7 @@ If IP-literal push is not supported, stop and identify an endpoint the owner act
 
 The previous estimate of 5–7 days was based on the invalid Cloudflare route and is withdrawn. Return a revised estimate only after confirming the certificate/IP endpoint compatibility, Gmail OAuth policy path and sample Alert email. The earlier 6–9 day Gmail API estimate is also provisional until those exact deployment constraints are checked.
 
-**Current state:** documentation correction only. No production changes. The Cloudflare branch is quarantined as superseded and must not be merged/deployed.
+**Current state:** production preflight and a Let’s Encrypt staging renewal simulation completed; no production runtime/configuration/database changes. The staging test left the live certificate serial unchanged. Documentation is updated with the evidence below. The Cloudflare branch remains quarantined as superseded and must not be merged/deployed.
 
 ## 6. Source documents
 
@@ -92,3 +92,44 @@ The previous estimate of 5–7 days was based on the invalid Cloudflare route an
 - `docs/RELEASE_QUALIFICATION_2026-11-18.md`
 - `v2/README.md`
 
+
+
+## 7. Live VM preflight — 21 November 2026
+
+Read-only checks were run through the connected Terminal Commands device `job-radar`. No Nginx configuration, certificate files, application files, environment values, database, Docker container, DNS, Gmail setting, or production service was changed.
+
+### TLS and Certbot
+
+- Live origin: `https://130.210.27.197/`.
+- The certificate served on port 443 has an **IP Subject Alternative Name** for `130.210.27.197`. It is issued by Let's Encrypt (intermediate `YE2`); `curl` certificate verification returned `ssl_verify_result=0`.
+- Observed live certificate validity: `2026-11-19 23:09:23 UTC` through `2026-11-26 15:09:22 UTC`. This is expected for a Let's Encrypt IP-address certificate using the `shortlived` profile (approximately 160 hours / six days), not a conventional 90-day DNS certificate.
+- Certbot version: `5.10.0`. Renewal config has `preferred_profile = shortlived`, `authenticator = webroot`, and maps the IP to `/var/www/letsencrypt`.
+- Snap Certbot systemd timer is scheduled twice daily, at `00:00 UTC` and `16:19 UTC`. The November 21 `00:00 UTC` timer service completed successfully.
+- Executable root-owned deploy hook exists at `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh`; it runs `systemctl reload nginx`.
+- A staging-only challenge test passed:
+  `sudo certbot renew --dry-run --force-renewal --cert-name jobbeeper-ip-prod`.
+  Certbot reported: `Congratulations, all simulated renewals succeeded`.
+- After the staging test, the live certificate serial/fingerprint remained unchanged, HTTPS `/health` still returned HTTP 200, and `nginx -t` passed.
+
+Let’s Encrypt documents that IP-address certificates must use its short-lived profile, and recommends reliable automation. The current configuration has a twice-daily renewal timer and a deploy hook; no manual production renewal was needed during this audit.
+
+### Pub/Sub IP-literal endpoint compatibility
+
+Current Google Cloud Pub/Sub documentation requires a publicly accessible HTTPS endpoint with a valid CA-signed certificate. The documentation reviewed does **not** explicitly state whether an IPv4-literal URL is accepted or rejected. The production certificate and HTTPS checks satisfy the certificate-name/trust part of that requirement, but this is **not proof** that the Pub/Sub API will accept or successfully deliver to an IP-literal push endpoint.
+
+The connected VM has no `gcloud` CLI or configured GCP project. No Pub/Sub topic/subscription was created and no real push delivery was attempted. The proposed route `/api/webhooks/google-pubsub` is not implemented. Actual Google-side URL acceptance/delivery remains an open preflight gate.
+
+### Runtime state after the checks
+
+- Nginx is active and its configuration test passes.
+- Container `v2-radar-1` remains up on image `job-radar-prod-release:dda6d57`.
+- Public-IP HTTPS `/health` returns HTTP 200 with certificate verification successful.
+- No live certificate serial change occurred during the staging dry run.
+
+### Remaining gates
+
+1. Verify actual Pub/Sub endpoint URL acceptance and authenticated push delivery in the owner's Google Cloud project after the webhook route is built in an isolated development workspace.
+2. Confirm Google's current Gmail restricted-scope permitted-use-case and OAuth verification/security-assessment path for this owner-only mailbox use.
+3. Obtain one sanitized representative Google Alert email to validate the parser and redirect-link handling.
+4. Keep the production checkout out of development; use a fresh isolated workspace and database for implementation/testing.
+5. No production webhook, OAuth consent, Gmail watch, Pub/Sub resource, DB migration, or application deployment has been made.
