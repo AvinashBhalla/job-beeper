@@ -389,6 +389,34 @@ class GoogleAlertsFeedBatchTests(unittest.TestCase):
         )
         self.assertEqual(session.calls[0][1]["headers"]["If-None-Match"], '"existing"')
 
+    def test_batch_spaces_requests_using_injected_sleeper(self):
+        session = FakeSession(
+            FakeResponse(304),
+            FakeResponse(304),
+            FakeResponse(304),
+        )
+        delays = []
+        summary = poll_google_alerts_feed_batch(
+            self.conn,
+            [
+                GoogleAlertsFeedConfig("feed-a", "A", FEED_URL),
+                GoogleAlertsFeedConfig("feed-b", "B", FEED_URL),
+                GoogleAlertsFeedConfig("feed-c", "C", FEED_URL),
+            ],
+            session=session,
+            min_interval_seconds=0.75,
+            sleeper=delays.append,
+            now=FIXED_NOW,
+        )
+        self.assertEqual(summary.not_modified, 3)
+        self.assertEqual(delays, [0.75, 0.75])
+
+    def test_batch_rejects_excessive_inter_request_delay(self):
+        with self.assertRaisesRegex(ValueError, "min_interval_seconds"):
+            poll_google_alerts_feed_batch(
+                self.conn, [], min_interval_seconds=31
+            )
+
     def test_batch_closes_owned_http_session(self):
         # A caller-provided session is intentionally not closed by the batch.
         response = FakeResponse(304)
