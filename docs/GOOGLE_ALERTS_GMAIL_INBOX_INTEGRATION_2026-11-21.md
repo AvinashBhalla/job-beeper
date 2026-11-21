@@ -4,7 +4,7 @@
 **Repository:** `AvinashBhalla/job-beeper`  
 **Target branch:** `v2-live-radar`  
 **Planning branch:** `feat/google-alerts-gmail-ingestion`  
-**Status:** Owner-confirmed product direction; design and policy gates documented; no Gmail access or production changes
+**Status:** Personal-only Gmail push architecture selected; parser foundation in draft PR; no Gmail authorization, Pub/Sub resources or production changes
 
 ## 1. Corrected owner requirement — authoritative
 
@@ -54,19 +54,20 @@ Use Gmail API read-only access with a durable, scheduled incremental history pol
 
 ### 2.1 Separate owner-only authorization
 
-The existing `v2/google_oauth.py` flow is for member sign-in and requests only `openid email profile`. Keep it unchanged.
+The existing `v2/google_oauth.py` flow is for JobBeeper account/member sign-in and requests only `openid email profile`. Keep it unchanged.
 
-Implement a separate Gmail connection with its own:
+This first release is **strictly personal and single-account**. Create a separate Google Cloud project using Google's **Personal Mode** onboarding, then create a **Web application** OAuth client for the Oracle VM callback. Personal Mode restricts authorization to the Google Account that created the project, removes OAuth app verification and the unverified-app screen for that creator, and avoids the External-app testing cap/token expiry. It is a one-way project choice: it cannot later be converted to External/Internal or shared. If JobBeeper ever becomes multi-member for Gmail, create a separate OAuth project and complete its own policy/verification process; do not widen this personal client.
 
-- OAuth client configuration/environment variables;
-- authorization state, PKCE verifier and callback path;
-- owner/admin-only connect and disconnect controls;
-- token storage, encryption key and refresh handling;
-- connection status and account identity checks.
+Implement a dedicated Gmail connection with its own:
+- Personal Mode OAuth client ID/secret and redirect URI;
+- authorization state and PKCE verifier;
+- owner-only connect/disconnect controls and account-identity binding;
+- encrypted refresh-token storage and key separation;
+- connection status, token refresh, revocation and disconnect cleanup.
 
-Request only `https://www.googleapis.com/auth/gmail.readonly` if and only if Google confirms the use case is permitted. Do not request `gmail.modify`, `mail.google.com`, `gmail.labels`, or other additional/broader scopes. `gmail.readonly` permits listing labels and reading message metadata/bodies, which is enough to discover the pre-created label and read only its messages. Do not create or modify labels/filters through the API; the owner configures them in Gmail. Reading full message bodies is necessary for parsing, and the Gmail API's `messages.get` full format is not available with `gmail.metadata`; metadata-only access cannot implement the required parser.
+Request only `https://www.googleapis.com/auth/gmail.readonly`. Do not request `gmail.modify`, `mail.google.com`, `gmail.labels`, or any broader/additional scope. The owner creates the label/filter in Gmail; the application only reads labels and messages. Keep Gmail authorization entirely separate from member OIDC. No OAuth secret, access token or refresh token may enter GitHub, chat, browser storage, logs or plaintext DB columns. The refresh token is encrypted at rest using a key held separately from the SQLite volume (VM secret/environment file with restrictive permissions or a dedicated secret store).
 
-**Owner consent recorded (21 November 2026):** the owner expressly agrees to a separate JobBeeper owner-only Gmail connection, with the application restricted operationally to Google Alerts messages. This is consent to the planned access, not evidence of Google's approval for the multi-member product use case; it does not close the policy gate in Section 3.
+**Owner consent recorded (21 November 2026):** the owner explicitly agrees to personal Gmail authorization and has selected the Oracle VM, Pub/Sub push and Telegram. This is not permission to expose Gmail-derived discovery metadata or job observations to other JobBeeper accounts.
 
 Never add Gmail scopes to ordinary member sign-in. Never expose owner OAuth start/callback/status/refresh-token data to ordinary member accounts.
 
@@ -78,25 +79,41 @@ JobBeeper will use read-only `users.labels.list` to resolve the exact label ID, 
 
 Do not add the `gmail.labels` scope or programmatically create/change the Gmail filter. The owner does this once in Gmail UI; the app is read-only. Google documents that `messages.list` accepts `labelIds` and that `history.list` accepts `labelId`, both with pagination.
 
-### 2.3 Incremental polling and checkpoint recovery
+### 2.3 Gmail push notifications, initial backfill and recovery
 
-A local JobBeeper worker will poll the Gmail API using `users.history.list` and a durable `startHistoryId` checkpoint:
+The chosen trigger is **Gmail push → Cloud Pub/Sub → authenticated HTTPS webhook on the Oracle VM → durable sync queue → Gmail history reconciliation**. The Pub/Sub notification is a change pointer, not an email body. The webhook must never parse or fetch mail inline.
 
-1. **Owner-confirmed initial sync: backfill all available Google Alerts emails.** On the first approved owner connection, call `users.getProfile` and persist its returned `historyId` as the initial-sync baseline **before** starting the historical scan. Enumerate the mailbox with `users.messages.list(labelIds=[label_id], includeSpamTrash=false)`. Do not use a mailbox-wide list or `q` query; the dedicated label is the sole API selection boundary. The owner-created filter should have applied the label to all matching historical messages and all future arrivals. Follow every `nextPageToken` until no next page remains; use up to 500 IDs per page and do not impose a date cutoff or recent-window limit. This retrieves labelled messages across Inbox and archived/All Mail locations; Spam and Trash remain excluded by default. Gmail's [messages.list reference](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list) documents the `q` filter, page token and 500-message maximum; [the list guide](https://developers.google.com/workspace/gmail/api/guides/list-messages) confirms that list results contain message IDs/thread IDs and must be expanded with `messages.get`. The `q` parameter is not available with `gmail.metadata`, so this design remains conditional on approval for the Restricted `gmail.readonly` scope.
-   - Persist each discovered message ID and page/progress state before moving to the next page, so an interrupted backfill resumes rather than restarting or skipping pages.
-   - Stage all matching candidates through the metadata-only preflight below; fetch `format=raw` only after sender, subject and Authentication-Results pass. Parse in memory and enqueue each result independently.
-   - Once the full enumeration has been staged, call `users.history.list` from the pre-scan baseline, page through the entire history response, and durably stage all message-added IDs found during the backfill. This closes the race for new Alerts arriving while the full mailbox scan is running. Only after every history page and discovered ID is safely staged should the worker commit the latest returned history cursor and switch to ordinary incremental polling.
-   - The backfill is idempotent across retries and repeated discoveries: the message-processing ledger and canonical destination dedupe prevent duplicate processing/jobs. Do not declare the initial sync complete while an ID is still pending or retryable.
-2. Poll `history.list` on a conservative interval through the existing service runtime with the required `labelId=label_id` filter. Use `historyTypes=messageAdded,labelAdded` and page through all results.
-3. Collect unique message IDs from `messagesAdded` records and `labelsAdded` records that add the dedicated label. Stage those IDs durably before advancing the committed history cursor.
-4. Read only message headers first: request `messages.get(format=metadata)` with `From`, `Subject` and `Authentication-Results` in `metadataHeaders`. Discard messages that do not match the confirmed Google Alerts sender/subject and Gmail authentication pattern without downloading their bodies.
-5. For matching messages only, request `messages.get(format=raw)`, base64url-decode the RFC 5322 payload and parse it in memory. Use the Gmail message resource's `internalDate` for mailbox-arrival ordering and recovery windows; the RFC `Date` header is retained only as optional display metadata. Enqueue every result item independently.
-6. Commit the new Gmail history cursor only after every page and every discovered message ID has been safely staged. Repeated notifications or poll retries must be idempotent.
-7. If Gmail returns HTTP 404 because the checkpoint is no longer valid, run a bounded full resynchronization using the last successful poll time plus an overlap window, deduplicate against the processing ledger, then establish a new checkpoint. Record the recovery event and do not silently skip the gap.
+**Cloud setup:**
+1. Create one Pub/Sub topic in the personal-mode project (or a separate small GCP project explicitly linked to it) and one push subscription targeting the JobBeeper webhook.
+2. Grant `gmail-api-push@system.gserviceaccount.com` Publisher permission on the topic.
+3. Configure authenticated Pub/Sub push using a dedicated user-managed service account and OIDC JWT audience. Validate the JWT signature, issuer, audience, expiry and expected service-account identity at the webhook.
+4. The push endpoint must be publicly reachable over HTTPS with a valid CA-signed certificate. The Oracle VM currently sits behind Nginx; before creating the subscription, inspect the actual certificate chain and SAN and confirm the exact callback route is reachable from Google. If the present IP-based HTTPS origin does not meet the public TLS requirements, use a domain with a valid certificate. Do not relax TLS or expose an unauthenticated webhook to make it work.
+5. Create the topic/subscription only after checking the GCP project billing state and current Pub/Sub free-tier/pricing. No paid resource or billing change is authorized by the architecture choice alone.
 
-The same local poller runs regardless of whether GitHub Actions is available. GitHub Actions are not a runtime dependency, and no paid hosted runner is required.
+**Watch configuration:**
+- Resolve `JobBeeper/GoogleAlerts` to its Gmail label ID using read-only `users.labels.list`.
+- Register Gmail `users.watch` with `topicName`, `labelIds=[label_id]` and `labelFilterBehavior=INCLUDE`. The Gmail API requires the Gmail push service account to be able to publish to the topic.
+- Persist the returned `historyId` and `expiration`. The returned history ID is the sync baseline for changes after watch registration. A successful watch also emits an immediate notification, which is harmless and must be processed idempotently.
+- Renew `users.watch` daily; Gmail requires renewal at least every seven days. Store the current expiration and alert/log if renewal fails.
 
-**Why polling, not Pub/Sub for the first release:** Gmail documents both full and partial synchronization. Partial sync uses `history.list`; a cursor may expire and return HTTP 404, in which case full sync is required. Gmail push notifications can later trigger the same partial sync if lower latency is justified, but require a Pub/Sub topic and a renewable `users.watch` registration. The existing production IP endpoint and Pub/Sub route do not need to be involved in this polling MVP.
+**Race-free initial synchronization — owner-selected all available emails:**
+1. Ensure the Pub/Sub topic/subscription and durable webhook queue are ready first.
+2. Call `users.watch` with the dedicated label filter and persist the returned history ID as the backfill baseline **before** scanning historical mail.
+3. Enumerate every message carrying `labelIds=[label_id]` with `includeSpamTrash=false`, follow every `nextPageToken`, and apply no date cutoff. This includes matching labelled messages in Inbox and archived/All Mail; Spam and Trash remain excluded.
+4. Durably stage each message ID and page progress before advancing. Resume interrupted scans from the last committed page/checkpoint.
+5. Run the metadata-only preflight below, then retrieve `format=raw` only for messages whose exact sender, subject prefix and unambiguous Gmail `Authentication-Results` pass.
+6. After the enumeration is staged, call `users.history.list` from the watch response's baseline history ID, filtered with `labelId=label_id`, and page through all records. Include `messageAdded` and `labelAdded` change types; enqueue messages that are added to or receive the dedicated label while the full scan is running.
+7. Commit the resulting history cursor only after every page and every discovered message ID is durably staged. Process all message IDs idempotently; do not declare backfill complete while any candidate is pending or retryable.
+
+**Push event handling and ongoing sync:**
+- The webhook accepts only the configured Pub/Sub subscription and a valid OIDC-authenticated push. Decode the Pub/Sub `message.data` payload to obtain the authorized mailbox identity and new `historyId`; validate the identity against the one owner account bound during OAuth.
+- Persist a compact notification/outbox record (Pub/Sub message ID, high-water history ID, receive time and processing status), then return HTTP 2xx. Acknowledge only after durable persistence. Do not log the payload, token, mailbox address or any email content.
+- A worker coalesces notifications and calls `users.history.list(startHistoryId=last_committed_history_id, labelId=label_id)`, pages every result, collects `messageAdded` and `labelAdded` message IDs, and stages them before advancing the cursor.
+- For every candidate, call `messages.get(format=metadata)` with only `From`, `Subject` and `Authentication-Results`. Drop unlabelled/non-Google Alerts messages without requesting their bodies. For authenticated candidates only, call `messages.get(format=raw)`, base64url-decode, parse in memory and enqueue each result.
+- Gmail notifications can be delayed or dropped and are capped at one notification event per second per watched user. Run a low-frequency periodic `history.list` reconciliation (for example, every 15 minutes) as a safety net in addition to push. Push is a latency optimization, not the source of truth.
+- If Gmail returns HTTP 404 for an expired history cursor, run a full label-scoped resynchronization with an overlap, deduplicate against the processing ledger, then establish a new cursor. Do not silently skip the gap.
+
+The worker runs inside the existing V2 service/runtime on the Oracle VM after separate isolated validation. GitHub Actions are not part of the runtime path.
 
 ### 2.4 Email parsing
 
@@ -127,61 +144,62 @@ For each extracted result:
 
 Do not store raw email bodies, whole MIME payloads, attachments, unrelated message headers, or Gmail snippets in the jobs database. The Gmail message processing ledger should retain only the minimum identifiers/checkpoints/status needed for idempotency, under a documented retention policy. Fetch public posting details from the public destination rather than treating the email itself as the durable source of job content.
 
-## 3. Google policy and security gate — blocking for production
+## 3. Personal-use OAuth and Restricted-data guardrails
 
-This feature needs a policy decision before any production OAuth grant.
+This is now a **single-user personal integration**, not a multi-member mailbox product.
 
-- `gmail.readonly` is a **Restricted** Gmail scope because it permits reading message bodies and metadata.
-- Google's current policy lists approved Gmail use cases such as email clients, email backup, productivity improvements to the email experience, and reporting/monitoring services that improve the email experience. A shared job-discovery product that turns an owner's Google Alerts emails into opportunities for multiple JobBeeper members is **not clearly established as an approved use case** by the published examples.
-- Owner consent alone does not establish that the product use is permitted. The product's data flow from the owner's mailbox into shared member-visible records must be described accurately and reviewed against the Limited Use requirements.
-- Do not request `gmail.readonly`, initiate live OAuth consent, store a refresh token, or enable production polling until the permitted-use-case question and data-transfer/retention rules are resolved with Google.
-- Restricted-scope data accessed through a third-party server may require OAuth verification and an annual third-party security assessment. Exceptions exist for personal, development/testing, internal and other specific cases, but JobBeeper's multi-member product must not assume that a personal-use exception applies.
-- The production application will need visible disclosure, a privacy policy, a user-help/deletion process, encrypted tokens and data at rest, key management, least-privilege access, access logging and a documented incident-response path before any restricted-scope production review.
+- Google's Personal Mode is intended for an app used solely by its creator. It is restricted to that Google Account and does not require OAuth app verification or show the unverified-app warning. The project cannot be converted into a multi-user app later; use a separate project for any future shared product.
+- `gmail.readonly` is still classified as a **Restricted** Gmail scope. Personal Mode removes the OAuth app verification step for the creator, but does not remove the obligation to follow Google's Workspace User Data Policy and Limited Use requirements.
+- Google's Gmail approved-use examples include personal productivity features and email-derived reporting/monitoring for the user's benefit. This personal job-alert tracker is designed as a productivity/monitoring feature for the owner only. Job discovery itself is not explicitly named in Google's examples, so do not expand it into a shared/member service, advertising, resale, profiling or model training without a fresh policy review.
+- **Server-side security assessment ambiguity remains:** Google's restricted-scope guidance separately states that apps which store/transmit restricted-scope data or can access it from/through a third-party server must complete a security assessment. The Oracle VM is a server-side integration. Do not assume the Personal Mode OAuth verification exception automatically waives that security-assessment requirement. Before enabling persistent production token/body access, verify the assessment applicability for this creator-only deployment; if it applies, complete the required assessment or change the architecture to avoid prohibited server-side access.
+- Do not add Gmail scopes to member OIDC or allow any other JobBeeper account to connect/authorize Gmail. Personal Mode must remain bound to the owner account.
+- Data minimization: fetch only label-scoped candidate IDs, validate metadata before body retrieval, parse raw MIME in memory, discard raw email/snippets/query/headers and keep only minimal sync metadata and publicly verified posting data. Do not send email-derived content to Telegram. Telegram messages must be built from the independently fetched public job posting only.
+- Encrypt the refresh token at rest and keep its encryption key separate from the database; restrict file/process access; redact OAuth and webhook data from logs; support revoke/disconnect and deletion of tokens/checkpoints/processing metadata.
+- If the intended use changes to shared members, customer accounts or another Gmail account, stop and create a new OAuth/security/policy design. Do not reuse the personal-mode client.
 
-If Google does not approve this use case, stop the Gmail API route. Do not try to circumvent the restriction with IMAP, app passwords, forwarding, another Google account, or another API surface without an independent policy review.
-
-### Data-minimization requirements if approved
-
-- Store access/refresh tokens encrypted at rest; protect the encryption key separately from the database. Never log, print, commit or place tokens in the browser.
-- Keep the owner mailbox connection separate from member authentication and authorization.
-- Fetch message bodies only after sender/label validation; parse in memory and discard raw content.
-- Persist only a short-lived deduplication ledger and the minimum durable history cursor/checkpoint required to synchronize.
-- Do not use Gmail content to train or fine-tune models.
-- Do not expose alert query text, raw messages, inbox metadata or links that reveal the owner's account.
-- Keep public job-page data sourced and re-fetched from the public destination; do not permanently copy email content into the shared jobs store.
-- Provide a clear disconnect/revoke path and deletion of stored tokens/checkpoints/processing metadata.
+The personal-use verification exception is grounded in Google's current Personal Mode and restricted-scope documentation. The separate security-assessment question remains an explicit pre-production control, not a reason to mislabel the app as multi-member.
 
 ## 4. Current code baseline and boundaries
 
-- Existing member OAuth: `v2/google_oauth.py`, `v2/test_google_oauth.py`; member sign-in scope remains `openid email profile`.
-- Existing V2 ingestion: reuse `normalize_job()`, `upsert_jobs()`, canonical opportunity linking and member preference evaluation in `v2/radar.py`.
-- The previous RSS work is in PR #101 / branch `feat/google-alerts-rss-atom-parser`. It is a superseded proof of concept and must not be merged or deployed as the requested email integration. Keep it closed/draft for history only.
-- The incorrect Cloudflare Email Routing branch remains quarantined and must not be merged or cherry-picked.
-- The production target recorded by the current handover is the Oracle VM `job-radar`, origin `https://130.210.27.197/`, with FastAPI behind Nginx. Do not change production, DNS, certificates, Nginx, OAuth, GCP resources or the database during design/fixture work.
-- Build and test on a fresh isolated, non-production checkout and database. The only currently connected Terminal Commands machine is the production `job-radar` VM; do not use it for development testing.
-- Do not trigger GitHub Actions or spend money on hosted CI. Run local tests in a dedicated non-production environment.
+- Existing member OAuth: `v2/google_oauth.py`, `v2/test_google_oauth.py`; member sign-in scope remains `openid email profile` and must not be modified.
+- Existing ingestion/evaluation: `v2/radar.py` provides `normalize_job()`, `upsert_jobs()`, canonical opportunities and per-user job evaluations. Gmail must not bypass destination verification.
+- Existing per-user Telegram delivery: `v2/user_notifications.py` uses `user_notification_settings`, `user_notification_ledger`, `user_job_evaluations` and a private `user_telegram_chats` link from `v2/telegram_linking.py`. Use this path for the owner's personal Telegram delivery. Do **not** use legacy global `v2/telegram.py` / `notification_ledger` for Gmail-originated notifications.
+- **Required personal-data isolation:** public ATS jobs are globally visible, but Gmail-discovered records must be owner-only. Add an owner/source visibility field (e.g. `source_owner_user_id`) or an equivalent user-scoped observation table. Every feed query and job-evaluation/notification queue must enforce `source_owner_user_id IS NULL OR source_owner_user_id = current_user.id`, including admin views; don't let global evaluation/notification workers fan a Gmail-only record out to other users. For URLs already known through public sources, link the personal discovery to the existing public canonical opportunity without storing private email metadata or creating duplicate job rows.
+- Owner Gmail jobs must be evaluated against the owner's `user_preferences`, visible in the owner's dashboard, and queued only to the owner's linked private Telegram chat after per-user opt-in. Keep Telegram alertability/freshness and no-backlog rules intact.
+- The initial historical backfill should populate the owner's dashboard without creating a Telegram flood. Recommended default: suppress Telegram delivery for all messages discovered during the one-time backfill; start Telegram alerts only for messages arriving after initial sync is complete. Confirm this owner-facing behavior before enabling notifications.
+- The previous RSS work in PR #101 is superseded and must not be merged. The Cloudflare Email Routing branch remains quarantined.
+- Production target: Oracle VM `job-radar`, FastAPI behind Nginx. Do not modify production, DNS, certificates, Nginx, OAuth, GCP resources or DB during architecture and parser review. A read-only TLS/endpoint preflight is required before a Pub/Sub push subscription is created.
+- Develop and test in a fresh isolated non-production checkout/database. Do not use the only connected production `job-radar` machine as a test runner.
+- Do not trigger GitHub Actions or incur paid runner spend. Check GCP Pub/Sub current pricing/billing before resource provisioning; no billing enablement or billable resource creation is implied by the architecture selection.
 
 ## 5. Validation plan
 
-1. Owner creates the `JobBeeper/GoogleAlerts` label and Gmail filter, applies it to all existing matching conversations and verifies that future Google Alerts are labelled. Record the resolved label ID at connection time; do not store mailbox contents.
-2. Build parser tests for HTML-only, plain-text-only, multipart/alternative, nested MIME, encoded text, multiple result cards, missing href, malformed card, duplicate links, Google redirect URLs and unrelated email.
-3. Build Gmail API client tests with mocked HTTP responses for OAuth state/PKCE, token refresh, profile lookup, history pagination, message-added extraction, unrelated-sender filtering, duplicate message IDs, checkpoint atomicity, 429/5xx backoff, 401 refresh, revoked authorization, and history 404 recovery.
-4. Verify one result item per card enters the existing verified-job pipeline. Verify two emails with different Alert searches that contain the same URL produce one canonical job while retaining only policy-compliant minimal provenance.
-5. Run the focused Google Alerts Gmail tests and full V2 regression suite in a fresh non-production virtual environment. Record exact Python version, dependency versions, test count and commit SHA.
-6. Measure poll duration and Gmail API quota usage using one owner mailbox and synthetic/local fixtures. Only enable a conservative recurring polling interval after approval and isolated end-to-end validation.
-7. Complete Google permitted-use-case review, OAuth verification/security assessment requirements, privacy/data-retention controls and the separate production release checklist before connecting the real mailbox or deploying.
+1. Owner creates the `JobBeeper/GoogleAlerts` label/filter and applies it to all existing matches; verify future Alerts receive the label.
+2. Build the Personal Mode OAuth client for a Web application callback; keep credentials outside GitHub/chat and test state, PKCE, account binding, token refresh, revoke and encrypted token storage with a mock token service first.
+3. Mock-test Pub/Sub webhook OIDC validation, wrong audience/service account rejection, durable acknowledgement, duplicate delivery, notification coalescing and rate handling.
+4. Mock-test `users.watch` label filtering, watch response baseline/expiry, daily renewal, initial backfill race catch-up, label-scoped `history.list` pagination, `messageAdded`/`labelAdded`, cursor expiry/404 recovery and periodic reconciliation.
+5. Add assertions that every list/watch/history API call carries the dedicated label ID and every message-body retrieval follows a passing metadata preflight. A non-Google or unlabelled message must never receive `format=raw`.
+6. Verify public job destination fetch, normalized fields, canonical dedupe and private owner-only source visibility. Confirm no Gmail-only row is visible to another account/admin feed or evaluated/queued by another user's notification worker.
+7. Verify only the owner's per-user Telegram setting/private chat receives new-job notifications. Legacy global Telegram sender/ledger must remain untouched by this source. Suppress all one-time backfill notifications by default; send only future arrivals after initial sync complete (pending owner confirmation).
+8. Run focused parser + Gmail client + webhook + private-visibility tests and full V2 regression suite in a fresh non-production checkout/database; record Python/dependency versions, exact test counts and commit SHA. Do not use the production VM as a test runner or paid GitHub Actions.
+9. Read-only preflight the VM callback's public HTTPS certificate chain/SAN/firewall/Nginx path. Only then create Pub/Sub resources with authenticated OIDC push. Confirm project billing/pricing before provisioning.
+10. Determine whether creator-only Personal Mode exception also affects the separate security-assessment rule for restricted data processed on the Oracle VM. Do not store production tokens or enable the live mailbox until the requirement is resolved and all security/data-minimization controls pass.
 
 ## 6. Owner input required
 
 No credentials, OAuth secrets, Gmail password, app password, refresh token, or access token should be sent in chat.
 
-The owner has supplied a representative Google Alerts `.eml` with multiple results and expressly consented to the owner-only Gmail connection for Google Alerts messages. No further sample is currently required for the parser foundation. The raw fixture must remain outside GitHub and must not be copied into logs or durable application storage.
+The owner has supplied a representative Google Alerts `.eml` with multiple results and expressly consented to a personal owner-only Gmail connection. The raw fixture remains outside GitHub and must not be copied into logs or durable application storage.
 
-The owner explicitly decided on 21 November 2026 that the initial Gmail synchronization must backfill **all available Google Alerts emails** (no date cutoff or recent-window limit). The operational scope is only messages with the dedicated `JobBeeper/GoogleAlerts` label across Inbox and archived/All Mail; Spam and Trash remain excluded by default. The owner must apply the label to existing matches and set the Gmail filter to label future arrivals. The app will use `labelIds`/`labelId` on every list/history operation and metadata-first validation before body retrieval. The full-backfill procedure and race-free handoff to incremental history polling are specified in Section 2.3.
+The owner has selected:
+- Hosting: existing Oracle VM `job-radar`.
+- Trigger: Gmail push notifications through Cloud Pub/Sub to an authenticated HTTPS webhook, with scheduled history reconciliation as a safety net.
+- Results: existing owner dashboard plus Telegram, using only the owner's per-user private Telegram chat.
+- Backfill: all available labelled Google Alerts emails, no date cutoff; Spam and Trash excluded.
+- Mailbox boundary: only the `JobBeeper/GoogleAlerts` label. The owner creates the label/filter in Gmail; the app never lists unlabelled mailbox messages or retrieves unlabelled bodies.
+- Product boundary: creator-only personal instance for the first release. No other JobBeeper user may connect Gmail or see Gmail-only discoveries.
 
-Before production OAuth work, the product owner must resolve Google's Gmail permitted-use-case question.
-
-**Policy-status clarification:** the owner has confirmed personal consent and the intended mailbox boundary. This does not, by itself, establish that Google has approved the product's multi-member job-discovery use case under the Workspace User Data policy. Do not initiate live OAuth or retain tokens until the owner supplies the applicable Google approval/verification status or the use case is otherwise cleared through Google's official review process. We will not enable a live connection, request consent or store a refresh token without that gate. No Gmail credentials, OAuth secrets, passwords, access tokens or refresh tokens should be sent in chat.
+The owner must still create the Personal Mode OAuth project/client and configure the Gmail label/filter. The webhook endpoint's CA-signed public HTTPS requirements and the restricted-data server-side security-assessment applicability must be checked before live OAuth and Pub/Sub activation. Do not request secrets in chat; use a secure local/VM credential handoff only after implementation and controls are ready.
 
 ## 7. Official references reviewed on 21 November 2026
 
