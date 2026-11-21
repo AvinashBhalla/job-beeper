@@ -282,8 +282,6 @@ def _extract_plain_text(plain: str) -> tuple[GoogleAlertEmailResult, ...]:
         result = _make_result(title, snippet, raw_url, "plain_text")
         if result:
             extracted.append(result)
-            if len(extracted) >= MAX_RESULTS_PER_EMAIL:
-                break
 
     return _dedupe_results(extracted)
 
