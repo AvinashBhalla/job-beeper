@@ -121,8 +121,11 @@ def _parse_public_https_url(value: str) -> tuple[str, str, str]:
 
     path = parsed.path or "/"
     target = path + (f"?{parsed.query}" if parsed.query else "")
+    # Construct Host from the validated IDNA hostname, not the untrusted
+    # original authority string. Bracket IPv6 literals as required by HTTP.
+    authority = f"[{host_ascii}]" if ":" in host_ascii else host_ascii
     # Fragments never reach the HTTP server.
-    return host_ascii, target, parsed.netloc
+    return host_ascii, target, authority
 
 
 def _resolve_public_addresses(host: str, resolver=None) -> tuple[str, ...]:
