@@ -83,8 +83,8 @@ A local JobBeeper worker will poll the Gmail API using `users.history.list` and 
 1. On first connection, establish a baseline history ID from the authenticated mailbox. By default, do not backfill old mail; begin processing messages arriving after connection. Any historical backfill requires a separate, explicit owner decision and a bounded date window.
 2. Poll `history.list` on a conservative interval through the existing service runtime, optionally filtering by the dedicated label ID. Use `historyTypes=messageAdded` and page through all results.
 3. Collect unique message IDs from the `messagesAdded` records. Stage those IDs durably before advancing the committed history cursor.
-4. Read only message headers first when necessary; discard messages that do not match the confirmed Google Alerts sender/subject pattern without downloading their bodies.
-5. Fetch the full MIME payload for matching messages, parse the email in memory, and enqueue every result item independently.
+4. Read only message headers first: request `messages.get(format=metadata)` with `From`, `Subject` and `Authentication-Results` in `metadataHeaders`. Discard messages that do not match the confirmed Google Alerts sender/subject and Gmail authentication pattern without downloading their bodies.
+5. For matching messages only, request `messages.get(format=raw)`, base64url-decode the RFC 5322 payload and parse it in memory. Use the Gmail message resource's `internalDate` for mailbox-arrival ordering and recovery windows; the RFC `Date` header is retained only as optional display metadata. Enqueue every result item independently.
 6. Commit the new Gmail history cursor only after every page and every discovered message ID has been safely staged. Repeated notifications or poll retries must be idempotent.
 7. If Gmail returns HTTP 404 because the checkpoint is no longer valid, run a bounded full resynchronization using the last successful poll time plus an overlap window, deduplicate against the processing ledger, then establish a new checkpoint. Record the recovery event and do not silently skip the gap.
 
