@@ -5,7 +5,7 @@ import unittest
 from v2.google_alerts_rss import parse_google_alerts_atom, unwrap_google_alert_url
 
 
-SAMPLE_FEED = \'\'\'<?xml version="1.0" encoding="UTF-8"?>
+SAMPLE_FEED = '''<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:idx="urn:atom-extension:indexing">
   <id>tag:google.com,2005:reader/user/REDACTED/state/com.google/alerts/REDACTED</id>
   <title>Google Alert - "Software Engineer" India React TypeScript</title>
@@ -30,7 +30,7 @@ SAMPLE_FEED = \'\'\'<?xml version="1.0" encoding="UTF-8"?>
     <author><name/></author>
   </entry>
 </feed>
-\'\'\'
+'''
 
 
 class GoogleAlertsAtomTests(unittest.TestCase):
