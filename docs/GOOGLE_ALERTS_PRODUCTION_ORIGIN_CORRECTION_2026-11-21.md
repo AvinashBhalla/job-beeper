@@ -183,9 +183,13 @@ The root feed ID includes account/Alert identifiers and the root `rel="self"` hr
 Branch: `feat/google-alerts-rss-atom-parser`.
 
 - `v2/google_alerts_rss.py`: Atom parser, HTML-to-text conversion (ignores script/style), Google redirect unwrapping, size limit, UTF-8 requirement, DTD/entity rejection, and static HTTPS/public-host checks. Uses existing `v2.dedupe.canonicalize_url`.
-- `v2/google_alerts_rss_polling.py`: one-feed conditional poller, bounded streamed reads, Google-only feed redirects, HTTP 304 handling, sanitized 429/503 Retry-After handling, idempotent SQLite state/entry persistence, a sequential one-shot batch runner with retry-backoff skips, and a protected external JSON feed-config loader. The loader requires an owner-only regular file outside the repository and validates each feed URL; it hides URLs from repr/error strings. The config is plaintext protected by filesystem permissions, not encrypted.
+- `v2/google_alerts_rss_polling.py`: one-feed conditional poller, bounded streamed reads, Google-only feed redirects, HTTP 304 handling, sanitized 429/503 Retry-After handling, idempotent SQLite state/entry persistence, a sequential one-shot batch runner with persisted retry-backoff skips and configurable inter-request spacing, and a protected external JSON feed-config loader. The loader requires an owner-only regular file outside the repository and validates each feed URL; it hides URLs from repr/error strings. The config is plaintext protected by filesystem permissions, not encrypted.
+- `v2/google_alerts_safe_fetch.py`: DNS-pinned HTTPS fetcher that validates all DNS answers before connecting, pins the chosen IP while retaining TLS hostname verification, manually revalidates each redirect hop, enforces robots.txt on every hop, caps response size and content types, and honours Retry-After on 429/503.
+- `v2/google_alerts_job_extract.py`: conservative Schema.org `JobPosting` JSON-LD extraction. It requires title and hiring organization, rejects expired postings, and routes missing/ambiguous structured data to review.
+- `v2/google_alerts_pipeline.py`: one-shot queue processor that collapses duplicate canonical result URLs within a batch, fetches and verifies destinations, records blocked/rejected/retryable/dead-letter/review states, and passes verified jobs into the existing V2 normalizer and `upsert_jobs()` callback.
+- `v2/radar.py`: adds `process_google_alert_rss_queue()` and `run_google_alerts_rss_batch()` manual entry points. The latter loads the protected config path from `JOB_RADAR_GOOGLE_ALERTS_CONFIG`, polls once, then processes a bounded result batch. No timer or public endpoint is enabled.
 - `v2/radar.py`: V2 `init_db()` now calls the additive schema initializer so feed-state and result-queue tables will be created on a future application deployment.
-- `v2/test_google_alerts_rss.py` and `v2/test_google_alerts_rss_polling.py`: 35 focused tests.
+- `v2/test_google_alerts_rss.py`, `v2/test_google_alerts_rss_polling.py`, `v2/test_google_alerts_safe_fetch.py`, `v2/test_google_alerts_job_extract.py`, and `v2/test_google_alerts_pipeline.py`: 73 focused tests.
 - `.github/workflows/v2-ci.yml`: adds the new files to the syntax-check list.
 
 The new schema stores opaque feed IDs, labels, ETag/Last-Modified values, timestamps, error codes and parsed result metadata. **It does not store feed URLs, root feed IDs or self links.** It does store resolved external job destination URLs and parsed titles/snippets as work-queue data.
@@ -206,12 +210,13 @@ The feed was fetched once through the poller in the isolated feature workspace. 
 ### Validation and remaining limitations
 
 - Python 3.10.12 in a fresh isolated clone: `py_compile` passed for `radar.py`, parser, poller and both test files.
-- Focused tests: **35/35 passed** after adding protected feed-config and batch/backoff cases.
+- Focused tests: **73/73 passed** after adding protected config, batch pacing, DNS pinning, robots, JobPosting extraction and shared-ingestion pipeline cases.
 - The full `v2.test_radar` suite could not be imported in this clean VM workspace because `bs4` is not installed there. I did not install project dependencies on the production VM.
 - Latest GitHub Actions run ended before runner assignment (`runner_id=0`, zero steps). No CI checks executed; repository CI remains unverified.
 - PR #101 remains draft and unmerged.
-- No feed scheduler/timer or poll interval is enabled. The protected config loader exists, but the actual feed config file (including the remaining 97 URLs) has not been created. No result-page network fetcher, DNS/redirect-hop SSRF protection, job extraction/verification, shared job ingestion, preference evaluation, or production deployment is included.
-- The additive schema initializer exists in code but has **not** been applied to the production database. The external feed-config loader has not been integrated into process startup or service configuration.
+- No feed scheduler/timer or automatic poll interval is enabled. The protected config loader exists, but the actual feed config file (including the remaining 97 URLs) has not been created or installed on the VM. The one-shot manual batch entrypoint is not configured or executed against all feeds.
+- The safe fetcher, robots check, JobPosting extractor and V2 shared-ingestion pipeline exist only in the feature branch. They have not been deployed; no result queue has been populated in production.
+- The additive schema initializer exists in code but has **not** been applied to the production database. The external feed-config loader has not been integrated into service startup or a systemd job.
 
 The supplied RSS URL remains a private bearer-like link. Do not place it in tickets, logs, source control, public dashboards or copied diagnostics.
 
@@ -239,3 +244,30 @@ Expected config shape (use placeholders only; never commit actual feed URLs):
 **The actual file has not been created** and should be provided through a separate owner-only deployment secret/configuration path, not GitHub or chat. The loader is not yet wired into service startup. The batch helper is a one-shot function only; no schedule, timer, 98-feed import or automatic polling cadence has been enabled.
 
 After adding config loader and batch/backoff tests, the focused parser/poller suite is **35/35 passing** in the clean isolated workspace. GitHub Actions remains unverified because the runner is not assigned (`runner_id=0`, no steps). The full V2 test suite could not be run on this workspace due missing `bs4`; no packages were installed on the production VM.
+
+## 12. Destination verification and V2 shared-ingestion pipeline — 21 November 2026
+
+The latest feature-branch increment implements the downstream result-processing path without creating a separate jobs database:
+
+1. A bounded queue batch claims due RSS result rows and groups entries sharing the same canonical destination URL.
+2. The safe fetcher resolves the destination host, rejects the entire DNS answer if any returned address is private/reserved, and connects to a validated IP while preserving the original host for TLS verification.
+3. It disables automatic redirects, manually validates every redirect destination, and checks the destination host's robots.txt policy before each hop. A missing robots file is treated as no policy; 401/403 deny; an unavailable robots response fails closed. Response content types and size are bounded.
+4. It parses Schema.org `JobPosting` JSON-LD. A listing needs a title and hiring organization; expired jobs are rejected; no/ambiguous structured evidence goes to review.
+5. Verified records are normalized through the existing V2 `normalize_job()` and passed to existing `upsert_jobs()`. The existing path creates/updates shared jobs, assigns canonical opportunities and refreshes configured users' preference evaluations. No parallel job store or matching implementation is added.
+6. Feed observations are retained as provenance in `source_details`; canonical URL determines the Google Alerts source ID. Multiple Alert rules with the same posting collapse to one destination fetch per batch, while existing DB uniqueness/canonical rules handle cross-batch/cross-source dedupe.
+7. 403/robots-denied records become `blocked` (not retried), 404/410 and expired postings become `rejected`, 429/503/network failures are retried with Retry-After/backoff and eventually dead-lettered, while missing structured data becomes `needs_review`.
+
+### Observed destination outcomes using the supplied sample
+
+- Shine destination: robots.txt allowed access; the page returned HTTP 200 and a Schema.org `JobPosting` record. Extracted title: **Software Engineering - React & Node - Associate (India)**; employer: **PwC Acceleration Centers in India**; location: **All India, IN**; description present. This was a single read-only test from the isolated workspace.
+- Foundit destination: returned **HTTP 403**. The fetcher stopped; no proxy, alternate identity or bypass was attempted.
+
+### Latest isolated validation
+
+- Python 3.10.12: `py_compile` passed for the parser, poller, fetcher, extractor, queue pipeline, V2 `radar.py`, and five focused test modules.
+- Focused unit tests: **73/73 passed**.
+- GitHub Actions V2 CI remains unverified because the job terminates before runner assignment (`runner_id=0`, zero steps). This is a runner/infrastructure failure, not a test report.
+- The full existing `v2.test_radar` regression suite could not be imported in the clean workspace because `bs4` is not installed. I did not install project dependencies on the production VM.
+- PR #101 remains draft and unmerged.
+
+**Still not enabled:** no feed-config file is installed, the remaining 97 RSS URLs are not loaded, no automatic scheduler/timer exists, and no production DB migration/service deployment has occurred. The manual `run_google_alerts_rss_batch()` entrypoint exists but has not been called against all owner alerts.
