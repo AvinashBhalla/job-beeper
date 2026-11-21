@@ -1,14 +1,16 @@
 # PRIORITY CHANGE — 21 November 2026
 
-**New P0 next discovery-source increment: [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).**
+**P0 next discovery-source increment:** [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md), [Cloudflare implementation update](GOOGLE_ALERTS_CLOUDFLARE_IMPLEMENTATION_UPDATE_2026-11-21.md), [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).
 
-Owner-confirmed product direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members will not connect Gmail. A dedicated Gmail label will scope a Gmail API `users.watch`; Cloud Pub/Sub will push notifications to an authenticated JobBeeper HTTPS webhook. The worker will then use Gmail history to fetch new labelled emails, verify destination job pages, ingest valid opportunities once into the shared database, and evaluate each member against their own preferences.
+Owner-confirmed product direction: 98 Google Alerts arrive in one owner-controlled Gmail mailbox; members do not connect Gmail. Preferred event path: Gmail filter (label + forward only matching Alert mail) → Cloudflare Email Routing on a dedicated subdomain → Cloudflare Email Worker → compact event in Cloudflare Queues → timestamped HMAC-signed JobBeeper webhook → durable SQLite inbox/result queue → safe URL extraction and verification → shared jobs/canonical opportunities → independent member-preference evaluation.
 
-**Estimate:** 6–9 focused engineering working days for the production-ready owner-mailbox MVP, subject to public HTTPS host resolution, Google Cloud setup and any OAuth restricted-scope verification/security-assessment requirements. A 2–3 day proof-of-flow is not production readiness.
+**Do not implement the older Gmail API users.watch + Google Pub/Sub design for the MVP.** It requires restricted gmail.readonly access and broad mailbox permissions. The preferred forwarding design does not require Gmail OAuth or Google Cloud Pub/Sub. The Cloudflare approach is conditional on confirming access to the Cloudflare zone for jobbeeper.com and validating a representative redacted Alert email. Do not alter apex MX records or existing mail routing.
 
-**Planning only:** the plan is documented, but no implementation, Google Cloud resource provisioning, Gmail authorization, production configuration or deployment has been approved or performed. Obtain explicit execution approval before coding or changing Cloud/production resources.
+**Estimate:** 5–7 focused engineering working days after Cloudflare zone access and a sample Alert email are available. This excludes account-access delays or unplanned DNS remediation. A 1–2 day proof-of-flow is not production readiness.
 
-Keep the 20 November production-acceptance gates active: member browser/API/database mapping is unresolved; per-user notification delivery is unverified; Workday/LinkedIn cooldowns must be preserved; Naukri relay remains intentionally paused. See the feature plan for the revised P0/P1/P2 backlog and rollout gates.
+**Isolated branch created:** feat/google-alerts-email-routing. No Cloudflare resources, DNS records, Gmail filters, forwarding rules, production settings or services have been changed.
+
+Keep the 20 November production-acceptance gates active: member browser/API/database mapping is unresolved; per-user notification delivery is unverified; Workday/LinkedIn cooldowns must be preserved; Naukri relay remains intentionally paused. V2 upsert_jobs() already invokes per-user evaluations for affected job IDs; reuse it rather than duplicating member-matching logic.
 
 ---
 
