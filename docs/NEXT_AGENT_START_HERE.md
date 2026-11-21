@@ -1,3 +1,21 @@
+# LATEST OWNER DECISION — GOOGLE ALERTS EMAIL VIA GMAIL API
+
+**Confirmed 21 November 2026:** the product requirement is direct reading of the owner's existing Gmail inbox. Multiple Google Alerts rules use different search strings, but all notification emails share the same Google Alerts email structure. Each message can contain multiple result items. Parse every item from each matching message through one generic email parser. Do not ask for RSS URLs; do not create per-alert parsers, feed configurations, or manual-forwarding workflows.
+
+**Read first:** [Google Alerts Gmail Inbox Integration](GOOGLE_ALERTS_GMAIL_INBOX_INTEGRATION_2026-11-21.md). It defines the owner-only Gmail authorization, history polling/checkpoint recovery, MIME parsing, shared ingestion, privacy controls, Google policy gate and test plan.
+
+**Current architecture:** keep member Google sign-in unchanged (`openid email profile`). The owner Gmail integration is a separate OAuth grant. The MVP design uses local scheduled `users.history.list` polling and a durable historyId, not Gmail push/Pub/Sub or a public webhook. The implementation will fetch headers first, retrieve full MIME only for confirmed Google Alerts messages, parse all items, and send verified public job postings through existing V2 `normalize_job()`/`upsert_jobs()` and member evaluation.
+
+**Policy gate:** `gmail.readonly` is a Restricted scope. Google's approved Gmail use cases include email clients, backup, productivity and some email-monitoring/reporting services; JobBeeper's use of the owner's alerts to populate shared member-facing job discovery is not clearly established as permitted. Do not request live consent or connect the real mailbox until Google confirms the permitted-use-case and Limited Use/data-transfer requirements. A server-side restricted-scope app may also require verification and an annual third-party security assessment. See the integration plan's official links.
+
+**Obsolete work:** RSS PR #101 is superseded by this email requirement and must remain closed/unmerged; do not use its RSS feed URLs or poller as the product implementation. The separate Cloudflare Email Routing branch remains quarantined and must not be merged/deployed.
+
+**Owner input:** before parser validation, obtain one sanitized Google Alerts `.eml` file with multiple items. No Gmail password, app password, OAuth secret, access token or refresh token is needed in chat. Safe default on first connection is to process only new emails; historical backfill is a separate owner decision.
+
+**Cost/environment:** do not trigger GitHub Actions or incur hosted CI spend. Develop and test in a fresh non-production checkout and database. The only currently connected Terminal Commands machine is the production `job-radar` VM; do not run development tests there. No Gmail OAuth, production polling, database migration, timer, GCP resources or deployment has been configured.
+
+---
+
 # PRIORITY CHANGE — 21 November 2026
 
 **P0 next discovery-source increment:** [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).
