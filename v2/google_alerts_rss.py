@@ -209,7 +209,7 @@ def parse_google_alerts_atom(
         xml_text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ValueError("Google Alerts feed must use UTF-8 encoding.") from exc
-    if re.search(r"<!\\s*(DOCTYPE|ENTITY)\\b", xml_text, flags=re.IGNORECASE):
+    if re.search(r"<!\s*(DOCTYPE|ENTITY)\b", xml_text, flags=re.IGNORECASE):
         raise ValueError("DTD and entity declarations are not allowed in Alert feeds.")
 
     try:
