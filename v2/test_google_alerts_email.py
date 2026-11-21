@@ -15,13 +15,25 @@ from v2.google_alerts_email import (
 SENDER = "Google Alerts <googlealerts-noreply@google.com>"
 
 
-def make_email(*, html_body=None, plain_body=None, sender=SENDER, subject="Google Alert - example query"):
+def make_email(
+    *,
+    html_body=None,
+    plain_body=None,
+    sender=SENDER,
+    subject="Google Alert - example query",
+    authentication_results=(
+        "mx.google.com; dkim=pass header.i=@google.com; "
+        "spf=pass; dmarc=pass header.from=google.com"
+    ),
+):
     message = EmailMessage()
     message["From"] = sender
     message["To"] = "owner@example.test"
     message["Subject"] = subject
     message["Date"] = "Fri, 20 Nov 2026 06:19:10 -0800"
     message["Message-ID"] = "<message-123@example.test>"
+    if authentication_results is not None:
+        message["Authentication-Results"] = authentication_results
     if plain_body is not None:
         message.set_content(plain_body)
     if html_body is not None:
@@ -147,6 +159,18 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
         with self.assertRaises(GoogleAlertEmailError) as caught:
             parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "unrecognized_sender")
+
+    def test_rejects_sender_without_google_dkim_and_dmarc(self):
+        raw = make_email(
+            authentication_results="mx.google.com; dkim=fail; dmarc=fail",
+            html_body=structured_html([{
+                "title": "Role",
+                "url": "https://jobs.example.test/role",
+            }]),
+        )
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(raw)
+        self.assertEqual(caught.exception.code, "sender_authentication_failed")
 
     def test_rejects_non_alert_subject(self):
         raw = make_email(
