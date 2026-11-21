@@ -239,7 +239,13 @@ def ingest_event(db_path: str | Path, body: bytes, payload: Any) -> dict[str, An
     if not isinstance(body, bytes) or len(body) > MAX_EVENT_BODY_BYTES:
         raise ValueError("event body is too large")
     event = validate_event(payload)
-    payload_hash = hashlib.sha256(body).hexdigest()
+    # Hash the normalized event rather than its incoming JSON key order. The
+    # HMAC still authenticates the exact raw bytes, while idempotency is based
+    # on the validated semantic payload.
+    canonical_body = json.dumps(
+        event, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    payload_hash = hashlib.sha256(canonical_body).hexdigest()
     created_at = _now_iso()
     inserted = False
 
