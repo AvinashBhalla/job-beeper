@@ -104,6 +104,10 @@ class PinnedConnectionTests(unittest.TestCase):
 
 
 class SafePublicFetchTests(unittest.TestCase):
+    def _fetch(self, *args, **kwargs):
+        kwargs.setdefault("robots_checker", lambda _: True)
+        return fetch_public_job_page(*args, **kwargs)
+
     def _resolver(self, mapping):
         calls = []
 
@@ -122,7 +126,7 @@ class SafePublicFetchTests(unittest.TestCase):
         factory = FakeConnectionFactory(response)
         resolver, calls = self._resolver({"jobs.example.com": ["93.184.216.34"]})
 
-        page = fetch_public_job_page(
+        page = self._fetch(
             "https://jobs.example.com/software-engineer?id=123#section",
             resolver=resolver,
             connection_factory=factory,
@@ -148,7 +152,7 @@ class SafePublicFetchTests(unittest.TestCase):
             {"jobs.example.com": ["93.184.216.34", "10.10.0.5"]}
         )
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/job",
                 resolver=resolver,
                 connection_factory=factory,
@@ -165,7 +169,7 @@ class SafePublicFetchTests(unittest.TestCase):
             ("https://jobs.example.com:8443/job", "url_not_public_https"),
         ):
             with self.subTest(url=url), self.assertRaises(SafeFetchError) as caught:
-                fetch_public_job_page(url)
+                self._fetch(url)
             self.assertEqual(caught.exception.code, expected)
 
     def test_revalidates_dns_for_each_redirect_hop(self):
@@ -181,7 +185,7 @@ class SafePublicFetchTests(unittest.TestCase):
             "careers.example.net": ["93.184.216.35"],
         })
 
-        page = fetch_public_job_page(
+        page = self._fetch(
             "https://jobs.example.com/outbound",
             resolver=resolver,
             connection_factory=factory,
@@ -206,7 +210,7 @@ class SafePublicFetchTests(unittest.TestCase):
         factory = FakeConnectionFactory(redirect)
         resolver, calls = self._resolver({"jobs.example.com": ["93.184.216.34"]})
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/go",
                 resolver=resolver,
                 connection_factory=factory,
@@ -219,7 +223,7 @@ class SafePublicFetchTests(unittest.TestCase):
         factory = FakeConnectionFactory(redirect)
         resolver, _ = self._resolver({"jobs.example.com": ["93.184.216.34"]})
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/go",
                 resolver=resolver,
                 connection_factory=factory,
@@ -234,7 +238,7 @@ class SafePublicFetchTests(unittest.TestCase):
         )
         resolver, _ = self._resolver({"jobs.example.com": ["93.184.216.34"]})
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/same",
                 resolver=resolver,
                 connection_factory=factory,
@@ -250,7 +254,7 @@ class SafePublicFetchTests(unittest.TestCase):
         factory = FakeConnectionFactory(*responses)
         resolver, _ = self._resolver({"jobs.example.com": ["93.184.216.34"]})
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/step-0",
                 resolver=resolver,
                 connection_factory=factory,
@@ -265,7 +269,7 @@ class SafePublicFetchTests(unittest.TestCase):
         factory = FakeConnectionFactory(response)
         resolver, _ = self._resolver({"jobs.example.com": ["93.184.216.34"]})
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/job",
                 max_bytes=20,
                 resolver=resolver,
@@ -279,7 +283,7 @@ class SafePublicFetchTests(unittest.TestCase):
         factory = FakeConnectionFactory(response)
         resolver, _ = self._resolver({"jobs.example.com": ["93.184.216.34"]})
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/job",
                 resolver=resolver,
                 connection_factory=factory,
@@ -291,13 +295,103 @@ class SafePublicFetchTests(unittest.TestCase):
             raise OSError("secret internal resolver detail")
 
         with self.assertRaises(SafeFetchError) as caught:
-            fetch_public_job_page(
+            self._fetch(
                 "https://jobs.example.com/job",
                 resolver=fail_resolution,
                 connection_factory=FakeConnectionFactory(),
             )
         self.assertEqual(caught.exception.code, "dns_resolution_failed")
         self.assertNotIn("secret", str(caught.exception))
+
+
+class RobotsPolicyTests(unittest.TestCase):
+    def setUp(self):
+        from v2 import google_alerts_safe_fetch
+        google_alerts_safe_fetch._ROBOTS_CACHE.clear()
+
+    def _resolver(self, host="jobs.example.com"):
+        return lambda name, port, *, type: dns_records("93.184.216.34")
+
+    def test_disallow_rule_blocks_page_request(self):
+        factory = FakeConnectionFactory(FakeResponse(
+            200,
+            {"Content-Type": "text/plain"},
+            b"User-agent: *\\nDisallow: /private",
+        ))
+        with self.assertRaises(SafeFetchError) as caught:
+            fetch_google_page = fetch_public_job_page(
+                "https://jobs.example.com/private/posting",
+                resolver=self._resolver(),
+                connection_factory=factory,
+            )
+        self.assertEqual(caught.exception.code, "robots_disallowed")
+        self.assertEqual(len(factory.connections), 1)
+        self.assertEqual(factory.connections[0].request_args[1], "/robots.txt")
+
+    def test_allow_rule_allows_page_and_caches_policy(self):
+        robots = FakeResponse(
+            200, {"Content-Type": "text/plain"},
+            b"User-agent: *\\nDisallow: /private",
+        )
+        page1 = FakeResponse(200, {"Content-Type": "text/html"}, b"First page")
+        page2 = FakeResponse(200, {"Content-Type": "text/html"}, b"Second page")
+        factory = FakeConnectionFactory(robots, page1, page2)
+        resolver = self._resolver()
+
+        first = fetch_public_job_page(
+            "https://jobs.example.com/public/one",
+            resolver=resolver,
+            connection_factory=factory,
+        )
+        second = fetch_public_job_page(
+            "https://jobs.example.com/public/two",
+            resolver=resolver,
+            connection_factory=factory,
+        )
+        self.assertEqual(first.text, "First page")
+        self.assertEqual(second.text, "Second page")
+        # robots.txt was fetched once; the policy was reused for the second URL.
+        self.assertEqual(len(factory.connections), 3)
+        self.assertEqual(factory.connections[0].request_args[1], "/robots.txt")
+
+    def test_missing_robots_file_allows_page(self):
+        factory = FakeConnectionFactory(
+            FakeResponse(404, {"Content-Type": "text/plain"}),
+            FakeResponse(200, {"Content-Type": "text/html"}, b"Page"),
+        )
+        page = fetch_public_job_page(
+            "https://jobs.example.com/posting",
+            resolver=self._resolver(),
+            connection_factory=factory,
+        )
+        self.assertEqual(page.text, "Page")
+        self.assertEqual(len(factory.connections), 2)
+
+    def test_forbidden_robots_file_denies_all(self):
+        factory = FakeConnectionFactory(
+            FakeResponse(403, {"Content-Type": "text/plain"})
+        )
+        with self.assertRaises(SafeFetchError) as caught:
+            fetch_public_job_page(
+                "https://jobs.example.com/posting",
+                resolver=self._resolver(),
+                connection_factory=factory,
+            )
+        self.assertEqual(caught.exception.code, "robots_disallowed")
+        self.assertEqual(len(factory.connections), 1)
+
+    def test_robots_server_error_fails_closed(self):
+        factory = FakeConnectionFactory(
+            FakeResponse(503, {"Retry-After": "60"})
+        )
+        with self.assertRaises(SafeFetchError) as caught:
+            fetch_public_job_page(
+                "https://jobs.example.com/posting",
+                resolver=self._resolver(),
+                connection_factory=factory,
+            )
+        self.assertEqual(caught.exception.code, "robots_unavailable")
+        self.assertEqual(len(factory.connections), 1)
 
 
 if __name__ == "__main__":
