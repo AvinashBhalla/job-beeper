@@ -7,6 +7,8 @@ and every new host is resolved and validated again.
 """
 from __future__ import annotations
 
+import datetime as dt
+import email.utils
 import http.client
 import ipaddress
 import re
@@ -36,9 +38,16 @@ ALLOWED_CONTENT_TYPES = {
 class SafeFetchError(Exception):
     """Sanitized fetch failure that never includes the source URL."""
 
-    def __init__(self, code: str, *, http_status: int | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        http_status: int | None = None,
+        retry_after_seconds: int | None = None,
+    ) -> None:
         self.code = code
         self.http_status = http_status
+        self.retry_after_seconds = retry_after_seconds
         super().__init__(code)
 
 
@@ -166,6 +175,22 @@ def _resolve_public_addresses(host: str, resolver=None) -> tuple[str, ...]:
         parsed_addresses.append((parsed.version, address))
     parsed_addresses.sort()
     return tuple(address for _, address in parsed_addresses)
+
+
+def _retry_after_seconds(value: str | None) -> int | None:
+    if not value:
+        return None
+    try:
+        return max(0, min(86_400, int(float(value))))
+    except (TypeError, ValueError, OverflowError):
+        try:
+            parsed = email.utils.parsedate_to_datetime(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=dt.timezone.utc)
+        delta = parsed.astimezone(dt.timezone.utc) - dt.datetime.now(dt.timezone.utc)
+        return max(0, min(86_400, int(delta.total_seconds())))
 
 
 def _header(headers, name: str) -> str | None:
@@ -355,6 +380,14 @@ def fetch_public_job_page(
                 current = urljoin(current, location)
                 continue
 
+            if status in {429, 503}:
+                raise SafeFetchError(
+                    "upstream_rate_limited" if status == 429 else "upstream_unavailable",
+                    http_status=status,
+                    retry_after_seconds=_retry_after_seconds(
+                        _header(headers, "Retry-After")
+                    ),
+                )
             if status != 200:
                 raise SafeFetchError(
                     "upstream_http_error",
