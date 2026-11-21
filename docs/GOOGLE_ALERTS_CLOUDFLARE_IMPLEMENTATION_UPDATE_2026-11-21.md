@@ -20,7 +20,7 @@ The owner's requirement is event-driven processing of new Google Alert email, no
 4. The owner creates a Gmail filter matching only Google Alerts messages. The filter applies the JobBeeper/GoogleAlerts label and forwards matching new messages to the dedicated Cloudflare address. Disable general forwarding; keep Gmail's copy in the Inbox.
 5. The Email Worker validates sender and recipient, parses the raw MIME message using a maintained MIME parser, extracts message metadata and result anchors, and enqueues a compact JSON event. It does not log or enqueue full raw email bodies or attachments.
 6. A Cloudflare Queue consumer sends the event to the JobBeeper public HTTPS endpoint using HMAC-SHA256 over the exact request bytes and a timestamp.
-7. The JobBeeper webhook verifies the signature, timestamp, recipient, sender, schema and body size; then stores the message and URL candidates in a durable SQLite inbox/processing queue in one transaction before returning success.
+7. The JobBeeper webhook verifies the HMAC signature, timestamp, schema and body size (the Worker has already enforced the configured sender and exact recipient); it then stores the message and URL candidates in a durable SQLite inbox/processing queue in one transaction before returning success.
 8. A backend worker resolves and validates the destination URLs, fetches permitted public pages under per-host budgets, extracts actual job postings, and upserts verified observations as source google_alerts.
 9. Existing canonical linking and per-user evaluation remain the shared downstream pipeline. The existing upsert_jobs() function already refreshes configured user evaluations for affected job IDs, so do not duplicate this logic in the new source.
 
