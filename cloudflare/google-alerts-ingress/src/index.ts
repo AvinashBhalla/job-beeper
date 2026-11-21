@@ -143,7 +143,7 @@ async function enqueueAlert(email: Email, envelopeFrom: string, envelopeTo: stri
       receivedAt,
       headerFrom,
       String(index),
-      ...batch.map((link) => link.url),
+      ...batch.flatMap((link) => [link.url, link.title]),
     ].join("\n");
     const event: AlertEvent = {
       schema_version: 1,
@@ -162,7 +162,12 @@ async function enqueueAlert(email: Email, envelopeFrom: string, envelopeTo: stri
     }
     messages.push({ body: event });
   }
-  if (messages.length > 0) await queue.sendBatch(messages);
+  // Send individually: Queue sendBatch has an aggregate-size limit in
+  // addition to the per-message limit. Each event is already bounded below
+  // 96 KiB, so individual writes avoid a large multi-link email exceeding it.
+  for (const item of messages) {
+    await queue.send(item.body);
+  }
 }
 
 async function signRequest(body: string, timestamp: string, secret: string): Promise<string> {
