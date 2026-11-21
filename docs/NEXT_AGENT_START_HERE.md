@@ -1,3 +1,15 @@
+# LATEST OWNER DECISION — GOOGLE ALERTS RSS MULTI-FEED
+
+**Decision confirmed 21 November 2026:** all Google Alerts RSS feeds use the same Atom 1.0 output format; only each alert's Google Alerts search string differs. Use one common parser, poller, queue, safe fetcher and shared V2 ingestion path. Do not build per-query parsers or per-alert pipelines. Configure one protected `{id, label, url}` item for each RSS-enabled alert; the search string remains in Google Alerts and is not required in runtime config.
+
+**Read first:** [Google Alerts RSS multi-feed operating guide](GOOGLE_ALERTS_RSS_MULTI_FEED_OPERATING_GUIDE_2026-11-21.md). It records the format decision, 98-feed cap, secret-handling rules, canonical deduplication across alert queries, no-cost validation commands and release sequence.
+
+**Current PR:** [draft PR #101](https://github.com/AvinashBhalla/job-beeper/pull/101), branch `feat/google-alerts-rss-atom-parser`. The reported isolated run passed 73/73 focused RSS tests and Python compilation. Full V2 regression remains unverified because the earlier clean workspace lacked `bs4`. GitHub Actions quota is exhausted: **do not trigger Actions, buy minutes or enable billing**. Run remaining validation only in a fresh non-production local/isolated virtual environment using `v2/requirements-dev.txt`; never on the production VM/container or live DB.
+
+**No immediate owner input required.** Before the multi-feed pilot, the remaining private feed URLs must be transferred directly into the owner-only external JSON file via a secure file-transfer method, never pasted into chat or committed. Before migrating all alert rules, confirm whether RSS is allowed to replace email delivery for those rules. Do not change the existing alert delivery settings or enable a scheduler as part of this documentation step.
+
+---
+
 # PRIORITY CHANGE — 21 November 2026
 
 **P0 next discovery-source increment:** [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).
