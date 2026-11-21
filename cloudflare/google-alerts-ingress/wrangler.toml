@@ -1,7 +1,7 @@
 name = "job-beeper-google-alerts-ingress"
 main = "src/index.ts"
 compatibility_date = "2026-11-21"
-workers_dev = true
+workers_dev = false
 
 [vars]
 GOOGLE_ALERTS_INBOUND_TO = "google-alerts@alerts-in.jobbeeper.com"
