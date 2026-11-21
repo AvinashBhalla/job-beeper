@@ -94,11 +94,11 @@ def _google_authentication_passes(message) -> bool:
     return bool(
         result.startswith("mx.google.com;")
         and re.search(
-            r"\bdkim=pass\b.*?header\.i=@google\.com(?=$|[\\s;])",
+            r"\bdkim=pass\b.*?header\.i=@google\.com(?=$|[\s;])",
             result,
         )
         and re.search(
-            r"\bdmarc=pass\b.*?header\.from=google\.com(?=$|[\\s;])",
+            r"\bdmarc=pass\b.*?header\.from=google\.com(?=$|[\s;])",
             result,
         )
     )
