@@ -225,6 +225,19 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
             parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "too_many_results")
 
+    def test_plain_text_fallback_rejects_excessive_unique_results(self):
+        plain = "\\n\\n".join(
+            (
+                f"Role {index} at ExampleCo\\n"
+                f"Python backend position {index}\\n"
+                f"<{google_redirect(f'https://jobs.example.test/roles/{index}')}>"
+            )
+            for index in range(101)
+        )
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(make_email(plain_body=plain))
+        self.assertEqual(caught.exception.code, "too_many_results")
+
     def test_rejects_oversized_raw_message(self):
         with self.assertRaises(GoogleAlertEmailError) as caught:
             parse_google_alert_email(b"x" * 100, max_raw_bytes=10)
