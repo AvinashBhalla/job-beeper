@@ -74,13 +74,17 @@ The preferred setup is a narrow Gmail label (for example, `JobBeeper/GoogleAlert
 
 Creating the label/filter through the Gmail UI is optional for the implementation: an initial version can filter inbox additions and inspect headers to match the verified Google Alerts sender/subject. Do not assume a sender address or message layout until a representative email fixture is reviewed.
 
-A Gmail label is a processing filter, not an OAuth security boundary. The `gmail.readonly` scope still grants broad read access to the mailbox. The code must fetch only new candidate messages and must not scan unrelated mail bodies.
+A Gmail label is a processing filter, not an OAuth security boundary. The `gmail.readonly` scope still grants broad read access to the mailbox. The code must fetch bodies only for candidate messages identified by the full initial Google Alerts search or subsequent incremental history; it must not scan unrelated mail bodies.
 
 ### 2.3 Incremental polling and checkpoint recovery
 
 A local JobBeeper worker will poll the Gmail API using `users.history.list` and a durable `startHistoryId` checkpoint:
 
-1. On first connection, establish a baseline history ID from the authenticated mailbox. By default, do not backfill old mail; begin processing messages arriving after connection. Any historical backfill requires a separate, explicit owner decision and a bounded date window.
+1. **Owner-confirmed initial sync: backfill all available Google Alerts emails.** On the first approved owner connection, call `users.getProfile` and persist its returned `historyId` as the initial-sync baseline **before** starting the historical scan. Enumerate the mailbox with `users.messages.list`, using a Gmail search query constrained to the verified Google Alerts sender and alert subject phrase (for example, `from:googlealerts-noreply@google.com subject:"Google Alert"`). The query is only a candidate filter: every message must still pass the metadata-header checks below, including the exact subject prefix and unambiguous Gmail authentication results. Follow every `nextPageToken` until no next page remains; use up to 500 IDs per page and do not impose a date cutoff or recent-window limit. This searches matching mail across Inbox and archived/All Mail locations; Spam and Trash remain excluded by default (`includeSpamTrash=false`) and are not part of this initial backfill. Gmail's [messages.list reference](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list) documents the `q` filter, page token and 500-message maximum; [the list guide](https://developers.google.com/workspace/gmail/api/guides/list-messages) confirms that list results contain message IDs/thread IDs and must be expanded with `messages.get`. The `q` parameter is not available with `gmail.metadata`, so this design remains conditional on approval for the Restricted `gmail.readonly` scope.
+   - Persist each discovered message ID and page/progress state before moving to the next page, so an interrupted backfill resumes rather than restarting or skipping pages.
+   - Stage all matching candidates through the metadata-only preflight below; fetch `format=raw` only after sender, subject and Authentication-Results pass. Parse in memory and enqueue each result independently.
+   - Once the full enumeration has been staged, call `users.history.list` from the pre-scan baseline, page through the entire history response, and durably stage all message-added IDs found during the backfill. This closes the race for new Alerts arriving while the full mailbox scan is running. Only after every history page and discovered ID is safely staged should the worker commit the latest returned history cursor and switch to ordinary incremental polling.
+   - The backfill is idempotent across retries and repeated discoveries: the message-processing ledger and canonical destination dedupe prevent duplicate processing/jobs. Do not declare the initial sync complete while an ID is still pending or retryable.
 2. Poll `history.list` on a conservative interval through the existing service runtime, optionally filtering by the dedicated label ID. Use `historyTypes=messageAdded` and page through all results.
 3. Collect unique message IDs from the `messagesAdded` records. Stage those IDs durably before advancing the committed history cursor.
 4. Read only message headers first: request `messages.get(format=metadata)` with `From`, `Subject` and `Authentication-Results` in `metadataHeaders`. Discard messages that do not match the confirmed Google Alerts sender/subject and Gmail authentication pattern without downloading their bodies.
@@ -106,7 +110,7 @@ The parser is generic for Google Alerts emails, not query-specific.
 - Isolate malformed result cards so one malformed item does not discard other valid items in the same message.
 - Treat email content and links as untrusted input; enforce URL scheme/host checks, DNS/SSRF protection, redirect limits, response-size limits, robots policy and per-host backoff when fetching destinations.
 
-A sanitized real Google Alerts email is required to establish the exact sender, subject, MIME nesting, HTML card markup, tracking-link shape and multi-item layout. Do not claim the parser is validated until it passes that fixture and synthetic edge cases.
+The owner supplied a representative Google Alerts `.eml` containing multiple result items. Its MIME structure, sender/subject pattern, structured HTML cards and destination redirect shape were inspected; the raw fixture remains outside GitHub. Do not claim the committed parser is validated until the sanitized fixture and synthetic edge cases have been exercised by the committed test module in an isolated non-production environment.
 
 ### 2.5 Shared job verification and ingestion
 
@@ -169,9 +173,11 @@ If Google does not approve this use case, stop the Gmail API route. Do not try t
 
 No credentials, OAuth secrets, Gmail password, app password, refresh token, or access token should be sent in chat.
 
-Before parser implementation, the owner should provide one sanitized Google Alerts email as an `.eml` attachment (or a complete sanitized MIME source file) with multiple results. It is not necessary to provide all search strings, all alert emails, RSS URLs, or credentials.
+The owner has supplied a representative Google Alerts `.eml` with multiple results; no further sample is currently required for the parser foundation. The raw fixture must remain outside GitHub and must not be copied into logs or durable application storage.
 
-Before production OAuth work, the product owner must resolve Google's Gmail permitted-use-case question. We will not enable a live connection without that gate. If the owner wants historical alerts processed on first connection, that should be decided separately; the safe default is new emails only.
+The owner explicitly decided on 21 November 2026 that the initial Gmail synchronization must backfill **all available Google Alerts emails** (no date cutoff or recent-window limit). The operational scope is matching messages across Inbox and archived/All Mail locations; Spam and Trash remain excluded by default. The full-backfill procedure and race-free handoff to incremental history polling are specified in Section 2.3.
+
+Before production OAuth work, the product owner must resolve Google's Gmail permitted-use-case question. We will not enable a live connection, request consent or store a refresh token without that gate. No Gmail credentials, OAuth secrets, passwords, access tokens or refresh tokens should be sent in chat.
 
 ## 7. Official references reviewed on 21 November 2026
 
