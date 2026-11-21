@@ -88,6 +88,15 @@ class GoogleAlertIngestTests(unittest.TestCase):
         self.assertTrue(second["duplicate"])
         self.assertEqual(first["result_count"], second["result_count"])
 
+    def test_duplicate_delivery_is_independent_of_json_key_order(self):
+        payload = self._event()
+        sorted_body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        insertion_order_body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        first = google_alert_ingest.ingest_event(self.db_path, sorted_body, payload)
+        second = google_alert_ingest.ingest_event(self.db_path, insertion_order_body, payload)
+        self.assertFalse(first["duplicate"])
+        self.assertTrue(second["duplicate"])
+
     def test_repeated_url_across_messages_has_one_fetch_candidate_two_observations(self):
         first_payload = self._event("message-id-0001")
         second_payload = self._event("message-id-0002")
