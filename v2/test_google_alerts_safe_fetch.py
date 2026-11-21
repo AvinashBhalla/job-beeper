@@ -359,7 +359,7 @@ class RobotsPolicyTests(unittest.TestCase):
             302, {"Location": "https://careers.example.net/private/posting"}
         )
         factory = FakeConnectionFactory(redirect)
-        resolver, _ = self._resolver({
+        resolver = self._resolver({
             "jobs.example.com": ["93.184.216.34"],
             "careers.example.net": ["93.184.216.35"],
         })
