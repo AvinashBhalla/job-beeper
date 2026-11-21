@@ -162,6 +162,70 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
             parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "unrecognized_sender")
 
+    def test_rejects_google_alerts_among_multiple_from_addresses(self):
+        raw = make_email(
+            sender=f"{SENDER}, Attacker <attacker@example.test>",
+            html_body=structured_html([{
+                "title": "Role",
+                "url": "https://jobs.example.test/role",
+            }]),
+        )
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(raw)
+        self.assertEqual(caught.exception.code, "unrecognized_sender")
+
+    def test_rejects_duplicate_from_headers(self):
+        raw = make_email(html_body=structured_html([{
+            "title": "Role",
+            "url": "https://jobs.example.test/role",
+        }]))
+        message = BytesParser(policy=policy.default).parsebytes(raw)
+        message["From"] = "Attacker <attacker@example.test>"
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(message.as_bytes())
+        self.assertEqual(caught.exception.code, "unrecognized_sender")
+
+    def test_rejects_duplicate_subject_headers(self):
+        raw = make_email(html_body=structured_html([{
+            "title": "Role",
+            "url": "https://jobs.example.test/role",
+        }]))
+        message = BytesParser(policy=policy.default).parsebytes(raw)
+        message["Subject"] = "Weekly report"
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(message.as_bytes())
+        self.assertEqual(caught.exception.code, "unrecognized_subject")
+
+    def test_rejects_dkim_domain_suffix_spoof(self):
+        raw = make_email(
+            authentication_results=(
+                "mx.google.com; dkim=pass header.i=@google.com.attacker; "
+                "spf=pass; dmarc=pass header.from=google.com"
+            ),
+            html_body=structured_html([{
+                "title": "Role",
+                "url": "https://jobs.example.test/role",
+            }]),
+        )
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(raw)
+        self.assertEqual(caught.exception.code, "sender_authentication_failed")
+
+    def test_rejects_dmarc_domain_suffix_spoof(self):
+        raw = make_email(
+            authentication_results=(
+                "mx.google.com; dkim=pass header.i=@google.com; "
+                "spf=pass; dmarc=pass header.from=google.com.attacker"
+            ),
+            html_body=structured_html([{
+                "title": "Role",
+                "url": "https://jobs.example.test/role",
+            }]),
+        )
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(raw)
+        self.assertEqual(caught.exception.code, "sender_authentication_failed")
+
     def test_rejects_sender_without_google_dkim_and_dmarc(self):
         raw = make_email(
             authentication_results="mx.google.com; dkim=fail; dmarc=fail",
