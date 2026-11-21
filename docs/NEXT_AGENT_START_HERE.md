@@ -4,7 +4,7 @@
 
 Owner-confirmed product direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members will not connect Gmail. A dedicated Gmail label will scope a Gmail API `users.watch`; Cloud Pub/Sub will push notifications to an authenticated JobBeeper HTTPS webhook. The worker will then use Gmail history to fetch new labelled emails, verify destination job pages, ingest valid opportunities once into the shared database, and evaluate each member against their own preferences.
 
-**Estimate:** 6–8 focused engineering working days for the production-ready owner-mailbox MVP, subject to public HTTPS host resolution, Google Cloud setup and any OAuth restricted-scope verification/security-assessment requirements. A 2–3 day proof-of-flow is not production readiness.
+**Estimate:** 6–9 focused engineering working days for the production-ready owner-mailbox MVP, subject to public HTTPS host resolution, Google Cloud setup and any OAuth restricted-scope verification/security-assessment requirements. A 2–3 day proof-of-flow is not production readiness.
 
 **Planning only:** the plan is documented, but no implementation, Google Cloud resource provisioning, Gmail authorization, production configuration or deployment has been approved or performed. Obtain explicit execution approval before coding or changing Cloud/production resources.
 
