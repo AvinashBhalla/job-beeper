@@ -1,0 +1,22 @@
+name = "job-beeper-google-alerts-ingress"
+main = "src/index.ts"
+compatibility_date = "2026-11-21"
+workers_dev = true
+
+[vars]
+GOOGLE_ALERTS_INBOUND_TO = "google-alerts@alerts-in.jobbeeper.com"
+GOOGLE_ALERTS_ALLOWED_FROM = ""
+MAX_RAW_EMAIL_BYTES = "2097152"
+# Set JOB_BEEPER_WEBHOOK_URL after the correct public API origin is confirmed.
+# Set JOB_BEEPER_WEBHOOK_SECRET with: wrangler secret put JOB_BEEPER_WEBHOOK_SECRET
+
+[[queues.producers]]
+binding = "ALERT_EVENTS"
+queue = "job-beeper-google-alert-events"
+
+[[queues.consumers]]
+queue = "job-beeper-google-alert-events"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "job-beeper-google-alert-events-dlq"
