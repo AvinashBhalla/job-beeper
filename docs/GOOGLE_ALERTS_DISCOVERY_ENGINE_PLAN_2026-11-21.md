@@ -107,6 +107,8 @@ Implement a distinct owner-only connection flow with its own state, PKCE, callba
 
 The intended Gmail permission is `https://www.googleapis.com/auth/gmail.readonly`. It is restricted by Google's scope classification. It allows broad read access to Gmail messages/settings; the dedicated label is an application-side filter, not an OAuth permission boundary. The consent screen must plainly explain that JobBeeper reads alert messages from the owner's mailbox and does not modify or send email.
 
+Before implementing this path, confirm that this product use case is permitted under Google's Workspace API user-data policy—not just that the OAuth flow technically works. Google's Gmail-scope policy limits access to approved use cases, including certain user-benefiting productivity and email-based monitoring/reporting services. If the use case is not accepted, stop before requesting the restricted scope and reassess the intake architecture rather than attempting to work around Google's policy.
+
 Google's current policy indicates that restricted-scope apps accessing restricted data from or through a third-party server may need restricted-scope verification and a security assessment. The exact path depends on how the owner-only OAuth project is classified and configured. Confirm this before production; do not assume that a single-mailbox deployment automatically waives every requirement.
 
 ### 4.2 Pub/Sub setup
