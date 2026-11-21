@@ -34,7 +34,11 @@ from v2 import ats_directory, auth, board_discovery, board_scheduler, company_wa
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
-from v2.google_alerts_rss_polling import init_google_alerts_rss_schema
+from v2.google_alerts_rss_polling import (
+    init_google_alerts_rss_schema,
+    load_google_alerts_feed_configs,
+    poll_google_alerts_feed_batch,
+)
 from v2.google_alerts_pipeline import process_google_alert_rss_queue as _process_google_alert_rss_queue
 
 ROOT = Path(__file__).resolve().parent
@@ -1763,6 +1767,40 @@ def process_google_alert_rss_queue(limit: int = 10):
             upsert_jobs_fn=upsert_jobs,
             limit=limit,
         )
+
+def run_google_alerts_rss_batch(
+    *,
+    config_path: str | None = None,
+    feed_limit: int = 98,
+    result_limit: int = 10,
+    min_interval_seconds: float = 1.0,
+) -> dict[str, Any]:
+    """Run one manual feed poll plus one verification/ingestion batch.
+
+    Feed URLs are loaded from an owner-only file outside the repository via
+    JOB_RADAR_GOOGLE_ALERTS_CONFIG (or the explicit config_path argument).
+    This callable does not schedule itself or expose feed URLs in its result.
+    """
+    selected_path = config_path or os.getenv("JOB_RADAR_GOOGLE_ALERTS_CONFIG")
+    if not selected_path:
+        raise RuntimeError("Google Alerts RSS runtime configuration is not set.")
+
+    feeds = load_google_alerts_feed_configs(
+        selected_path,
+        max_feeds=feed_limit,
+    )
+    with connect_sqlite(DB_PATH) as conn:
+        poll_summary = poll_google_alerts_feed_batch(
+            conn,
+            feeds,
+            min_interval_seconds=min_interval_seconds,
+        )
+    processing_summary = process_google_alert_rss_queue(limit=result_limit)
+    return {
+        "feeds_configured": len(feeds),
+        "poll": poll_summary,
+        "processing": processing_summary,
+    }
 
 
 # Increment whenever deterministic matching/alertability rules change so
