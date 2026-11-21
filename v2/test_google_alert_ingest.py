@@ -131,6 +131,27 @@ class GoogleAlertIngestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at most 100"):
             google_alert_ingest.validate_event(payload)
 
+    def test_boolean_schema_version_is_rejected(self):
+        payload = self._event()
+        payload["schema_version"] = True
+        with self.assertRaisesRegex(ValueError, "schema version"):
+            google_alert_ingest.validate_event(payload)
+
+    def test_default_https_port_and_ipv6_are_normalized_safely(self):
+        default_port, default_hash = google_alert_ingest.normalized_public_url(
+            "https://example.com:443/jobs/123"
+        )
+        implicit_port, implicit_hash = google_alert_ingest.normalized_public_url(
+            "https://example.com/jobs/123"
+        )
+        self.assertEqual(default_port, implicit_port)
+        self.assertEqual(default_hash, implicit_hash)
+
+        ipv6_url, _ = google_alert_ingest.normalized_public_url(
+            "https://[2001:4860:4860::8888]/jobs/123"
+        )
+        self.assertTrue(ipv6_url.startswith("https://[2001:4860:4860::8888]/"))
+
 
 if __name__ == "__main__":
     unittest.main()
