@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_alert_ingest, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -1442,6 +1442,7 @@ def init_db() -> None:
     user_applications.init_schema(DB_PATH)
     board_scheduler.init_schema(str(DB_PATH))
     global_ats_discovery.init_schema(str(DB_PATH))
+    google_alert_ingest.init_schema(DB_PATH)
     user_preferences.migrate_first_admin_preferences(DB_PATH, get_config())
 
 
@@ -7730,6 +7731,64 @@ def disconnect_telegram_account(user: dict[str, Any] = Depends(require_authentic
         raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
     disconnected = telegram_linking.disconnect(DB_PATH, user["id"])
     return {"connected": False, "disconnected": disconnected}
+
+
+@app.post("/api/webhooks/google-alerts")
+async def google_alerts_email_webhook(request: Request):
+    """Accept compact, signed Google Alert events from the Cloudflare queue consumer."""
+    expected_secret = os.getenv("JOB_BEEPER_GOOGLE_ALERTS_WEBHOOK_SECRET", "").strip()
+    if len(expected_secret) < 32:
+        raise HTTPException(status_code=503, detail="Google Alerts webhook is not configured.")
+
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if content_type != "application/json":
+        raise HTTPException(status_code=415, detail="Content-Type must be application/json.")
+
+    try:
+        declared_length = request.headers.get("content-length", "")
+        if declared_length.isdigit() and int(declared_length) > google_alert_ingest.MAX_EVENT_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="Google Alerts event is too large.")
+        chunks: list[bytes] = []
+        total_bytes = 0
+        async for chunk in request.stream():
+            total_bytes += len(chunk)
+            if total_bytes > google_alert_ingest.MAX_EVENT_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="Google Alerts event is too large.")
+            chunks.append(chunk)
+        body = b"".join(chunks)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Unable to read Google Alerts event.") from None
+
+    timestamp = request.headers.get("X-JobBeeper-Timestamp", "")
+    signature = request.headers.get("X-JobBeeper-Signature", "")
+    if not google_alert_ingest.verify_request_signature(
+        body, timestamp, signature, expected_secret,
+    ):
+        raise HTTPException(status_code=403, detail="Webhook authentication failed.")
+
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid Google Alerts event JSON.") from None
+
+    try:
+        result = google_alert_ingest.ingest_event(DB_PATH, body, payload)
+    except ValueError as exc:
+        log.warning("Google Alerts webhook rejected event error_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except sqlite3.Error as exc:
+        log.exception("Google Alerts webhook persistence failed error_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Google Alerts event could not be persisted.") from None
+
+    if not result["duplicate"]:
+        log.info(
+            "Google Alerts event accepted event_hash=%s links=%s",
+            hashlib.sha256(str(payload.get("event_id", "")).encode("utf-8")).hexdigest()[:12],
+            result["result_count"],
+        )
+    return result
 
 
 @app.post("/api/telegram/webhook")
