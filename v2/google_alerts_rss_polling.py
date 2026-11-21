@@ -565,3 +565,123 @@ def record_feed_failure(
                 error.code, when, when,
             ),
         )
+
+
+@dataclass(frozen=True)
+class FeedBatchItem:
+    feed_id: str
+    status: str
+    new_entries: int = 0
+    total_entries: int = 0
+    error_code: str | None = None
+
+
+@dataclass(frozen=True)
+class FeedBatchSummary:
+    checked: int
+    modified: int
+    not_modified: int
+    failed: int
+    skipped_backoff: int
+    new_entries: int
+    items: tuple[FeedBatchItem, ...]
+
+
+def _parse_utc_timestamp(value: str) -> dt.datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def poll_google_alerts_feed_batch(
+    conn: sqlite3.Connection,
+    feeds: tuple[GoogleAlertsFeedConfig, ...] | list[GoogleAlertsFeedConfig],
+    *,
+    session: requests.Session | Any | None = None,
+    timeout: tuple[int, int] = DEFAULT_TIMEOUT,
+    max_bytes: int = DEFAULT_MAX_FEED_BYTES,
+    now: dt.datetime | None = None,
+) -> FeedBatchSummary:
+    """Poll a configured feed set sequentially, persisting every result safely.
+
+    This is a one-shot batch primitive, not a scheduler. It respects any stored
+    Retry-After deadline, reuses one HTTP session, and returns only opaque feed
+    IDs and sanitized status codes. The caller controls when the next batch
+    starts and must keep the feed list in a protected runtime configuration.
+    """
+    current_time = now or _utc_now()
+    checked_at = _utc_iso(current_time)
+    client = session or requests.Session()
+    owns_session = session is None
+    items: list[FeedBatchItem] = []
+
+    try:
+        for feed in feeds:
+            row = conn.execute(
+                "SELECT retry_after_at FROM google_alert_rss_feed_state WHERE feed_id=?",
+                (feed.feed_id,),
+            ).fetchone()
+            retry_at = _parse_utc_timestamp(row[0]) if row and row[0] else None
+            if retry_at and retry_at > current_time.astimezone(dt.timezone.utc):
+                items.append(
+                    FeedBatchItem(feed_id=feed.feed_id, status="skipped_backoff")
+                )
+                continue
+
+            try:
+                result = poll_google_alerts_feed(
+                    feed.url,
+                    get_feed_checkpoint(conn, feed.feed_id),
+                    session=client,
+                    timeout=timeout,
+                    max_bytes=max_bytes,
+                    now=current_time,
+                )
+                saved = record_feed_success(
+                    conn,
+                    feed_id=feed.feed_id,
+                    feed_label=feed.label,
+                    result=result,
+                )
+                items.append(
+                    FeedBatchItem(
+                        feed_id=feed.feed_id,
+                        status=result.status,
+                        new_entries=saved.new_entries,
+                        total_entries=saved.total_entries,
+                    )
+                )
+            except GoogleAlertsFeedError as exc:
+                record_feed_failure(
+                    conn,
+                    feed_id=feed.feed_id,
+                    feed_label=feed.label,
+                    error=exc,
+                    checked_at=checked_at,
+                )
+                items.append(
+                    FeedBatchItem(
+                        feed_id=feed.feed_id,
+                        status="failed",
+                        error_code=exc.code,
+                    )
+                )
+    finally:
+        if owns_session:
+            client.close()
+
+    return FeedBatchSummary(
+        checked=sum(item.status != "skipped_backoff" for item in items),
+        modified=sum(item.status == "modified" for item in items),
+        not_modified=sum(item.status == "not_modified" for item in items),
+        failed=sum(item.status == "failed" for item in items),
+        skipped_backoff=sum(item.status == "skipped_backoff" for item in items),
+        new_entries=sum(item.new_entries for item in items),
+        items=tuple(items),
+    )
