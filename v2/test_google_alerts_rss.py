@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from v2.google_alerts_rss import parse_google_alerts_atom, unwrap_google_alert_url
+from v2.google_alerts_rss import _html_to_text, parse_google_alerts_atom, unwrap_google_alert_url
 
 
 SAMPLE_FEED = '''<?xml version="1.0" encoding="UTF-8"?>
@@ -76,6 +76,22 @@ class GoogleAlertsAtomTests(unittest.TestCase):
         payload = '<!DOCTYPE feed [<!ENTITY x "boom">]><feed xmlns="http://www.w3.org/2005/Atom"/>'
         with self.assertRaisesRegex(ValueError, "DTD and entity"):
             parse_google_alerts_atom(payload)
+
+    def test_rejects_non_utf8_xml_before_entity_processing(self):
+        payload = (
+            '<?xml version="1.0" encoding="UTF-16"?>'
+            '<!DOCTYPE feed [<!ENTITY x "boom">]>'
+            '<feed xmlns="http://www.w3.org/2005/Atom"/>'
+        ).encode("utf-16")
+        with self.assertRaisesRegex(ValueError, "UTF-8 encoding"):
+            parse_google_alerts_atom(payload)
+
+    def test_html_text_extraction_ignores_script_and_style_content(self):
+        text = _html_to_text(
+            "Role <b>Engineer</b><script>alert(1)</script>"
+            "<style>.secret { display:none }</style> India"
+        )
+        self.assertEqual(text, "Role Engineer India")
 
     def test_rejects_private_or_non_https_destinations(self):
         for url in (
