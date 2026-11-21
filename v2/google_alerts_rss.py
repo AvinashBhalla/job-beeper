@@ -30,19 +30,29 @@ class _TextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
+        self._skip_depth = 0
 
     def handle_starttag(
         self, tag: str, attrs: list[tuple[str, str | None]]
     ) -> None:
-        if tag.lower() in self._BLOCK_TAGS:
+        lowered = tag.lower()
+        if lowered in {"script", "style"}:
+            self._skip_depth += 1
+            return
+        if not self._skip_depth and lowered in self._BLOCK_TAGS:
             self.parts.append(" ")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() in self._BLOCK_TAGS:
+        lowered = tag.lower()
+        if lowered in {"script", "style"}:
+            self._skip_depth = max(0, self._skip_depth - 1)
+            return
+        if not self._skip_depth and lowered in self._BLOCK_TAGS:
             self.parts.append(" ")
 
     def handle_data(self, data: str) -> None:
-        self.parts.append(data)
+        if not self._skip_depth:
+            self.parts.append(data)
 
 
 def _html_to_text(value: str) -> str:
@@ -195,11 +205,15 @@ def parse_google_alerts_atom(
 
     if len(raw) > max_bytes:
         raise ValueError("Google Alerts feed exceeds the configured size limit.")
-    if re.search(br"<!\s*(DOCTYPE|ENTITY)\b", raw, flags=re.IGNORECASE):
+    try:
+        xml_text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Google Alerts feed must use UTF-8 encoding.") from exc
+    if re.search(r"<!\\s*(DOCTYPE|ENTITY)\\b", xml_text, flags=re.IGNORECASE):
         raise ValueError("DTD and entity declarations are not allowed in Alert feeds.")
 
     try:
-        root = ET.fromstring(raw)
+        root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
         raise ValueError("Google Alerts feed is not valid XML.") from exc
     if root.tag != f"{ATOM}feed":
