@@ -1,3 +1,11 @@
+# QUARANTINED — INVALID DOMAIN ASSUMPTION — DO NOT MERGE / DEPLOY
+
+This Cloudflare implementation plan was drafted assuming JobBeeper could use Cloudflare Email Routing on `jobbeeper.com`. That assumption is unsupported and false for the current project setup: production is documented at `https://130.210.27.197/` on the owner's Oracle VM. There is no evidence the owner controls `jobbeeper.com`.
+
+The branch `feat/google-alerts-email-routing` is unmerged and has no PR. No production, DNS, Cloudflare, Gmail or mail-routing changes occurred. Treat all Worker/Queue code here as a quarantined prototype. Do not merge, deploy or cherry-pick any of it. The current source of truth is [the production-origin correction](https://github.com/AvinashBhalla/job-beeper/blob/v2-live-radar/docs/GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) on `v2-live-radar`.
+
+---
+
 # Google Alerts Discovery Engine — Cloudflare ingress implementation update
 
 **Date:** 21 November 2026  
