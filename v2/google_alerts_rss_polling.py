@@ -10,8 +10,7 @@ import datetime as dt
 import email.utils
 import re
 import sqlite3
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -275,6 +274,7 @@ def poll_google_alerts_feed(
 
 def init_google_alerts_rss_schema(conn: sqlite3.Connection) -> None:
     """Create feed checkpoint and result-queue tables on an existing app DB."""
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS google_alert_rss_feed_state (
