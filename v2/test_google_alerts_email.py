@@ -195,6 +195,19 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
             parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "no_alert_results_found")
 
+    def test_rejects_excessive_result_count_without_silent_truncation(self):
+        items = [
+            {
+                "title": f"Role {index}",
+                "url": f"https://jobs.example.test/roles/{index}",
+            }
+            for index in range(101)
+        ]
+        raw = make_email(html_body=structured_html(items))
+        with self.assertRaises(GoogleAlertEmailError) as caught:
+            parse_google_alert_email(raw)
+        self.assertEqual(caught.exception.code, "too_many_results")
+
     def test_rejects_oversized_raw_message(self):
         with self.assertRaises(GoogleAlertEmailError) as caught:
             parse_google_alert_email(b"x" * 100, max_raw_bytes=10)
