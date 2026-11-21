@@ -1,3 +1,9 @@
+## Owner decision — full initial Gmail backfill (21 November 2026)
+
+The intended Gmail API retrieval sequence is explicit: fetch only `From`, `Subject` and `Authentication-Results` with `format=metadata`; fetch `format=raw` only for authenticated Google Alerts candidates. Use Gmail `internalDate` for inbox-arrival ordering and recovery windows. **Owner decision (21 November 2026): initial sync must backfill all available Google Alerts emails**, with no date cutoff or recent-window limit. Search matching mail across Inbox and archived/All Mail locations; Spam/Trash are excluded by default. Capture the `users.getProfile` history baseline before the full paginated `users.messages.list` scan, durably stage every discovered message ID/page, then catch up all `history.list` pages from that baseline before committing the incremental cursor. Resume safely after interruption and keep message/result dedupe idempotent. See `docs/GOOGLE_ALERTS_GMAIL_INBOX_INTEGRATION_2026-11-21.md` Section 2.3.
+
+---
+
 # LATEST GOOGLE ALERTS EMAIL FIXTURE AND PARSER STATUS — 21 NOVEMBER 2026
 
 The owner uploaded one Google Alerts `.eml` message. It is `multipart/alternative` with plain text and HTML; the HTML contains a structured JSON script (`data-scope="inboxmarkup"`, publisher `Google Alerts`) whose `cards[].widgets[]` LINK items contain title, description and Google redirect URL. The sample contains three job results. The plain-text and visible HTML renderings contain the same three items. Do not commit the raw email: it includes mailbox/Message-ID data, alert-management and unsubscribe tokens, and a private RSS link.
