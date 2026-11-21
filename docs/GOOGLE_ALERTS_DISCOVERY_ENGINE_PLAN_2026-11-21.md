@@ -2,7 +2,7 @@
 
 This is the initial architecture proposal. Before implementation, read [Google Alerts production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md). The only documented project production origin is `https://130.210.27.197/` on the Oracle VM `job-radar`. Do not assume the owner controls `jobbeeper.com`; do not configure Cloudflare Email Routing or custom-domain workers there.
 
-The Gmail API + Pub/Sub design remains a candidate only after confirming the production IP TLS certificate includes the IP as an IP SAN, Google Pub/Sub authenticated push supports an IP-literal HTTPS endpoint, the Gmail restricted-scope use case is permitted, and a real sanitized Alert fixture can be parsed. The previously created Cloudflare feature branch is quarantined, unmerged, and must not be deployed or cherry-picked.
+Live VM preflight on 21 November confirmed that `130.210.27.197` presents a trusted Let's Encrypt certificate with the IP in its IP SAN, HTTPS verification succeeds, and `/health` returns HTTP 200. Certbot 5.10.0 is configured for the shortlived profile with a twice-daily Snap timer and an Nginx reload deploy hook; a forced staging renewal simulation passed and did not change the live certificate. Google Pub/Sub documentation requires a publicly accessible HTTPS endpoint with a CA-signed certificate but does not explicitly settle IPv4-literal URL acceptance. Actual Pub/Sub API acceptance/delivery remains untested because the VM has no `gcloud` CLI/project and the webhook route is not implemented. Gmail `gmail.readonly` remains a restricted scope with a policy/verification gate, and a sanitized Alert fixture is still required. The previously created Cloudflare feature branch is quarantined, unmerged, and must not be deployed or cherry-picked.
 
 **Previous 6–9 day estimate withdrawn** pending these checks. No Gmail OAuth, watch, Pub/Sub resource or production webhook has been configured.
 
@@ -163,31 +163,16 @@ Add structured logs keyed by hashed message/result identifiers, not raw email co
 
 ## 7. Delivery estimate
 
-### Engineering estimate
+**A revised delivery estimate is intentionally withheld.** The previous 6–9 focused engineering day estimate and the 2–3 day proof-of-flow estimate are withdrawn. They were issued before verifying the real IP-based production origin and before establishing the Gmail restricted-scope policy route.
 
-**6–9 focused engineering working days** for a production-ready owner-mailbox MVP, assuming one engineer works in a clean verified checkout, the correct public production hostname is available, the owner can configure the Google Cloud project and authorize the mailbox, and no external Google verification/security-assessment hold blocks launch.
+The VM-side certificate/renewal preflight is now **PASS**. The remaining schedule-driving items are:
+- actual Pub/Sub API acceptance and authenticated delivery to an IP-literal endpoint (or selecting an owner-controlled alternative if Google rejects it);
+- confirmation of the applicable Gmail restricted-scope permitted-use-case, OAuth verification and any required security assessment;
+- one sanitized Google Alert message fixture;
+- a clean isolated development workspace and test database;
+- the unresolved member browser/API/database mapping acceptance gate.
 
-| Work package | Estimate |
-|---|---:|
-| Preflight: inspect representative Alert email, map all 98 rules, verify Google Cloud/OAuth audience and public HTTPS endpoint | 0.5–1 day |
-| Owner-only Gmail OAuth, encrypted token lifecycle, label binding and initial watch | 1 day |
-| Pub/Sub topic/subscription integration, authenticated webhook, durable queue, daily watch renewal and reconciliation | 1–1.5 days |
-| Gmail history/message sync, parser, per-message/result idempotency and rule mapping | 0.75–1 day |
-| Safe URL resolution, host throttling/cache and extraction/verification tiers | 1–1.5 days |
-| Shared DB ingestion, canonical dedupe and per-user evaluation integration | 0.75–1 day |
-| Admin health/metrics, tests, silent historical backfill, pilot and production release checks | 1–1.5 days |
-| **Total** | **6–9 days** |
-
-A constrained proof-of-flow (connect one mailbox, receive one labelled push, parse one email and queue URLs) could be built in roughly **2–3 days**, but that is not production readiness and must not be described as a launch.
-
-### Calendar risk outside engineering
-
-- Gmail `gmail.readonly` is a restricted scope. Verification and/or a security assessment may be required depending on the chosen Google OAuth app classification and server-side data handling. External review time is not included in the 6–8 engineering days and is not under JobBeeper's control.
-- Final production HTTPS hostname/routing is unresolved in the 20 November acceptance audit. If DNS/TLS/reverse-proxy work is required, add that work before the webhook can be enabled.
-- Google Cloud project permissions/billing and Pub/Sub setup must be available. Do not create paid resources or change the consent screen until the owner has reviewed the setup and cost implications.
-- The 98 Alert rules need an inventory and category mapping. If the list is not already exportable, initial manual classification may add time.
-
-**Practical release expectation:** target an internal 5–10-rule pilot after the first 4–5 engineering days, then enable all 98 after 1–3 additional days of quality, duplicate, backfill and production checks. This is a planning estimate, not a guaranteed date.
+Re-estimate after those items are resolved. Do not treat a working TLS certificate or a successful Certbot staging renewal as proof that the full Gmail/Pub/Sub integration is launch-ready.
 
 ## 8. Rollout and acceptance gates
 
@@ -268,3 +253,14 @@ Google documentation:
 ---
 
 **Execution status:** planning only. No source code, database schema, Gmail authorization, Google Cloud topic/subscription, production configuration or deployment has been changed as part of this plan.
+
+
+## 11. Live VM preflight — 21 November 2026
+
+See [Google Alerts production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md#7-live-vm-preflight--21-november-2026) for the full command evidence.
+
+**VM-side certificate/renewal gate: PASS.** The live IP certificate includes the production IP in its IP SAN and passes CA validation. Certbot 5.10.0 is configured with the Let's Encrypt `shortlived` profile, a webroot challenge on `/var/www/letsencrypt`, a twice-daily Snap renewal timer (`00:00` and `16:19 UTC`), and a deploy hook that reloads Nginx. A forced staging renewal simulation succeeded. The live certificate serial remained unchanged; Nginx config test and production health check passed; the production container remained up.
+
+**Google Pub/Sub endpoint gate: NOT YET PROVEN.** The current official documentation says the endpoint must be publicly accessible over HTTPS with a valid CA-signed certificate, but does not explicitly clarify IPv4-literal URL support. No GCP project or `gcloud` CLI is available on the VM, no Pub/Sub resources were provisioned, and the webhook route is not implemented. Verify actual API acceptance/delivery in the owner's GCP project before treating this design as approved.
+
+**No production application, database, Nginx, certificate, Gmail, DNS, Cloudflare or Pub/Sub configuration was changed.** The only external challenge activity was the Certbot staging dry run.
