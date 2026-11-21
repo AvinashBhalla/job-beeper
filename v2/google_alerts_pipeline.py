@@ -236,7 +236,8 @@ def process_google_alert_rss_queue(
                 next_attempt_at=retry_at,
                 last_seen_at=timestamp,
             )
-            counts[disposition] += len(group)
+            count_key = "retryable" if disposition == "retryable_error" else disposition
+            counts[count_key] += len(group)
             continue
         except Exception:
             _update_group_status(
