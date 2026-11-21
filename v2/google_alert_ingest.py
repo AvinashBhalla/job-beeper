@@ -77,12 +77,17 @@ def normalized_public_url(value: Any) -> tuple[str, str]:
         raise ValueError("result URL must not target a non-public IP address")
     if port is not None and not 1 <= port <= 65535:
         raise ValueError("result URL port is invalid")
+    if (scheme, port) in {("https", 443), ("http", 80)}:
+        port = None
 
     # Preserve path/query case; URL paths can be case-sensitive. Remove only
-    # fragments, which are not sent to the HTTP server.
+    # fragments, which are not sent to the HTTP server. Keep IPv6 literals
+    # bracketed when rebuilding the authority component.
+    authority_host = f"[{host}]" if ":" in host else host
+    authority = authority_host if port is None else f"{authority_host}:{port}"
     normalized = urlunsplit((
         scheme,
-        host if port is None else f"{host}:{port}",
+        authority,
         parsed.path or "/",
         parsed.query,
         "",
@@ -183,7 +188,8 @@ def validate_event(payload: Any) -> dict[str, Any]:
     """Validate compact, versioned Worker payload before any database writes."""
     if not isinstance(payload, dict):
         raise ValueError("event must be a JSON object")
-    if payload.get("schema_version") != 1:
+    schema_version = payload.get("schema_version")
+    if isinstance(schema_version, bool) or schema_version != 1:
         raise ValueError("unsupported Google Alert event schema version")
 
     event_id = payload.get("event_id")
