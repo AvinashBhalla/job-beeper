@@ -25,6 +25,31 @@ JobBeeper must:
 
 ## 2. Architecture decision for the MVP
 
+## 2. Sample email inspection — uploaded owner fixture
+
+One owner-supplied `.eml` file was inspected on 21 November 2026. The raw file is **not** committed because it contains the mailbox address, message/thread identifiers, alert-management URLs, tracking tokens and an RSS footer link. The parser must not retain or export those values.
+
+Observed structure:
+
+- RFC 5322 message with `From: Google Alerts <googlealerts-noreply@google.com>`.
+- Subject begins with `Google Alert - ` followed by the alert's search string. Treat the full subject/search string as private metadata; the parser validates only the prefix and does not return it.
+- `multipart/alternative` with a UTF-8 plain-text part (base64 transfer encoding) and UTF-8 HTML part (quoted-printable transfer encoding).
+- HTML includes a `script[data-scope="inboxmarkup"]` element with `type="application/json"`. The object identifies publisher `Google Alerts` and contains `cards[].widgets[]` entries of type `LINK`, with `title`, `description` and `url`.
+- The same three result cards also appear in visible HTML anchors and in the plain-text alternative.
+- Each result URL is a Google `/url` redirect with its publisher destination embedded in the `url` query parameter.
+- The sample includes three job result items from two publisher domains. The email footer also contains non-result links such as alert settings, unsubscribe and RSS; these must not be treated as job results.
+
+The primary extraction path is the structured JSON block, validated by the sender and publisher name. If that block is missing/invalid, the parser falls back to Google result anchors in the HTML. If there is no usable HTML result, it falls back to wrapped links in the plain-text part. The plain-text format wraps long titles across lines, so this is a lower-confidence fallback; final job title/employer/location are always verified from the destination posting.
+
+**Parser implementation added in draft PR #102:**
+- `v2/google_alerts_email.py` accepts raw RFC 5322 bytes (Gmail API `format=raw` response after base64url decoding).
+- Validates sender and subject prefix, MIME/body size limits, HTTPS destinations and a bounded number of Google redirect unwrappings.
+- Extracts all structured `LINK` widgets (up to the configured per-message limit), removes canonical duplicate destinations and returns only minimal result fields plus a SHA-256 message fingerprint.
+- Does not perform network requests or persist raw email, recipient, query, message ID, Google tracking tokens, alert settings links or RSS footer URL.
+
+Focused test module `v2/test_google_alerts_email.py` was added with eight synthetic tests covering multi-result structured HTML, canonical duplicate collapse, HTML and plain-text fallbacks, sender/subject rejection, invalid redirect handling and raw-size limits. The test file has **not yet been executed** in an isolated project checkout; treat it as added but unverified until the no-cost local test run is completed.
+
+
 Use Gmail API read-only access with a durable, scheduled incremental history poll. Do not introduce Pub/Sub, a public webhook, Cloudflare, a custom domain, or Gmail watch registration in the first MVP.
 
 ### 2.1 Separate owner-only authorization
