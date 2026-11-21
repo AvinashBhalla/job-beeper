@@ -155,7 +155,7 @@ Add structured logs keyed by hashed message/result identifiers, not raw email co
 
 ### Engineering estimate
 
-**6–8 focused engineering working days** for a production-ready owner-mailbox MVP, assuming one engineer works in a clean verified checkout, the correct public production hostname is available, the owner can configure the Google Cloud project and authorize the mailbox, and no external Google verification/security-assessment hold blocks launch.
+**6–9 focused engineering working days** for a production-ready owner-mailbox MVP, assuming one engineer works in a clean verified checkout, the correct public production hostname is available, the owner can configure the Google Cloud project and authorize the mailbox, and no external Google verification/security-assessment hold blocks launch.
 
 | Work package | Estimate |
 |---|---:|
@@ -166,7 +166,7 @@ Add structured logs keyed by hashed message/result identifiers, not raw email co
 | Safe URL resolution, host throttling/cache and extraction/verification tiers | 1–1.5 days |
 | Shared DB ingestion, canonical dedupe and per-user evaluation integration | 0.75–1 day |
 | Admin health/metrics, tests, silent historical backfill, pilot and production release checks | 1–1.5 days |
-| **Total** | **6–8 days** |
+| **Total** | **6–9 days** |
 
 A constrained proof-of-flow (connect one mailbox, receive one labelled push, parse one email and queue URLs) could be built in roughly **2–3 days**, but that is not production readiness and must not be described as a launch.
 
