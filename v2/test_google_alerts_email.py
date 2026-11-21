@@ -226,10 +226,10 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "too_many_results")
 
     def test_plain_text_fallback_rejects_excessive_unique_results(self):
-        plain = "\\n\\n".join(
+        plain = "\n\n".join(
             (
-                f"Role {index} at ExampleCo\\n"
-                f"Python backend position {index}\\n"
+                f"Role {index} at ExampleCo\n"
+                f"Python backend position {index}\n"
                 f"<{google_redirect(f'https://jobs.example.test/roles/{index}')}>"
             )
             for index in range(101)
