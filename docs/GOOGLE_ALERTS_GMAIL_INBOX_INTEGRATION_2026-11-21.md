@@ -131,18 +131,23 @@ The parser is generic for Google Alerts emails, not query-specific.
 
 The owner supplied a representative Google Alerts `.eml` containing multiple result items. Its MIME structure, sender/subject pattern, structured HTML cards and destination redirect shape were inspected; the raw fixture remains outside GitHub. Do not claim the committed parser is validated until the sanitized fixture and synthetic edge cases have been exercised by the committed test module in an isolated non-production environment.
 
-### 2.5 Shared job verification and ingestion
+### 2.5 Shared job verification and personal ingestion
 
 For each extracted result:
 
 1. Normalize and canonicalize the destination URL.
 2. Collapse duplicate destinations found in the same email, across different alert emails, or across different alert search strings.
 3. Fetch the public job posting through the reviewed safe-fetch implementation. Do not bypass 403/429, robots denial, login walls, CAPTCHAs or other access controls.
-4. Prefer structured `JobPosting` evidence and validate required fields such as title and employer. Route uncertain pages to review rather than inventing a job.
+4. Verify that the destination is still an active/current public posting. Prefer structured `JobPosting` evidence and validate required fields such as title and employer. Route uncertain, removed or closed pages to review/rejection rather than inventing a job.
 5. Normalize verified records through existing V2 `normalize_job()` and store them with existing `upsert_jobs()`.
-6. Reuse existing canonical opportunity linking and per-member preference evaluations. Keep notifications separate and do not enable Telegram as part of this integration.
+6. Link to an existing public canonical opportunity where the public posting is already known; otherwise persist the discovery with an explicit owner-only source visibility marker.
+7. Evaluate the job against the owner's saved `user_preferences` and create a per-user notification-ledger entry for eligible matches.
 
-Do not store raw email bodies, whole MIME payloads, attachments, unrelated message headers, or Gmail snippets in the jobs database. The Gmail message processing ledger should retain only the minimum identifiers/checkpoints/status needed for idempotency, under a documented retention policy. Fetch public posting details from the public destination rather than treating the email itself as the durable source of job content.
+**Owner-approved historical notifications:** the owner explicitly wants Telegram notifications for jobs discovered from the initial historical backfill as well as future alerts. Do not silently suppress the historical batch. Add a Gmail-source-specific historical-backfill delivery mode that bypasses only the generic no-backlog/notification-enabled-at cutoff for messages discovered by this one-time sync. It must still enforce current saved role/location/skill/experience preferences, verified active posting status, canonical deduplication, the owner's Telegram opt-in and linked private chat, retry limits, rate limits and delivery ledger idempotency. Do not change no-backlog behavior for other job sources. Queue the historical batch durably and send in controlled batches respecting Telegram throttling; expose counts/progress and allow pause/retry without re-importing or duplicating notifications. The default must be to send notifications for all verified eligible historical matches, not to flood with unverified email cards.
+
+Telegram message content must be generated from the verified public job posting only. Never include the Google Alert email body, alert search string, recipient, message/thread IDs or Gmail metadata.
+
+Do not store raw email bodies, whole MIME payloads, attachments, unrelated message headers, or Gmail snippets in the jobs database. The Gmail message processing ledger should retain only minimum identifiers/checkpoints/status needed for idempotency, under a documented retention policy. Fetch public posting details from the public destination rather than treating the email itself as the durable source of job content.
 
 ## 3. Personal-use OAuth and Restricted-data guardrails
 
@@ -180,7 +185,7 @@ The personal-use verification exception is grounded in Google's current Personal
 4. Mock-test `users.watch` label filtering, watch response baseline/expiry, daily renewal, initial backfill race catch-up, label-scoped `history.list` pagination, `messageAdded`/`labelAdded`, cursor expiry/404 recovery and periodic reconciliation.
 5. Add assertions that every list/watch/history API call carries the dedicated label ID and every message-body retrieval follows a passing metadata preflight. A non-Google or unlabelled message must never receive `format=raw`.
 6. Verify public job destination fetch, normalized fields, canonical dedupe and private owner-only source visibility. Confirm no Gmail-only row is visible to another account/admin feed or evaluated/queued by another user's notification worker.
-7. Verify only the owner's per-user Telegram setting/private chat receives new-job notifications. Legacy global Telegram sender/ledger must remain untouched by this source. Suppress all one-time backfill notifications by default; send only future arrivals after initial sync complete (pending owner confirmation).
+7. Verify that the owner's per-user Telegram setting/private chat receives notifications for eligible jobs from both historical backfill and future arrivals. Historical backfill must use a Gmail-source-specific override for only the generic no-backlog/notification-enabled-at cutoff; preserve preferences, current-live-posting validation, deduplication, opt-in, private-chat routing, throttling, retries and delivery-ledger idempotency. Do not alter other sources' backlog policy. Legacy global Telegram sender/ledger must remain untouched by this source.
 8. Run focused parser + Gmail client + webhook + private-visibility tests and full V2 regression suite in a fresh non-production checkout/database; record Python/dependency versions, exact test counts and commit SHA. Do not use the production VM as a test runner or paid GitHub Actions.
 9. Read-only preflight the VM callback's public HTTPS certificate chain/SAN/firewall/Nginx path. Only then create Pub/Sub resources with authenticated OIDC push. Confirm project billing/pricing before provisioning.
 10. Determine whether creator-only Personal Mode exception also affects the separate security-assessment rule for restricted data processed on the Oracle VM. Do not store production tokens or enable the live mailbox until the requirement is resolved and all security/data-minimization controls pass.
