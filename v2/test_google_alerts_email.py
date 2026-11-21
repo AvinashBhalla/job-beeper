@@ -122,13 +122,13 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
     def test_plain_text_fallback_ignores_alert_banner_and_footer_links(self):
         destination = "https://jobs.example.test/roles/one"
         plain = (
-            "=== Web - 1 new result for [example query] ===\\n\\n"
-            "Backend Engineer at ExampleCo\\n"
-            "Python and REST API work.\\n"
-            f"<{google_redirect(destination)}>\\n\\n"
-            "- - - - - - - - - - - - - - - - - -\\n"
-            "Unsubscribe from this Google Alert:\\n"
-            "<https://www.google.co.in/alerts/remove?msgid=private>\\n"
+            "=== Web - 1 new result for [example query] ===\n\n"
+            "Backend Engineer at ExampleCo\n"
+            "Python and REST API work.\n"
+            f"<{google_redirect(destination)}>\n\n"
+            "- - - - - - - - - - - - - - - - - -\n"
+            "Unsubscribe from this Google Alert:\n"
+            "<https://www.google.co.in/alerts/remove?msgid=private>\n"
         )
         parsed = parse_google_alert_email(make_email(plain_body=plain))
         self.assertEqual(len(parsed.results), 1)
