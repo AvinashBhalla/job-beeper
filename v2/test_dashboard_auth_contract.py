@@ -45,6 +45,7 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
     { ok: true, status: 200, json: async () => ({ user: { id: 8, email: 'user@example.com', role: 'user', status: 'active' } }) },
     { ok: true, status: 200, json: async () => ({ status: 'logged_out' }) },
     { ok: true, status: 200, json: async () => ({ user: { id: 7, email: 'admin@example.com', role: 'admin', status: 'active' } }) },
+    { ok: true, status: 200, json: async () => ({ consented: true }) },
   ];
   const client = createClient({
     apiBase: '/api',
@@ -80,6 +81,15 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
   await externalClient.login('victim@example.com', 'do-not-leak-this-password');
   assert.strictEqual(calls[5].url, '/api/auth/login');
   assert.strictEqual(calls[5].options.credentials, 'same-origin');
+  await client.request('/integrations/google-alerts/gmail/consent', {
+    method: 'POST', body: { accepted: true, disclosure_version: '2026-11-22-v2' },
+  });
+  assert.strictEqual(calls[6].url, '/api/integrations/google-alerts/gmail/consent');
+  assert.strictEqual(calls[6].options.headers['Content-Type'], 'application/json');
+  assert.strictEqual(calls[6].options.headers['X-CSRF-Token'], 'csrf-123');
+  assert.deepStrictEqual(JSON.parse(calls[6].options.body), { accepted: true, disclosure_version: '2026-11-22-v2' });
+  assert.strictEqual(client.formatErrorDetail([{ type: 'missing', loc: ['body', 'accepted'], msg: 'Field required' }]), 'accepted: Field required');
+  assert.strictEqual(client.formatErrorDetail('Consent required.'), 'Consent required.');
   console.log('cookie auth client contract passed');
 })().catch(error => { console.error(error); process.exit(1); });
 """
