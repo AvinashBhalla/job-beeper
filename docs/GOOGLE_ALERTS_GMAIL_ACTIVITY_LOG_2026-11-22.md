@@ -1,6 +1,8 @@
 # Google Alerts Gmail — Activity Log and Deployment Preparation
 
 **Checkpoint:** 22 November 2026 (UTC)
+
+> Chronological audit log. Entries are appended as work proceeds; older sections record their state at the time and may be superseded. The newest OAuth acceptance/deployment state is in the final section and `GOOGLE_ALERTS_GMAIL_LIVE_ACCEPTANCE_HANDOFF_2026-11-22.md`.
 **Repository:** `AvinashBhalla/job-beeper`
 **Feature branch:** `feat/google-alerts-gmail-ingestion`
 **Draft PR:** [#102](https://github.com/AvinashBhalla/job-beeper/pull/102)
@@ -165,3 +167,37 @@ Obtain Google's determination on whether this job-alert-to-job-discovery use cas
 3. Revalidated Compose with the real private env file using config --quiet; no interpolated credentials were printed. This preflights configuration only and does not modify/recreate the running container.
 4. Inspected the latest exact-head GitHub Actions V2 CI run for 5efa631. It failed before any job steps (steps=[]); the log artifact was not available. It did not execute the test suite. No rerun was requested. Local focused regression and full historical offline coverage remain the available test evidence.
 5. No production backup, image build, container restart/deployment, Gmail OAuth, mailbox read, or Telegram send has happened yet.
+
+
+## 22 November 2026 — deployed login/consent fixes and Google OAuth audience blocker
+
+### Engineering fixes and deployment
+
+1. Owner confirmed creation of the Gmail label `JobBeeper/GoogleAlerts`. The intended filter configuration was then instructed, but its completion was not explicitly confirmed; verify it before the first successful sync. The owner then opened the production dashboard through SSH local forwarding to `http://localhost:8080`.
+2. The first dashboard login returned `403 Cross-origin login is not allowed`. Root cause was Docker source NAT: the browser request came from `localhost`, but the container saw bridge gateway `172.18.0.1`. PR [#103](https://github.com/AvinashBhalla/job-beeper/pull/103), commit `ee44e7af1deec7a923b007a5ccc568a2a1542f1a`, added a narrow localhost/no-forwarded-header allowance and regression coverage. The 5 focused Gmail/radar tests passed. The fix was deployed as `job-radar-prod-release:originfix-20261122`; the owner then signed in successfully.
+3. On the Account panel, the consent POST initially returned 422 and the UI displayed `[object Object]`. Root cause: shared `dashboard/auth.js` passed a plain object as the fetch body rather than JSON-serializing it. PR [#104](https://github.com/AvinashBhalla/job-beeper/pull/104), commit `8c25ff8b13d6ed4a25ac8f2caa79e73a5373cb29`, added JSON body serialization, the JSON content type, retained CSRF handling and formatted FastAPI validation details. Dashboard contract suite: **12 passed**. The candidate image also passed the 5 Gmail/radar tests and Python compile checks. The fix was deployed as `job-radar-prod-release:gmail-consent-20261122`.
+4. Both app updates recreated only `v2-radar-1`, retained the external `v2_radar-data` volume, preserved the loopback-only `127.0.0.1:8000` port and current Gmail live-access env setting, and passed health/dashboard/OpenAPI HTTP 200 checks. Fresh root-only SQLite backups were created before each deploy; latest is `/var/backups/job-radar-daily/release-gmail-consent-20261122T062255Z`, checksum-verified, SQLite integrity `ok`, with 28,731 jobs and 2 users.
+5. The running container currently has `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=true`. This is a configuration gate only; it does not mean a mailbox is connected. Do not change this value as part of the Google test-user fix.
+
+### Google OAuth attempt and observed blocker
+
+1. After the frontend fix deployed, the browser consent POST returned **200 OK**, and `GET /api/integrations/google-alerts/gmail/connect` returned **302 Found**. Thus the browser/client and JobBeeper consent route worked.
+2. Google then returned **403 `access_denied`**. The page says JobBeeper has not completed Google's verification process and is in testing, accessible only to developer-approved testers.
+3. Request details visible in the screenshot: `access_type=offline`, scope `https://www.googleapis.com/auth/gmail.readonly`, `response_type=code`, redirect `http://localhost:8080/api/integrations/google-alerts/gmail/callback`, PKCE `S256`, prompt `consent`.
+4. This is a Google OAuth audience/test-user allowlist blocker, not an application CORS or consent-payload problem. The exact Gmail account used for authorization must be listed under the same OAuth project's **Google Auth Platform → Audience → Test users** if the project is External/Testing. First confirm the selected Cloud project owns the client ID configured on the VM. Do not switch app type, broaden scopes, or publish Production as a workaround.
+5. Google policy research confirms `gmail.readonly` is a Restricted scope. External/Testing projects allow up to 100 test users and test authorizations expire after seven days. Restricted-scope production verification and potential server-side security assessment remain separate gates. A limited-personal-use or test-user grant must not be mistaken for full production OAuth verification or a CASA/security assessment.
+
+### Read-only production state after the failed Google authorization
+
+- `google_alerts_gmail_credentials=0`.
+- `google_alerts_gmail_data_use_consents=1` (one consent row from the latest connect attempt; inspect `consumed_at`/expiry rather than assuming the consent is reusable).
+- `google_alerts_gmail_oauth_states=1` (an OAuth attempt/state row; no code returned to callback).
+- `google_alerts_gmail_messages=0`, `google_alerts_gmail_sync_state=0`, `google_alerts_gmail_opportunities=0`.
+- SQLite `PRAGMA integrity_check=ok`; jobs remain 28,731.
+- No Gmail refresh token, granted mailbox credential, message body or sync/backfill was created. No callback request was observed in the app logs.
+
+### Next owner action
+
+Open the exact Google Cloud project associated with the configured Gmail OAuth Web client. In Google Auth Platform → Audience, check user type and publishing status. If External/Testing, add the exact Gmail mailbox account used for the Google Alerts label to Test users and Save. Then retry through the same localhost tunnel, re-check the disclosure, and connect using that allowlisted account. If it still fails, capture the new exact error and verify project/client/account pairing. After a successful redirect, validate owner identity and label, then confirm encrypted credentials and sync state. Do not enable Telegram as part of this test.
+
+The authoritative step-by-step handoff, current runtime image, test-mode limitations and policy references are in `docs/GOOGLE_ALERTS_GMAIL_LIVE_ACCEPTANCE_HANDOFF_2026-11-22.md`.

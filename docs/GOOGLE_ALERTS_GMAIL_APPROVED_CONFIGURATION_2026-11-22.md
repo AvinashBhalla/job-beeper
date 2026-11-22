@@ -5,7 +5,22 @@
 
 ## Approval record
 
-The owner reports that Google approval has been received for the intended personal Gmail workflow on 22 November 2026. The approval correspondence is not copied into this repository and must remain in the owner's private records. This implementation remains restricted to the approved single-owner use case and the single `gmail.readonly` scope. The owner reports no issue with the current workflow. Do not interpret this approval as permission to add other mailboxes, member accounts, broader scopes, Pub/Sub push, a public SaaS offering, or a materially different data flow.
+The owner reported receiving Google approval for the intended personal Gmail workflow on 22 November 2026; the approval correspondence is not copied into this repository and remains in the owner's private records. **That report must not be interpreted as proof that this OAuth client has completed Google's OAuth verification.** A live authorization attempt on 22 November returned Google `403 access_denied`; the page states the app has not completed verification and is in Testing, accessible only to developer-approved testers. The current action is to verify the exact Cloud project's Audience/Test users configuration and add the intended Gmail mailbox as a test user if the project is External/Testing. This implementation remains limited to one owner account and the single `gmail.readonly` scope. Do not add other mailboxes, member accounts, broader scopes, Pub/Sub push, a public SaaS offering, or a materially different data flow.
+
+
+## Superseding live runtime and OAuth test checkpoint — 22 November 2026
+
+This section supersedes older statements in this runbook that say the production service has not been deployed, the Gmail environment is absent from the container, or Gmail live access remains disabled.
+
+- The Gmail integration and two follow-up fixes are merged and deployed. Current image: `job-radar-prod-release:gmail-consent-20261122`; current container: `v2-radar-1`; host binding: `127.0.0.1:8000`; external data volume: `v2_radar-data`.
+- The private Gmail environment is loaded by the active Compose service. `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=true` is currently set. This flag does not mean an account is connected; no Gmail credential/token exists yet.
+- Owner successfully signed in through the localhost SSH tunnel. The consent API POST returns 200 and OAuth-start returns 302. Google then denies the OAuth request with 403 `access_denied`, explaining that the app is in Testing and only developer-approved testers may access it.
+- Next owner action: select the exact Google Cloud project owning the configured Gmail OAuth Web client. In Google Auth Platform → Audience, verify user type and Publishing status. For External/Testing, add the exact Gmail account receiving the Google Alerts label under Test users and Save. Then retry from `http://localhost:8080/dashboard/#access` over the open SSH tunnel using that same mailbox.
+- The attempted request asks only for `gmail.readonly`, with `access_type=offline`, PKCE S256 and the registered localhost callback. Google did not return a code; the callback was not reached.
+- Read-only post-error DB counts: Gmail credentials 0; consent records 1; OAuth state rows 1; messages 0; sync rows 0; opportunities 0. SQLite integrity is `ok` and public jobs count remains 28,731. Consent/OAuth state rows do not prove a Gmail grant.
+- Google's documentation classifies `gmail.readonly` as a Restricted scope. External/Testing authorizations are temporary (up to 100 test users; seven-day authorization expiry); this is not a durable polling deployment or a substitute for production restricted-scope verification/security assessment. Do not publish the app to Production as a quick workaround.
+- Detailed activities, request evidence, exact counts, official Google links and the next safe checks are in `docs/GOOGLE_ALERTS_GMAIL_LIVE_ACCEPTANCE_HANDOFF_2026-11-22.md`.
+
 
 ## What is now wired in code
 
@@ -48,18 +63,18 @@ In the owner Gmail account, create the label `JobBeeper/GoogleAlerts` and a filt
 
 ## Verified environment-file location and production Compose distinction
 
-The owner has populated /home/ubuntu/job-beeper/.env. On 22 November 2026, the file was verified as mode 600, owned by ubuntu:ubuntu; all nine Gmail variable names are present with non-empty, non-placeholder values. The feature checkout's configuration parser accepted the values, validated the Fernet key, confirmed the exact localhost callback, 180-second polling mode and JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false. A read-only query inside the production container confirmed that the configured numeric owner ID maps to an active administrator. The updated feature-branch Compose file also passed:
+The owner populated `/home/ubuntu/job-beeper/.env`. At the pre-deployment checkpoint on 22 November, the file was verified as mode 600, owned by ubuntu:ubuntu; all nine Gmail variable names were present with non-empty, non-placeholder values. The feature checkout's configuration parser accepted the values, validated the Fernet key, confirmed the exact localhost callback and 180-second polling mode. At that checkpoint `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false`; the later deployed runtime now has this flag set to `true` (see the superseding live checkpoint above). A read-only query confirmed that the configured numeric owner ID maps to an active administrator. The reviewed Compose file passed:
 
     docker compose --env-file /home/ubuntu/job-beeper/.env -f v2/docker-compose.yml config --quiet
 
-**Important:** the currently running production container was created from /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST/candidate-compose.yml, which uses ./runtime.env from that release directory. That separate root-owned runtime.env currently has only the pre-existing runtime keys; the running container has no JOB_RADAR_GMAIL_* variables. /home/ubuntu/job-beeper/.env is therefore prepared for the updated feature-branch Compose release, but it has not been loaded into the running container. The older /home/ubuntu/job-beeper checkout is also behind the feature branch and must not be used as the release source.
+Historical note from the pre-deployment checkpoint: at that time, the running container had no JOB_RADAR_GMAIL_* variables and the owner .env had not been loaded. This was superseded on 22 November 2026 when the reviewed Gmail Compose release was deployed with `/home/ubuntu/job-beeper/.env`. Current container/runtime and OAuth status are documented in the superseding checkpoint above.
 
-Do not manually modify the archived release bundle's runtime.env or restart the service as a workaround. The approved release must explicitly pass /home/ubuntu/job-beeper/.env using --env-file with the reviewed Compose file (or deliberately stage the same values in the new release's protected runtime env file as part of the reviewed release procedure). No secret values should appear in shell output. The current application has not been restarted and live Gmail remains disabled.
+Historical release instruction: never modify an archived release bundle's runtime.env as a workaround. The reviewed deployment explicitly passed `/home/ubuntu/job-beeper/.env` using `--env-file`; the production service has since been recreated and the Gmail live-access flag is currently true. No secret values should appear in shell output. The live mailbox is still **not authorized** because Google denied the OAuth request before callback.
 
 ## Production release compatibility checks
 
 The release Compose now explicitly preserves the current deployment contract:
-- image is tagged job-radar-prod-release:gmail-20261122 for an identifiable candidate and rollback;
+- current deployed image is tagged `job-radar-prod-release:gmail-consent-20261122`; earlier candidate tag `job-radar-prod-release:gmail-20261122` is historical;
 - host port remains loopback-only at 127.0.0.1:8000;
 - the existing named volume is declared external as v2_radar-data, so the release cannot silently create a new empty DB volume;
 - JOB_BEEPER_COOKIE_SECURE and JOB_BEEPER_PUBLIC_ORIGIN continue to flow from the private environment file; and
@@ -69,9 +84,11 @@ Compose was checked using the real private env file with config --quiet; the res
 
 The exact-head GitHub Actions V2 CI check for commit 5efa63121816a7cc854267c7d7d9fcbc0ea31ab3 finished failed before starting any steps (steps=[]). It did not execute tests. The local focused regression remains the available test evidence; do not treat the failed hosted check as a code-test failure or trigger extra paid CI attempts. The current focused suites and broader locally recorded regression evidence are in the activity log and PR description.
 
-## Read-only preflight
+## Read-only preflight (completed before deployment)
 
-After the reviewed code and Compose wiring are present in the target deployment, first keep live access disabled and run the preflight inside the app container:
+The read-only Gmail configuration preflight was run before deployment with live access disabled and passed. It validated the owner administrator binding, dedicated OAuth settings, localhost callback and polling-only/no-PubSub configuration. The later Google OAuth `access_denied` is an Audience/Test users issue and was returned by Google after the app redirected successfully; it is not a preflight/config parsing failure.
+
+Original preflight command:
 
 ```bash
 python -m v2.google_alerts_gmail_preflight
@@ -81,9 +98,11 @@ Expected checks: all six required values parse, the callback is localhost, polli
 
 A preflight failure must be corrected before enabling live access. Do not work around a failed owner binding by changing the database or using another account ID without reviewing the target account.
 
-## Controlled activation sequence
+## Historical controlled activation sequence (deployment completed; OAuth grant pending)
 
-1. Confirm the private environment file contains the intended dedicated OAuth client, owner ID/mailbox, and separately generated Fernet key. Keep `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false`.
+Steps 1–5 below were completed as part of the 22 November deployment. Step 6 is currently blocked at Google's OAuth Audience/Test users gate. Do not repeat the deployment or toggle the current live-access setting to work around the Google error.
+
+1. Confirm the private environment file contains the intended dedicated OAuth client, owner ID/mailbox, and separately generated Fernet key. This was completed; the currently deployed runtime has `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=true`.
 2. Validate the effective Compose configuration without printing interpolated values or environment output. Build/release the reviewed branch only under the separately approved deployment procedure; this runbook does not authorize a production restart or deployment.
 3. Run the read-only preflight with live access still disabled. Confirm the application is using the intended existing JobBeeper database and the configured owner ID maps to the active administrator account.
 4. Confirm the owner Gmail label/filter is present. Keep Telegram notification settings separate from Gmail connection consent; connecting Gmail must not enable Telegram notifications.
@@ -96,6 +115,6 @@ No Pub/Sub topic, subscription, public webhook, domain, DNS, certificate or paid
 
 ## Current configuration blocker
 
-At the time this runbook was written, the isolated PR checkout has no `.env`/`.env.feature` Gmail credential file and no Gmail OAuth client ID/secret, owner ID or Fernet key installed in its environment. The tracked example contains placeholders only. The existing feature demo is unsuitable, and its environment file must not be repurposed. Therefore configuration wiring and the preflight are ready, but the Gmail OAuth client/private values still need to be installed in the actual deployment environment before the preflight can pass.
+Historical pre-deployment blocker: the isolated PR checkout did not then have a private Gmail environment file. This was later superseded when the owner's private values were validated and loaded by the deployed production Compose service.
 
-No real OAuth request, Gmail mailbox read, Telegram external send, production DB migration, container restart, deployment or live-access activation is performed by this implementation change.
+Current status is different: the production OAuth attempt reached Google but was rejected with 403 `access_denied` because the app is shown as Testing and only developer-approved testers can use it. No authorization code returned to the callback, no Gmail credential/token was stored, and no mailbox read or sync occurred. See the superseding checkpoint and live-acceptance handoff. The active live-access flag is currently true; it is not proof of authorization.
