@@ -107,6 +107,10 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         self.assertIn("connectButton.disabled = !dataUseConsent || !dataUseConsent.checked", source)
         self.assertIn("if (!consent || !consent.checked)", source)
+        self.assertIn("GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION = '2026-11-22-v2'", source)
+        self.assertIn("authClient.request('/integrations/google-alerts/gmail/consent'", source)
+        self.assertIn("method: 'POST'", source)
+        self.assertIn("disclosure_version: GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION", source)
         self.assertIn("googleAlertsGmailDataUseConsent').addEventListener('change'", source)
 
     def test_dashboard_has_login_and_user_holding_panels(self):
