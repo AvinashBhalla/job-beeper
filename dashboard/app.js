@@ -1891,6 +1891,8 @@
     }
   }
 
+  const GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION = '2026-11-22-v2';
+
   function formatGmailMessageCounts(counts = {}) {
     const entries = ['queued', 'processing', 'retry', 'processed', 'skipped', 'dead']
       .map(key => [key, Number(counts[key] || 0)])
@@ -2018,14 +2020,30 @@
     }
   }
 
-  function connectGoogleAlertsGmail() {
+  async function connectGoogleAlertsGmail() {
     const consent = $('googleAlertsGmailDataUseConsent');
+    const button = $('connectGoogleAlertsGmailBtn');
+    const status = $('googleAlertsGmailStatus');
     if (!consent || !consent.checked) {
-      const status = $('googleAlertsGmailStatus');
       if (status) status.textContent = 'Read the Google Alerts data-use notice and confirm it before connecting Gmail.';
       return;
     }
-    window.location.assign(`${API}/integrations/google-alerts/gmail/connect`);
+    if (button) button.disabled = true;
+    try {
+      const response = await authClient.request('/integrations/google-alerts/gmail/consent', {
+        method: 'POST',
+        body: {
+          accepted: true,
+          disclosure_version: GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not record Gmail data-use consent.');
+      window.location.assign(`${API}/integrations/google-alerts/gmail/connect`);
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not record Gmail data-use consent.';
+      if (button) button.disabled = false;
+    }
   }
 
   async function updateTelegramNotificationSetting() {
