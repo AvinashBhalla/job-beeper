@@ -111,11 +111,12 @@ Before any deployment:
 
 ## Current branch validation — 22 November 2026
 
-- On PR head `80bc74d6611754f19ccaec697571d70960ece8f1`, the bounded regression sweep passed **all 34 V2 test modules: 619 tests, zero failures**. Batches: 39 (6 modules), 56 (4), 54 (4), 104 (5), 191 (1), 81 (6), 59 (6) and 35 (2).
-- After the final expired-consent retirement fix, the Gmail and Gmail-radar integration modules were rerun at the exact PR head: **30 tests passed, zero failures**. This covers the current `expires_at`/`expired_at` schema migration, expiry audit retention and fresh-consent retry behavior.
+- On PR head `80bc74d6611754f19ccaec697571d70960ece8f1`, the bounded regression sweep passed **all 34 V2 test modules: 620 tests, zero failures**. Batches: 39 (6 modules), 56 (4), 55 (4), 104 (5), 191 (1), 81 (6), 59 (6) and 35 (2).
+- After the final expired-consent retirement fix, Gmail plus Gmail-radar integration passed **31 tests**. After adding disconnect-notification lifecycle coverage, the full Gmail and user-notification modules passed **55 tests**, including the new cascade/cancellation boundary test. This covers the current `expires_at`/`expired_at` schema migration, expiry audit retention, fresh-consent retry, queued Gmail-only job cleanup and preservation of independent public jobs.
+- Focused disconnect boundary regression passed: pending delivery rows for Gmail-only private jobs are removed by the job-deletion cascade; historical Gmail delivery rows attached to independently stored public ATS jobs are marked cancelled while public jobs remain.
 - Focused consent/API/dashboard checks passed **3/3**: owner/version/single-use/expiry/re-consent; direct OAuth-start denial, one-time acceptance and replay denial; dashboard consent POST contract.
 - Final preflight on the exact PR head: `node --check dashboard/app.js`, Python compilation for Gmail/auth backend and tests, and `git diff --check` all passed. The checkout was clean and tracking the GitHub branch.
-- The earlier 616-test result is the pre-consent-hardening baseline; the current branch regression result is 619 tests. Tests use synthetic fixtures in the isolated checkout. No hosted CI, real Gmail OAuth, mailbox read or Telegram send was used.
+- The earlier 616-test result is the pre-consent-hardening baseline; the current branch regression result is 620 tests. Tests use synthetic fixtures in the isolated checkout. No hosted CI, real Gmail OAuth, mailbox read or Telegram send was used.
 
 ## Final post-change validation and review
 
