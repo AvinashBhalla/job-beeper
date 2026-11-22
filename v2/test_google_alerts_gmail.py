@@ -4,6 +4,7 @@ import base64
 import json
 import sqlite3
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -132,18 +133,24 @@ class GmailIntegrationTests(unittest.TestCase):
         self.assertFalse(gmail.consume_data_use_consent(self.db, 7, self.config))
         with sqlite3.connect(self.db) as conn:
             row = conn.execute(
-                "SELECT disclosure_version,accepted_at,consumed_at "
+                "SELECT disclosure_version,accepted_at,expires_at,consumed_at "
                 "FROM google_alerts_gmail_data_use_consents"
             ).fetchone()
         self.assertEqual(row[0], gmail.DATA_USE_DISCLOSURE_VERSION)
         self.assertTrue(row[1])
-        self.assertTrue(row[2])
+        self.assertGreater(row[2], int(time.time()))
+        self.assertTrue(row[3])
 
         gmail.record_data_use_consent(
             self.db, 7, self.config, accepted=True,
             disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
         )
-        self.assertTrue(gmail.consume_data_use_consent(self.db, 7, self.config))
+        with sqlite3.connect(self.db) as conn:
+            conn.execute(
+                "UPDATE google_alerts_gmail_data_use_consents "
+                "SET expires_at=0 WHERE consumed_at IS NULL"
+            )
+        self.assertFalse(gmail.consume_data_use_consent(self.db, 7, self.config))
 
 
     def test_sync_cycle_is_inert_when_live_access_is_not_enabled(self):
