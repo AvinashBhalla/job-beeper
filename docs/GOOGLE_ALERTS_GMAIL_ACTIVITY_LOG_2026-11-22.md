@@ -201,3 +201,16 @@ Obtain Google's determination on whether this job-alert-to-job-discovery use cas
 Open the exact Google Cloud project associated with the configured Gmail OAuth Web client. In Google Auth Platform → Audience, check user type and publishing status. If External/Testing, add the exact Gmail mailbox account used for the Google Alerts label to Test users and Save. Then retry through the same localhost tunnel, re-check the disclosure, and connect using that allowlisted account. If it still fails, capture the new exact error and verify project/client/account pairing. After a successful redirect, validate owner identity and label, then confirm encrypted credentials and sync state. Do not enable Telegram as part of this test.
 
 The authoritative step-by-step handoff, current runtime image, test-mode limitations and policy references are in `docs/GOOGLE_ALERTS_GMAIL_LIVE_ACCEPTANCE_HANDOFF_2026-11-22.md`.
+
+
+## 22 November 2026 — first successful Gmail authorization and backfill
+
+1. Owner added two Google developer-approved test accounts and subsequently completed the Google OAuth flow. The dashboard now reports initial backfill complete and incremental history reconciliation active.
+2. Read-only production verification: 1 encrypted Gmail credential; 4 Gmail messages all `processed` with no error codes; 8 parsed alert results; 1 Gmail-derived historical opportunity; one sync row with `backfill_state=complete`, label binding and incremental history cursor; no sync error. SQLite integrity `ok`; jobs count 28,732 (prior pre-Gmail count 28,731).
+3. The sole retained Gmail job is **Software Engineering – React & Node – Associate** at **PwC Acceleration Centers in India**, location `All India, IN`. The current evaluation reports `match=0`, `score=0`, reason `location outside configured targets`. No preferences were changed.
+4. No Telegram chat is linked to the owner; no notification setting or notification ledger row exists. The Gmail owner is an administrator. The current dashboard hides Telegram linking for admins and the Telegram/link/notification APIs reject admin accounts. Record this as a product integration gap: implement an owner-admin Telegram link and explicit opt-in path, rather than attempting to link a second Gmail tester or changing the owner binding.
+5. The owner confirmed label creation earlier; creation/application of the Gmail filter to future and historical matching conversations still needs explicit confirmation. Incremental Gmail history polling is active; continue processing only the configured label.
+6. No Telegram account was linked, no notification was enabled, no Telegram message was sent, and no target-location preference was altered.
+7. Next: owner verifies the retained job in the feed and decides whether `All India` belongs in saved location preferences; verify the Gmail filter; implement owner-admin Telegram opt-in if desired; keep delivery gated by current matching, freshness, private-chat linking and explicit opt-in. Google Testing authorizations remain temporary, and Restricted-scope production/policy assessment gates remain applicable.
+
+See `GOOGLE_ALERTS_GMAIL_LIVE_ACCEPTANCE_HANDOFF_2026-11-22.md` for current totals and implementation details.

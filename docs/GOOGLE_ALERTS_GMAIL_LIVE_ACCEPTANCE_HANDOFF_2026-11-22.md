@@ -122,3 +122,51 @@ Official references:
 - Do not send Telegram alerts during OAuth smoke testing.
 - Do not turn off authentication/CSRF/CORS or alter the loopback-only binding.
 - Do not replace the production database volume or restore a snapshot for this OAuth denial.
+
+
+## 22 November 2026 — successful Google OAuth and initial Gmail backfill
+
+### Owner-reported milestone
+
+The owner added two developer-approved test accounts in Google Auth Platform and was then able to complete Google login/OAuth. The dashboard reports: **Initial backfill complete; incremental history reconciliation is active; 4 processed**. This is the first successful live Gmail authorization and backfill checkpoint.
+
+The Gmail integration remains single-owner. Adding two Google OAuth test users only allows those identities to pass Google's Testing audience gate; it does not enable two Gmail mailboxes in JobBeeper. The deployed integration credential is bound to the configured owner administrator. Keep only that intended owner mailbox connected and confirm it is the mailbox carrying `JobBeeper/GoogleAlerts`.
+
+### Read-only production verification after the successful backfill
+
+Checked against the live SQLite database in read-only mode; no token or mailbox contents were printed:
+
+- Gmail credentials: **1** encrypted owner credential present.
+- Gmail data-use consent records: **1**.
+- Gmail messages: **4**, all with `status='processed'`, `history_backfill=1`, four processing attempts total, **0 rows with an error code**.
+- Parsed Google Alert results: **8** total across the four processed messages.
+- Gmail-derived opportunities: **1**, tagged as historical backfill.
+- Gmail sync state: **1**, `backfill_state='complete'`, non-empty label binding and incremental history cursor, no `last_error_code`; `last_reconciled_at` was updated at the verification checkpoint.
+- Jobs table: **28,732**, one more than the prior pre-Gmail checkpoint of 28,731.
+- SQLite `PRAGMA integrity_check`: **ok**.
+
+The one retained Gmail-derived job is titled **Software Engineering – React & Node – Associate**, company **PwC Acceleration Centers in India**, location **All India, IN**. Current owner evaluation is `match=0`, `score=0`, reason: **location outside configured targets**. This explains why this historical record does not currently qualify for a Telegram notification; do not change the user's location preferences automatically.
+
+### Telegram state and role limitation discovered
+
+Read-only production counts for the configured Gmail owner account:
+
+- linked Telegram private chats: **0**;
+- per-user notification settings rows: **0**;
+- enabled notification settings: **0**;
+- notification ledger rows: **0**.
+
+The Gmail owner is the active **administrator** account. Current dashboard code deliberately hides `telegramConnectPanel` for administrators, and `/api/telegram/status`, `/api/telegram/link`, and `/api/notifications/settings` reject administrator accounts (403). Therefore this owner cannot currently link a Telegram chat or explicitly opt in from the existing UI. This is not a Gmail sync failure. Do not try to work around it by connecting another OAuth tester mailbox or by assigning a different JobBeeper owner ID.
+
+Before Telegram can be used for this personal Gmail owner, implement and test a narrow owner-admin Telegram linking/opt-in path bound to the configured Gmail owner account, preserving the current private-chat requirement, explicit opt-in, preferences/freshness/match checks, rate limits, retry/idempotency and Gmail historical-backfill marker. Do not create a link, enable notifications, or send Telegram messages as part of that code change. The owner must still complete the separate affirmative UI opt-in.
+
+### Next steps
+
+1. In the Jobs Feed, verify the retained PwC Gmail-sourced job and confirm it is appropriately visible in the owner's account. Keep the current preference filters unless the owner explicitly chooses to include India-wide locations.
+2. Confirm the Gmail filter is saved for future Google Alerts and applies the label to matching new conversations. Label existence is confirmed; filter creation/application to future messages and historic conversations has not been explicitly confirmed.
+3. Continue read-only monitoring of the 180-second incremental history polling. New messages should be processed only when carrying the configured label.
+4. Decide whether `All India` should be included in the owner's saved target locations. Do not widen location preferences silently.
+5. Implement the owner-admin Telegram connection/opt-in path before any Telegram notification test. Keep Telegram disabled until the owner links a private chat and explicitly checks the notification setting. Historical alerts should only be queued if current match, score threshold, freshness and all other delivery checks pass.
+6. Retain evidence that this OAuth authorization was granted while the app is in Testing. Testing-mode authorizations are temporary and must not be treated as durable production approval; continue the Restricted-scope verification and server-side security-assessment/policy gates in the existing Google handoff.
+
+No Telegram chat was linked, no notification setting was enabled, no Telegram message was sent, and no preferences were changed as part of this checkpoint.

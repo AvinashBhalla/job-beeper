@@ -17,6 +17,12 @@
 
 After Google admits the correct test account, retry OAuth and verify the callback, connected owner identity and exact Gmail label before inspecting sync. Do not enable Telegram as part of OAuth testing. Do not print secrets, account IDs, email content or tokens. No Gmail credential, mailbox message or sync state exists yet.
 
+## Successful Gmail authorization and live sync — 22 November 2026 (latest checkpoint)
+
+The owner added two Google OAuth test users and successfully completed the OAuth flow. Production read-only verification now shows one encrypted Gmail credential, four processed historical messages, eight parsed Alert results, one Gmail-derived historical job, a completed backfill state and active incremental history reconciliation with a cursor and no sync error. SQLite integrity is `ok`; jobs count is 28,732. The retained PwC Software Engineering – React & Node – Associate job currently evaluates to score 0 / no match because its location is `All India, IN` and falls outside the owner's saved location targets. Do not widen preferences without the owner's choice.
+
+Telegram is not yet ready for this admin owner: zero private chat links, zero notification settings and zero ledger rows. The current app hides the Telegram panel and its Telegram/link/notification endpoints reject administrator accounts. Implement a narrowly scoped owner-admin Telegram linking and explicit opt-in path if the owner wants Telegram; do not circumvent owner binding, auto-enable notifications or send messages. Current matching/freshness/private-chat/explicit opt-in/rate/idempotency checks must remain. The Gmail label exists; confirm the filter is saved and applies to future and matching historical alerts. Detailed counts and next steps are in `docs/GOOGLE_ALERTS_GMAIL_LIVE_ACCEPTANCE_HANDOFF_2026-11-22.md`.
+
 ## Scope correction — authoritative
 
 The owner clarified this is **one personal account only**. There are no other intended users and no near-term hosted SaaS launch. Do not add multi-member Gmail, account switching, customer onboarding, tenant administration or broad user-management features. Retain the existing signed-in owner identity only because Job Beeper's current preferences/authentication/Telegram model uses it.
