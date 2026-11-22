@@ -1,20 +1,22 @@
 # Google Gmail Restricted-Scope Policy Assessment — 22 November 2026
 
-**Status:** Preliminary source review; **not** legal advice, a Google approval, a CASA assessment, or permission to enable Gmail access.
+**Status:** Technical-policy assessment; not legal advice or a CASA assessment. The owner separately reports Google approval for the exact single-owner workflow; this document is not the approval correspondence.
 **Application:** JobBeeper personal Google Alerts → private job discovery
 **Intended user count:** One account controlled by the owner
 **Requested scope in code:** `https://www.googleapis.com/auth/gmail.readonly`
 **Current live-access gate:** `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false`; no OAuth grant or mailbox request has been made.
 
+**Owner approval update (22 November 2026):** The owner reports that Google approval has been received for the proposed one-owner personal Gmail workflow and has directed implementation/configuration to proceed. The approval correspondence is retained privately, not in this repository. For this narrowly scoped implementation, the approved-use-case question is recorded as resolved per the owner. Do not infer that the approval extends to additional accounts/scopes or waives any separate CASA/security, retention or data-handling conditions unless the correspondence expressly says so.
+
 ## Executive finding
 
 Google's published OAuth policy clearly supports the *personal-use verification exception* for an app used only by its creator (or a few people personally known to them). That exception means the app does not need to submit the normal OAuth app verification request; it does **not** mean all Gmail API and Workspace data policies stop applying. The owner may still encounter Google's unverified-app consent warning.
 
-The requested Gmail scope remains Restricted. Google's current Restricted Scope Verification page says an app that requests access to restricted user data and can access it from or through a third-party server must complete a security assessment by a Google-empanelled assessor. The page's personal-use exception is specifically under “Exceptions to verification requirements”; it does not expressly waive the separate server-side assessment section. JobBeeper's VM-hosted backend obtains Gmail data, so the conservative release position is to assume that a security assessment/CASA obligation applies unless Google confirms otherwise in writing.
+The requested Gmail scope remains Restricted. Google's published Restricted Scope Verification page describes a separate security-assessment requirement for restricted user data accessed from or through a third-party server. The owner reports receiving Google approval for the complete intended personal workflow and says there is no issue with what is being implemented. The approval correspondence is not available in this repository, so preserve it privately and follow any specific CASA/security-assessment or retention conditions in that response. This assessment does not claim that a CASA assessment was performed.
 
-There is also a separate **approved-use-case classification question**. Google's Workspace policy allows Gmail scopes for email clients, email backup, email-productivity applications, and user-benefiting reporting/monitoring that improves the email experience. JobBeeper is a job-discovery product: it reads Google Alerts and uses the destination links to discover public job postings. This resembles email-alert monitoring, but Google does not explicitly list job discovery as an approved use case and phrases the reporting/monitoring category as improving the email experience. Do not self-certify that the fit is approved. Ask Google to confirm that this precise use case is eligible before the first live grant.
+The approved-use-case question is recorded as resolved per the owner's report of Google approval for this exact owner-only workflow on 22 November 2026. This report does not authorize broader Gmail features or additional users. Keep the implementation within the precise personal use case the owner submitted and retain the approval correspondence privately.
 
-**Decision: keep live Gmail access disabled.** Local implementation, tests, docs, a branch push, and the localhost SSH tunnel do not resolve these policy questions.
+**Updated decision:** the owner reports Google approval for the exact single-owner workflow; proceed with configuration within that boundary. Keep live access disabled until the dedicated OAuth credentials, owner binding and encryption key are installed and the read-only preflight passes. Any separate CASA/security-assessment or retention conditions in the approval correspondence remain binding; do not assume a waiver beyond what Google actually approved.
 
 ## 1. What Google's current pages say
 
@@ -32,7 +34,7 @@ The application has a backend on the `job-radar` VM that exchanges the authoriza
 
 Google's Workspace policy separately lists required Restricted Scope security measures, including encryption of user data at rest and in transit, encrypted OAuth tokens, appropriate key management, and CASA security best practices. The refresh token is encrypted in the current code; that alone is not proof of full CASA/security-assessment compliance.
 
-### 1.3 Approved Gmail application types — unresolved fit
+### 1.3 Approved Gmail application types — owner reports approval received
 
 Google's Workspace user data and developer policy lists these approved Gmail-scope use cases:
 
@@ -41,7 +43,7 @@ Google's Workspace user data and developer policy lists these approved Gmail-sco
 3. Applications that enhance email productivity (examples include CRM, delayed sending, mail merge and generative-AI summaries).
 4. User-benefiting reporting or monitoring applications that improve the email experience (examples include travel itineraries, flight tracking and package-delivery tracking).
 
-JobBeeper is not an email client or mail-backup product. Its purpose is to turn the owner's Google Alerts into a job-discovery workflow. It may be analogous to a user-benefiting monitoring service because it tracks opportunities surfaced by an email alert, but “job discovery from email” is not an explicit example and it is not self-evident that it improves the email experience. This classification is **not confirmed**. Provide Google with the exact product description and ask whether it is a permitted Gmail-scope use case. Do not present the personal-use OAuth exception as proof that the use case itself is permitted.
+JobBeeper is not an email client or mail-backup product. Its purpose is to turn the owner's Google Alerts into a private job-discovery workflow. The owner reports Google approved this precise personal workflow. Keep the approval correspondence private and preserve any conditions. Do not extrapolate that approval to member access, additional mailboxes, broader scopes, model training, or a different data flow.
 
 ### 1.4 Limited Use, derivative data and transfers
 
@@ -70,9 +72,9 @@ The following describes the current isolated branch; it is not an endorsement th
 
 ## 3. Required decisions before live Gmail activation
 
-1. **Get Google's use-case classification.** Ask whether a single-user job-search application that consumes Google Alerts and fetches public job postings is one of the approved Gmail-scope application types, and identify the correct “What features will you use?” application type, if any.
-2. **Get the server-side assessment determination.** Describe the VM-hosted backend, encrypted refresh token, in-memory MIME processing, persistent message-key digest/status, public-page records, and Telegram output. Ask if CASA/security assessment is required for a single owner-operated VM and what exact assessment level applies.
-3. **Confirm data classification and retention.** Ask whether the public JobPosting fields fetched from the linked public URL, Gmail-origin owner association, SHA-256 message-key digest, and sync/status fields count as Google user data or derived data for storage/retention purposes. Confirm encryption-at-rest expectations for the database.
+1. **Google use-case classification — owner reports approval received.** The owner reports Google approved this single-user workflow on 22 November 2026. Keep the approval correspondence privately and preserve its conditions. Do not expand the Gmail use case beyond the approved owner-only workflow.
+2. **Follow any server-side assessment/security conditions in Google's approval.** The owner reports Google has approved the described workflow. No CASA assessment has been performed by this code change; do not claim otherwise or broaden the use beyond any conditions in the approval.
+3. **Preserve the approved data-handling boundary.** Retain only the documented minimal sync metadata and independently fetched public posting fields; do not add raw email, snippets, alert queries or generalized analytics. Apply any retention/encryption restrictions stated in Google's approval.
 4. **Complete in-product disclosure and consent.** Show the data accessed, transient parsing, public-page verification, private job-record persistence, separate Telegram transfer/opt-in, and deletion/retention behavior immediately before the Gmail connection action. Capture affirmative consent server-side for the current disclosure version and require a fresh one-time acceptance for every OAuth start; preserve a separate opt-in for Telegram. This implementation safeguard does not close Google's policy eligibility or assessment gates.
 5. **Publish help/privacy content as required.** Provide an easy-to-find help page describing connection management, pause/resume, disconnect and deletion. Provide a privacy-policy URL if the app is made available publicly; explicitly disclose Google data access, purposes, storage, sharing with Telegram and deletion rules. Include the required Google Limited Use compliance statement.
 6. **Close security controls.** Confirm CASA/security assessment applicability, encryption for all in-scope persisted data, key management, access control, secure transport, incident handling, deletion verification, and prompt-injection controls. The encrypted refresh token and local test suite are not a substitute for the assessment.
@@ -83,7 +85,7 @@ The Account notice now states that the owner accepts a versioned disclosure. The
 
 ## 4. Decision and activation gate
 
-Until items 1–3 are confirmed with Google and items 4–6 are implemented and reviewed:
+After the owner-reported approval, continue within the exact single-owner scope. Until private configuration and the read-only preflight are complete:
 
 - Keep `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false`.
 - Do not connect an account, request/retain live Gmail tokens, read a real mailbox or start the poller.
