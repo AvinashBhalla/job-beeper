@@ -215,7 +215,8 @@ def init_schema(db_path: str | Path) -> None:
             disclosure_version TEXT NOT NULL,
             accepted_at TEXT NOT NULL,
             expires_at INTEGER NOT NULL DEFAULT 0,
-            consumed_at TEXT
+            consumed_at TEXT,
+            expired_at TEXT
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_google_alerts_gmail_consent_pending
           ON google_alerts_gmail_data_use_consents(user_id, disclosure_version)
@@ -295,6 +296,17 @@ def init_schema(db_path: str | Path) -> None:
                 "ALTER TABLE google_alerts_gmail_data_use_consents "
                 "ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0"
             )
+        if "expired_at" not in consent_columns:
+            conn.execute(
+                "ALTER TABLE google_alerts_gmail_data_use_consents "
+                "ADD COLUMN expired_at TEXT"
+            )
+        conn.execute("DROP INDEX IF EXISTS idx_google_alerts_gmail_consent_pending")
+        conn.execute(
+            """CREATE UNIQUE INDEX idx_google_alerts_gmail_consent_pending
+               ON google_alerts_gmail_data_use_consents(user_id, disclosure_version)
+               WHERE consumed_at IS NULL AND expired_at IS NULL"""
+        )
 
         columns = {
             row[1] for row in conn.execute(
@@ -326,6 +338,16 @@ def record_data_use_consent(
     accepted_at = datetime.now(timezone.utc)
     expires_at = int(accepted_at.timestamp()) + 600
     with DB_LOCK, _connect(db_path) as conn:
+        conn.execute(
+            """UPDATE google_alerts_gmail_data_use_consents
+               SET expired_at=?
+               WHERE user_id=? AND disclosure_version=?
+                 AND consumed_at IS NULL AND expired_at IS NULL AND expires_at<=?""",
+            (
+                accepted_at.isoformat(), int(user_id),
+                DATA_USE_DISCLOSURE_VERSION, int(accepted_at.timestamp()),
+            ),
+        )
         conn.execute(
             """INSERT OR IGNORE INTO google_alerts_gmail_data_use_consents
                  (user_id,disclosure_version,accepted_at,expires_at)
