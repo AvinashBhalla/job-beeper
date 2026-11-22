@@ -2038,7 +2038,7 @@
         },
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || 'Could not record Gmail data-use consent.');
+      if (!response.ok) throw new Error(authClient.formatErrorDetail(data.detail) || 'Could not record Gmail data-use consent.');
       window.location.assign(`${API}/integrations/google-alerts/gmail/connect`);
     } catch (error) {
       if (status) status.textContent = error.message || 'Could not record Gmail data-use consent.';

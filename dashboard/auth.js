@@ -41,6 +41,17 @@
     function request(path, options = {}) {
       const method = String(options.method || 'GET').toUpperCase();
       const headers = Object.assign({}, options.headers || {});
+      let body = options.body;
+      const isJsonBody = Array.isArray(body) || (
+        body !== null
+        && typeof body === 'object'
+        && (Object.getPrototypeOf(body) === Object.prototype || Object.getPrototypeOf(body) === null)
+      );
+      if (isJsonBody) {
+        body = JSON.stringify(body);
+        const hasContentType = Object.keys(headers).some(name => name.toLowerCase() === 'content-type');
+        if (!hasContentType) headers['Content-Type'] = 'application/json';
+      }
       if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
         const csrfToken = readCookie('job_beeper_csrf');
         if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
@@ -48,8 +59,30 @@
       return fetchImpl(`${base}${path}`, Object.assign({}, options, {
         method,
         headers,
+        body,
         credentials: 'same-origin',
       }));
+    }
+
+    function formatErrorDetail(detail) {
+      if (typeof detail === 'string') return detail;
+      if (Array.isArray(detail)) {
+        return detail.map(item => {
+          if (typeof item === 'string') return item;
+          if (!item || typeof item !== 'object') return '';
+          const location = Array.isArray(item.loc)
+            ? item.loc.filter(part => part !== 'body').join('.')
+            : '';
+          const message = typeof item.msg === 'string' ? item.msg
+            : typeof item.message === 'string' ? item.message : '';
+          return [location, message].filter(Boolean).join(': ');
+        }).filter(Boolean).join('; ');
+      }
+      if (detail && typeof detail === 'object') {
+        if (typeof detail.message === 'string') return detail.message;
+        try { return JSON.stringify(detail); } catch (_error) { return ''; }
+      }
+      return '';
     }
 
     function login(email, password) {
@@ -94,7 +127,7 @@
       }
     }
 
-    return { login, currentUser, logout, request, bootstrap };
+    return { login, currentUser, logout, request, bootstrap, formatErrorDetail };
   }
 
   return { createClient, resolveApiBase };
