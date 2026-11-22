@@ -92,7 +92,7 @@ Before any deployment:
 
 ## Server-side consent-bypass fix — 22 November 2026
 
-- Added disclosure version `2026-11-22-v2` and a consent ledger with an unused-consent uniqueness constraint.
+- Added disclosure version `2026-11-22-v2` and a consent ledger with an unused-consent uniqueness constraint. Each acceptance expires after 10 minutes; the OAuth-start transaction consumes only a current, unexpired acceptance. A schema migration gives older pending rows an already-expired default.
 - The dashboard now POSTs affirmative acceptance to the authenticated server before opening the OAuth URL. The OAuth-start GET atomically consumes the unused acceptance, so direct authenticated requests and replays are denied.
 - The ledger stores only the Job Beeper account ID, disclosure version, acceptance time and consumed time. It survives Gmail disconnect as evidence and is removed by Job Beeper account deletion through the user foreign key.
 - Added unit, API-route and dashboard contract coverage. Run the focused tests and record exact results before merge; no Gmail OAuth, mailbox access, Telegram delivery or production deployment is part of this change.
