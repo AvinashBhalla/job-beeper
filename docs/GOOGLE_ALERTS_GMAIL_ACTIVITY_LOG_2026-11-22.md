@@ -156,3 +156,12 @@ Obtain Google's determination on whether this job-alert-to-job-discovery use cas
 4. docker compose --env-file /home/ubuntu/job-beeper/.env -f v2/docker-compose.yml config --quiet passed against the feature-branch Compose file.
 5. Critical release-path distinction: the currently running service uses /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST/candidate-compose.yml and that directory's root-owned ./runtime.env. That runtime file has no Gmail keys and the running container has no JOB_RADAR_GMAIL_* variables. The owner .env is ready to be explicitly supplied to the reviewed feature-branch Compose file with --env-file; it has not been loaded into the running container. Do not mutate the archived release bundle's runtime env or restart the service as a workaround.
 6. No deployment, container restart, Gmail OAuth, mailbox access, token creation, Gmail sync, or Telegram external send took place. Live access remains disabled.
+
+
+## 22 November 2026 — production Compose contract and hosted check audit
+
+1. Reviewed the exact running deployment definition. It binds the service only to 127.0.0.1:8000, reads a root-only runtime env file, and mounts external Docker volume v2_radar-data.
+2. Hardened the feature-branch production Compose file to preserve that binding and volume explicitly, retain the current cookie/public-origin settings, pass the Gmail variables from the owner-controlled private env file, and use a versioned candidate image tag job-radar-prod-release:gmail-20261122.
+3. Revalidated Compose with the real private env file using config --quiet; no interpolated credentials were printed. This preflights configuration only and does not modify/recreate the running container.
+4. Inspected the latest exact-head GitHub Actions V2 CI run for 5efa631. It failed before any job steps (steps=[]); the log artifact was not available. It did not execute the test suite. No rerun was requested. Local focused regression and full historical offline coverage remain the available test evidence.
+5. No production backup, image build, container restart/deployment, Gmail OAuth, mailbox read, or Telegram send has happened yet.

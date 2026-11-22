@@ -1,15 +1,20 @@
 services:
   radar:
+    image: job-radar-prod-release:gmail-20261122
     build:
       context: ..
       dockerfile: v2/Dockerfile
     restart: unless-stopped
+    # Preserve production's loopback-only listener and existing data volume.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - radar-data:/data
     environment:
       JOB_RADAR_DB: /data/jobs.db
+      # Preserve current authentication origin/cookie behaviour from the private env.
+      JOB_BEEPER_COOKIE_SECURE: ${JOB_BEEPER_COOKIE_SECURE:-true}
+      JOB_BEEPER_PUBLIC_ORIGIN: ${JOB_BEEPER_PUBLIC_ORIGIN:-}
       JOB_RADAR_TELEGRAM_BOT_TOKEN: ${JOB_RADAR_TELEGRAM_BOT_TOKEN:-}
       JOB_RADAR_TELEGRAM_CHAT_ID: ${JOB_RADAR_TELEGRAM_CHAT_ID:-}
       JOB_BEEPER_TELEGRAM_BOT_USERNAME: ${JOB_BEEPER_TELEGRAM_BOT_USERNAME:-}
@@ -28,3 +33,5 @@ services:
 
 volumes:
   radar-data:
+    external: true
+    name: v2_radar-data

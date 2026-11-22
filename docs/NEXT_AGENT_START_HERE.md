@@ -20,9 +20,9 @@ Current personal path: existing VM `job-radar`; trigger: localhost OAuth callbac
 
 - Owner populated /home/ubuntu/job-beeper/.env (mode 600, ubuntu:ubuntu). All nine Gmail setting names have non-empty, non-placeholder values. The feature checkout's load_config() accepted them, the Fernet key validated, and localhost/polling defaults checked out; live access is false.
 - The configured numeric owner ID was checked read-only inside the current production container and maps to an active administrator account.
-- The feature Compose file passed: docker compose --env-file /home/ubuntu/job-beeper/.env -f v2/docker-compose.yml config --quiet.
+- The feature Compose file passed config validation with /home/ubuntu/job-beeper/.env. Its production compatibility is explicitly preserved: loopback-only 127.0.0.1:8000 binding, external volume v2_radar-data, current cookie/public-origin settings, and a versioned candidate image tag.
 - **Do not assume the running service is configured yet.** Its current Compose file is /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST/candidate-compose.yml, using that directory's root-owned ./runtime.env; the running container has no Gmail env variables. The new .env is ready for the feature-branch release when that Compose file is used with explicit --env-file. Do not modify the archived runtime env or restart/deploy as a workaround. The old /home/ubuntu/job-beeper checkout is behind the feature branch and is not a release source.
-- No service restart, deployment, Gmail OAuth or mailbox access has occurred. Keep the live-access value false.
+- The exact-head V2 GitHub Actions run on 5efa631 failed before any steps (steps=[]); it did not execute tests. Local focused tests passed and no retry was triggered. No service restart, deployment, Gmail OAuth or mailbox access has occurred. Keep the live-access value false.
 
 ## Safety and go-live gates
 

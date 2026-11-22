@@ -56,6 +56,19 @@ The owner has populated /home/ubuntu/job-beeper/.env. On 22 November 2026, the f
 
 Do not manually modify the archived release bundle's runtime.env or restart the service as a workaround. The approved release must explicitly pass /home/ubuntu/job-beeper/.env using --env-file with the reviewed Compose file (or deliberately stage the same values in the new release's protected runtime env file as part of the reviewed release procedure). No secret values should appear in shell output. The current application has not been restarted and live Gmail remains disabled.
 
+## Production release compatibility checks
+
+The release Compose now explicitly preserves the current deployment contract:
+- image is tagged job-radar-prod-release:gmail-20261122 for an identifiable candidate and rollback;
+- host port remains loopback-only at 127.0.0.1:8000;
+- the existing named volume is declared external as v2_radar-data, so the release cannot silently create a new empty DB volume;
+- JOB_BEEPER_COOKIE_SECURE and JOB_BEEPER_PUBLIC_ORIGIN continue to flow from the private environment file; and
+- the existing Telegram token/chat settings continue to flow from that same file.
+
+Compose was checked using the real private env file with config --quiet; the resolved configuration was not printed. Do not substitute an all-interface port mapping or a new volume name.
+
+The exact-head GitHub Actions V2 CI check for commit 5efa63121816a7cc854267c7d7d9fcbc0ea31ab3 finished failed before starting any steps (steps=[]). It did not execute tests. The local focused regression remains the available test evidence; do not treat the failed hosted check as a code-test failure or trigger extra paid CI attempts. The current focused suites and broader locally recorded regression evidence are in the activity log and PR description.
+
 ## Read-only preflight
 
 After the reviewed code and Compose wiring are present in the target deployment, first keep live access disabled and run the preflight inside the app container:
