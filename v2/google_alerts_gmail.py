@@ -43,6 +43,7 @@ STATE_TTL_SECONDS = 600
 MAX_GMAIL_PAGE_SIZE = 500
 MAX_PUSH_BODY_BYTES = 64 * 1024
 MAX_MESSAGE_ATTEMPTS = 6
+DATA_USE_DISCLOSURE_VERSION = "2026-11-22-v2"
 
 # Access tokens are short-lived and intentionally kept only in process memory.
 # The owner-only worker reuses a token until a small expiry safety window.
@@ -208,6 +209,17 @@ def init_schema(db_path: str | Path) -> None:
         CREATE INDEX IF NOT EXISTS idx_google_alerts_oauth_expiry
           ON google_alerts_gmail_oauth_states(expires_at);
 
+        CREATE TABLE IF NOT EXISTS google_alerts_gmail_data_use_consents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            disclosure_version TEXT NOT NULL,
+            accepted_at TEXT NOT NULL,
+            consumed_at TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_google_alerts_gmail_consent_pending
+          ON google_alerts_gmail_data_use_consents(user_id, disclosure_version)
+          WHERE consumed_at IS NULL;
+
         CREATE TABLE IF NOT EXISTS google_alerts_gmail_credentials (
             singleton INTEGER PRIMARY KEY CHECK(singleton=1),
             owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -282,6 +294,58 @@ def init_schema(db_path: str | Path) -> None:
                 conn.execute(
                     f"ALTER TABLE google_alerts_gmail_sync_state ADD COLUMN {column} TEXT"
                 )
+
+
+def record_data_use_consent(
+    db_path: str | Path,
+    user_id: int,
+    config: GmailIntegrationConfig,
+    *,
+    accepted: bool,
+    disclosure_version: str,
+) -> None:
+    """Record an affirmative, versioned acceptance for one OAuth attempt."""
+    if int(user_id) != config.owner_user_id:
+        raise GoogleAlertsGmailError("gmail_owner_only")
+    if accepted is not True:
+        raise GoogleAlertsGmailError("gmail_data_use_consent_required")
+    if disclosure_version != DATA_USE_DISCLOSURE_VERSION:
+        raise GoogleAlertsGmailError("gmail_data_use_disclosure_version_mismatch")
+    with DB_LOCK, _connect(db_path) as conn:
+        conn.execute(
+            """INSERT OR IGNORE INTO google_alerts_gmail_data_use_consents
+                 (user_id,disclosure_version,accepted_at)
+               VALUES(?,?,?)""",
+            (int(user_id), DATA_USE_DISCLOSURE_VERSION, _now_iso()),
+        )
+
+
+def consume_data_use_consent(
+    db_path: str | Path,
+    user_id: int,
+    config: GmailIntegrationConfig,
+) -> bool:
+    """Atomically consume the latest unused consent before starting OAuth."""
+    if int(user_id) != config.owner_user_id:
+        raise GoogleAlertsGmailError("gmail_owner_only")
+    stamp = _now_iso()
+    with DB_LOCK, _connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """SELECT id FROM google_alerts_gmail_data_use_consents
+               WHERE user_id=? AND disclosure_version=? AND consumed_at IS NULL
+               ORDER BY id DESC LIMIT 1""",
+            (int(user_id), DATA_USE_DISCLOSURE_VERSION),
+        ).fetchone()
+        if row is None:
+            return False
+        conn.execute(
+            """UPDATE google_alerts_gmail_data_use_consents
+               SET consumed_at=?
+               WHERE user_id=? AND disclosure_version=? AND consumed_at IS NULL""",
+            (stamp, int(user_id), DATA_USE_DISCLOSURE_VERSION),
+        )
+    return True
 
 
 def create_authorization_url(
