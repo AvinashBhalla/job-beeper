@@ -703,6 +703,82 @@ class GmailIntegrationTests(unittest.TestCase):
         with self.assertRaises(gmail.GoogleAlertsGmailError):
             gmail.store_pubsub_push(self.db, **args)
 
+    def test_disconnect_removes_gmail_only_queued_alerts_but_keeps_public_jobs(self):
+        from v2 import user_notifications
+
+        user_notifications.init_schema(self.db)
+        with user_notifications._connect(self.db) as conn:
+            conn.executemany(
+                "INSERT INTO canonical_opportunities(id) VALUES(?)",
+                [(201,), (202,)],
+            )
+            conn.executemany(
+                """INSERT INTO jobs(
+                     id,canonical_opportunity_id,source,source_owner_user_id
+                   ) VALUES(?,?,?,?)""",
+                [
+                    (11, 201, "google_alerts_gmail", 7),
+                    (12, 202, "workday", None),
+                ],
+            )
+            conn.executemany(
+                """INSERT INTO google_alerts_gmail_opportunities(
+                     user_id,canonical_opportunity_id,candidate_job_id,history_backfill,
+                     first_observed_at,last_observed_at
+                   ) VALUES(?,?,?,?,?,?)""",
+                [
+                    (7, 201, 11, 0, "2026-11-22T00:00:00+00:00", "2026-11-22T00:00:00+00:00"),
+                    (7, 202, 12, 1, "2026-11-22T00:00:00+00:00", "2026-11-22T00:00:00+00:00"),
+                ],
+            )
+            conn.executemany(
+                """INSERT INTO user_notification_ledger(
+                     user_id,canonical_opportunity_id,candidate_job_id,status,
+                     backlog_override,created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?)""",
+                [
+                    (7, 201, 11, "queued", 0, "2026-11-22T00:00:00+00:00", "2026-11-22T00:00:00+00:00"),
+                    (7, 202, 12, "queued", 1, "2026-11-22T00:00:00+00:00", "2026-11-22T00:00:00+00:00"),
+                ],
+            )
+
+        gmail.save_credentials(
+            self.db, 7, "owner@example.test", "refresh",
+            gmail.GMAIL_SCOPE, self.config,
+        )
+        session = Mock()
+        session.post.return_value = Mock(status_code=200)
+        with patch.object(gmail, "refresh_access_token", return_value="access-token"):
+            with patch.object(gmail, "GmailApiClient") as api_client:
+                gmail.disconnect(self.db, self.config, session=session)
+        api_client.return_value.stop_watch.assert_called_once_with()
+
+        with user_notifications._connect(self.db) as conn:
+            self.assertEqual(
+                conn.execute("SELECT COUNT(*) FROM jobs WHERE id=11").fetchone()[0],
+                0,
+            )
+            self.assertEqual(
+                conn.execute("SELECT COUNT(*) FROM jobs WHERE id=12").fetchone()[0],
+                1,
+            )
+            # The FK cascade removes the future Gmail-only queue row together
+            # with its private candidate job.
+            self.assertEqual(
+                conn.execute(
+                    "SELECT COUNT(*) FROM user_notification_ledger WHERE candidate_job_id=11"
+                ).fetchone()[0],
+                0,
+            )
+            # Historical Gmail delivery for an independently public ATS job is
+            # explicitly cancelled, while the public job itself is preserved.
+            public_delivery = conn.execute(
+                """SELECT status,backlog_override FROM user_notification_ledger
+                   WHERE candidate_job_id=12"""
+            ).fetchone()
+        self.assertEqual(tuple(public_delivery), ("cancelled", 0))
+
+
     def test_disconnect_erases_gmail_credentials_and_sync_state(self):
         gmail.save_credentials(
             self.db, 7, "owner@example.test", "refresh",
