@@ -13,7 +13,7 @@
 - The private environment `/home/ubuntu/job-beeper/.env` remains mode `0600`, owned by `ubuntu:ubuntu`. It contains the pre-existing bot token, username `Qdhorvbot`, and a newly generated webhook secret. Secret values are not stored in Git, documentation or chat.
 - Telegram Bot API `getMe` confirmed the existing bot username `Qdhorvbot`. `setWebhook` completed successfully with `https://130.210.27.197/api/telegram/webhook`, `allowed_updates=["message"]`, `max_connections=5`, and `drop_pending_updates=false`. `getWebhookInfo` confirmed exact URL, zero pending updates, and no last webhook error. The webhook secret is delivered by Telegram in `X-Telegram-Bot-Api-Secret-Token` and checked by the application.
 - The HTTPS endpoint is publicly reachable and its active certificate has an IP SAN for `130.210.27.197`; certificate renewal is managed by the host's existing certbot timer. No DNS, custom domain or new certificate resource was created.
-- No Telegram private chat has been linked; no notification settings have been enabled; no notification ledger rows exist; no job-alert Telegram messages have been sent.
+- No Telegram private chat has been linked through the new owner-specific account flow; no per-user notification setting is enabled and `user_notification_ledger` has zero rows. **Separate legacy behaviour:** the old global Telegram notifier remains enabled (`JOB_RADAR_TELEGRAM_CHAT_ID` and bot token are configured, and `notifications_enabled=true` in app config). It delivered three legacy LinkedIn alerts after this deployment: 2 at 07:51:58 UTC and 1 at 07:57:37 UTC on 22 November. These were sent to the pre-existing static global chat ID and are not evidence that the new owner-specific link or per-user opt-in succeeded. The legacy notifier was left unchanged.
 
 ## Code changes
 
@@ -68,9 +68,18 @@ The directory is `root:root` mode `0700`; files are `root:root` mode `0600`. `SH
 
 ## Explicitly not done
 
-- No Telegram chat linked by the owner.
+- No Telegram chat linked through the new owner-specific account flow. The user-facing `t.me` page did not open the Telegram app; the pending token remained unconsumed, and no `/api/telegram/webhook` POST was received.
 - No job-alert notification enabled.
-- No job-alert Telegram message sent.
+- No job-alert message sent through the new owner-specific per-user channel. Three legacy global LinkedIn alerts were sent through the pre-existing static chat configuration at 07:51:58 and 07:57:37 UTC; see live-state note above.
 - No user preference was automatically changed by this release.
 - No Gmail scope or label restriction changed, and no new Gmail sync/backfill was triggered by the code release.
 - No first email from the newly created Google Alerts has yet been confirmed.
+
+## Telegram start-button troubleshooting — 22 November 2026
+
+- The owner opened the generated `https://t.me/Qdhorvbot?start=...` link in Chrome and reported that clicking **START BOT** did nothing. The screenshot shows Telegram's web landing page, not the private bot chat.
+- Server evidence: `POST /api/telegram/link` succeeded at `08:05:03 UTC`, creating the one-time token for the configured owner. The latest DB check found the token unconsumed and unexpired (10-minute TTL; last checked with approximately 200 seconds remaining). No `POST /api/telegram/webhook` was logged after creation. Telegram `getWebhookInfo` still reported the configured HTTPS endpoint, zero pending updates and no last error.
+- Conclusion: the browser did not hand the `tg://` link off to a Telegram client; there is no evidence of a broken server webhook or a received `/start` update.
+- Owner workaround: open Telegram Desktop or Telegram mobile, search `@Qdhorvbot` / **Jobwatcher**, open the private chat, and send `/start <payload>` using the exact payload copied from the generated URL after `start=`. Sending bare `/start` is insufficient. If the one-time token expires, generate a fresh link in JobBeeper and use the new payload. Do not share the full start link publicly.
+- After the bot receives the payload, expect one private account-link confirmation. Then refresh Telegram connection status in JobBeeper. Notification settings should still be off until the owner explicitly opts in.
+- Separate legacy delivery correction: the old global Telegram sender remains configured (`JOB_RADAR_TELEGRAM_CHAT_ID` and bot token set; app `notifications_enabled=true`). Application logs show 2 legacy global LinkedIn notifications delivered at `07:51:58 UTC` and 1 at `07:57:37 UTC` on 22 November. This path uses the pre-existing static chat ID and does not create `user_telegram_chats` rows or `user_notification_ledger` rows. It was not disabled during the owner-link rollout. Ask the owner before changing the existing global notification switch.
