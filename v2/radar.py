@@ -7584,6 +7584,11 @@ class AuthLoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
+class GoogleAlertsGmailConsentRequest(BaseModel):
+    accepted: bool
+    disclosure_version: str = Field(min_length=1, max_length=64)
+
+
 def _is_localhost_ssh_tunnel(request: Request | None) -> bool:
     if request is None or (request.url.hostname or "").casefold() != "localhost":
         return False
@@ -7825,6 +7830,33 @@ def _google_alerts_gmail_config(
     return config
 
 
+@app.post("/api/integrations/google-alerts/gmail/consent")
+def google_alerts_gmail_record_consent(
+    payload: GoogleAlertsGmailConsentRequest,
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config()
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    try:
+        google_alerts_gmail.record_data_use_consent(
+            DB_PATH,
+            int(user["id"]),
+            config,
+            accepted=payload.accepted,
+            disclosure_version=payload.disclosure_version,
+        )
+    except google_alerts_gmail.GoogleAlertsGmailError:
+        raise HTTPException(
+            status_code=400,
+            detail="The current Gmail data-use disclosure must be accepted before connecting.",
+        ) from None
+    return {
+        "consented": True,
+        "disclosure_version": google_alerts_gmail.DATA_USE_DISCLOSURE_VERSION,
+    }
+
+
 @app.get("/api/integrations/google-alerts/gmail/status")
 def google_alerts_gmail_status(
     user: dict[str, Any] = Depends(require_admin),
@@ -7903,6 +7935,13 @@ def google_alerts_gmail_connect(
     config = _google_alerts_gmail_config()
     if int(user["id"]) != config.owner_user_id:
         raise HTTPException(status_code=404, detail="Integration not found.")
+    if not google_alerts_gmail.consume_data_use_consent(
+        DB_PATH, int(user["id"]), config
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Review and accept the current Gmail data-use disclosure in Account before connecting.",
+        )
     authorization_url = google_alerts_gmail.create_authorization_url(
         DB_PATH, int(user["id"]), config
     )
