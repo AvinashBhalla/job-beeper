@@ -13,6 +13,7 @@ Eventual target: existing VM `job-radar`; trigger: Gmail push → Pub/Sub OIDC p
 - Implemented: generic Google Alerts email parser; owner-only Gmail OAuth/PKCE and encrypted refresh-token persistence; label-scoped watch/backfill/history sync; OIDC Pub/Sub endpoint; public job verifier; private job ingestion and historical Telegram notification handling; owner-only Account UI for connect/disconnect/status/progress/pause/resume/retry.
 - Recent hardening: in-memory access-token cache (short expiry safety margin; never persisted); cache invalidation on credential replacement/disconnect; explicit `cryptography` dependency; `.venv/` ignored by Git.
 - The account UI intentionally does not expose mailbox addresses, alert query terms, snippets, Gmail message IDs or tokens.
+- Offline validation (22 November 2026): all 34 V2 test modules completed successfully in segmented runs against isolated test databases; the focused Gmail-related set also passed 83/83. Python compile, dashboard JavaScript syntax and `git diff --check` passed. Real Gmail/Pub/Sub/Telegram acceptance remains outstanding.
 - The initial historical backfill must send eligible Telegram notifications, as the owner explicitly approved. The Gmail-only override bypasses only the no-backlog/enabled-at cutoff; current preferences, freshness, active public posting, Telegram opt-in/private chat, rate limits, retries and idempotency remain required.
 
 ## Safety and go-live gates
@@ -20,7 +21,7 @@ Eventual target: existing VM `job-radar`; trigger: Gmail push → Pub/Sub OIDC p
 1. No live Gmail OAuth or real mailbox access has been run. `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS` remains a deliberate gate; all credentials/keys belong in a secure server-side handoff, never chat or GitHub.
 2. `gmail.readonly` remains a Restricted scope. Determine the permitted-use-case, Limited Use/data-transfer obligations and whether the separate restricted-data security assessment applies to this creator-only server-side VM deployment. Personal Mode's creator-only OAuth verification exception does not automatically waive this question.
 3. No Pub/Sub topic/subscription has been provisioned; verify callback CA-signed HTTPS reachability and OIDC audience/service-account identity before provisioning. Check GCP billing/pricing; do not enable billing or create paid resources without explicit approval.
-4. Run the full V2 regression suite, inspect the full diff and exact pushed SHA, review migration/rollback, and complete controlled live-mailbox acceptance tests before considering merge/deploy.
+4. Full offline V2 validation is now complete: all 34 test modules passed in segmented runs using isolated test databases; focused Gmail-related validation passed 83/83. Python compile, dashboard JavaScript syntax and whitespace checks passed. Before merge/deploy, inspect the exact pushed SHA and full diff, review migration/rollback, and complete controlled live-mailbox acceptance tests.
 5. No production DB migration, container/service restart, Nginx/DNS/certificate change, OAuth resource creation, Pub/Sub provisioning, external Telegram send or production deployment has happened in this work.
 
 The isolated checkout is physically on the connected `job-radar` host but uses a separate Git clone and venv. It must not touch the live checkout, production DB, containers or services. Prefer another non-production machine for broader regression tests. `.venv/` must remain untracked and ignored. Do not trigger paid GitHub Actions; the user's Actions quota was exhausted.
@@ -506,7 +507,7 @@ Hirebase incremental ingestion is now being changed to avoid repeatedly spending
 1. Inspect/fix v2/test_hirebase.py method placement and review the current incremental cursor/pagination code.
 2. Add focused tests for cursor persistence/commit semantics and pagination. Ensure estimate-first and hard caps are intact.
 3. Run focused Hirebase/directory tests and git diff --check, compile Python, validate JSON and Compose.
-4. Run the full V2 suite at exact final HEAD. If long-running, use a background job and poll until completed; do not abandon it.
+4. Full V2 validation at the current feature HEAD completed in segmented runs: all 34 test modules passed. Repeat full V2 validation if additional code changes are made before merge.
 5. Validate dashboard JS using GitHub Actions/modern Node. VM Node 12 cannot parse existing optional chaining/nullish-coalescing syntax; do not rewrite unrelated JS to satisfy that old runtime.
 6. Update the implementation note and all three handovers with exact final test count, commit SHA, CI run and any remaining blockers.
 7. Only then push branch and create/update a draft PR. No deployment, no Hirebase activation, no key setup or live source enablement without explicit user approval.
