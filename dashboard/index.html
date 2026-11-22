@@ -793,6 +793,23 @@
               <p class="auth-description">Your session is stored in a secure, HttpOnly browser cookie. No access token needs to be copied or saved.</p>
               <button type="button" class="btn-pill btn-pill-secondary" id="accountLogoutBtn">Sign out</button>
             </div>
+
+            <div class="settings-block" id="googleAlertsGmailPanel" hidden>
+              <span class="settings-block-title">Google Alerts Gmail connection</span>
+              <p class="auth-description">Personal inbox integration for Google Alerts only. The app reads messages carrying your <strong>JobBeeper/GoogleAlerts</strong> label. Create the label and Gmail filter yourself; Job Beeper never edits mailbox labels or filters.</p>
+              <p id="googleAlertsGmailStatus" class="auth-description" role="status" aria-live="polite">Checking personal Gmail connection…</p>
+              <p id="googleAlertsGmailSyncProgress" class="form-help-text" role="status" aria-live="polite">Sync progress will appear here after the connection is enabled.</p>
+              <p id="googleAlertsGmailDeliveryProgress" class="form-help-text" role="status" aria-live="polite">Historical Telegram delivery status will appear here after sync begins.</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn-pill btn-pill-primary" id="connectGoogleAlertsGmailBtn" hidden>Connect personal Gmail</button>
+                <button type="button" class="btn-pill btn-pill-secondary" id="refreshGoogleAlertsGmailBtn">Refresh status</button>
+                <button type="button" class="btn-pill btn-pill-secondary" id="pauseGoogleAlertsBackfillBtn" hidden>Pause historical Telegram alerts</button>
+                <button type="button" class="btn-pill btn-pill-secondary" id="resumeGoogleAlertsBackfillBtn" hidden>Resume historical Telegram alerts</button>
+                <button type="button" class="btn-pill btn-pill-secondary" id="retryGoogleAlertsBackfillBtn" hidden>Retry failed historical alerts</button>
+                <button type="button" class="btn-pill btn-pill-secondary" id="disconnectGoogleAlertsGmailBtn" hidden>Disconnect and erase Gmail data</button>
+              </div>
+              <p class="form-help-text">Disconnect revokes the Gmail grant where possible and removes Gmail-only local credentials, sync state and private discoveries. Public job records already known from public sources are retained.</p>
+            </div>
           </div>
         </section>
       </div>

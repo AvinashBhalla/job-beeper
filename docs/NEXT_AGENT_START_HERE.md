@@ -1,3 +1,34 @@
+# CURRENT IMPLEMENTATION HANDOVER — 22 November 2026
+
+## Scope correction — authoritative
+
+The owner clarified this is **one personal account only**. There are no other intended users and no near-term hosted SaaS launch. Do not add multi-member Gmail, account switching, customer onboarding, tenant administration or broad user-management features. Retain the existing signed-in owner identity only because Job Beeper's current preferences/authentication/Telegram model uses it.
+
+Eventual target: existing VM `job-radar`; trigger: Gmail push → Pub/Sub OIDC push → durable queue → Gmail history reconciliation; results: existing dashboard + the owner's private Telegram. **Production activation is deferred** until release and Google restricted-data-policy gates are resolved. Pushing the feature branch is not deploying it.
+
+## Current feature branch work
+
+- Repo: `AvinashBhalla/job-beeper`; branch: `feat/google-alerts-gmail-ingestion`; draft PR #102 remains unmerged.
+- Isolated checkout: `/home/ubuntu/job-beeper-google-alerts-dev`. Existing checkouts and live service directories were not changed.
+- Implemented: generic Google Alerts email parser; owner-only Gmail OAuth/PKCE and encrypted refresh-token persistence; label-scoped watch/backfill/history sync; OIDC Pub/Sub endpoint; public job verifier; private job ingestion and historical Telegram notification handling; owner-only Account UI for connect/disconnect/status/progress/pause/resume/retry.
+- Recent hardening: in-memory access-token cache (short expiry safety margin; never persisted); cache invalidation on credential replacement/disconnect; explicit `cryptography` dependency; `.venv/` ignored by Git.
+- The account UI intentionally does not expose mailbox addresses, alert query terms, snippets, Gmail message IDs or tokens.
+- The initial historical backfill must send eligible Telegram notifications, as the owner explicitly approved. The Gmail-only override bypasses only the no-backlog/enabled-at cutoff; current preferences, freshness, active public posting, Telegram opt-in/private chat, rate limits, retries and idempotency remain required.
+
+## Safety and go-live gates
+
+1. No live Gmail OAuth or real mailbox access has been run. `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS` remains a deliberate gate; all credentials/keys belong in a secure server-side handoff, never chat or GitHub.
+2. `gmail.readonly` remains a Restricted scope. Determine the permitted-use-case, Limited Use/data-transfer obligations and whether the separate restricted-data security assessment applies to this creator-only server-side VM deployment. Personal Mode's creator-only OAuth verification exception does not automatically waive this question.
+3. No Pub/Sub topic/subscription has been provisioned; verify callback CA-signed HTTPS reachability and OIDC audience/service-account identity before provisioning. Check GCP billing/pricing; do not enable billing or create paid resources without explicit approval.
+4. Run the full V2 regression suite, inspect the full diff and exact pushed SHA, review migration/rollback, and complete controlled live-mailbox acceptance tests before considering merge/deploy.
+5. No production DB migration, container/service restart, Nginx/DNS/certificate change, OAuth resource creation, Pub/Sub provisioning, external Telegram send or production deployment has happened in this work.
+
+The isolated checkout is physically on the connected `job-radar` host but uses a separate Git clone and venv. It must not touch the live checkout, production DB, containers or services. Prefer another non-production machine for broader regression tests. `.venv/` must remain untracked and ignored. Do not trigger paid GitHub Actions; the user's Actions quota was exhausted.
+
+**Read next:** `docs/GOOGLE_ALERTS_GMAIL_INBOX_INTEGRATION_2026-11-21.md` — its 22 November implementation checkpoint supersedes older planning statements in the file. Historic sections below are retained for audit trail only where they conflict with this current handover.
+
+---
+
 ## Owner decision — historical Gmail notifications (21 November 2026)
 
 **Owner decision (21 November 2026): send Telegram notifications for eligible jobs from the historical backfill as well as future arrivals.** Implement a Gmail-source-specific backfill delivery mode that bypasses only the generic no-backlog/enabled-at cutoff; retain current user preferences, currently-live public posting verification, canonical dedupe, explicit per-user Telegram opt-in, linked private chat, rate limiting, retry policy and idempotent ledger. Send in controlled batches. Do not change backlog policy for other sources. Never send raw email snippets, query text or mailbox metadata.
@@ -6,7 +37,7 @@
 
 # CURRENT OWNER DECISIONS — PERSONAL GOOGLE ALERTS GMAIL PUSH (21 NOVEMBER 2026)
 
-The owner selected a **single-user personal integration** on the existing Oracle VM `job-radar`. Trigger: Gmail `users.watch` → Cloud Pub/Sub topic → authenticated OIDC push webhook → durable queue → Gmail `history.list` reconciliation. Results: the owner's existing dashboard plus Telegram, using the existing per-user private-chat path in `v2/user_notifications.py` + `v2/telegram_linking.py`; do not use the legacy global Telegram queue for Gmail-originated alerts.
+Historical 21 November target (deployment deferred by the 22 November scope clarification): the owner selected a **single-user personal integration** on the existing Oracle VM `job-radar`. Trigger: Gmail `users.watch` → Cloud Pub/Sub topic → authenticated OIDC push webhook → durable queue → Gmail `history.list` reconciliation. Results: the owner's existing dashboard plus Telegram, using the existing per-user private-chat path in `v2/user_notifications.py` + `v2/telegram_linking.py`; do not use the legacy global Telegram queue for Gmail-originated alerts.
 
 OAuth: use a separate Google Cloud **Personal Mode** project and Web application client. It is creator-only, does not require OAuth app verification, and cannot be converted into a multi-user project. Keep member `google_oauth.py` unchanged. Request only `gmail.readonly`.
 
@@ -32,7 +63,7 @@ Authoritative design: `docs/GOOGLE_ALERTS_GMAIL_INBOX_INTEGRATION_2026-11-21.md`
 
 The owner expressly consents to a separate owner-only Gmail connection restricted operationally to Google Alerts. The owner will create a Gmail label named `JobBeeper/GoogleAlerts` and a filter applying it to matching historical conversations and future Google Alerts. The app must use only `labelIds=[label_id]` on `users.messages.list` and `labelId=label_id` on `users.history.list`, excluding Spam/Trash, and must not read unlabelled bodies. Keep Gmail API scope to `gmail.readonly` only; do not request `gmail.labels` or modify mailbox labels/filters in code.
 
-Owner consent is not Google's approval for the multi-member product use case. The Google Restricted-scope policy gate remains open; no live OAuth, token storage or production polling until the use case is cleared through Google.
+Owner consent is not Google's approval for the restricted-scope server-side processing design. The permitted-use, Limited Use and security-assessment applicability gates remain open; no live OAuth, token storage or production polling until those checks are resolved.
 
 ---
 
@@ -66,7 +97,7 @@ Next: run `python -m unittest v2.test_google_alerts_email -v`, then the combined
 
 **Owner input already supplied:** the owner provided a representative multi-result Google Alerts `.eml`, consented to the creator-only Gmail connection and selected a full historical backfill across all messages carrying the dedicated label, with Telegram notifications for eligible verified results from that backfill. Do not ask again. No password, OAuth secret, access token or refresh token belongs in chat.
 
-**Cost/environment:** do not trigger GitHub Actions or incur hosted CI spend. Develop and test in a fresh non-production checkout and database. The only currently connected Terminal Commands machine is the production `job-radar` VM; do not run development tests there. No Gmail OAuth, production polling, database migration, timer, GCP resources or deployment has been configured.
+**Cost/environment:** do not trigger GitHub Actions or incur hosted CI spend. Develop and test in a fresh non-production checkout and database. The connected machine is the `job-radar` host. A separate feature checkout exists at `/home/ubuntu/job-beeper-google-alerts-dev`; it is isolated from live service directories, but prefer another non-production host for broad tests. No real Gmail OAuth, production polling, live database migration, production timer, GCP resources or deployment has been configured.
 
 ---
 
@@ -74,7 +105,7 @@ Next: run `python -m unittest v2.test_google_alerts_email -v`, then the combined
 
 **P0 next discovery-source increment:** [Google Alerts Discovery Engine plan](GOOGLE_ALERTS_DISCOVERY_ENGINE_PLAN_2026-11-21.md) · [production-origin correction](GOOGLE_ALERTS_PRODUCTION_ORIGIN_CORRECTION_2026-11-21.md) · [tracking issue #100](https://github.com/AvinashBhalla/job-beeper/issues/100).
 
-Owner-confirmed direction: all 98 Google Alerts arrive in one owner-controlled Gmail mailbox; JobBeeper members do not connect Gmail. Valid jobs go into the shared jobs/canonical-opportunity database and are evaluated independently against each member's own saved preferences.
+Historical note superseded by the current single-owner decision above: all Google Alerts arrive in one owner-controlled Gmail mailbox. The personal connection is bound to the sole local account and its saved preferences; do not introduce member Gmail onboarding or multi-account support. Public jobs already present from public sources remain shared, while Gmail-only observations are owner-scoped.
 
 **Production origin is `https://130.210.27.197/`**, on the Oracle VM `job-radar`, with Nginx proxying to FastAPI at `127.0.0.1:8000`. There is no evidence that the owner controls `jobbeeper.com` or any custom domain. The member-facing website mentioned in the November 20 report is a separate browser surface whose relationship to this VM/database remains unproven. Do not configure Cloudflare, DNS, email routing or webhooks for `jobbeeper.com`.
 

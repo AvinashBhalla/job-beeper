@@ -345,6 +345,11 @@ class AuthApiTests(unittest.TestCase):
                 # Telegram authenticates this server-to-server route with its dedicated secret header.
                 self.assertNotIn(radar.require_authenticated, dependency_calls, route.path)
                 self.assertNotIn(radar.require_admin, dependency_calls, route.path)
+            elif route.path == "/api/integrations/google-alerts/gmail/pubsub":
+                # Google authenticates Pub/Sub push using its signed OIDC identity token.
+                self.assertIn(radar.require_google_alerts_pubsub, dependency_calls, route.path)
+                self.assertNotIn(radar.require_authenticated, dependency_calls, route.path)
+                self.assertNotIn(radar.require_admin, dependency_calls, route.path)
             elif route.path in {"/api/auth/me", "/api/auth/logout"}:
                 self.assertIn(radar.get_current_user, dependency_calls, route.path)
             elif route.path in {

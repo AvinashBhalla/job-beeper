@@ -4,7 +4,35 @@
 **Repository:** `AvinashBhalla/job-beeper`  
 **Target branch:** `v2-live-radar`  
 **Planning branch:** `feat/google-alerts-gmail-ingestion`  
-**Status:** Personal-only Gmail push architecture selected; parser foundation in draft PR; no Gmail authorization, Pub/Sub resources or production changes
+**Status (22 November 2026):** Parser, public-posting verifier, label-scoped Gmail OAuth/sync backend, owner-only notification controls and account UI are implemented in the isolated feature checkout. Draft PR #102 remains unmerged. No Gmail authorization, Pub/Sub resources or production changes.
+
+## 0. Implementation checkpoint and corrected personal scope — 22 November 2026
+
+The owner has clarified that this is for **one personal Job Beeper account only**. There are no additional users to support, no planned member onboarding and no near-term hosted SaaS deployment. Do not build account switching, per-customer Gmail grants, tenant administration, or a generalized multi-member Gmail product. The existing Job Beeper `users.id` is retained only as the signed-in owner identity required by the current authentication, preferences and private Telegram data model; it is not a request to productize multi-user Gmail.
+
+The eventual host remains the existing VM, and the chosen trigger remains Gmail push through Cloud Pub/Sub with history reconciliation; notifications go to the owner's existing dashboard and Telegram chat. **Deployment/activation is deferred until the owner is ready and the release gates below are closed.** Code work and a feature-branch push are not authorization to enable Gmail access, provision GCP resources or alter the running service.
+
+Implementation now present in the isolated branch checkout:
+- `v2/google_alerts_email.py`: generic Google Alerts parser with metadata preflight and bounded extraction.
+- `v2/google_alerts_gmail.py`: Personal Mode OAuth/PKCE, encrypted refresh-token storage, label-scoped Gmail API, watch/backfill/history recovery, OIDC Pub/Sub validation and durable processing queue. Access tokens are now cached only in process memory until a safety window before expiry; refresh tokens remain encrypted at rest.
+- `v2/google_alerts_job_verifier.py`: safe public HTTPS posting verification, robots policy and active Schema.org JobPosting checks.
+- `v2/radar.py` and `v2/user_notifications.py`: verified opportunity ingestion and owner Telegram historical-backfill behavior. Historical Gmail delivery still observes current preferences, freshness, Telegram opt-in, private-chat routing, throttling, retries and idempotency. Other sources' backlog behavior is unchanged.
+- `dashboard/index.html` and `dashboard/app.js`: owner-only Gmail connect/disconnect, status, sync progress and historical Telegram pause/resume/retry controls. The UI does not display mailbox addresses, alert search terms, snippets, message IDs or credentials.
+- `v2/requirements.txt`: explicit `cryptography` dependency for Fernet token encryption.
+
+The `.venv/` is an isolated local environment and is excluded from Git. Continue to use the configured feature branch and leave draft PR #102 unmerged until the full release review is complete.
+
+### Production-readiness gates — must close before activating Gmail
+
+1. Resolve Google's Restricted-scope permitted-use-case, Limited Use/data-transfer and separate server-side security-assessment applicability for this creator-only `gmail.readonly` deployment. Personal Mode's OAuth verification exception must not be treated as an automatic exemption from the restricted-data assessment rule.
+2. Complete a clean full V2 regression run, inspect the full tracked and untracked diff, confirm migrations and rollback steps, and review the exact pushed commit. Focused tests alone are not full-suite release evidence.
+3. With a controlled owner mailbox, confirm label/filter setup, metadata-first/raw-only-after-authentication behavior, race-free historical backfill, incremental push/history recovery, owner Telegram delivery, pause/resume/retry and disconnect deletion. The private `.eml` fixture must remain outside Git and logs.
+4. Validate the public HTTPS callback route and authenticated Pub/Sub OIDC delivery; confirm GCP billing/pricing before any topic/subscription creation. No paid resource or billing change has been authorized.
+5. Prepare a production migration backup, rollback and service restart plan. Do not deploy to or restart production until a separate go-live action is explicitly requested after these gates pass.
+
+The current isolated checkout is `/home/ubuntu/job-beeper-google-alerts-dev` on `feat/google-alerts-gmail-ingestion`. It is a separate clone and venv on the connected `job-radar` host; do not infer that the live app, database, Nginx or containers were changed. Prefer a non-production machine for future test runs. No Gmail OAuth, real mailbox access, Telegram external send, GCP provisioning or production deploy has been performed.
+
+---
 
 ## 1. Corrected owner requirement — authoritative
 
@@ -19,7 +47,7 @@ JobBeeper must:
 - Detect Google Alerts emails and parse every result item from each message.
 - Treat all alert emails as the same format; do not build one parser or feed per search string.
 - Verify each destination posting, deduplicate repeated postings across alerts and send valid job records through the existing V2 shared ingestion path.
-- Evaluate each stored job independently against member preferences. Members do not connect Gmail and must not see the owner's mailbox, raw messages, alert queries or mailbox metadata.
+- Evaluate each stored job against the owner's saved preferences. The connection is bound to this one local account; mailbox contents, alert queries and Gmail metadata are never exposed in the dashboard or Telegram.
 
 **This requirement supersedes the RSS/Atom direction in the earlier planning notes and PR #101. No RSS feed URLs are required for this email-based design.**
 
@@ -47,10 +75,10 @@ The primary extraction path is the structured JSON block, validated by the exact
 - Extracts all structured `LINK` widgets (up to the configured per-message limit), removes canonical duplicate destinations and returns only minimal result fields plus a SHA-256 message fingerprint.
 - Does not perform network requests or persist raw email, recipient, query, message ID, Google tracking tokens, alert settings links or RSS footer URL.
 
-Focused test module `v2/test_google_alerts_email.py` was added with twelve synthetic tests covering multi-result structured HTML, canonical duplicate collapse, HTML and plain-text fallbacks, sender/subject rejection, invalid redirect handling raw-size limits and rejection (rather than silent truncation) when a message exceeds the per-email result cap. The test file has **not yet been executed** in an isolated project checkout; treat it as added but unverified until the no-cost local test run is completed.
+Focused parser tests cover multi-result structured HTML, canonical duplicate collapse, HTML and plain-text fallbacks, sender/subject/authentication rejection, invalid redirect handling, raw-size limits and rejection (rather than silent truncation) when a message exceeds the per-email result cap. The current parser suite has 18 passing tests.
 
 
-Use Gmail API read-only access with a durable, scheduled incremental history poll. Do not introduce Pub/Sub, a public webhook, Cloudflare, a custom domain, or Gmail watch registration in the first MVP.
+Use Gmail API read-only access with **Gmail push through Cloud Pub/Sub** and durable Gmail history reconciliation. This supersedes the earlier polling-only proposal. The application is still expected to perform periodic history reconciliation as a safety net, but Pub/Sub push is the primary trigger. Do not provision GCP resources or change the public endpoint until the production-readiness gates in Section 0 are closed.
 
 ### 2.1 Separate owner-only authorization
 
@@ -169,12 +197,12 @@ The personal-use verification exception is grounded in Google's current Personal
 - Existing member OAuth: `v2/google_oauth.py`, `v2/test_google_oauth.py`; member sign-in scope remains `openid email profile` and must not be modified.
 - Existing ingestion/evaluation: `v2/radar.py` provides `normalize_job()`, `upsert_jobs()`, canonical opportunities and per-user job evaluations. Gmail must not bypass destination verification.
 - Existing per-user Telegram delivery: `v2/user_notifications.py` uses `user_notification_settings`, `user_notification_ledger`, `user_job_evaluations` and a private `user_telegram_chats` link from `v2/telegram_linking.py`. Use this path for the owner's personal Telegram delivery. Do **not** use legacy global `v2/telegram.py` / `notification_ledger` for Gmail-originated notifications.
-- **Required personal-data isolation:** public ATS jobs are globally visible, but Gmail-discovered records must be owner-only. Add an owner/source visibility field (e.g. `source_owner_user_id`) or an equivalent user-scoped observation table. Every feed query and job-evaluation/notification queue must enforce `source_owner_user_id IS NULL OR source_owner_user_id = current_user.id`, including admin views; don't let global evaluation/notification workers fan a Gmail-only record out to other users. For URLs already known through public sources, link the personal discovery to the existing public canonical opportunity without storing private email metadata or creating duplicate job rows.
+- **Implemented private-source boundary:** public ATS jobs remain shared; a Gmail-only job carries the configured owner marker and the Gmail opportunity observation records the owner. A known public URL reuses its public canonical opportunity. Preserve the narrow owner check because it protects this personal account's private discovery records; do not expand it into member administration or a multi-user Gmail product.
 - Owner Gmail jobs must be evaluated against the owner's `user_preferences`, visible in the owner's dashboard, and queued only to the owner's linked private Telegram chat after per-user opt-in. Keep Telegram alertability/freshness and no-backlog rules intact.
 - **Owner decision: send Telegram notifications for eligible verified jobs from the initial historical backfill as well as future arrivals.** Use a Gmail-source-specific historical-backfill delivery marker that bypasses only the generic no-backlog/`enabled_at` cutoff. Preserve current preferences, active-public-posting validation, canonical deduplication, per-user Telegram opt-in, linked private chat, rate limits, retry policy and delivery-ledger idempotency. Send in controlled batches. Do not change backlog policy for other sources or notify from email snippets.
 - The previous RSS work in PR #101 is superseded and must not be merged. The Cloudflare Email Routing branch remains quarantined.
 - Production target: Oracle VM `job-radar`, FastAPI behind Nginx. Do not modify production, DNS, certificates, Nginx, OAuth, GCP resources or DB during architecture and parser review. A read-only TLS/endpoint preflight is required before a Pub/Sub push subscription is created.
-- Develop and test in a fresh isolated non-production checkout/database. Do not use the only connected production `job-radar` machine as a test runner.
+- Keep code and test data in the isolated feature checkout/database. The current isolated clone is physically on the connected `job-radar` VM but is separate from the live checkout/service/database; prefer a genuinely non-production machine for any further broad regression run.
 - Do not trigger GitHub Actions or incur paid runner spend. Check GCP Pub/Sub current pricing/billing before resource provisioning; no billing enablement or billable resource creation is implied by the architecture selection.
 
 ## 5. Validation plan
@@ -197,7 +225,7 @@ No credentials, OAuth secrets, Gmail password, app password, refresh token, or a
 The owner has supplied a representative Google Alerts `.eml` with multiple results and expressly consented to a personal owner-only Gmail connection. The raw fixture remains outside GitHub and must not be copied into logs or durable application storage.
 
 The owner has selected:
-- Hosting: existing Oracle VM `job-radar`.
+- Eventual hosting target: existing Oracle VM `job-radar`; deployment is deferred and no near-term hosted launch is planned.
 - Trigger: Gmail push notifications through Cloud Pub/Sub to an authenticated HTTPS webhook, with scheduled history reconciliation as a safety net.
 - Results: existing owner dashboard plus Telegram, using only the owner's per-user private Telegram chat.
 - Backfill: all available labelled Google Alerts emails, no date cutoff; Spam and Trash excluded.

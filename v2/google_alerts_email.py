@@ -85,12 +85,8 @@ def _is_alert_subject(value: str | None) -> bool:
     )
 
 
-def _google_authentication_passes(message) -> bool:
-    """Require one unambiguous Gmail authentication result, not just From."""
-    values = message.get_all("Authentication-Results", [])
-    if len(values) != 1:
-        return False
-    result = re.sub(r"\s+", " ", str(values[0])).casefold()
+def _authentication_result_passes(value: str | None) -> bool:
+    result = re.sub(r"\s+", " ", str(value or "")).casefold()
     return bool(
         result.startswith("mx.google.com;")
         and re.search(
@@ -101,6 +97,36 @@ def _google_authentication_passes(message) -> bool:
             r"\bdmarc=pass\b.*?header\.from=google\.com(?=$|[\s;])",
             result,
         )
+    )
+
+
+def _google_authentication_passes(message) -> bool:
+    """Require one unambiguous Gmail authentication result, not just From."""
+    values = message.get_all("Authentication-Results", [])
+    return len(values) == 1 and _authentication_result_passes(str(values[0]))
+
+
+def is_google_alerts_metadata(headers: object) -> bool:
+    """Validate metadata headers before permitting a raw-body fetch.
+
+    The caller must independently verify that the message still carries the
+    selected Gmail label.
+    """
+    if not isinstance(headers, list):
+        return False
+    wanted = {"from": [], "subject": [], "authentication-results": []}
+    for header in headers:
+        if not isinstance(header, dict):
+            continue
+        name = str(header.get("name") or "").strip().casefold()
+        if name in wanted:
+            wanted[name].append(str(header.get("value") or ""))
+    if any(len(values) != 1 for values in wanted.values()):
+        return False
+    return (
+        _sender_is_google_alerts(wanted["from"][0])
+        and _is_alert_subject(wanted["subject"][0])
+        and _authentication_result_passes(wanted["authentication-results"][0])
     )
 
 

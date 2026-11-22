@@ -138,6 +138,7 @@ def _application_query() -> str:
         JOIN jobs j ON j.id=a.job_id
         LEFT JOIN user_job_evaluations e
           ON e.user_id=a.user_id AND e.job_id=a.job_id
+        WHERE (j.source_owner_user_id IS NULL OR j.source_owner_user_id=a.user_id)
     """
 
 
@@ -147,7 +148,7 @@ def get_for_user(
     with connect_sqlite(Path(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            _application_query() + " WHERE a.user_id=? AND a.id=?",
+            _application_query() + " AND a.user_id=? AND a.id=?",
             (int(user_id), int(application_id)),
         ).fetchone()
     return dict(row) if row else None
@@ -158,7 +159,7 @@ def list_for_user(db_path: Path, user_id: int) -> list[dict[str, Any]]:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             _application_query()
-            + " WHERE a.user_id=? ORDER BY a.applied_at DESC,a.id DESC LIMIT 2000",
+            + " AND a.user_id=? ORDER BY a.applied_at DESC,a.id DESC LIMIT 2000",
             (int(user_id),),
         ).fetchall()
     return [dict(row) for row in rows]
@@ -181,9 +182,12 @@ def create(
     with DB_LOCK, connect_sqlite(Path(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         job = conn.execute(
-            "SELECT canonical_opportunity_id FROM jobs WHERE id=?", (job_id,)
+            "SELECT canonical_opportunity_id,source_owner_user_id FROM jobs WHERE id=?", (job_id,)
         ).fetchone()
-        if job is None:
+        if job is None or (
+            job["source_owner_user_id"] is not None
+            and int(job["source_owner_user_id"]) != int(user_id)
+        ):
             raise LookupError("Job not found.")
         canonical_id = job["canonical_opportunity_id"]
         if canonical_id is None:
@@ -197,7 +201,7 @@ def create(
             status_value, notes_value, timestamp, timestamp,
         ))
         row = conn.execute(
-            _application_query() + " WHERE a.user_id=? AND a.canonical_opportunity_id=?",
+            _application_query() + " AND a.user_id=? AND a.canonical_opportunity_id=?",
             (int(user_id), int(canonical_id)),
         ).fetchone()
         conn.commit()

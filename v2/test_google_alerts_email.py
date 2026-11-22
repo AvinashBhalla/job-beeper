@@ -72,6 +72,15 @@ def google_redirect(destination):
     return "https://www.google.com/url?" + urlencode({"rct": "j", "sa": "t", "url": destination})
 
 
+def add_raw_header(raw_message, name, value):
+    """Add a deliberately duplicated header to a serialized MIME fixture."""
+    header_block, separator, body = raw_message.partition(b"\n\n")
+    if not separator:
+        raise AssertionError("email fixture has no header/body separator")
+    new_header = f"{name}: {value}".encode("utf-8")
+    return header_block + b"\n" + new_header + separator + body
+
+
 class GoogleAlertsEmailParserTests(unittest.TestCase):
     def test_extracts_every_result_from_structured_json_in_multipart_email(self):
         items = [
@@ -179,10 +188,11 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
             "title": "Role",
             "url": "https://jobs.example.test/role",
         }]))
-        message = BytesParser(policy=policy.default).parsebytes(raw)
-        message["From"] = "Attacker <attacker@example.test>"
+        raw = add_raw_header(
+            raw, "From", "Attacker <attacker@example.test>"
+        )
         with self.assertRaises(GoogleAlertEmailError) as caught:
-            parse_google_alert_email(message.as_bytes())
+            parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "unrecognized_sender")
 
     def test_rejects_duplicate_subject_headers(self):
@@ -190,10 +200,9 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
             "title": "Role",
             "url": "https://jobs.example.test/role",
         }]))
-        message = BytesParser(policy=policy.default).parsebytes(raw)
-        message["Subject"] = "Weekly report"
+        raw = add_raw_header(raw, "Subject", "Weekly report")
         with self.assertRaises(GoogleAlertEmailError) as caught:
-            parse_google_alert_email(message.as_bytes())
+            parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "unrecognized_subject")
 
     def test_rejects_dkim_domain_suffix_spoof(self):
@@ -225,6 +234,30 @@ class GoogleAlertsEmailParserTests(unittest.TestCase):
         with self.assertRaises(GoogleAlertEmailError) as caught:
             parse_google_alert_email(raw)
         self.assertEqual(caught.exception.code, "sender_authentication_failed")
+
+    def test_metadata_preflight_accepts_only_authenticated_google_alerts(self):
+        from v2.google_alerts_email import is_google_alerts_metadata
+
+        headers = [
+            {"name": "From", "value": SENDER},
+            {"name": "Subject", "value": "Google Alert - example"},
+            {
+                "name": "Authentication-Results",
+                "value": (
+                    "mx.google.com; dkim=pass header.i=@google.com; "
+                    "dmarc=pass header.from=google.com"
+                ),
+            },
+        ]
+        self.assertTrue(is_google_alerts_metadata(headers))
+        self.assertFalse(is_google_alerts_metadata(headers[:2]))
+        self.assertFalse(is_google_alerts_metadata(headers + [headers[0]]))
+        tampered = [dict(header) for header in headers]
+        tampered[2]["value"] = (
+            "mx.google.com; dkim=pass header.i=@google.com.attacker; "
+            "dmarc=pass header.from=google.com"
+        )
+        self.assertFalse(is_google_alerts_metadata(tampered))
 
     def test_rejects_sender_without_google_dkim_and_dmarc(self):
         raw = make_email(
