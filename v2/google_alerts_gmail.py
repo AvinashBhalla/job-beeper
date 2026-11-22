@@ -214,6 +214,7 @@ def init_schema(db_path: str | Path) -> None:
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             disclosure_version TEXT NOT NULL,
             accepted_at TEXT NOT NULL,
+            expires_at INTEGER NOT NULL DEFAULT 0,
             consumed_at TEXT
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_google_alerts_gmail_consent_pending
@@ -284,6 +285,17 @@ def init_schema(db_path: str | Path) -> None:
         CREATE INDEX IF NOT EXISTS idx_google_alerts_gmail_opportunities_job
           ON google_alerts_gmail_opportunities(user_id, candidate_job_id);
         """)
+        consent_columns = {
+            row[1] for row in conn.execute(
+                "PRAGMA table_info(google_alerts_gmail_data_use_consents)"
+            )
+        }
+        if "expires_at" not in consent_columns:
+            conn.execute(
+                "ALTER TABLE google_alerts_gmail_data_use_consents "
+                "ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0"
+            )
+
         columns = {
             row[1] for row in conn.execute(
                 "PRAGMA table_info(google_alerts_gmail_sync_state)"
@@ -311,12 +323,17 @@ def record_data_use_consent(
         raise GoogleAlertsGmailError("gmail_data_use_consent_required")
     if disclosure_version != DATA_USE_DISCLOSURE_VERSION:
         raise GoogleAlertsGmailError("gmail_data_use_disclosure_version_mismatch")
+    accepted_at = datetime.now(timezone.utc)
+    expires_at = int(accepted_at.timestamp()) + 600
     with DB_LOCK, _connect(db_path) as conn:
         conn.execute(
             """INSERT OR IGNORE INTO google_alerts_gmail_data_use_consents
-                 (user_id,disclosure_version,accepted_at)
-               VALUES(?,?,?)""",
-            (int(user_id), DATA_USE_DISCLOSURE_VERSION, _now_iso()),
+                 (user_id,disclosure_version,accepted_at,expires_at)
+               VALUES(?,?,?,?)""",
+            (
+                int(user_id), DATA_USE_DISCLOSURE_VERSION,
+                accepted_at.isoformat(), expires_at,
+            ),
         )
 
 
@@ -329,21 +346,24 @@ def consume_data_use_consent(
     if int(user_id) != config.owner_user_id:
         raise GoogleAlertsGmailError("gmail_owner_only")
     stamp = _now_iso()
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
     with DB_LOCK, _connect(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             """SELECT id FROM google_alerts_gmail_data_use_consents
-               WHERE user_id=? AND disclosure_version=? AND consumed_at IS NULL
+               WHERE user_id=? AND disclosure_version=?
+                 AND consumed_at IS NULL AND expires_at>?
                ORDER BY id DESC LIMIT 1""",
-            (int(user_id), DATA_USE_DISCLOSURE_VERSION),
+            (int(user_id), DATA_USE_DISCLOSURE_VERSION, now_epoch),
         ).fetchone()
         if row is None:
             return False
         conn.execute(
             """UPDATE google_alerts_gmail_data_use_consents
                SET consumed_at=?
-               WHERE user_id=? AND disclosure_version=? AND consumed_at IS NULL""",
-            (stamp, int(user_id), DATA_USE_DISCLOSURE_VERSION),
+               WHERE user_id=? AND disclosure_version=?
+                 AND consumed_at IS NULL AND expires_at>?""",
+            (stamp, int(user_id), DATA_USE_DISCLOSURE_VERSION, now_epoch),
         )
     return True
 
