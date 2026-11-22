@@ -371,10 +371,17 @@ def consume_data_use_consent(
     now_epoch = int(datetime.now(timezone.utc).timestamp())
     with DB_LOCK, _connect(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """UPDATE google_alerts_gmail_data_use_consents
+               SET expired_at=?
+               WHERE user_id=? AND disclosure_version=?
+                 AND consumed_at IS NULL AND expired_at IS NULL AND expires_at<=?""",
+            (stamp, int(user_id), DATA_USE_DISCLOSURE_VERSION, now_epoch),
+        )
         row = conn.execute(
             """SELECT id FROM google_alerts_gmail_data_use_consents
                WHERE user_id=? AND disclosure_version=?
-                 AND consumed_at IS NULL AND expires_at>?
+                 AND consumed_at IS NULL AND expired_at IS NULL AND expires_at>?
                ORDER BY id DESC LIMIT 1""",
             (int(user_id), DATA_USE_DISCLOSURE_VERSION, now_epoch),
         ).fetchone()
@@ -384,7 +391,7 @@ def consume_data_use_consent(
             """UPDATE google_alerts_gmail_data_use_consents
                SET consumed_at=?
                WHERE user_id=? AND disclosure_version=?
-                 AND consumed_at IS NULL AND expires_at>?""",
+                 AND consumed_at IS NULL AND expired_at IS NULL AND expires_at>?""",
             (stamp, int(user_id), DATA_USE_DISCLOSURE_VERSION, now_epoch),
         )
     return True
