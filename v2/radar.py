@@ -7595,12 +7595,17 @@ def _is_localhost_ssh_tunnel(request: Request | None) -> bool:
     if request.url.scheme.lower() != "http":
         return False
     client_host = (getattr(request.client, "host", "") or "").casefold()
-    if client_host not in {"127.0.0.1", "::1", "localhost"}:
+    # Docker SNATs host traffic sent to this Compose service's loopback-only
+    # published port through the bridge gateway (172.18.0.1 in production).
+    # Trust that gateway only for a localhost HTTP Host and without proxy
+    # headers; the app port must remain bound to 127.0.0.1 on the host.
+    if client_host not in {"127.0.0.1", "::1", "localhost", "172.18.0.1"}:
         return False
-    # The direct SSH local-forward path reaches the loopback app listener and
-    # has no proxy headers. Do not trust a public reverse proxy's Host header.
     headers = getattr(request, "headers", {})
-    return not headers.get("x-forwarded-for") and not headers.get("x-forwarded-proto")
+    return not any(
+        headers.get(name)
+        for name in ("x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "forwarded")
+    )
 
 
 def _auth_cookie_secure(request: Request | None = None) -> bool:
