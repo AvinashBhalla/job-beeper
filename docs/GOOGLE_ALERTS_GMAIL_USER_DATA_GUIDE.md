@@ -24,9 +24,9 @@ Gmail connection does not itself enable Telegram delivery. Job Beeper uses the s
 
 ## Manage or delete the connection
 
-The Account screen provides Gmail status and a disconnect action. Disconnect attempts to revoke the Google grant, clears stored access-token cache, deletes the Gmail credential, OAuth/sync state, push/message queue metadata and Gmail-to-opportunity associations, removes Gmail-only private job rows and related user evaluation/application rows, and cancels pending Gmail historical notification deliveries. Revocation can fail if Google's endpoint is unavailable; local deletion still proceeds.
+The Account screen provides Gmail status and a disconnect action. Disconnect attempts to revoke the Google grant, clears stored access-token cache, deletes the Gmail credential, OAuth/sync state, push/message queue metadata and Gmail-to-opportunity associations, removes Gmail-only private job rows and related user evaluation/application rows, and cancels pending Gmail historical notification deliveries. Pending member-notification rows tied to Gmail-only private jobs are removed by the job-deletion foreign-key cascade. Historical backfill deliveries attached to independently stored public ATS jobs are marked cancelled; those public job records remain. Revocation can fail if Google's endpoint is unavailable; local deletion still proceeds.
 
-Public job records already present independently of the Gmail-only private source are retained. Notification-ledger history may remain as cancelled history, and already-sent deliveries cannot be recalled from Telegram by Job Beeper. To stop future Telegram messages before disconnect, turn off the separate Job Beeper Telegram notifications setting and unlink the Telegram chat as needed.
+Public job records already present independently of the Gmail-only private source are retained. Minimal notification-ledger history for public-job backfill cancellations may remain. A Telegram send already in progress when disconnect occurs can still complete, and messages already sent cannot be recalled by Job Beeper. To stop future Telegram messages before disconnect, turn off the separate Job Beeper Telegram notifications setting and unlink the Telegram chat as needed.
 
 ## Before enabling the feature
 
