@@ -100,3 +100,39 @@ The directory is `root:root` mode `0700`; files are `root:root` mode `0600`. `SH
 3. Confirm the candidate job is discovered after the notification opt-in timestamp and passes title/role, skills, location, score threshold and freshness checks. Do not bypass the current “no configured target-role match” failure on the PwC record.
 4. If a qualifying new job is found, verify exactly one per-user queue/ledger record and the expected private Telegram delivery. Avoid using historical backfill as a send test.
 5. Keep the legacy global notifier distinction visible when reviewing Telegram messages; it uses the static legacy chat configuration, independently of the owner-specific chat/opt-in.
+
+## 22 November 2026 — first-email wait diagnosis: no new alert emails; older messages in Spam
+
+### Read-only mailbox findings
+
+- The connected mailbox matches the Google Alerts delivery address shown in the owner's alert settings.
+- Gmail API search for authenticated sender googlealerts-noreply@google.com over the last 7 days returned 6 messages across all mailbox folders: 4 in the inbox/selected label and 2 in Spam.
+- JobBeeper retrieved full metadata headers (From, Subject, Authentication-Results) for the two Spam messages. Both passed the same is_google_alerts_metadata validator used by the application. Their internal dates are 20 November 2026, 19:29:24 IST and 20:29:26 IST. Neither has the selected JobBeeper/GoogleAlerts label; both carry Gmail's SPAM label.
+- The four messages in the inbox with the selected JobBeeper label also passed the application sender/authentication validator. Their dates are 20 November 2026, 19:48:55 IST, 19:49:10 IST, 20:49:18 IST and 22:05:00 IST.
+- Therefore, all six messages predate the new role-based Google Alerts created on 22 November. There are zero new authenticated Google Alerts emails on 22 November as of the latest check. The six old messages are not evidence that the new queries have fired.
+- The four inbox/label messages are the same four messages already processed as historical backfill: 8 parsed results, zero processing errors. The two Spam messages were not fetched because the worker only lists messages with the dedicated label; neither was read as raw content or persisted.
+
+### JobBeeper status
+
+- Gmail OAuth credential: 1, connected owner.
+- Selected Gmail label ID exists and is being polled.
+- Sync mode polling; interval 180 seconds.
+- Latest history reconciliation: 22 November 2026, 14:02 IST; no sync error; no new label-scoped history events since the stored cursor.
+- Gmail message table remains four historical backfill records, all processed; no non-backfill Gmail messages.
+- Per-user Telegram chat is connected and explicit job-alert opt-in is ON (enabled_at=13:52:13 IST). Per-user notification ledger has zero rows, because no new qualifying job arrived.
+
+### Interpretation
+
+The current delay is upstream of JobBeeper: Google Alerts has not emailed a new result from the newly created queries yet. Google states that alerts are sent when new matching results appear in Google Search; an edit-preview showing already indexed results does not prove that a new alert email has been generated. As-it-happens selects the notification frequency, but it cannot make Google discover or index a page sooner. See https://support.google.com/websearch/answer/4815696.
+
+The Spam findings expose a delivery risk for future alerts. Gmail has treated two genuine Google Alerts messages as Spam. The user should edit the existing Gmail filter for googlealerts-noreply@google.com and ensure it both applies JobBeeper/GoogleAlerts and checks Never send it to Spam. Google also recommends adding googlealerts-noreply@google.com to Contacts and checking Spam when alerts are missing. Do not retroactively apply the filter to matching conversations or move the two 20-November Spam messages into the selected label while per-user notifications are enabled: they predate the new queries and could be staged as incremental label-added events. Leave those historical Spam messages untouched unless the owner later explicitly wants them ingested as historical backfill.
+
+### Next acceptance steps
+
+1. Owner edits the existing Gmail filter: From googlealerts-noreply@google.com; keep Apply label JobBeeper/GoogleAlerts; enable Never send it to Spam. Do not select Also apply filter to matching conversations for this change.
+2. Add googlealerts-noreply@google.com to Gmail Contacts as an additional spam-prevention measure. Do not mark old Spam items as Not spam or apply the JobBeeper label to them yet.
+3. Verify all three alerts remain enabled and are delivered to the connected Gmail owner: As-it-happens, Web, English, India, All results. Google recommends checking the signed-in account, alert enabled status, alert settings, Spam folder and email filters in its official guide.
+4. Wait for a newly received email after the filter change. JobBeeper will discover it on the next 180-second history poll after the Google email is delivered and labelled.
+5. Validate the entire chain: authenticated Google sender, selected label, Gmail parsing, public posting verification, role/skill/location/score/freshness match, then exactly one Telegram ledger entry/delivery. Do not use any 20-November message or historical backfill as the first new-alert delivery test.
+
+No Gmail scope, Google Alerts query, notification setting or Telegram configuration was changed during this diagnosis.

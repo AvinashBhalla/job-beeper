@@ -249,3 +249,14 @@ See `TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md` for current UI instructio
 6. Next: confirm Gmail filter applies the dedicated label; validate next new email end-to-end; ensure any candidate was discovered after the per-user opt-in timestamp and passes all matching/freshness/public-post checks; then verify one queue record and delivery. Do not use historical backfill or the non-matching PwC row as a send test.
 
 See TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md for current operational state and remaining acceptance checks.
+
+## 22 November 2026 — first-email wait diagnosis and Spam-folder findings
+
+1. Read-only Gmail API query for authenticated Google Alerts sender googlealerts-noreply@google.com over the last 7 days returned 6 messages: 4 inbox messages with the JobBeeper label and 2 Spam messages without it.
+2. Full metadata (From, Subject, Authentication-Results) was checked with the application's own is_google_alerts_metadata validator. All six messages passed. Four inbox/label emails were received on 20 November at 19:48:55, 19:49:10, 20:49:18 and 22:05:00 IST. Two Spam emails were received on 20 November at 19:29:24 and 20:29:26 IST. Neither Spam email carried the selected JobBeeper label.
+3. All six messages predate the new role-based Alerts created on 22 November. There are no authenticated Google Alerts messages received on 22 November as of this checkpoint. Thus there is no new email yet for JobBeeper to ingest; do not blame the app's history poller.
+4. JobBeeper still has 4 historical messages processed, 8 parsed results, zero errors. Label-scoped history reconciliation is polling every 180 seconds; latest poll at 14:02 IST, no error and no new history events. Per-user Telegram opt-in remains ON from 13:52:13 IST but queue remains empty because there are no new history events.
+5. Next owner action: edit the existing Gmail filter for googlealerts-noreply@google.com, retain label JobBeeper/GoogleAlerts, add Never send it to Spam, and do not select Also apply filter to matching conversations to avoid backfilling the two old Spam emails as new label events. Add the sender to Contacts. Then verify the three alerts remain enabled and wait for a message received after the filter change.
+6. The new-email acceptance chain is still pending: sender authentication, label, ingestion, public posting verification, target-role/skills/location/score/freshness match, and one per-user Telegram delivery. No settings or scopes were changed during this check.
+
+See TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md for dates, counts and exact owner actions.
