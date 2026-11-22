@@ -93,6 +93,7 @@ Before any deployment:
 ## Server-side consent-bypass fix — 22 November 2026
 
 - Added disclosure version `2026-11-22-v2` and a consent ledger with an unused-consent uniqueness constraint. Each acceptance expires after 10 minutes; the OAuth-start transaction consumes only a current, unexpired acceptance. A schema migration gives older pending rows an already-expired default.
+- Expired, unused attempts receive an `expired_at` audit timestamp. The partial unique index excludes expired records, so they remain as audit evidence without blocking a fresh acceptance.
 - The dashboard now POSTs affirmative acceptance to the authenticated server before opening the OAuth URL. The OAuth-start GET atomically consumes the unused acceptance, so direct authenticated requests and replays are denied.
 - The ledger stores only the Job Beeper account ID, disclosure version, acceptance time and consumed time. It survives Gmail disconnect as evidence and is removed by Job Beeper account deletion through the user foreign key.
 - Added unit, API-route and dashboard contract coverage. Run the focused tests and record exact results before merge; no Gmail OAuth, mailbox access, Telegram delivery or production deployment is part of this change.
@@ -108,9 +109,17 @@ Before any deployment:
 - A broader combined run of the Gmail, authentication and dashboard modules reached the local process execution deadline during a later dashboard contract test. No assertion failure was reported before the timeout. The consent-specific bounded rerun completed successfully; do not represent the timed-out command as a complete suite pass.
 - No hosted Actions run was triggered.
 
+## Current branch validation — 22 November 2026
+
+- On PR head `80bc74d6611754f19ccaec697571d70960ece8f1`, the bounded regression sweep passed **all 34 V2 test modules: 619 tests, zero failures**. Batches: 39 (6 modules), 56 (4), 54 (4), 104 (5), 191 (1), 81 (6), 59 (6) and 35 (2).
+- After the final expired-consent retirement fix, the Gmail and Gmail-radar integration modules were rerun at the exact PR head: **30 tests passed, zero failures**. This covers the current `expires_at`/`expired_at` schema migration, expiry audit retention and fresh-consent retry behavior.
+- Focused consent/API/dashboard checks passed **3/3**: owner/version/single-use/expiry/re-consent; direct OAuth-start denial, one-time acceptance and replay denial; dashboard consent POST contract.
+- Final preflight on the exact PR head: `node --check dashboard/app.js`, Python compilation for Gmail/auth backend and tests, and `git diff --check` all passed. The checkout was clean and tracking the GitHub branch.
+- The earlier 616-test result is the pre-consent-hardening baseline; the current branch regression result is 619 tests. Tests use synthetic fixtures in the isolated checkout. No hosted CI, real Gmail OAuth, mailbox read or Telegram send was used.
+
 ## Final post-change validation and review
 
-- Full local V2 regression after the localhost/polling edits: **34/34 modules, 616 tests passed, zero failures**, run as nine bounded batches to stay within the terminal command limit.
+- Historical pre-consent-hardening baseline: **34 V2 modules, 616 tests passed, zero failures**. The current consent-hardening regression is recorded in the section above.
 - Batch results: 107 tests (6 modules), 28 (4), 51 (3), 53 Gmail-focused tests (4), 49 OAuth/shared tests (4), 191 radar tests (1), 42 (4), 26 (4), and 69 user application/notification/preferences tests (4). Total: 616 tests across 34 distinct modules.
 - `py_compile` passed for `v2/google_alerts_gmail.py` and `v2/radar.py`; `git diff --check` passed after the code review.
 - Final review covered the Gmail polling/push config and sync path, history cursor recovery, worker pacing, localhost origin/cookie boundary, push endpoint gating, regression tests, environment example and handover docs. No blocking issue was identified in the reviewed diff; no additional code change was made during this final review.
