@@ -56,6 +56,19 @@ class UserNotificationServiceTests(unittest.TestCase):
             INSERT INTO user_preferences VALUES(1,'{"match_threshold":55}'),(2,'{"match_threshold":55}');
             INSERT INTO user_telegram_chats VALUES(1,'111','private'),(2,'222','private');
             ''')
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("ALTER TABLE jobs ADD COLUMN source_owner_user_id INTEGER")
+            conn.execute("""
+                CREATE TABLE google_alerts_gmail_opportunities (
+                    user_id INTEGER NOT NULL,
+                    canonical_opportunity_id INTEGER NOT NULL,
+                    candidate_job_id INTEGER NOT NULL,
+                    history_backfill INTEGER NOT NULL DEFAULT 0,
+                    first_observed_at TEXT NOT NULL DEFAULT '',
+                    last_observed_at TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY(user_id,canonical_opportunity_id)
+                )
+            """)
         user_notifications.init_schema(self.db)
         from v2 import user_preferences
         for uid in (1, 2):
@@ -111,8 +124,8 @@ class UserNotificationServiceTests(unittest.TestCase):
     def test_queue_is_user_scoped_and_never_replays_pre_opt_in_jobs(self):
         # Baseline is after the old job and before the two fresh jobs.
         with user_notifications._connect(self.db) as conn:
-            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
-            conn.execute("INSERT INTO user_notification_settings VALUES(2,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(2,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
         with user_notifications._connect(self.db) as conn:
             self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
             self.assertEqual(user_notifications._queue_new_matches(conn, 2, '2026-11-07T00:00:00+00:00'), 1)
@@ -127,6 +140,147 @@ class UserNotificationServiceTests(unittest.TestCase):
         with user_notifications._connect(self.db) as conn:
             status = conn.execute('SELECT status FROM user_notification_ledger WHERE user_id=1').fetchone()[0]
         self.assertEqual(status, 'cancelled')
+
+    def test_historical_gmail_result_bypasses_only_enabled_at_cutoff(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T11:00:00+00:00','2026-11-07T11:00:00+00:00')"
+            )
+            conn.execute(
+                """INSERT INTO google_alerts_gmail_opportunities
+                   (user_id,canonical_opportunity_id,candidate_job_id,history_backfill,
+                    first_observed_at,last_observed_at)
+                   VALUES(1,101,1,1,'2026-11-07T11:30:00+00:00','2026-11-07T11:30:00+00:00')"""
+            )
+            queued = user_notifications._queue_new_matches(
+                conn, 1, "2026-11-07T11:00:00+00:00"
+            )
+            row = conn.execute(
+                "SELECT backlog_override FROM user_notification_ledger WHERE user_id=1"
+            ).fetchone()
+        self.assertEqual(queued, 1)
+        self.assertEqual(row["backlog_override"], 1)
+
+    def test_historical_gmail_override_does_not_bypass_max_age(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "UPDATE user_preferences SET preferences_json=? WHERE user_id=1",
+                ('{"match_threshold":55,"max_age_hours":1}',),
+            )
+            conn.execute(
+                "UPDATE jobs SET discovered_at=? WHERE id=1",
+                ("2026-11-07T10:00:00+00:00",),
+            )
+            conn.execute(
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T11:00:00+00:00','2026-11-07T11:00:00+00:00')"
+            )
+            conn.execute(
+                """INSERT INTO google_alerts_gmail_opportunities
+                   (user_id,canonical_opportunity_id,candidate_job_id,history_backfill)
+                   VALUES(1,101,1,1)"""
+            )
+            queued = user_notifications._queue_new_matches(
+                conn, 1, "2026-11-07T11:00:00+00:00"
+            )
+        self.assertEqual(queued, 0)
+
+    def test_gmail_history_override_still_requires_owner_visibility(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("UPDATE jobs SET source_owner_user_id=2 WHERE id=1")
+            conn.execute(
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T11:00:00+00:00','2026-11-07T11:00:00+00:00')"
+            )
+            conn.execute(
+                """INSERT INTO google_alerts_gmail_opportunities
+                   (user_id,canonical_opportunity_id,candidate_job_id,history_backfill)
+                   VALUES(1,101,1,1)"""
+            )
+            queued = user_notifications._queue_new_matches(
+                conn, 1, "2026-11-07T11:00:00+00:00"
+            )
+        self.assertEqual(queued, 0)
+
+    def test_historical_override_survives_claim_and_final_send_revalidation(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T11:00:00+00:00','2026-11-07T11:00:00+00:00')"
+            )
+            conn.execute(
+                """INSERT INTO google_alerts_gmail_opportunities
+                   (user_id,canonical_opportunity_id,candidate_job_id,history_backfill)
+                   VALUES(1,101,1,1)"""
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, "2026-11-07T11:00:00+00:00"
+                ),
+                1,
+            )
+        item = user_notifications._claim_one(self.db)
+        self.assertIsNotNone(item)
+        self.assertEqual(item["backlog_override"], 1)
+        self.assertTrue(user_notifications._still_deliverable(self.db, item))
+
+    def test_gmail_historical_delivery_pause_and_resume(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T11:00:00+00:00','2026-11-07T11:00:00+00:00')"
+            )
+            conn.execute(
+                """INSERT INTO google_alerts_gmail_opportunities
+                   (user_id,canonical_opportunity_id,candidate_job_id,history_backfill)
+                   VALUES(1,101,1,1)"""
+            )
+            self.assertEqual(
+                user_notifications._queue_new_matches(
+                    conn, 1, "2026-11-07T11:00:00+00:00"
+                ),
+                1,
+            )
+        paused = user_notifications.set_gmail_backfill_paused(self.db, 1, True)
+        self.assertTrue(paused["gmail_backfill_paused"])
+        self.assertIsNone(user_notifications._claim_one(self.db))
+        self.assertEqual(
+            user_notifications.gmail_historical_delivery_summary(self.db, 1),
+            {"queued": 1},
+        )
+        resumed = user_notifications.set_gmail_backfill_paused(self.db, 1, False)
+        self.assertFalse(resumed["gmail_backfill_paused"])
+        item = user_notifications._claim_one(self.db)
+        self.assertIsNotNone(item)
+        self.assertTrue(user_notifications._still_deliverable(self.db, item))
+
+    def test_retry_only_requeues_gmail_historical_delivery_rows(self):
+        with user_notifications._connect(self.db) as conn:
+            conn.execute(
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T11:00:00+00:00','2026-11-07T11:00:00+00:00')"
+            )
+            conn.execute(
+                """INSERT INTO google_alerts_gmail_opportunities
+                   (user_id,canonical_opportunity_id,candidate_job_id,history_backfill)
+                   VALUES(1,101,1,1)"""
+            )
+            conn.execute(
+                """INSERT INTO user_notification_ledger(
+                     user_id,canonical_opportunity_id,candidate_job_id,status,
+                     backlog_override,created_at,updated_at
+                   ) VALUES(1,101,1,'dead',1,'x','x')"""
+            )
+            conn.execute(
+                """INSERT INTO user_notification_ledger(
+                     user_id,canonical_opportunity_id,candidate_job_id,status,
+                     backlog_override,created_at,updated_at
+                   ) VALUES(1,102,2,'dead',0,'x','x')"""
+            )
+        self.assertEqual(
+            user_notifications.retry_gmail_historical_notifications(self.db, 1), 1
+        )
+        with user_notifications._connect(self.db) as conn:
+            rows = dict(conn.execute(
+                "SELECT canonical_opportunity_id,status FROM user_notification_ledger"
+            ).fetchall())
+        self.assertEqual(rows[101], "queued")
+        self.assertEqual(rows[102], "dead")
 
     def test_initial_source_baseline_jobs_are_not_queued_for_any_member(self):
         with user_notifications._connect(self.db) as conn:
@@ -154,7 +308,7 @@ class UserNotificationServiceTests(unittest.TestCase):
     def test_baseline_marker_blocks_a_previously_queued_item_before_send(self):
         with user_notifications._connect(self.db) as conn:
             conn.execute(
-                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
             )
             self.assertEqual(
                 user_notifications._queue_new_matches(
@@ -188,7 +342,7 @@ class UserNotificationServiceTests(unittest.TestCase):
                 "INSERT INTO notification_ledger(canonical_opportunity_id,baseline_suppressed,status) VALUES(101,1,'suppressed')"
             )
             conn.execute(
-                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
             )
             self.assertEqual(
                 user_notifications._queue_new_matches(
@@ -202,7 +356,7 @@ class UserNotificationServiceTests(unittest.TestCase):
     def test_canonical_baseline_marker_cancels_previously_queued_member_item(self):
         with user_notifications._connect(self.db) as conn:
             conn.execute(
-                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
             )
             self.assertEqual(
                 user_notifications._queue_new_matches(
@@ -225,7 +379,7 @@ class UserNotificationServiceTests(unittest.TestCase):
     def test_canonical_baseline_marker_blocks_final_send_revalidation(self):
         with user_notifications._connect(self.db) as conn:
             conn.execute(
-                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
             )
             self.assertEqual(
                 user_notifications._queue_new_matches(
@@ -278,7 +432,7 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def test_transient_delivery_failure_is_recorded_for_retry(self):
         with user_notifications._connect(self.db) as conn:
-            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
         response = unittest.mock.Mock(status_code=503)
         with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response):
@@ -293,7 +447,7 @@ class UserNotificationServiceTests(unittest.TestCase):
     def test_zero_dispatch_limit_is_a_true_noop(self):
         with user_notifications._connect(self.db) as conn:
             conn.execute(
-                "INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
+                "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')"
             )
         with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN': 'test-token'}):
             with patch.object(user_notifications, "_queue_new_matches") as queue:
@@ -306,7 +460,7 @@ class UserNotificationServiceTests(unittest.TestCase):
         with user_notifications._connect(self.db) as conn:
             for uid in (1, 2):
                 conn.execute(
-                    "INSERT INTO user_notification_settings VALUES(?,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')",
+                    "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(?,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')",
                     (uid,),
                 )
         with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN': 'test-token'}):
@@ -317,7 +471,7 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def test_dispatch_sends_only_to_owner_chat_and_marks_sent(self):
         with user_notifications._connect(self.db) as conn:
-            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
         response = unittest.mock.Mock(status_code=200)
         response.json.return_value = {'ok': True}
@@ -339,7 +493,7 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def test_preference_change_cancels_a_queued_job_that_no_longer_has_a_fresh_evaluation(self):
         with user_notifications._connect(self.db) as conn:
-            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
             conn.execute("UPDATE user_preferences SET preferences_json=? WHERE user_id=1", ('{"match_threshold":95}',))
         response = unittest.mock.Mock(status_code=200)
@@ -353,7 +507,7 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def test_current_nonmatching_evaluation_cancels_previously_queued_notification(self):
         with user_notifications._connect(self.db) as conn:
-            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             self.assertEqual(user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00'), 1)
             conn.execute("UPDATE user_job_evaluations SET match=0 WHERE user_id=1 AND job_id=1")
         response = unittest.mock.Mock(status_code=200)
@@ -369,7 +523,7 @@ class UserNotificationServiceTests(unittest.TestCase):
         with user_notifications._connect(self.db) as conn:
             for uid in (1, 2):
                 conn.execute(
-                    "INSERT INTO user_notification_settings VALUES(?,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')",
+                    "INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(?,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')",
                     (uid,),
                 )
         response = unittest.mock.Mock(status_code=200)
@@ -387,7 +541,7 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def test_permanent_telegram_client_error_is_not_retried(self):
         with user_notifications._connect(self.db) as conn:
-            conn.execute("INSERT INTO user_notification_settings VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
         response = unittest.mock.Mock(status_code=400)
         response.raise_for_status.side_effect = user_notifications.requests.HTTPError("bad request", response=response)

@@ -38,6 +38,7 @@ def init_schema(db_path: Path) -> None:
             user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
             enabled INTEGER NOT NULL DEFAULT 0,
             enabled_at TEXT,
+            gmail_backfill_paused INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS user_notification_ledger (
@@ -51,6 +52,7 @@ def init_schema(db_path: Path) -> None:
             claimed_at TEXT,
             sent_at TEXT,
             last_error TEXT,
+            backlog_override INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(user_id, canonical_opportunity_id)
@@ -58,12 +60,40 @@ def init_schema(db_path: Path) -> None:
         CREATE INDEX IF NOT EXISTS idx_user_notification_due
           ON user_notification_ledger(status, next_attempt_at, created_at);
         """)
+        settings_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(user_notification_settings)")
+        }
+        if "gmail_backfill_paused" not in settings_columns:
+            conn.execute(
+                "ALTER TABLE user_notification_settings "
+                "ADD COLUMN gmail_backfill_paused INTEGER NOT NULL DEFAULT 0"
+            )
+        columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(user_notification_ledger)")
+        }
+        if "backlog_override" not in columns:
+            conn.execute(
+                "ALTER TABLE user_notification_ledger "
+                "ADD COLUMN backlog_override INTEGER NOT NULL DEFAULT 0"
+            )
 
 
 def get_settings(db_path: Path, user_id: int) -> dict[str, Any]:
     with _connect(Path(db_path)) as conn:
-        row = conn.execute("SELECT enabled, enabled_at, updated_at FROM user_notification_settings WHERE user_id=?", (int(user_id),)).fetchone()
-    return {"enabled": bool(row["enabled"]), "enabled_at": row["enabled_at"], "updated_at": row["updated_at"]} if row else {"enabled": False, "enabled_at": None, "updated_at": None}
+        row = conn.execute(
+            "SELECT enabled,enabled_at,gmail_backfill_paused,updated_at "
+            "FROM user_notification_settings WHERE user_id=?",
+            (int(user_id),),
+        ).fetchone()
+    return {
+        "enabled": bool(row["enabled"]),
+        "enabled_at": row["enabled_at"],
+        "gmail_backfill_paused": bool(row["gmail_backfill_paused"]),
+        "updated_at": row["updated_at"],
+    } if row else {
+        "enabled": False, "enabled_at": None,
+        "gmail_backfill_paused": False, "updated_at": None,
+    }
 
 
 def set_enabled(db_path: Path, user_id: int, enabled: bool) -> dict[str, Any]:
@@ -89,6 +119,70 @@ def set_enabled(db_path: Path, user_id: int, enabled: bool) -> dict[str, Any]:
         if not enabled:
             conn.execute("UPDATE user_notification_ledger SET status='cancelled',updated_at=? WHERE user_id=? AND status IN ('queued','failed','sending')", (stamp, int(user_id)))
     return get_settings(db_path, user_id)
+
+
+def set_gmail_backfill_paused(
+    db_path: Path,
+    user_id: int,
+    paused: bool,
+) -> dict[str, Any]:
+    if not isinstance(paused, bool):
+        raise ValueError("paused must be a boolean.")
+    stamp = _stamp()
+    with DB_LOCK, _connect(Path(db_path)) as conn:
+        conn.execute(
+            """INSERT INTO user_notification_settings(
+                 user_id,enabled,enabled_at,gmail_backfill_paused,updated_at
+               ) VALUES(?,0,NULL,?,?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                 gmail_backfill_paused=excluded.gmail_backfill_paused,
+                 updated_at=excluded.updated_at""",
+            (int(user_id), int(paused), stamp),
+        )
+    return get_settings(db_path, user_id)
+
+
+def retry_gmail_historical_notifications(
+    db_path: Path,
+    user_id: int,
+) -> int:
+    """Requeue only historical Gmail delivery rows; delivery checks still apply."""
+    stamp = _stamp()
+    with DB_LOCK, _connect(Path(db_path)) as conn:
+        cursor = conn.execute(
+            """UPDATE user_notification_ledger
+               SET status='queued',attempt_count=0,next_attempt_at=NULL,
+                   claimed_at=NULL,last_error=NULL,updated_at=?
+               WHERE user_id=? AND backlog_override=1
+                 AND status IN ('failed','dead','cancelled')
+                 AND EXISTS (
+                   SELECT 1 FROM google_alerts_gmail_opportunities go
+                   WHERE go.user_id=user_notification_ledger.user_id
+                     AND go.canonical_opportunity_id=
+                         user_notification_ledger.canonical_opportunity_id
+                     AND go.history_backfill=1
+                 )""",
+            (stamp, int(user_id)),
+        )
+    return max(0, int(cursor.rowcount))
+
+
+def gmail_historical_delivery_summary(
+    db_path: Path,
+    user_id: int,
+) -> dict[str, int]:
+    with _connect(Path(db_path)) as conn:
+        rows = conn.execute(
+            """SELECT l.status,COUNT(*) AS n
+               FROM user_notification_ledger l
+               JOIN google_alerts_gmail_opportunities go
+                 ON go.user_id=l.user_id
+                AND go.canonical_opportunity_id=l.canonical_opportunity_id
+               WHERE l.user_id=? AND go.history_backfill=1
+               GROUP BY l.status""",
+            (int(user_id),),
+        ).fetchall()
+    return {str(row["status"]): int(row["n"]) for row in rows}
 
 
 def _queue_new_matches(
@@ -121,21 +215,30 @@ def _queue_new_matches(
     stamp = _stamp()
     cursor = conn.execute(
         """INSERT OR IGNORE INTO user_notification_ledger
-          (user_id,canonical_opportunity_id,candidate_job_id,status,created_at,updated_at)
-        SELECT ?,j.canonical_opportunity_id,j.id,'queued',?,?
+          (user_id,canonical_opportunity_id,candidate_job_id,status,
+           backlog_override,created_at,updated_at)
+        SELECT ?,j.canonical_opportunity_id,j.id,'queued',
+               COALESCE(go.history_backfill,0),?,?
         FROM jobs j
+        LEFT JOIN google_alerts_gmail_opportunities go
+          ON go.user_id=? AND go.canonical_opportunity_id=j.canonical_opportunity_id
         JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
         WHERE e.match=1 AND e.score>=? AND e.preference_fingerprint=?
           AND COALESCE(j.source_initial_baseline,0)=0
+          AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)
           AND NOT EXISTS (
             SELECT 1 FROM notification_ledger nl
             WHERE nl.canonical_opportunity_id=j.canonical_opportunity_id
               AND COALESCE(nl.baseline_suppressed,0)=1
           )
-          AND j.discovered_at>=? AND j.discovered_at>=?
+          AND (j.discovered_at>=? OR COALESCE(go.history_backfill,0)=1)
+          AND j.discovered_at>=?
           AND j.canonical_opportunity_id IS NOT NULL
         ORDER BY j.discovered_at,j.id""",
-        (user_id, stamp, stamp, user_id, threshold, expected_fingerprint, enabled_at, fresh_after),
+        (
+            user_id, stamp, stamp, user_id, user_id, threshold,
+            expected_fingerprint, user_id, enabled_at, fresh_after,
+        ),
     )
     return max(0, int(cursor.rowcount))
 
@@ -160,7 +263,8 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
               WHERE COALESCE(j.source_initial_baseline,0)=1
                  OR COALESCE(nl.baseline_suppressed,0)=1
             )""", (stamp,))
-        row = conn.execute("""SELECT l.id,l.user_id,l.attempt_count,t.chat_id,j.title,j.company,j.location,j.url,
+        row = conn.execute("""SELECT l.id,l.user_id,l.attempt_count,l.backlog_override,
+          l.canonical_opportunity_id,t.chat_id,j.title,j.company,j.location,j.url,
           j.source,j.discovered_at,e.score,e.reasons_json
           FROM user_notification_ledger l
           JOIN user_notification_settings s ON s.user_id=l.user_id AND s.enabled=1
@@ -169,6 +273,20 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
           JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
           WHERE (l.status='queued' OR (l.status='failed' AND l.next_attempt_at IS NOT NULL AND l.next_attempt_at<=?))
             AND COALESCE(j.source_initial_baseline,0)=0
+            AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=l.user_id)
+            AND (l.backlog_override=0 OR COALESCE(s.gmail_backfill_paused,0)=0)
+            AND (
+              (l.backlog_override=0 AND j.discovered_at>=s.enabled_at)
+              OR (
+                l.backlog_override=1
+                AND EXISTS (
+                  SELECT 1 FROM google_alerts_gmail_opportunities go
+                  WHERE go.user_id=l.user_id
+                    AND go.canonical_opportunity_id=l.canonical_opportunity_id
+                    AND go.history_backfill=1
+                )
+              )
+            )
             AND NOT EXISTS (
               SELECT 1
               FROM notification_ledger nl
@@ -193,8 +311,9 @@ def _still_deliverable(
     send it based only on the fact that it was eligible when it was first queued.
     """
     with _connect(Path(db_path)) as conn:
-        row = conn.execute("""SELECT l.user_id,s.enabled_at,t.chat_id,j.discovered_at,
-          e.preference_fingerprint,e.match,e.score,p.preferences_json
+        row = conn.execute("""SELECT l.user_id,l.canonical_opportunity_id,
+          l.backlog_override,s.gmail_backfill_paused,s.enabled_at,t.chat_id,j.discovered_at,
+          j.source_owner_user_id,e.preference_fingerprint,e.match,e.score,p.preferences_json
           FROM user_notification_ledger l
           JOIN user_notification_settings s ON s.user_id=l.user_id AND s.enabled=1
           JOIN user_telegram_chats t ON t.user_id=l.user_id AND t.chat_type='private'
@@ -203,6 +322,20 @@ def _still_deliverable(
           JOIN user_preferences p ON p.user_id=l.user_id
           WHERE l.id=? AND l.status='sending' AND t.chat_id=?
             AND COALESCE(j.source_initial_baseline,0)=0
+            AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=l.user_id)
+            AND (l.backlog_override=0 OR COALESCE(s.gmail_backfill_paused,0)=0)
+            AND (
+              (l.backlog_override=0 AND j.discovered_at>=s.enabled_at)
+              OR (
+                l.backlog_override=1
+                AND EXISTS (
+                  SELECT 1 FROM google_alerts_gmail_opportunities go
+                  WHERE go.user_id=l.user_id
+                    AND go.canonical_opportunity_id=l.canonical_opportunity_id
+                    AND go.history_backfill=1
+                )
+              )
+            )
             AND NOT EXISTS (
               SELECT 1
               FROM notification_ledger nl
@@ -212,7 +345,13 @@ def _still_deliverable(
           (item["id"], item["chat_id"])).fetchone()
     if row is None:
         return False
-    if not row["enabled_at"] or row["discovered_at"] < row["enabled_at"] or not bool(row["match"]):
+    if (
+        (bool(row["backlog_override"]) and bool(row["gmail_backfill_paused"]))
+        or (not bool(row["backlog_override"]) and (
+            not row["enabled_at"] or row["discovered_at"] < row["enabled_at"]
+        ))
+        or not bool(row["match"])
+    ):
         return False
     try:
         preferences = json.loads(row["preferences_json"] or "{}")

@@ -29,7 +29,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
+from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, google_alerts_gmail, google_alerts_job_verifier, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
@@ -899,6 +899,10 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
 def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -> list[dict[str, Any]]:
     conn.row_factory = sqlite3.Row
     identity = canonical_identity(job)
+    # Public observations may link to public opportunities; a private
+    # observation may additionally link to another observation owned by the
+    # same account, but never to another account's private canonical record.
+    owner_id = job.get("source_owner_user_id")
     if identity["url_norm"]:
         rows = conn.execute("""
             SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
@@ -908,10 +912,16 @@ def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -
             FROM canonical_opportunities co
             JOIN jobs j ON j.id = co.representative_job_id
             WHERE co.canonical_url=?
+              AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)
             LIMIT 20
-        """, (identity["url_norm"],)).fetchall()
+        """, (identity["url_norm"], owner_id)).fetchall()
         if rows:
             return [dict(row) for row in rows]
+    # Private Gmail observations may reuse an exact known public URL, but
+    # must not merge into a merely similar vacancy based on employer/title/
+    # location; distinct postings can legitimately share all three.
+    if owner_id is not None:
+        return []
 
     rows = conn.execute("""
         SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
@@ -921,9 +931,10 @@ def _candidate_canonical_groups(conn: sqlite3.Connection, job: dict[str, Any]) -
         FROM canonical_opportunities co
         JOIN jobs j ON j.id = co.representative_job_id
         WHERE co.company_norm=? AND co.location_norm=?
+          AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)
         ORDER BY co.last_seen_at DESC
         LIMIT 100
-    """, (identity["company_norm"], identity["location_norm"])).fetchall()
+    """, (identity["company_norm"], identity["location_norm"], owner_id)).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -959,7 +970,10 @@ def _create_canonical_group(
             canonical_match_confidence=?
         WHERE id=?
     """, (canonical_id, method, confidence, job_id))
-    _ensure_notification_state(conn, canonical_id, notification_state)
+    # Gmail-only canonical groups must never enter the legacy/global
+    # notification ledger. Their delivery is exclusively per-user.
+    if job.get("source_owner_user_id") is None:
+        _ensure_notification_state(conn, canonical_id, notification_state)
     return canonical_id
 
 
@@ -1044,9 +1058,11 @@ def backfill_notification_ledger() -> None:
             )
             SELECT co.id, 'suppressed', co.first_seen_at, co.last_seen_at
             FROM canonical_opportunities co
+            JOIN jobs representative ON representative.id=co.representative_job_id
             LEFT JOIN notification_ledger nl
                 ON nl.canonical_opportunity_id = co.id
-            WHERE nl.canonical_opportunity_id IS NULL
+            WHERE representative.source_owner_user_id IS NULL
+              AND nl.canonical_opportunity_id IS NULL
         """)
         conn.commit()
 
@@ -1092,6 +1108,7 @@ def init_db() -> None:
             experience_extraction_version INTEGER NOT NULL DEFAULT 1,
             source_details_json TEXT NOT NULL DEFAULT '{}',
             source_initial_baseline INTEGER NOT NULL DEFAULT 0,
+            source_owner_user_id INTEGER,
             first_seen_at TEXT NOT NULL,
             last_seen_at TEXT NOT NULL,
             canonical_opportunity_id INTEGER,
@@ -1370,6 +1387,11 @@ def init_db() -> None:
         _ensure_column(conn, "jobs", "experience_extraction_version", "INTEGER NOT NULL DEFAULT 1")
         _ensure_column(conn, "jobs", "source_details_json", "TEXT NOT NULL DEFAULT '{}'")
         _ensure_column(conn, "jobs", "source_initial_baseline", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "jobs", "source_owner_user_id", "INTEGER")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_source_owner_discovered "
+            "ON jobs(source_owner_user_id, discovered_at DESC)"
+        )
         _ensure_column(conn, "jobs", "canonical_opportunity_id", "INTEGER")
         _ensure_column(conn, "jobs", "canonical_match_method", "TEXT")
         _ensure_column(conn, "notification_ledger", "decision_reason_json", "TEXT DEFAULT '[]'")
@@ -1438,6 +1460,7 @@ def init_db() -> None:
     auth.init_auth_schema(DB_PATH)
     user_preferences.init_preferences_schema(DB_PATH)
     telegram_linking.init_schema(DB_PATH)
+    google_alerts_gmail.init_schema(DB_PATH)
     user_notifications.init_schema(DB_PATH)
     user_applications.init_schema(DB_PATH)
     board_scheduler.init_schema(str(DB_PATH))
@@ -1522,12 +1545,17 @@ def upsert_jobs(
                        source_posted_at, posted_precision, description,
                        description_format, experience_min_years,
                        experience_max_years, experience_provenance,
-                       experience_confidence, title, experience_extraction_version
+                       experience_confidence, title, experience_extraction_version,
+                       source_owner_user_id
                    FROM jobs
                    WHERE source=? AND source_job_id=?""",
                 (j["source"], j["source_job_id"]),
             ).fetchone()
             if existing:
+                incoming_owner_id = j.get("source_owner_user_id")
+                existing_owner_id = existing[13]
+                if existing_owner_id != incoming_owner_id:
+                    raise ValueError("A job observation cannot change source ownership.")
                 # Re-polls commonly return the same long job description. The
                 # experience parser is regex-heavy, so re-running it for every
                 # unchanged observation wastes CPU without changing the stored
@@ -1625,7 +1653,8 @@ def upsert_jobs(
                     source_details_json=CASE
                         WHEN ? <> '{}' THEN ?
                         ELSE source_details_json
-                    END
+                    END,
+                    source_owner_user_id=COALESCE(?,source_owner_user_id)
                     WHERE id=?
                 """, (
                     iso(last_seen_at) or j["discovered_at"],
@@ -1638,7 +1667,8 @@ def upsert_jobs(
                     j["experience_provenance"], j["experience_provenance"],
                     j["experience_confidence"], j["experience_confidence"],
                     EXPERIENCE_EXTRACTION_VERSION,
-                    source_details_json, source_details_json, existing[0],
+                    source_details_json, source_details_json,
+                    j.get("source_owner_user_id"), existing[0],
                 ))
 
                 newly_canonicalized = not existing[1]
@@ -1686,7 +1716,7 @@ def upsert_jobs(
                     or next_precision != existing[4]
                     or experience_inputs_changed
                 )
-                if evaluation_inputs_changed:
+                if evaluation_inputs_changed and j.get("source_owner_user_id") is None:
                     _persist_job_evaluation(conn, int(existing[0]), config)
                 if evaluation_inputs_changed or newly_canonicalized:
                     affected_job_ids.append(int(existing[0]))
@@ -1721,8 +1751,9 @@ def upsert_jobs(
                         discovery_latency_seconds, description, description_format,
                         experience_min_years, experience_max_years, experience_provenance,
                         experience_confidence, experience_extraction_version,
-                        source_details_json, first_seen_at, last_seen_at, source_initial_baseline
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                        source_details_json, first_seen_at, last_seen_at, source_initial_baseline,
+                        source_owner_user_id
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)
                 """, (
                     j["source"], j["source_job_id"], j["company"], j["title"],
                     j["location"], j["url"], j["source_posted_at"],
@@ -1731,11 +1762,13 @@ def upsert_jobs(
                     incoming_description_format, j["experience_min_years"],
                     j["experience_max_years"], j["experience_provenance"],
                     j["experience_confidence"], EXPERIENCE_EXTRACTION_VERSION,
-                    source_details_json, j["discovered_at"], iso(last_seen_at) or j["discovered_at"]
+                    source_details_json, j["discovered_at"], iso(last_seen_at) or j["discovered_at"],
+                    j.get("source_owner_user_id"),
                 ))
                 _assign_canonical(conn, int(cur.lastrowid))
                 mark_initial_baseline(int(cur.lastrowid), str(j["source"]))
-                _persist_job_evaluation(conn, int(cur.lastrowid), config)
+                if j.get("source_owner_user_id") is None:
+                    _persist_job_evaluation(conn, int(cur.lastrowid), config)
                 affected_job_ids.append(int(cur.lastrowid))
                 new_count += 1
         conn.commit()
@@ -1743,6 +1776,161 @@ def upsert_jobs(
     if affected_job_ids:
         refresh_configured_user_evaluations(affected_job_ids)
     return new_count
+
+def record_google_alert_posting(
+    owner_user_id: int,
+    posting: dict[str, Any],
+    *,
+    history_backfill: bool,
+) -> int:
+    """Attach a freshly verified public posting to the owner's Gmail observation."""
+    if not isinstance(posting, dict):
+        raise ValueError("Verified job data is required.")
+    canonical_url = canonicalize_url(str(posting.get("canonical_url") or posting.get("url") or ""))
+    title = str(posting.get("title") or "").strip()
+    company = str(posting.get("company") or "").strip()
+    if not canonical_url or not title or not company:
+        raise ValueError("Public JobPosting evidence is incomplete.")
+
+    # Prefer an existing globally public canonical opportunity. A Gmail-only
+    # observation must not create a duplicate public job row for the same URL.
+    with connect_sqlite(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        public = conn.execute(
+            """SELECT j.id,j.canonical_opportunity_id
+               FROM canonical_opportunities co
+               JOIN jobs j ON j.canonical_opportunity_id=co.id
+               WHERE co.canonical_url=? AND j.source_owner_user_id IS NULL
+               ORDER BY CASE WHEN j.id=co.representative_job_id THEN 0 ELSE 1 END,
+                        j.discovered_at DESC,j.id DESC
+               LIMIT 1""",
+            (canonical_url,),
+        ).fetchone()
+
+    if public is not None:
+        job_id = int(public["id"])
+        canonical_id = int(public["canonical_opportunity_id"])
+    else:
+        source_job_id = hashlib.sha256(canonical_url.encode("utf-8")).hexdigest()
+        normalized = normalize_job(
+            source="google_alerts_gmail",
+            source_id=source_job_id,
+            company=company,
+            title=title,
+            location=str(posting.get("location") or "Not specified"),
+            url=canonical_url,
+            posted_at=parse_relative(posting.get("source_posted_at")),
+            posted_precision=str(posting.get("posted_precision") or "unknown"),
+            description=str(posting.get("description") or ""),
+            description_format="plain",
+            source_details={
+                "verification_basis": "public_jsonld_jobposting",
+                "verified_at": str(posting.get("verified_at") or iso(now())),
+                "source_domain": str(posting.get("source_domain") or ""),
+            },
+        )
+        normalized["source_owner_user_id"] = int(owner_user_id)
+        upsert_jobs([normalized])
+        with connect_sqlite(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """SELECT id,canonical_opportunity_id
+                   FROM jobs
+                   WHERE source='google_alerts_gmail' AND source_job_id=?
+                     AND source_owner_user_id=?""",
+                (source_job_id, int(owner_user_id)),
+            ).fetchone()
+        if row is None or row["canonical_opportunity_id"] is None:
+            raise RuntimeError("Verified Gmail observation was not persisted.")
+        job_id = int(row["id"])
+        canonical_id = int(row["canonical_opportunity_id"])
+
+    stamp = iso(now())
+    with db_lock, connect_sqlite(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO google_alerts_gmail_opportunities(
+                 user_id,canonical_opportunity_id,candidate_job_id,history_backfill,
+                 first_observed_at,last_observed_at
+               ) VALUES(?,?,?,?,?,?)
+               ON CONFLICT(user_id,canonical_opportunity_id) DO UPDATE SET
+                 candidate_job_id=excluded.candidate_job_id,
+                 history_backfill=MAX(
+                   google_alerts_gmail_opportunities.history_backfill,
+                   excluded.history_backfill
+                 ),
+                 last_observed_at=excluded.last_observed_at""",
+            (
+                int(owner_user_id), canonical_id, job_id, int(bool(history_backfill)),
+                stamp, stamp,
+            ),
+        )
+
+    preferences = user_preferences.get_user_preferences(DB_PATH, int(owner_user_id))
+    if preferences.get("onboarding_complete"):
+        refresh_user_job_evaluations(int(owner_user_id), preferences, [job_id])
+    return job_id
+
+
+def _process_google_alert_candidate(
+    owner_user_id: int,
+    alert_result: Any,
+    history_backfill: bool,
+) -> None:
+    """Verify the public destination and persist only public page fields."""
+    try:
+        posting = google_alerts_job_verifier.verify_public_job_posting(
+            str(getattr(alert_result, "destination_url", "") or "")
+        )
+    except google_alerts_job_verifier.PublicJobVerificationError as exc:
+        log.info("Google Alerts candidate skipped verification_code=%s", exc.code)
+        return
+    record_google_alert_posting(
+        int(owner_user_id), posting, history_backfill=bool(history_backfill)
+    )
+
+
+async def google_alerts_gmail_worker() -> None:
+    """Owner-only Gmail worker; polling sleeps at its configured cadence."""
+    while not stop_event.is_set():
+        gmail_config = None
+        wait_seconds = 30
+        try:
+            gmail_config = google_alerts_gmail.load_config()
+            if (
+                gmail_config is not None
+                and gmail_config.live_access_enabled
+                and google_alerts_gmail.has_credentials(DB_PATH)
+            ):
+                result = await asyncio.to_thread(
+                    google_alerts_gmail.run_sync_cycle,
+                    DB_PATH,
+                    gmail_config,
+                    _process_google_alert_candidate,
+                )
+                if result.get("messages", {}).get("processed"):
+                    log.info(
+                        "Google Alerts sync: mode=%s stage=%s processed=%s skipped=%s",
+                        result.get("sync_mode"), result.get("stage"),
+                        result["messages"].get("processed", 0),
+                        result["messages"].get("skipped", 0),
+                    )
+                if gmail_config.sync_mode == "polling" and result.get("stage") == "complete":
+                    sync_counts = (result.get("sync") or {}).get("message_counts") or {}
+                    pending_messages = sum(int(sync_counts.get(status, 0)) for status in ("queued", "processing", "retry"))
+                    incremental_pending = result.get("staging", {}).get("incremental_complete") is False
+                    if not pending_messages and not incremental_pending:
+                        wait_seconds = gmail_config.poll_interval_seconds
+        except google_alerts_gmail.GoogleAlertsGmailError as exc:
+            if exc.status_code == 401 and gmail_config is not None:
+                google_alerts_gmail.clear_access_token_cache(DB_PATH, gmail_config.owner_user_id)
+            log.warning("Google Alerts worker stopped cycle error_code=%s", exc.code)
+        except Exception as exc:
+            log.error("Google Alerts worker failed error_type=%s", type(exc).__name__)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
+        except asyncio.TimeoutError:
+            pass
+
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
@@ -1859,6 +2047,7 @@ def backfill_job_evaluations(config: dict[str, Any] | None = None) -> int:
             FROM jobs j
             LEFT JOIN job_evaluations e ON e.job_id = j.id
             WHERE e.job_id IS NULL
+              AND j.source_owner_user_id IS NULL
             ORDER BY j.first_seen_at ASC, j.id ASC
         """).fetchall()
         for row in rows:
@@ -1878,7 +2067,8 @@ def refresh_job_evaluations(config: dict[str, Any] | None = None) -> int:
             SELECT j.id
             FROM jobs j
             LEFT JOIN job_evaluations e ON e.job_id = j.id
-            WHERE e.job_id IS NULL OR e.config_fingerprint != ?
+            WHERE (e.job_id IS NULL OR e.config_fingerprint != ?)
+              AND j.source_owner_user_id IS NULL
             ORDER BY j.first_seen_at ASC, j.id ASC
         """, (fingerprint,)).fetchall()
         for row in rows:
@@ -1960,8 +2150,9 @@ def refresh_user_job_evaluations(
                  FROM jobs j
                  LEFT JOIN user_job_evaluations e
                    ON e.job_id=j.id AND e.user_id=?
-                 WHERE (e.job_id IS NULL OR e.preference_fingerprint != ?)"""
-        params: list[Any] = [int(user_id), fingerprint]
+                 WHERE (e.job_id IS NULL OR e.preference_fingerprint != ?)
+                   AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)"""
+        params: list[Any] = [int(user_id), fingerprint, int(user_id)]
         if job_ids:
             placeholders = ",".join("?" for _ in job_ids)
             sql += f" AND j.id IN ({placeholders})"
@@ -1990,7 +2181,10 @@ def ensure_user_job_evaluations_initialized(
         }
         if not {"jobs", "user_job_evaluations"}.issubset(tables):
             return 0
-        jobs_count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        jobs_count = conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE source_owner_user_id IS NULL OR source_owner_user_id=?",
+            (int(user_id),),
+        ).fetchone()[0]
         existing = conn.execute(
             "SELECT 1 FROM user_job_evaluations WHERE user_id=? LIMIT 1",
             (int(user_id),),
@@ -7361,12 +7555,18 @@ async def startup() -> None:
     refresh_configured_user_evaluations()
     app.state.scheduler_task = asyncio.create_task(scheduler())
     app.state.notification_worker_task = asyncio.create_task(notification_worker())
+    app.state.google_alerts_gmail_worker_task = asyncio.create_task(
+        google_alerts_gmail_worker()
+    )
 
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
     stop_event.set()
-    for task_name in ("scheduler_task", "notification_worker_task"):
+    for task_name in (
+        "scheduler_task", "notification_worker_task",
+        "google_alerts_gmail_worker_task",
+    ):
         task = getattr(app.state, task_name, None)
         if task:
             await task
@@ -7376,6 +7576,7 @@ SESSION_COOKIE_NAME = "job_beeper_session"
 CSRF_COOKIE_NAME = "job_beeper_csrf"
 CSRF_HEADER_NAME = "X-CSRF-Token"
 GOOGLE_STATE_COOKIE_NAME = "job_beeper_google_state"
+GOOGLE_ALERTS_GMAIL_STATE_COOKIE_NAME = "job_beeper_google_alerts_state"
 
 
 class AuthLoginRequest(BaseModel):
@@ -7383,14 +7584,38 @@ class AuthLoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
-def _auth_cookie_secure() -> bool:
+class GoogleAlertsGmailConsentRequest(BaseModel):
+    accepted: bool
+    disclosure_version: str = Field(min_length=1, max_length=64)
+
+
+def _is_localhost_ssh_tunnel(request: Request | None) -> bool:
+    if request is None or (request.url.hostname or "").casefold() != "localhost":
+        return False
+    if request.url.scheme.lower() != "http":
+        return False
+    client_host = (getattr(request.client, "host", "") or "").casefold()
+    if client_host not in {"127.0.0.1", "::1", "localhost"}:
+        return False
+    # The direct SSH local-forward path reaches the loopback app listener and
+    # has no proxy headers. Do not trust a public reverse proxy's Host header.
+    headers = getattr(request, "headers", {})
+    return not headers.get("x-forwarded-for") and not headers.get("x-forwarded-proto")
+
+
+def _auth_cookie_secure(request: Request | None = None) -> bool:
+    # Only plain-HTTP requests arriving directly over the SSH loopback tunnel
+    # may omit Secure. Public/proxied requests retain the normal Secure flag.
+    if _is_localhost_ssh_tunnel(request):
+        return False
     value = os.getenv("JOB_BEEPER_COOKIE_SECURE", "true").strip().lower()
     return value not in {"0", "false", "no", "off"}
 
 
 def _expected_login_origin(request: Request):
+    local_tunnel = _is_localhost_ssh_tunnel(request)
     configured_origin = os.getenv("JOB_BEEPER_PUBLIC_ORIGIN", "").strip()
-    expected = urlsplit(configured_origin or str(request.base_url))
+    expected = urlsplit(str(request.base_url) if local_tunnel else (configured_origin or str(request.base_url)))
     if (
         expected.scheme.lower() not in {"http", "https"}
         or not expected.netloc
@@ -7411,7 +7636,7 @@ def _issue_user_session(request: Request, response: Response, user: dict[str, An
         conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
     cookie_options = {
         "path": "/",
-        "secure": _auth_cookie_secure(),
+        "secure": _auth_cookie_secure(request),
         "samesite": "lax",
         "max_age": auth.SESSION_TTL_SECONDS,
     }
@@ -7581,6 +7806,292 @@ def google_auth_callback(
     return response
 
 
+def _google_alerts_gmail_config(
+    *,
+    require_live_access: bool = True,
+) -> google_alerts_gmail.GmailIntegrationConfig:
+    try:
+        config = google_alerts_gmail.load_config()
+    except google_alerts_gmail.GoogleAlertsGmailError:
+        raise HTTPException(
+            status_code=503,
+            detail="Personal Gmail integration configuration is incomplete.",
+        ) from None
+    if config is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Personal Gmail integration is not configured.",
+        )
+    if require_live_access and not config.live_access_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="Personal Gmail access is disabled pending owner setup and the restricted-data policy gate.",
+        )
+    return config
+
+
+@app.post("/api/integrations/google-alerts/gmail/consent")
+def google_alerts_gmail_record_consent(
+    payload: GoogleAlertsGmailConsentRequest,
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config()
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    try:
+        google_alerts_gmail.record_data_use_consent(
+            DB_PATH,
+            int(user["id"]),
+            config,
+            accepted=payload.accepted,
+            disclosure_version=payload.disclosure_version,
+        )
+    except google_alerts_gmail.GoogleAlertsGmailError:
+        raise HTTPException(
+            status_code=400,
+            detail="The current Gmail data-use disclosure must be accepted before connecting.",
+        ) from None
+    return {
+        "consented": True,
+        "disclosure_version": google_alerts_gmail.DATA_USE_DISCLOSURE_VERSION,
+    }
+
+
+@app.get("/api/integrations/google-alerts/gmail/status")
+def google_alerts_gmail_status(
+    user: dict[str, Any] = Depends(require_admin),
+):
+    try:
+        config = google_alerts_gmail.load_config()
+    except google_alerts_gmail.GoogleAlertsGmailError:
+        return {"configured": False, "enabled": False, "connected": False}
+    if config is None or int(user["id"]) != config.owner_user_id:
+        return {"configured": config is not None, "enabled": False, "connected": False}
+    return {
+        "configured": True,
+        "enabled": bool(config.live_access_enabled),
+        "sync_mode": config.sync_mode,
+        "poll_interval_seconds": config.poll_interval_seconds,
+        "connected": google_alerts_gmail.has_credentials(DB_PATH),
+        "sync": google_alerts_gmail.sync_state(DB_PATH),
+        "notifications": {
+            "settings": user_notifications.get_settings(DB_PATH, int(user["id"])),
+            "historical_delivery": user_notifications.gmail_historical_delivery_summary(
+                DB_PATH, int(user["id"])
+            ),
+        },
+    }
+
+
+@app.post("/api/integrations/google-alerts/gmail/notifications/pause")
+def google_alerts_gmail_notifications_pause(
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config(require_live_access=False)
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    settings = user_notifications.set_gmail_backfill_paused(
+        DB_PATH, int(user["id"]), True
+    )
+    return {"notifications": settings}
+
+
+@app.post("/api/integrations/google-alerts/gmail/notifications/resume")
+def google_alerts_gmail_notifications_resume(
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config(require_live_access=False)
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    settings = user_notifications.set_gmail_backfill_paused(
+        DB_PATH, int(user["id"]), False
+    )
+    return {"notifications": settings}
+
+
+@app.post("/api/integrations/google-alerts/gmail/notifications/retry")
+def google_alerts_gmail_notifications_retry(
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config(require_live_access=False)
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    retried = user_notifications.retry_gmail_historical_notifications(
+        DB_PATH, int(user["id"])
+    )
+    return {
+        "requeued": retried,
+        "historical_delivery": user_notifications.gmail_historical_delivery_summary(
+            DB_PATH, int(user["id"])
+        ),
+    }
+
+
+@app.get("/api/integrations/google-alerts/gmail/connect")
+def google_alerts_gmail_connect(
+    request: Request,
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config()
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    if not google_alerts_gmail.consume_data_use_consent(
+        DB_PATH, int(user["id"]), config
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Review and accept the current Gmail data-use disclosure in Account before connecting.",
+        )
+    authorization_url = google_alerts_gmail.create_authorization_url(
+        DB_PATH, int(user["id"]), config
+    )
+    state = parse_qs(urlsplit(authorization_url).query).get("state", [""])[0]
+    response = RedirectResponse(authorization_url, status_code=302)
+    response.set_cookie(
+        key=GOOGLE_ALERTS_GMAIL_STATE_COOKIE_NAME,
+        value=state,
+        httponly=True,
+        secure=_auth_cookie_secure(request),
+        samesite="lax",
+        max_age=google_alerts_gmail.STATE_TTL_SECONDS,
+        path=google_alerts_gmail.CALLBACK_PATH,
+    )
+    return response
+
+
+@app.get(google_alerts_gmail.CALLBACK_PATH)
+def google_alerts_gmail_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    error: str = "",
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config()
+    failure_url = "/dashboard/?gmail_connect=failed"
+
+    def finish_redirect(url: str):
+        response = RedirectResponse(url, status_code=303)
+        response.delete_cookie(
+            key=GOOGLE_ALERTS_GMAIL_STATE_COOKIE_NAME,
+            httponly=True,
+            secure=_auth_cookie_secure(request),
+            samesite="lax",
+            path=google_alerts_gmail.CALLBACK_PATH,
+        )
+        return response
+
+    if int(user["id"]) != config.owner_user_id:
+        return finish_redirect(failure_url)
+    browser_state = request.cookies.get(GOOGLE_ALERTS_GMAIL_STATE_COOKIE_NAME, "")
+    if (
+        not browser_state
+        or not state
+        or not secrets.compare_digest(browser_state, state)
+    ):
+        return finish_redirect(failure_url)
+    state_data = google_alerts_gmail.consume_authorization_state(DB_PATH, state)
+    if state_data is None or int(state_data[0]) != int(user["id"]):
+        return finish_redirect(failure_url)
+    if error:
+        return finish_redirect("/dashboard/?gmail_connect=cancelled")
+
+    try:
+        token_data = google_alerts_gmail.exchange_authorization_code(
+            code, state_data[1], config
+        )
+        client = google_alerts_gmail.GmailApiClient(token_data["access_token"])
+        profile = client.get_profile()
+        if profile["email_address"] != config.owner_email:
+            raise google_alerts_gmail.GoogleAlertsGmailError("gmail_account_not_owner")
+        # Require the user-created label before retaining a refresh token.
+        client.resolve_alert_label_id()
+        google_alerts_gmail.save_credentials(
+            DB_PATH,
+            int(user["id"]),
+            profile["email_address"],
+            token_data["refresh_token"],
+            token_data["scopes"],
+            config,
+        )
+    except google_alerts_gmail.GoogleAlertsGmailError as exc:
+        log.warning("Personal Gmail connection rejected error_code=%s", exc.code)
+        return finish_redirect(failure_url)
+    except Exception as exc:
+        log.warning(
+            "Personal Gmail connection failed error_type=%s", type(exc).__name__
+        )
+        return finish_redirect(failure_url)
+
+    return finish_redirect("/dashboard/?gmail_connect=connected")
+
+
+@app.post("/api/integrations/google-alerts/gmail/disconnect")
+def google_alerts_gmail_disconnect(
+    user: dict[str, Any] = Depends(require_admin),
+):
+    config = _google_alerts_gmail_config(require_live_access=False)
+    if int(user["id"]) != config.owner_user_id:
+        raise HTTPException(status_code=404, detail="Integration not found.")
+    google_alerts_gmail.disconnect(DB_PATH, config)
+    return {"disconnected": True}
+
+
+def require_google_alerts_pubsub(request: Request):
+    config = _google_alerts_gmail_config()
+    if (
+        config.sync_mode != "push"
+        or not config.push_audience
+        or not config.push_service_account_email
+        or not config.pubsub_subscription
+    ):
+        raise HTTPException(status_code=404, detail="Push synchronization is not configured.")
+    authorization = request.headers.get("authorization", "")
+    if not google_alerts_gmail.verify_pubsub_oidc_token(
+        authorization,
+        audience=config.push_audience,
+        expected_service_account_email=config.push_service_account_email,
+    ):
+        raise HTTPException(status_code=401, detail="Unauthenticated push.")
+    return config
+
+
+@app.post("/api/integrations/google-alerts/gmail/pubsub")
+async def google_alerts_gmail_pubsub_push(
+    request: Request,
+    config: google_alerts_gmail.GmailIntegrationConfig = Depends(require_google_alerts_pubsub),
+):
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > google_alerts_gmail.MAX_PUSH_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="Push payload too large.")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid push payload.") from None
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > google_alerts_gmail.MAX_PUSH_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="Push payload too large.")
+    try:
+        event = google_alerts_gmail.decode_pubsub_push(bytes(body))
+        google_alerts_gmail.store_pubsub_push(
+            DB_PATH,
+            subscription=event["subscription"],
+            expected_subscription=config.pubsub_subscription,
+            pubsub_message_id=event["pubsub_message_id"],
+            history_id=event["history_id"],
+            email_address=event["email_address"],
+        )
+    except google_alerts_gmail.GoogleAlertsGmailError as exc:
+        status = 403 if exc.code in {
+            "gmail_pubsub_subscription_mismatch",
+            "gmail_pubsub_mailbox_mismatch",
+        } else 400
+        raise HTTPException(status_code=status, detail="Invalid push event.") from None
+    return Response(status_code=204)
+
+
 @app.get("/api/auth/me")
 def auth_me(user: dict[str, Any] = Depends(get_current_user)):
     return {"user": user}
@@ -7605,7 +8116,7 @@ def auth_logout(
     auth.revoke_session(DB_PATH, session_token)
     cookie_options = {
         "path": "/",
-        "secure": _auth_cookie_secure(),
+        "secure": _auth_cookie_secure(request),
         "samesite": "lax",
     }
     response.delete_cookie(key=SESSION_COOKIE_NAME, httponly=True, **cookie_options)
@@ -9526,13 +10037,19 @@ def dedupe_candidates(limit: int = 100):
     }
 
 
-@app.get("/api/opportunities", dependencies=[Depends(require_admin)])
-def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False):
+@app.get("/api/opportunities")
+def opportunities(
+    minutes: int = 60,
+    limit: int = 100,
+    today_only: bool = False,
+    user: dict[str, Any] = Depends(require_admin),
+):
     minutes = max(1, min(minutes, 10080))
     limit = max(1, min(limit, 500))
     cutoff = iso(current_day_start_utc()) if today_only else iso(
         now() - dt.timedelta(minutes=minutes)
     )
+    owner_id = int(user["id"]) if isinstance(user, dict) and user.get("id") else None
     with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
@@ -9551,10 +10068,14 @@ def opportunities(minutes: int = 60, limit: int = 100, today_only: bool = False)
             FROM canonical_opportunities co
             JOIN jobs j ON j.canonical_opportunity_id = co.id
             WHERE co.last_seen_at >= ?
+              AND (
+                j.source_owner_user_id IS NULL
+                OR (? IS NOT NULL AND j.source_owner_user_id=?)
+              )
             GROUP BY co.id
             ORDER BY co.last_seen_at DESC
             LIMIT ?
-        """, (cutoff, limit)).fetchall()
+        """, (cutoff, owner_id, owner_id, limit)).fetchall()
     return {
         "opportunities": [dict(row) for row in rows]
     }
@@ -9709,9 +10230,9 @@ def jobs(
     age_cutoff = iso(now() - dt.timedelta(hours=max_age_hours)) if max_age_hours else None
     threshold = int(preferences.get("match_threshold", 55))
 
-    score_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.score, 0) ELSE COALESCE(e.score, 0) END"
-    match_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END"
-    alertable_sql = "CASE WHEN ?='admin' THEN COALESCE(ge.alertable, 0) ELSE COALESCE(e.alertable, 0) END"
+    score_sql = "CASE WHEN ?='admin' AND j.source_owner_user_id IS NULL THEN COALESCE(ge.score, 0) ELSE COALESCE(e.score, 0) END"
+    match_sql = "CASE WHEN ?='admin' AND j.source_owner_user_id IS NULL THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END"
+    alertable_sql = "CASE WHEN ?='admin' AND j.source_owner_user_id IS NULL THEN COALESCE(ge.alertable, 0) ELSE COALESCE(e.alertable, 0) END"
     where_sql = """
         WHERE (?='all'
           OR (?='matched' AND (CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END)=1)
@@ -9736,6 +10257,7 @@ def jobs(
           AND (? IS NULL OR julianday(COALESCE(j.source_posted_at, j.discovered_at)) >= julianday(?))
           AND (?=0 OR {alertable_sql}=1)
           AND (?=0 OR LOWER(COALESCE(j.location, '') || ' ' || COALESCE(j.description, '')) LIKE '%remote%')
+          AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)
     """.format(score_sql=score_sql, match_sql=match_sql, alertable_sql=alertable_sql)
 
     base_params = (
@@ -9745,7 +10267,7 @@ def jobs(
         min_score, user["role"], min_score, min_score, threshold, user["role"],
         age_cutoff, age_cutoff,
         int(bool(alertable_only)), user["role"],
-        int(bool(remote_only)),
+        int(bool(remote_only)), int(user["id"]),
     )
 
     order_expressions = {
@@ -9921,16 +10443,28 @@ def notification_queue(limit: int = 100):
     return {"notifications": result}
 
 
-@app.get("/api/opportunities/{opportunity_id}", dependencies=[Depends(require_admin)])
-def opportunity_detail(opportunity_id: int):
+@app.get("/api/opportunities/{opportunity_id}")
+def opportunity_detail(
+    opportunity_id: int,
+    user: dict[str, Any] = Depends(require_admin),
+):
+    owner_id = int(user["id"]) if isinstance(user, dict) and user.get("id") else None
     with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         opportunity = conn.execute("""
-            SELECT id, canonical_url, company_norm, title_norm, location_norm,
-                   first_seen_at, last_seen_at, representative_job_id
-            FROM canonical_opportunities
-            WHERE id=?
-        """, (opportunity_id,)).fetchone()
+            SELECT co.id, co.canonical_url, co.company_norm, co.title_norm, co.location_norm,
+                   co.first_seen_at, co.last_seen_at, co.representative_job_id
+            FROM canonical_opportunities co
+            WHERE co.id=?
+              AND EXISTS (
+                SELECT 1 FROM jobs j
+                WHERE j.canonical_opportunity_id=co.id
+                  AND (
+                    j.source_owner_user_id IS NULL
+                    OR (? IS NOT NULL AND j.source_owner_user_id=?)
+                  )
+              )
+        """, (opportunity_id, owner_id, owner_id)).fetchone()
         if not opportunity:
             raise HTTPException(status_code=404, detail="Opportunity not found")
 
@@ -9941,8 +10475,12 @@ def opportunity_detail(opportunity_id: int):
                    canonical_match_confidence
             FROM jobs
             WHERE canonical_opportunity_id=?
+              AND (
+                source_owner_user_id IS NULL
+                OR (? IS NOT NULL AND source_owner_user_id=?)
+              )
             ORDER BY COALESCE(source_posted_at, discovered_at) DESC, id ASC
-        """, (opportunity_id,)).fetchall()
+        """, (opportunity_id, owner_id, owner_id)).fetchall()
 
     return {
         "opportunity": dict(opportunity),
@@ -9969,14 +10507,18 @@ def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
     with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         total = conn.execute(
-            "SELECT COUNT(*) FROM jobs WHERE discovered_at >= ?", (cutoff,)
+            """SELECT COUNT(*) FROM jobs
+               WHERE discovered_at >= ?
+                 AND (source_owner_user_id IS NULL OR source_owner_user_id=?)""",
+            (cutoff, user["id"]),
         ).fetchone()[0]
         matched = conn.execute("""
             SELECT COUNT(*)
             FROM jobs j
             JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
             WHERE j.discovered_at >= ? AND e.match=1
-        """, (user["id"], cutoff)).fetchone()[0]
+              AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)
+        """, (user["id"], cutoff, user["id"])).fetchone()[0]
         alertable = 0
         alerted = 0
         if user["role"] == "admin":
@@ -9985,12 +10527,14 @@ def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
                 FROM jobs j
                 JOIN job_evaluations e ON e.job_id=j.id
                 WHERE j.discovered_at >= ? AND e.alertable=1
+                  AND j.source_owner_user_id IS NULL
             """, (cutoff,)).fetchone()[0]
             alerted = conn.execute("""
                 SELECT COUNT(*)
                 FROM notification_ledger nl
                 JOIN jobs j ON j.id=nl.candidate_job_id
                 WHERE j.discovered_at >= ? AND nl.status='sent'
+                  AND j.source_owner_user_id IS NULL
             """, (cutoff,)).fetchone()[0]
 
     local_now = now().astimezone(IST)
@@ -10027,8 +10571,9 @@ def job_detail(
                FROM jobs j
                JOIN user_job_evaluations e
                  ON e.job_id=j.id AND e.user_id=?
-               WHERE j.id=?""",
-            (user["id"], job_id),
+               WHERE j.id=?
+                 AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)""",
+            (user["id"], job_id, user["id"]),
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")

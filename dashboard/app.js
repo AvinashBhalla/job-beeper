@@ -1891,6 +1891,161 @@
     }
   }
 
+  const GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION = '2026-11-22-v2';
+
+  function formatGmailMessageCounts(counts = {}) {
+    const entries = ['queued', 'processing', 'retry', 'processed', 'skipped', 'dead']
+      .map(key => [key, Number(counts[key] || 0)])
+      .filter(([, value]) => value > 0);
+    return entries.length ? entries.map(([key, value]) => `${value} ${key}`).join(' · ') : 'No message counts yet';
+  }
+
+  function formatGmailDeliveryCounts(counts = {}) {
+    const labels = [
+      ['queued', 'queued'], ['sending', 'sending'], ['sent', 'sent'],
+      ['failed', 'failed'], ['dead', 'dead'], ['cancelled', 'cancelled'],
+    ];
+    const entries = labels.map(([key, label]) => [label, Number(counts[key] || 0)])
+      .filter(([, value]) => value > 0);
+    return entries.length ? entries.map(([label, value]) => `${value} ${label}`).join(' · ') : 'No eligible historical alerts yet';
+  }
+
+  async function loadGoogleAlertsGmailStatus() {
+    const panel = $('googleAlertsGmailPanel');
+    if (!panel) return;
+    panel.hidden = !state.isAdmin;
+    if (!state.isAdmin) return;
+
+    const status = $('googleAlertsGmailStatus');
+    const syncProgress = $('googleAlertsGmailSyncProgress');
+    const deliveryProgress = $('googleAlertsGmailDeliveryProgress');
+    const connectButton = $('connectGoogleAlertsGmailBtn');
+    const dataUseConsent = $('googleAlertsGmailDataUseConsent');
+    const disconnectButton = $('disconnectGoogleAlertsGmailBtn');
+    const pauseButton = $('pauseGoogleAlertsBackfillBtn');
+    const resumeButton = $('resumeGoogleAlertsBackfillBtn');
+    const retryButton = $('retryGoogleAlertsBackfillBtn');
+    try {
+      const response = await authClient.request('/integrations/google-alerts/gmail/status', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not load Gmail integration status.');
+
+      const configured = Boolean(data.configured);
+      const enabled = Boolean(data.enabled);
+      const connected = Boolean(data.connected);
+      if (status) {
+        status.textContent = !configured
+          ? 'Personal Gmail integration is not configured on the server yet.'
+          : !enabled
+            ? 'Personal Gmail integration is configured but disabled. The live-access and Google restricted-data policy gates must be cleared before connecting.'
+            : connected
+              ? 'Personal Gmail is connected. Only the dedicated Google Alerts label is processed; message bodies and alert search queries are not shown here.'
+              : 'Ready to connect. Use the personal Gmail account that owns your Google Alerts and has the dedicated label/filter.';
+      }
+      if (connectButton) {
+        connectButton.hidden = !configured || !enabled || connected;
+        connectButton.disabled = !dataUseConsent || !dataUseConsent.checked;
+      }
+      if (disconnectButton) disconnectButton.hidden = !connected;
+
+      const sync = data.sync || null;
+      if (syncProgress) {
+        if (!connected) {
+          syncProgress.textContent = 'Sync will start after the Gmail connection is enabled.';
+        } else if (!sync) {
+          syncProgress.textContent = 'Connected. The initial label-scoped backfill has not started yet.';
+        } else {
+          const stageLabels = {
+            scanning: 'Scanning historical messages',
+            history_catchup: 'Catching up arrivals during the initial scan',
+            draining: 'Processing verified historical results',
+            complete: 'Initial backfill complete; incremental history reconciliation is active',
+          };
+          const updated = sync.updated_at ? ` · updated ${new Date(sync.updated_at).toLocaleString()}` : '';
+          const lastError = sync.last_error_code ? ` · last sync error: ${sync.last_error_code}` : '';
+          syncProgress.textContent = `${stageLabels[sync.backfill_state] || `Sync stage: ${sync.backfill_state || 'unknown'}`} · ${formatGmailMessageCounts(sync.message_counts)}${updated}${lastError}`;
+        }
+      }
+
+      const notifications = data.notifications || {};
+      const settings = notifications.settings || {};
+      const delivery = notifications.historical_delivery || {};
+      const paused = Boolean(settings.gmail_backfill_paused);
+      if (deliveryProgress) {
+        deliveryProgress.textContent = `Historical Telegram alerts: ${formatGmailDeliveryCounts(delivery)}${paused ? ' · paused' : ''}. Current preferences, freshness checks and Telegram opt-in still apply.`;
+      }
+      if (pauseButton) pauseButton.hidden = !connected || paused;
+      if (resumeButton) resumeButton.hidden = !connected || !paused;
+      const retryable = Number(delivery.failed || 0) + Number(delivery.dead || 0) + Number(delivery.cancelled || 0);
+      if (retryButton) retryButton.hidden = !connected || retryable === 0;
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not load Gmail integration status.';
+    }
+  }
+
+  async function updateGoogleAlertsGmailBackfill(action) {
+    const status = $('googleAlertsGmailDeliveryProgress');
+    const buttons = [
+      $('pauseGoogleAlertsBackfillBtn'), $('resumeGoogleAlertsBackfillBtn'),
+      $('retryGoogleAlertsBackfillBtn'),
+    ].filter(Boolean);
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+      const response = await authClient.request(`/integrations/google-alerts/gmail/notifications/${action}`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Could not ${action} historical Telegram alerts.`);
+      if (status && action === 'retry') status.textContent = `${Number(data.requeued || 0)} failed historical notification(s) requeued. Delivery checks will run again before sending.`;
+      await loadGoogleAlertsGmailStatus();
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not update historical Telegram delivery.';
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
+  }
+
+  async function disconnectGoogleAlertsGmail() {
+    const button = $('disconnectGoogleAlertsGmailBtn');
+    if (!window.confirm('Disconnect personal Gmail? This revokes the grant where possible and deletes Gmail-only credentials, sync metadata and private Gmail discoveries. Public jobs discovered independently are retained.')) return;
+    if (button) button.disabled = true;
+    try {
+      const response = await authClient.request('/integrations/google-alerts/gmail/disconnect', { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not disconnect personal Gmail.');
+      await loadGoogleAlertsGmailStatus();
+      showToast('Personal Gmail disconnected and Gmail-only data cleanup completed.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Could not disconnect personal Gmail.', 'error', 7000);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function connectGoogleAlertsGmail() {
+    const consent = $('googleAlertsGmailDataUseConsent');
+    const button = $('connectGoogleAlertsGmailBtn');
+    const status = $('googleAlertsGmailStatus');
+    if (!consent || !consent.checked) {
+      if (status) status.textContent = 'Read the Google Alerts data-use notice and confirm it before connecting Gmail.';
+      return;
+    }
+    if (button) button.disabled = true;
+    try {
+      const response = await authClient.request('/integrations/google-alerts/gmail/consent', {
+        method: 'POST',
+        body: {
+          accepted: true,
+          disclosure_version: GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'Could not record Gmail data-use consent.');
+      window.location.assign(`${API}/integrations/google-alerts/gmail/connect`);
+    } catch (error) {
+      if (status) status.textContent = error.message || 'Could not record Gmail data-use consent.';
+      if (button) button.disabled = false;
+    }
+  }
+
   async function updateTelegramNotificationSetting() {
     const toggle = $('telegramNotificationsEnabled');
     const status = $('telegramNotificationSettingsStatus');
@@ -2875,6 +3030,16 @@
     if ($('telegramNotificationsEnabled')) $('telegramNotificationsEnabled').addEventListener('change', updateTelegramNotificationSetting);
     if ($('refreshTelegramStatusBtn')) $('refreshTelegramStatusBtn').addEventListener('click', loadTelegramStatus);
     if ($('disconnectTelegramBtn')) $('disconnectTelegramBtn').addEventListener('click', disconnectTelegram);
+    if ($('connectGoogleAlertsGmailBtn')) $('connectGoogleAlertsGmailBtn').addEventListener('click', connectGoogleAlertsGmail);
+    if ($('googleAlertsGmailDataUseConsent')) $('googleAlertsGmailDataUseConsent').addEventListener('change', () => {
+      const button = $('connectGoogleAlertsGmailBtn');
+      if (button) button.disabled = !$('googleAlertsGmailDataUseConsent').checked;
+    });
+    if ($('refreshGoogleAlertsGmailBtn')) $('refreshGoogleAlertsGmailBtn').addEventListener('click', loadGoogleAlertsGmailStatus);
+    if ($('disconnectGoogleAlertsGmailBtn')) $('disconnectGoogleAlertsGmailBtn').addEventListener('click', disconnectGoogleAlertsGmail);
+    if ($('pauseGoogleAlertsBackfillBtn')) $('pauseGoogleAlertsBackfillBtn').addEventListener('click', () => updateGoogleAlertsGmailBackfill('pause'));
+    if ($('resumeGoogleAlertsBackfillBtn')) $('resumeGoogleAlertsBackfillBtn').addEventListener('click', () => updateGoogleAlertsGmailBackfill('resume'));
+    if ($('retryGoogleAlertsBackfillBtn')) $('retryGoogleAlertsBackfillBtn').addEventListener('click', () => updateGoogleAlertsGmailBackfill('retry'));
 
 
   }
@@ -3035,6 +3200,13 @@
 
     await loadConfig();
     if (!state.isAdmin) await loadTelegramStatus();
+    if (state.isAdmin) {
+      const gmailResult = new URLSearchParams(window.location.search).get('gmail_connect');
+      if (gmailResult === 'connected') showToast('Personal Gmail connected. Initial sync will start automatically.', 'success');
+      else if (gmailResult === 'failed') showToast('Personal Gmail connection failed. Check the owner account, callback configuration and server logs.', 'error', 7000);
+      else if (gmailResult === 'cancelled') showToast('Personal Gmail connection was cancelled.', 'info');
+      await loadGoogleAlertsGmailStatus();
+    }
     if (state.isAdmin || state.config?.onboarding_complete) await loadJobsFeed();
     else { state.jobs = []; renderFeed(); }
     await loadSourceStatusTelemetry();
@@ -3050,7 +3222,9 @@
     });
     setInterval(refreshFeedIfVisible, 60000);
     setInterval(() => {
-      if (document.visibilityState === 'visible') void loadSourceStatusTelemetry();
+      if (document.visibilityState !== 'visible') return;
+      void loadSourceStatusTelemetry();
+      if (state.isAdmin) void loadGoogleAlertsGmailStatus();
     }, 30000);
   }
 
