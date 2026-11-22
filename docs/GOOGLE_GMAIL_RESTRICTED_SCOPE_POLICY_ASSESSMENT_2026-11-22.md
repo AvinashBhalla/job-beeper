@@ -79,7 +79,7 @@ The following describes the current isolated branch; it is not an endorsement th
 
 ### Consent safeguard added — 22 November 2026
 
-The Account notice now states that the owner accepts a versioned disclosure. The server records the Job Beeper user ID, disclosure version, acceptance timestamp and 10-minute expiry. The OAuth-start route atomically consumes one unused, unexpired acceptance and rejects direct, expired or replayed connect requests. Disconnect does not erase the record; it remains until the Job Beeper account is deleted. The record contains no Gmail data or credentials. This closes the client-only consent bypass but does not replace Google's eligibility, Limited Use or security-assessment determination.
+The Account notice now states that the owner accepts a versioned disclosure. The server records the Job Beeper user ID, disclosure version, acceptance timestamp and 10-minute expiry. The OAuth-start route atomically consumes one unused, unexpired acceptance and rejects direct, expired or replayed connect requests. Expired pending attempts are marked with `expired_at`, retained for audit, and excluded from the uniqueness constraint so a fresh acceptance can be recorded. Disconnect does not erase the record; it remains until the Job Beeper account is deleted. The record contains no Gmail data or credentials. This closes the client-only consent bypass but does not replace Google's eligibility, Limited Use or security-assessment determination.
 
 ## 4. Decision and activation gate
 
