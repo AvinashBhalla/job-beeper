@@ -35,6 +35,14 @@ The owner reported that Chrome's `t.me` landing page did nothing after clicking 
 
 The owner reports three role-based Google Alerts were created (as-it-happens, Web, English, India, all results). First email from these new alerts is still unconfirmed. Verify Gmail filter applies `JobBeeper/GoogleAlerts` to future messages and test the next incoming email end-to-end. Do not enable Telegram notifications until the owner links the private chat and explicitly opts in.
 
+## Telegram owner account connected — 22 November 2026 (latest checkpoint)
+
+Owner-specific Telegram chat is now linked. Production DB confirms one private chat for the configured Gmail owner administrator; webhook receipt was successful at 13:51:58 IST. The per-user notification opt-in checkbox was also switched ON, with enabled_at=13:52:13 IST. Per-user alerts are eligible only for jobs discovered after that time; historical backfill is excluded. There are currently zero per-user queued/sent notification ledger rows. The PwC historical Gmail job remains score 44 / no role match and must not be delivered.
+
+The new Google Alerts still have no confirmed fresh email: Gmail currently contains four processed historical messages only, all marked as backfill; zero non-backfill messages. Check that the Gmail filter assigns JobBeeper/GoogleAlerts to future matching emails, then verify the first new alert email through ingestion, public-post verification, preference match and a single per-user Telegram delivery.
+
+Important: the legacy global Telegram notifier is still enabled separately and sent three LinkedIn alerts after the owner-admin rollout (two at 07:51:58 UTC and one at 07:57:37 UTC). It uses a static legacy chat ID, not the new owner per-user chat/ledger. Do not disable without owner approval. Full details in TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md.
+
 ## Scope correction — authoritative
 
 The owner clarified this is **one personal account only**. There are no other intended users and no near-term hosted SaaS launch. Do not add multi-member Gmail, account switching, customer onboarding, tenant administration or broad user-management features. Retain the existing signed-in owner identity only because Job Beeper's current preferences/authentication/Telegram model uses it.
