@@ -369,11 +369,11 @@ class AuthApiTests(unittest.TestCase):
             self.assertEqual(accepted.status_code, 200)
             self.assertTrue(accepted.json()["consented"])
 
-            connected = self.client.get("/api/integrations/google-alerts/gmail/connect")
+            connected = self.client.get("/api/integrations/google-alerts/gmail/connect", follow_redirects=False)
             self.assertEqual(connected.status_code, 302)
             self.assertTrue(connected.headers["location"].startswith("https://accounts.google.com/"))
 
-            replay = self.client.get("/api/integrations/google-alerts/gmail/connect")
+            replay = self.client.get("/api/integrations/google-alerts/gmail/connect", follow_redirects=False)
             self.assertEqual(replay.status_code, 403)
 
 
