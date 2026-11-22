@@ -152,6 +152,22 @@ class GmailIntegrationTests(unittest.TestCase):
             )
         self.assertFalse(gmail.consume_data_use_consent(self.db, 7, self.config))
 
+        # An expired unused record is retired, retained for audit and must not
+        # block a fresh affirmative consent.
+        gmail.record_data_use_consent(
+            self.db, 7, self.config, accepted=True,
+            disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
+        )
+        with sqlite3.connect(self.db) as conn:
+            records = conn.execute(
+                "SELECT consumed_at,expired_at FROM google_alerts_gmail_data_use_consents "
+                "ORDER BY id"
+            ).fetchall()
+        self.assertEqual(len(records), 3)
+        self.assertIsNotNone(records[1][1])
+        self.assertIsNone(records[2][1])
+        self.assertTrue(gmail.consume_data_use_consent(self.db, 7, self.config))
+
 
     def test_sync_cycle_is_inert_when_live_access_is_not_enabled(self):
         result = gmail.run_sync_cycle(
