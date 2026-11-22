@@ -30,6 +30,13 @@ The isolated checkout is physically on the connected `job-radar` host but uses a
 
 ---
 
+## Latest feature hardening — 22 November 2026
+
+- Gmail API `401` responses now trigger one forced access-token refresh and one retry; persistent `401` responses fail closed. Regression coverage verifies both successful retry and no retry loop.
+- Gmail disconnect now best-effort calls `users.stop` before revoking the refresh grant and deleting local Gmail-only records. If stop/revoke cannot complete, local deletion still proceeds and Gmail's watch naturally expires within its seven-day maximum.
+- Updated focused Gmail-related validation: **85/85 tests passed**. The 34 V2 modules passed before this small Gmail-only hardening; rerun focused tests after any further edits.
+- Official Google restricted-scope policy links and the separate personal-use verification exception vs. server-side security-assessment distinction are recorded in the integration design document.
+
 ## Owner decision — historical Gmail notifications (21 November 2026)
 
 **Owner decision (21 November 2026): send Telegram notifications for eligible jobs from the historical backfill as well as future arrivals.** Implement a Gmail-source-specific backfill delivery mode that bypasses only the generic no-backlog/enabled-at cutoff; retain current user preferences, currently-live public posting verification, canonical dedupe, explicit per-user Telegram opt-in, linked private chat, rate limiting, retry policy and idempotent ledger. Send in controlled batches. Do not change backlog policy for other sources. Never send raw email snippets, query text or mailbox metadata.

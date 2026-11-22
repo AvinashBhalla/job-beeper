@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from cryptography.fernet import Fernet
@@ -201,6 +201,36 @@ class GmailIntegrationTests(unittest.TestCase):
             "access-two",
         )
         self.assertEqual(session.post.call_count, 2)
+
+    def test_gmail_api_retries_once_after_401_with_forced_access_token_refresh(self):
+        session = FakeSession([
+            FakeResponse({"error": "expired"}, status_code=401),
+            FakeResponse({"emailAddress": "owner@example.test", "historyId": "123"}),
+        ])
+        refresh = Mock(return_value="fresh-access-token")
+        client = gmail.GmailApiClient(
+            "stale-access-token", session=session, refresh_access_token=refresh
+        )
+
+        self.assertEqual(client.get_profile()["email_address"], "owner@example.test")
+        self.assertEqual(refresh.call_count, 1)
+        self.assertEqual(session.calls[0][2]["headers"]["Authorization"], "Bearer stale-access-token")
+        self.assertEqual(session.calls[1][2]["headers"]["Authorization"], "Bearer fresh-access-token")
+
+    def test_gmail_api_does_not_retry_repeated_401_responses(self):
+        session = FakeSession([
+            FakeResponse({"error": "expired"}, status_code=401),
+            FakeResponse({"error": "still unauthorized"}, status_code=401),
+        ])
+        refresh = Mock(return_value="fresh-access-token")
+        client = gmail.GmailApiClient(
+            "stale-access-token", session=session, refresh_access_token=refresh
+        )
+        with self.assertRaises(gmail.GoogleAlertsGmailError) as raised:
+            client.get_profile()
+        self.assertEqual(raised.exception.status_code, 401)
+        self.assertEqual(refresh.call_count, 1)
+        self.assertEqual(len(session.calls), 2)
 
     def test_access_token_cache_is_cleared_when_owner_replaces_credentials(self):
         gmail.save_credentials(
@@ -511,7 +541,13 @@ class GmailIntegrationTests(unittest.TestCase):
         )
         session = Mock()
         session.post.return_value = Mock(status_code=200)
-        gmail.disconnect(self.db, self.config, session=session)
+        with patch.object(gmail, "refresh_access_token", return_value="access-token") as refresh:
+            with patch.object(gmail, "GmailApiClient") as api_client:
+                gmail.disconnect(self.db, self.config, session=session)
+        refresh.assert_called_once_with(self.db, self.config, session=session)
+        api_client.assert_called_once_with("access-token")
+        api_client.return_value.stop_watch.assert_called_once_with()
+        session.post.assert_called_once()
         with sqlite3.connect(self.db) as conn:
             self.assertEqual(
                 conn.execute("SELECT COUNT(*) FROM google_alerts_gmail_credentials").fetchone()[0],

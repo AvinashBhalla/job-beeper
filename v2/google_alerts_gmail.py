@@ -551,12 +551,14 @@ class GmailApiClient:
         *,
         session: requests.Session | None = None,
         timeout: tuple[int, int] = (5, 20),
+        refresh_access_token: Callable[[], str] | None = None,
     ):
         if not isinstance(access_token, str) or not access_token:
             raise GoogleAlertsGmailError("gmail_access_token_missing")
         self.access_token = access_token
         self.session = session or requests.Session()
         self.timeout = timeout
+        self.refresh_access_token = refresh_access_token
 
     def _request(
         self,
@@ -567,17 +569,26 @@ class GmailApiClient:
         json_body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         url = f"{GMAIL_API_ROOT}/{path.lstrip('/')}"
-        try:
-            response = self.session.request(
-                method,
-                url,
-                headers={"Authorization": f"Bearer {self.access_token}"},
-                params=params,
-                json=json_body,
-                timeout=self.timeout,
-            )
-        except requests.RequestException:
-            raise GoogleAlertsGmailError("gmail_api_network_error", retryable=True) from None
+        for attempt in range(2):
+            try:
+                response = self.session.request(
+                    method,
+                    url,
+                    headers={"Authorization": f"Bearer {self.access_token}"},
+                    params=params,
+                    json=json_body,
+                    timeout=self.timeout,
+                )
+            except requests.RequestException:
+                raise GoogleAlertsGmailError("gmail_api_network_error", retryable=True) from None
+            if response.status_code != 401 or attempt == 1 or self.refresh_access_token is None:
+                break
+            # Google can invalidate an access token before its advertised expiry.
+            # Refresh once and retry the exact request; never loop on persistent 401s.
+            refreshed = self.refresh_access_token()
+            if not isinstance(refreshed, str) or not refreshed:
+                raise GoogleAlertsGmailError("gmail_access_token_refresh_failed")
+            self.access_token = refreshed
         if response.status_code in {429, 500, 502, 503, 504}:
             raise GoogleAlertsGmailError(
                 "gmail_api_temporary_failure",
@@ -867,7 +878,12 @@ def run_sync_cycle(
     if not config.live_access_enabled:
         return {"enabled": False, "stage": "disabled"}
     access_token = refresh_access_token(db_path, config)
-    client = GmailApiClient(access_token)
+    client = GmailApiClient(
+        access_token,
+        refresh_access_token=lambda: refresh_access_token(
+            db_path, config, force_refresh=True
+        ),
+    )
     profile = client.get_profile()
     if profile["email_address"] != config.owner_email:
         raise GoogleAlertsGmailError("gmail_account_not_owner")
@@ -1444,6 +1460,15 @@ def disconnect(
     except GoogleAlertsGmailError:
         pass
     if refresh_token:
+        # Stop Gmail push delivery before revoking the grant. If the access
+        # token is already invalid or the network is unavailable, local data
+        # deletion still proceeds and the watch naturally expires within 7 days.
+        try:
+            access_token = refresh_access_token(db_path, config, session=session)
+            GmailApiClient(access_token).stop_watch()
+        except GoogleAlertsGmailError:
+            pass
+
         client = session or requests
         try:
             client.post(
