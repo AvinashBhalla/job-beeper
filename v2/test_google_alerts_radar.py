@@ -84,6 +84,29 @@ class GoogleAlertsRadarIsolationTests(unittest.TestCase):
         spoofed_host_request.headers.get.return_value = None
         self.assertTrue(radar._auth_cookie_secure(spoofed_host_request))
 
+    def test_docker_loopback_publish_is_recognized_as_local_ssh_tunnel(self):
+        # Host -> 127.0.0.1:8000 reaches the container from its bridge gateway.
+        local_request = Mock()
+        local_request.url.hostname = "localhost"
+        local_request.url.scheme = "http"
+        local_request.client.host = "172.18.0.1"
+        local_request.headers.get.return_value = None
+        local_request.base_url = "http://localhost:8080/"
+        with patch.dict("os.environ", {"JOB_BEEPER_PUBLIC_ORIGIN": "https://130.210.27.197"}):
+            expected = radar._expected_login_origin(local_request)
+        self.assertEqual(expected.scheme, "http")
+        self.assertEqual(expected.netloc, "localhost:8080")
+        self.assertFalse(radar._auth_cookie_secure(local_request))
+
+        forwarded_request = Mock()
+        forwarded_request.url.hostname = "localhost"
+        forwarded_request.url.scheme = "http"
+        forwarded_request.client.host = "172.18.0.1"
+        forwarded_request.headers.get.side_effect = lambda name: (
+            "198.51.100.10" if name == "x-forwarded-for" else None
+        )
+        self.assertFalse(radar._is_localhost_ssh_tunnel(forwarded_request))
+
     def test_localhost_login_uses_tunnel_origin_instead_of_public_origin_setting(self):
         local_request = Mock()
         local_request.url.hostname = "localhost"
