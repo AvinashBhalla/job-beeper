@@ -5,6 +5,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from cryptography.fernet import Fernet
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -325,6 +326,56 @@ class AuthApiTests(unittest.TestCase):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(set(response.json()), {"status", "version", "uptime_seconds"})
+
+    def test_gmail_connect_requires_a_one_time_server_recorded_consent(self):
+        radar.google_alerts_gmail.init_schema(self.db_path)
+        env = {
+            "JOB_RADAR_GMAIL_OAUTH_CLIENT_ID": "personal-client.apps.googleusercontent.com",
+            "JOB_RADAR_GMAIL_OAUTH_CLIENT_SECRET": "test-client-secret",
+            "JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI": "https://jobs.example.test" + radar.google_alerts_gmail.CALLBACK_PATH,
+            "JOB_RADAR_GMAIL_OWNER_USER_ID": str(self.admin["id"]),
+            "JOB_RADAR_GMAIL_OWNER_EMAIL": self.admin["email"],
+            "JOB_RADAR_GMAIL_TOKEN_ENCRYPTION_KEY": Fernet.generate_key().decode("ascii"),
+            "JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS": "true",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            self.assertEqual(
+                self.client.post(
+                    "/api/auth/login",
+                    json={"email": "admin@example.com", "password": "correct horse battery staple"},
+                ).status_code,
+                200,
+            )
+            # A direct authenticated GET cannot bypass the Account checkbox.
+            denied = self.client.get("/api/integrations/google-alerts/gmail/connect")
+            self.assertEqual(denied.status_code, 403)
+
+            csrf = self.client.cookies.get("job_beeper_csrf")
+            bad_version = self.client.post(
+                "/api/integrations/google-alerts/gmail/consent",
+                json={"accepted": True, "disclosure_version": "stale-version"},
+                headers={"X-CSRF-Token": csrf},
+            )
+            self.assertEqual(bad_version.status_code, 400)
+
+            accepted = self.client.post(
+                "/api/integrations/google-alerts/gmail/consent",
+                json={
+                    "accepted": True,
+                    "disclosure_version": radar.google_alerts_gmail.DATA_USE_DISCLOSURE_VERSION,
+                },
+                headers={"X-CSRF-Token": csrf},
+            )
+            self.assertEqual(accepted.status_code, 200)
+            self.assertTrue(accepted.json()["consented"])
+
+            connected = self.client.get("/api/integrations/google-alerts/gmail/connect")
+            self.assertEqual(connected.status_code, 302)
+            self.assertTrue(connected.headers["location"].startswith("https://accounts.google.com/"))
+
+            replay = self.client.get("/api/integrations/google-alerts/gmail/connect")
+            self.assertEqual(replay.status_code, 403)
+
 
     def test_health_and_login_are_public_but_legacy_api_requires_admin(self):
         self.assertEqual(self.client.get("/health").status_code, 200)
