@@ -43,6 +43,14 @@ The new Google Alerts still have no confirmed fresh email: Gmail currently conta
 
 Important: the legacy global Telegram notifier is still enabled separately and sent three LinkedIn alerts after the owner-admin rollout (two at 07:51:58 UTC and one at 07:57:37 UTC). It uses a static legacy chat ID, not the new owner per-user chat/ledger. Do not disable without owner approval. Full details in TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md.
 
+## Latest Google Alerts email diagnosis — 22 November 2026
+
+No new Google Alerts email has arrived from the three role-based queries created on 22 November. Read-only Gmail API search for authenticated sender googlealerts-noreply@google.com over the last 7 days found six older messages, all received on 20 November: four inbox messages with JobBeeper/GoogleAlerts and two authenticated Google Alerts in Spam without the label. No messages from 22 November exist in the connected Gmail mailbox. All six passed the application's full sender/authentication validator. Do not treat the older two Spam emails as newly-created-alert results.
+
+JobBeeper is healthy: one connected Gmail credential, four historical messages processed (8 parsed results), no errors, label-scoped polling every 180s, latest reconciliation at 14:02 IST, no new history events. Per-user Telegram opt-in remains ON from 13:52:13 IST but no new notification is queued because no new job has arrived.
+
+Owner should edit the existing Gmail filter for googlealerts-noreply@google.com, retain the JobBeeper/GoogleAlerts label, add Never send it to Spam, and not apply it retroactively to matching conversations for now. Add the sender to Contacts. This prevents future genuine Alerts from being sidelined; the two 20-November Spam emails should not be moved/relabelled because they predate the new queries and a label-added event may be treated as incremental ingestion. Full details: docs/TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md.
+
 ## Scope correction — authoritative
 
 The owner clarified this is **one personal account only**. There are no other intended users and no near-term hosted SaaS launch. Do not add multi-member Gmail, account switching, customer onboarding, tenant administration or broad user-management features. Retain the existing signed-in owner identity only because Job Beeper's current preferences/authentication/Telegram model uses it.
