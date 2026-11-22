@@ -1,3 +1,5 @@
+> **Latest execution note — 22 November 2026:** Read [the RSS activity log](GOOGLE_ALERTS_RSS_ACTIVITY_LOG_2026-11-22.md) before further work. The fixture-based queue → Shine JobPosting → V2 upsert → member-evaluation path passed, but no live pilot entry has yet been proven to be a valid job. The current OpenAI pilot has 20 queued, mostly non-job results; the JavaScript Developer pilot has zero. Focused tests are 81/81 and the radar module is 191/191; full V2 discovery is still environment-blocked. First-sync baseline handling, recurring poll/queue draining, real-job feed relevance and release validation remain open. The multi-feed operating guide specifies a 98-feed cap, while the owner's latest report says 103 alerts; reconcile before scaling.
+
 # Updated implementation gate — 21 November 2026
 
 ## Owner clarification — multi-feed Atom contract (21 November 2026)

@@ -1,3 +1,15 @@
+# LATEST UPDATE — 22 November 2026, RSS end-to-end audit
+
+**Read first:** [Google Alerts RSS activity log and end-to-end audit](GOOGLE_ALERTS_RSS_ACTIVITY_LOG_2026-11-22.md).
+
+- A fixture-based RSS queue → real Shine/PwC posting page → shared upsert → per-member evaluation test passed. The queue row was synthetic; no live pilot feed has yet produced a verified job end-to-end.
+- Structured JobPosting skills and explicit experience requirements are now captured. An unambiguous Google result-snippet experience range is stored separately as medium-confidence search-result evidence.
+- Final focused RSS/safe-fetch/extraction/pipeline/matcher suite: **81/81 passed**. Radar regression module: **191/191 passed**. Full V2 discovery remains incomplete: the offline image lacks httpx2 for TestClient imports, and DNS-dependent tests cannot run with networking disabled.
+- Read-only pilot DB: OpenAI feed returned 20 queued, mostly non-job results; JavaScript Developer feed returned zero. Both last succeeded with HTTP 200 at 15:07:44 IST. No recurring RSS timer was found.
+- Baseline suppression for initial feed contents and a recurring poll/queue-drain worker remain open. Do not enable notifications or import the full alert set.
+- The multi-feed guide documents a **98-feed cap**; the owner's latest report says **103 alerts**. Reconcile before scaling. Keep existing email delivery unchanged.
+- No immediate owner action is required. No production or notification changes were made.
+
 # LATEST OWNER DECISION — GOOGLE ALERTS RSS MULTI-FEED
 
 **Decision confirmed 21 November 2026:** all Google Alerts RSS feeds use the same Atom 1.0 output format; only each alert's Google Alerts search string differs. Use one common parser, poller, queue, safe fetcher and shared V2 ingestion path. Do not build per-query parsers or per-alert pipelines. Configure one protected `{id, label, url}` item for each RSS-enabled alert; the search string remains in Google Alerts and is not required in runtime config.
