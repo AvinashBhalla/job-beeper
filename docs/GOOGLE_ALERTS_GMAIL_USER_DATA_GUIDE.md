@@ -16,7 +16,7 @@ Google's policy classification of data derived through this flow, including the 
 
 ## Consent record
 
-When the owner accepts the pre-connect notice, Job Beeper stores a consent record containing the Job Beeper account ID, disclosure version and acceptance timestamp. The OAuth-start endpoint requires an unused acceptance for the current disclosure version and consumes it once, so a direct or replayed connect request cannot bypass the notice. The record is retained after Gmail disconnect as evidence of the acceptance and is removed when the Job Beeper account is deleted. It contains no Gmail message content, mailbox address, Gmail message ID or token.
+When the owner accepts the pre-connect notice, Job Beeper stores a consent record containing the Job Beeper account ID, disclosure version, acceptance timestamp and a 10-minute expiry. The OAuth-start endpoint requires an unused, unexpired acceptance for the current disclosure version and consumes it once, so a direct or replayed connect request cannot bypass the notice. An abandoned consent expires automatically; the owner must accept again to start a later OAuth attempt. The record is retained after Gmail disconnect as evidence of the acceptance and is removed when the Job Beeper account is deleted. It contains no Gmail message content, mailbox address, Gmail message ID or token.
 
 ## Telegram notifications
 
