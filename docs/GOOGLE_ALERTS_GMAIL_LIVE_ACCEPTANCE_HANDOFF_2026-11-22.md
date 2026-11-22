@@ -170,3 +170,11 @@ Before Telegram can be used for this personal Gmail owner, implement and test a 
 6. Retain evidence that this OAuth authorization was granted while the app is in Testing. Testing-mode authorizations are temporary and must not be treated as durable production approval; continue the Restricted-scope verification and server-side security-assessment/policy gates in the existing Google handoff.
 
 No Telegram chat was linked, no notification setting was enabled, no Telegram message was sent, and no preferences were changed as part of this checkpoint.
+
+## 22 November 2026 — Telegram owner-admin path deployed
+
+PR #107 is merged and deployed. Only the configured Gmail owner admin can view/link/disconnect Telegram and access notification settings; ordinary admins remain blocked and member flows remain unchanged. The owner must still start the private link in Telegram and explicitly opt in. Bot `Qdhorvbot` has an HTTPS webhook registered at `https://130.210.27.197/api/telegram/webhook` for message updates only. `getWebhookInfo` confirms the endpoint, no pending updates and no last error. Notification settings remain disabled, there is no linked chat and no job alert has been sent.
+
+The admin config-save route now schedules refresh of existing first-admin job evaluations after syncing profile preferences. The PwC job now recognizes India as a target location, but score is 44 and `no configured target-role match` remains; it is not eligible for notification. The owner should decide whether to add `Software Engineering` / `Associate Software Engineer` role equivalents or ask for a controlled matcher alias before expecting this job to match.
+
+Current production release is `job-radar-prod-release:telegram-owner-20261122`, container `v2-radar-1`, external data volume `v2_radar-data`, loopback binding `127.0.0.1:8000`, health/dashboard/OpenAPI 200. Fresh root-only backup: `/var/backups/job-radar-daily/release-telegram-owner-20261122T074641Z` (checksum verified; integrity ok; 28,734 jobs; 1 Gmail credential; zero Telegram chats/notification opt-ins). Detailed test evidence and owner steps: `docs/TELEGRAM_OWNER_ADMIN_SETUP_HANDOFF_2026-11-22.md`.
