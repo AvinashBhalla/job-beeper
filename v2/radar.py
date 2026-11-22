@@ -7811,6 +7811,28 @@ def google_auth_callback(
     return response
 
 
+def _require_telegram_account_access(user: dict[str, Any]) -> int:
+    """Allow members and only the configured personal Gmail owner admin.
+
+    Telegram account linking is normally member-scoped. The personal Gmail
+    integration is intentionally owner-admin scoped, so that exact configured
+    owner may opt in to Telegram without opening these APIs to other admins.
+    """
+    user_id = int(user["id"])
+    if user.get("role") != "admin":
+        return user_id
+    try:
+        config = google_alerts_gmail.load_config()
+    except google_alerts_gmail.GoogleAlertsGmailError:
+        config = None
+    if config is None or user_id != int(config.owner_user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Telegram linking for administrator accounts is restricted to the configured personal Gmail owner.",
+        )
+    return user_id
+
+
 def _google_alerts_gmail_config(
     *,
     require_live_access: bool = True,
@@ -8184,23 +8206,21 @@ async def parse_user_resume(
 
 @app.get("/api/notifications/settings")
 def read_user_notification_settings(user: dict[str, Any] = Depends(require_authenticated)):
-    if user["role"] == "admin":
-        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
-    settings = user_notifications.get_settings(DB_PATH, user["id"])
-    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    user_id = _require_telegram_account_access(user)
+    settings = user_notifications.get_settings(DB_PATH, user_id)
+    connection = telegram_linking.get_connection(DB_PATH, user_id)
     return {"settings": settings, "telegram_connected": bool(connection)}
 
 
 @app.put("/api/notifications/settings")
 def update_user_notification_settings(payload: dict[str, Any], user: dict[str, Any] = Depends(require_authenticated)):
-    if user["role"] == "admin":
-        raise HTTPException(status_code=403, detail="Member notification settings are not available to administrators.")
+    user_id = _require_telegram_account_access(user)
     if set(payload) != {"enabled"} or not isinstance(payload.get("enabled"), bool):
         raise HTTPException(status_code=422, detail="Provide only an enabled boolean.")
-    if payload["enabled"] and not telegram_linking.get_connection(DB_PATH, user["id"]):
+    if payload["enabled"] and not telegram_linking.get_connection(DB_PATH, user_id):
         raise HTTPException(status_code=409, detail="Connect a private Telegram chat before enabling notifications.")
     try:
-        settings = user_notifications.set_enabled(DB_PATH, user["id"], payload["enabled"])
+        settings = user_notifications.set_enabled(DB_PATH, user_id, payload["enabled"])
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"settings": settings}
@@ -8208,8 +8228,7 @@ def update_user_notification_settings(payload: dict[str, Any], user: dict[str, A
 
 @app.get("/api/telegram/status")
 def telegram_connection_status(user: dict[str, Any] = Depends(require_authenticated)):
-    if user["role"] == "admin":
-        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    user_id = _require_telegram_account_access(user)
     username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
     configured = bool(
         username
@@ -8217,15 +8236,14 @@ def telegram_connection_status(user: dict[str, Any] = Depends(require_authentica
         and os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN")
         and re.fullmatch(r"[A-Za-z0-9_-]{1,256}", os.getenv("JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET", ""))
     )
-    connection = telegram_linking.get_connection(DB_PATH, user["id"])
+    connection = telegram_linking.get_connection(DB_PATH, user_id)
     return {"configured": configured, "bot_username": username if configured else None,
             "connection": connection or {"connected": False}}
 
 
 @app.post("/api/telegram/link")
 def create_telegram_link(user: dict[str, Any] = Depends(require_authenticated)):
-    if user["role"] == "admin":
-        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
+    user_id = _require_telegram_account_access(user)
     username = os.getenv("JOB_BEEPER_TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
     configured = bool(
         username
@@ -8235,16 +8253,15 @@ def create_telegram_link(user: dict[str, Any] = Depends(require_authenticated)):
     )
     if not configured:
         raise HTTPException(status_code=503, detail="Telegram linking is not configured yet.")
-    token, expires_at = telegram_linking.create_link_token(DB_PATH, user["id"])
+    token, expires_at = telegram_linking.create_link_token(DB_PATH, user_id)
     return {"url": f"https://t.me/{username}?start={token}", "expires_in_seconds": telegram_linking.TOKEN_TTL_SECONDS,
             "expires_at": expires_at}
 
 
 @app.delete("/api/telegram/link")
 def disconnect_telegram_account(user: dict[str, Any] = Depends(require_authenticated)):
-    if user["role"] == "admin":
-        raise HTTPException(status_code=403, detail="Telegram account linking is for member accounts.")
-    disconnected = telegram_linking.disconnect(DB_PATH, user["id"])
+    user_id = _require_telegram_account_access(user)
+    disconnected = telegram_linking.disconnect(DB_PATH, user_id)
     return {"connected": False, "disconnected": disconnected}
 
 
@@ -8336,9 +8353,25 @@ def read_config():
 
 
 @app.put("/api/config", dependencies=[Depends(require_admin)])
-def update_config(payload: dict[str, Any]):
+def update_config(
+    payload: dict[str, Any],
+    background_tasks: BackgroundTasks,
+):
     saved = save_config(payload)
     user_preferences.sync_first_admin_preferences(DB_PATH, saved)
+    # Admin candidate-profile edits must refresh that same first-admin
+    # evaluation set. Otherwise saved preferences advance while existing job
+    # evaluations retain the old fingerprint and are not eligible for alerts.
+    with connect_sqlite(DB_PATH) as conn:
+        admin = conn.execute(
+            "SELECT id FROM users WHERE role='admin' AND status='active' ORDER BY id LIMIT 1"
+        ).fetchone()
+    if admin is not None:
+        admin_id = int(admin[0])
+        admin_preferences = user_preferences.get_user_preferences(DB_PATH, admin_id)
+        background_tasks.add_task(
+            refresh_user_job_evaluations, admin_id, admin_preferences
+        )
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 

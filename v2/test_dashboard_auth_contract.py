@@ -230,6 +230,20 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         self.assertIn("experience_confidence", source)
         self.assertIn("rule-based evidence strength", source)
 
+    def test_telegram_panel_is_discovered_by_server_access_and_admin_initialization_checks_it(self):
+        parser = DashboardAuthMarkupParser()
+        parser.feed((ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+        self.assertIn("telegramConnectPanel", parser.ids)
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        start = source.index("  async function loadTelegramStatus()")
+        end = source.index("  const GOOGLE_ALERTS_GMAIL_DISCLOSURE_VERSION", start)
+        handler = source[start:end]
+        self.assertIn("panel.hidden = true", handler)
+        self.assertIn("if (panel) panel.hidden = false", handler)
+        self.assertIn("if (panel) panel.hidden = Boolean(state.isAdmin)", handler)
+        self.assertIn("await loadTelegramStatus();", source)
+        self.assertNotIn("if (!state.isAdmin) return", handler)
+
     def test_admin_dashboard_initialization_is_gated_by_session_bootstrap(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         for required in ("JobBeeperAuth.resolveApiBase", "JobBeeperAuth.createClient", "authClient.bootstrap", "initializeWorkspace"):
