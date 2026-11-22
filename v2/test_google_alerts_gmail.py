@@ -96,6 +96,56 @@ class GmailIntegrationTests(unittest.TestCase):
         gmail.clear_access_token_cache(self.db)
         self.tmp.cleanup()
 
+    def test_data_use_consent_is_owner_only_versioned_and_single_use(self):
+        with self.assertRaises(gmail.GoogleAlertsGmailError):
+            gmail.record_data_use_consent(
+                self.db, 7, self.config, accepted=False,
+                disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
+            )
+        with self.assertRaises(gmail.GoogleAlertsGmailError):
+            gmail.record_data_use_consent(
+                self.db, 7, self.config, accepted=True,
+                disclosure_version="old-disclosure",
+            )
+        with self.assertRaises(gmail.GoogleAlertsGmailError):
+            gmail.record_data_use_consent(
+                self.db, 8, self.config, accepted=True,
+                disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
+            )
+
+        gmail.record_data_use_consent(
+            self.db, 7, self.config, accepted=True,
+            disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
+        )
+        gmail.record_data_use_consent(
+            self.db, 7, self.config, accepted=True,
+            disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
+        )
+        with sqlite3.connect(self.db) as conn:
+            self.assertEqual(
+                conn.execute(
+                    "SELECT COUNT(*) FROM google_alerts_gmail_data_use_consents"
+                ).fetchone()[0],
+                1,
+            )
+        self.assertTrue(gmail.consume_data_use_consent(self.db, 7, self.config))
+        self.assertFalse(gmail.consume_data_use_consent(self.db, 7, self.config))
+        with sqlite3.connect(self.db) as conn:
+            row = conn.execute(
+                "SELECT disclosure_version,accepted_at,consumed_at "
+                "FROM google_alerts_gmail_data_use_consents"
+            ).fetchone()
+        self.assertEqual(row[0], gmail.DATA_USE_DISCLOSURE_VERSION)
+        self.assertTrue(row[1])
+        self.assertTrue(row[2])
+
+        gmail.record_data_use_consent(
+            self.db, 7, self.config, accepted=True,
+            disclosure_version=gmail.DATA_USE_DISCLOSURE_VERSION,
+        )
+        self.assertTrue(gmail.consume_data_use_consent(self.db, 7, self.config))
+
+
     def test_sync_cycle_is_inert_when_live_access_is_not_enabled(self):
         result = gmail.run_sync_cycle(
             self.db,
