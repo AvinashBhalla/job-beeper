@@ -14,6 +14,10 @@ Job Beeper follows each extracted destination link, fetches the destination page
 
 Google's policy classification of data derived through this flow, including the public-page fields linked to Gmail-derived destinations and the retained message-key digest, is still awaiting confirmation. The feature must not be enabled while that classification and any required storage controls remain unresolved.
 
+## Consent record
+
+When the owner accepts the pre-connect notice, Job Beeper stores a consent record containing the Job Beeper account ID, disclosure version and acceptance timestamp. The OAuth-start endpoint requires an unused acceptance for the current disclosure version and consumes it once, so a direct or replayed connect request cannot bypass the notice. The record is retained after Gmail disconnect as evidence of the acceptance and is removed when the Job Beeper account is deleted. It contains no Gmail message content, mailbox address, Gmail message ID or token.
+
 ## Telegram notifications
 
 Gmail connection does not itself enable Telegram delivery. Job Beeper uses the separate per-user notification setting and linked private Telegram chat. When enabled, eligible job details and public posting links may be delivered to that chat. Telegram is a separate service; the user must clearly opt in after seeing the applicable data-use disclosure.
@@ -26,4 +30,4 @@ Public job records already present independently of the Gmail-only private sourc
 
 ## Before enabling the feature
 
-The owner must review the visible pre-connect disclosure. The Gmail use-case eligibility, server-side Restricted-scope assessment/CASA requirements, treatment of derived data, encryption-at-rest requirements and public privacy/help publication remain release gates. Do not connect a real mailbox until those gates are explicitly resolved.
+The owner must review and affirmatively accept the visible pre-connect disclosure. The server records the disclosure version and acceptance timestamp and requires a fresh one-time acceptance for each OAuth start. This technical safeguard does not constitute Google's approval. The Gmail use-case eligibility, server-side Restricted-scope assessment/CASA requirements, treatment of derived data, encryption-at-rest requirements and public privacy/help publication remain release gates. Do not connect a real mailbox until those gates are explicitly resolved.
