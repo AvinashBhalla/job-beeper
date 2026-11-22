@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -65,6 +65,36 @@ class GoogleAlertsRadarIsolationTests(unittest.TestCase):
             "verification_basis": "public_jsonld_jobposting",
             "verified_at": "2026-11-21T00:00:00+00:00",
         }
+
+    def test_auth_cookies_are_non_secure_only_on_localhost_tunnel(self):
+        local_request = Mock()
+        local_request.url.hostname = "localhost"
+        local_request.url.scheme = "http"
+        local_request.client.host = "127.0.0.1"
+        local_request.headers.get.return_value = None
+        public_request = Mock()
+        public_request.url.hostname = "130.210.27.197"
+        self.assertFalse(radar._auth_cookie_secure(local_request))
+        self.assertTrue(radar._auth_cookie_secure(public_request))
+
+        spoofed_host_request = Mock()
+        spoofed_host_request.url.hostname = "localhost"
+        spoofed_host_request.url.scheme = "https"
+        spoofed_host_request.client.host = "127.0.0.1"
+        spoofed_host_request.headers.get.return_value = None
+        self.assertTrue(radar._auth_cookie_secure(spoofed_host_request))
+
+    def test_localhost_login_uses_tunnel_origin_instead_of_public_origin_setting(self):
+        local_request = Mock()
+        local_request.url.hostname = "localhost"
+        local_request.url.scheme = "http"
+        local_request.client.host = "127.0.0.1"
+        local_request.headers.get.return_value = None
+        local_request.base_url = "http://localhost:8080/"
+        with patch.dict("os.environ", {"JOB_BEEPER_PUBLIC_ORIGIN": "https://130.210.27.197"}):
+            expected = radar._expected_login_origin(local_request)
+        self.assertEqual(expected.scheme, "http")
+        self.assertEqual(expected.netloc, "localhost:8080")
 
     def test_disconnect_removes_gmail_private_jobs_but_preserves_public_jobs(self):
         public = radar.normalize_job(

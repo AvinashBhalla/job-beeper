@@ -93,6 +93,22 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("cookie auth client contract passed", result.stdout)
 
+    def test_gmail_connect_requires_explicit_data_use_confirmation(self):
+        parser = DashboardAuthMarkupParser()
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        parser.feed(html)
+        self.assertIn("googleAlertsGmailDataUseConsent", parser.ids)
+        self.assertIn("googleAlertsGmailDataUseDisclosure", parser.ids)
+        consent_markup = html.split("id=\"googleAlertsGmailDataUseConsent\"", 1)[1].split(">", 1)[0]
+        self.assertNotIn("checked", consent_markup, "Gmail data-use consent must be unchecked by default")
+        self.assertIn("raw email bodies", html)
+        self.assertIn("Telegram is a separate service", html)
+
+        source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("connectButton.disabled = !dataUseConsent || !dataUseConsent.checked", source)
+        self.assertIn("if (!consent || !consent.checked)", source)
+        self.assertIn("googleAlertsGmailDataUseConsent').addEventListener('change'", source)
+
     def test_dashboard_has_login_and_user_holding_panels(self):
         parser = DashboardAuthMarkupParser()
         parser.feed((ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))

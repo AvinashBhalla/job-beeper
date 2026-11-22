@@ -1890,8 +1890,10 @@ def _process_google_alert_candidate(
 
 
 async def google_alerts_gmail_worker() -> None:
-    """Creator-only Gmail worker; inert unless the live-access gate is explicit."""
+    """Owner-only Gmail worker; polling sleeps at its configured cadence."""
     while not stop_event.is_set():
+        gmail_config = None
+        wait_seconds = 30
         try:
             gmail_config = google_alerts_gmail.load_config()
             if (
@@ -1907,24 +1909,25 @@ async def google_alerts_gmail_worker() -> None:
                 )
                 if result.get("messages", {}).get("processed"):
                     log.info(
-                        "Google Alerts sync: stage=%s processed=%s skipped=%s",
-                        result.get("stage"),
+                        "Google Alerts sync: mode=%s stage=%s processed=%s skipped=%s",
+                        result.get("sync_mode"), result.get("stage"),
                         result["messages"].get("processed", 0),
                         result["messages"].get("skipped", 0),
                     )
+                if gmail_config.sync_mode == "polling" and result.get("stage") == "complete":
+                    sync_counts = (result.get("sync") or {}).get("message_counts") or {}
+                    pending_messages = sum(int(sync_counts.get(status, 0)) for status in ("queued", "processing", "retry"))
+                    incremental_pending = result.get("staging", {}).get("incremental_complete") is False
+                    if not pending_messages and not incremental_pending:
+                        wait_seconds = gmail_config.poll_interval_seconds
         except google_alerts_gmail.GoogleAlertsGmailError as exc:
-            if exc.status_code == 401:
-                google_alerts_gmail.clear_access_token_cache(
-                    DB_PATH, gmail_config.owner_user_id if gmail_config else None
-                )
+            if exc.status_code == 401 and gmail_config is not None:
+                google_alerts_gmail.clear_access_token_cache(DB_PATH, gmail_config.owner_user_id)
             log.warning("Google Alerts worker stopped cycle error_code=%s", exc.code)
         except Exception as exc:
-            log.error(
-                "Google Alerts worker failed error_type=%s",
-                type(exc).__name__,
-            )
+            log.error("Google Alerts worker failed error_type=%s", type(exc).__name__)
         try:
-            await asyncio.wait_for(stop_event.wait(), timeout=30)
+            await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
         except asyncio.TimeoutError:
             pass
 
@@ -7581,14 +7584,33 @@ class AuthLoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
-def _auth_cookie_secure() -> bool:
+def _is_localhost_ssh_tunnel(request: Request | None) -> bool:
+    if request is None or (request.url.hostname or "").casefold() != "localhost":
+        return False
+    if request.url.scheme.lower() != "http":
+        return False
+    client_host = (getattr(request.client, "host", "") or "").casefold()
+    if client_host not in {"127.0.0.1", "::1", "localhost"}:
+        return False
+    # The direct SSH local-forward path reaches the loopback app listener and
+    # has no proxy headers. Do not trust a public reverse proxy's Host header.
+    headers = getattr(request, "headers", {})
+    return not headers.get("x-forwarded-for") and not headers.get("x-forwarded-proto")
+
+
+def _auth_cookie_secure(request: Request | None = None) -> bool:
+    # Only plain-HTTP requests arriving directly over the SSH loopback tunnel
+    # may omit Secure. Public/proxied requests retain the normal Secure flag.
+    if _is_localhost_ssh_tunnel(request):
+        return False
     value = os.getenv("JOB_BEEPER_COOKIE_SECURE", "true").strip().lower()
     return value not in {"0", "false", "no", "off"}
 
 
 def _expected_login_origin(request: Request):
+    local_tunnel = _is_localhost_ssh_tunnel(request)
     configured_origin = os.getenv("JOB_BEEPER_PUBLIC_ORIGIN", "").strip()
-    expected = urlsplit(configured_origin or str(request.base_url))
+    expected = urlsplit(str(request.base_url) if local_tunnel else (configured_origin or str(request.base_url)))
     if (
         expected.scheme.lower() not in {"http", "https"}
         or not expected.netloc
@@ -7609,7 +7631,7 @@ def _issue_user_session(request: Request, response: Response, user: dict[str, An
         conn.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now()), user["id"]))
     cookie_options = {
         "path": "/",
-        "secure": _auth_cookie_secure(),
+        "secure": _auth_cookie_secure(request),
         "samesite": "lax",
         "max_age": auth.SESSION_TTL_SECONDS,
     }
@@ -7816,6 +7838,8 @@ def google_alerts_gmail_status(
     return {
         "configured": True,
         "enabled": bool(config.live_access_enabled),
+        "sync_mode": config.sync_mode,
+        "poll_interval_seconds": config.poll_interval_seconds,
         "connected": google_alerts_gmail.has_credentials(DB_PATH),
         "sync": google_alerts_gmail.sync_state(DB_PATH),
         "notifications": {
@@ -7873,6 +7897,7 @@ def google_alerts_gmail_notifications_retry(
 
 @app.get("/api/integrations/google-alerts/gmail/connect")
 def google_alerts_gmail_connect(
+    request: Request,
     user: dict[str, Any] = Depends(require_admin),
 ):
     config = _google_alerts_gmail_config()
@@ -7887,7 +7912,7 @@ def google_alerts_gmail_connect(
         key=GOOGLE_ALERTS_GMAIL_STATE_COOKIE_NAME,
         value=state,
         httponly=True,
-        secure=True,
+        secure=_auth_cookie_secure(request),
         samesite="lax",
         max_age=google_alerts_gmail.STATE_TTL_SECONDS,
         path=google_alerts_gmail.CALLBACK_PATH,
@@ -7911,7 +7936,7 @@ def google_alerts_gmail_callback(
         response.delete_cookie(
             key=GOOGLE_ALERTS_GMAIL_STATE_COOKIE_NAME,
             httponly=True,
-            secure=True,
+            secure=_auth_cookie_secure(request),
             samesite="lax",
             path=google_alerts_gmail.CALLBACK_PATH,
         )
@@ -7975,6 +8000,13 @@ def google_alerts_gmail_disconnect(
 
 def require_google_alerts_pubsub(request: Request):
     config = _google_alerts_gmail_config()
+    if (
+        config.sync_mode != "push"
+        or not config.push_audience
+        or not config.push_service_account_email
+        or not config.pubsub_subscription
+    ):
+        raise HTTPException(status_code=404, detail="Push synchronization is not configured.")
     authorization = request.headers.get("authorization", "")
     if not google_alerts_gmail.verify_pubsub_oidc_token(
         authorization,
@@ -8045,7 +8077,7 @@ def auth_logout(
     auth.revoke_session(DB_PATH, session_token)
     cookie_options = {
         "path": "/",
-        "secure": _auth_cookie_secure(),
+        "secure": _auth_cookie_secure(request),
         "samesite": "lax",
     }
     response.delete_cookie(key=SESSION_COOKIE_NAME, httponly=True, **cookie_options)

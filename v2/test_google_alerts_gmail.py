@@ -89,6 +89,7 @@ class GmailIntegrationTests(unittest.TestCase):
             pubsub_subscription="projects/example/subscriptions/google-alerts",
             push_audience="https://jobs.example.test" + gmail.CALLBACK_PATH,
             push_service_account_email="push@example.iam.gserviceaccount.com",
+            sync_mode="push",
         )
 
     def tearDown(self):
@@ -112,7 +113,7 @@ class GmailIntegrationTests(unittest.TestCase):
         env = {
             "JOB_RADAR_GMAIL_OAUTH_CLIENT_ID": "id",
             "JOB_RADAR_GMAIL_OAUTH_CLIENT_SECRET": "secret",
-            "JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI": "http://localhost" + gmail.CALLBACK_PATH,
+            "JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI": "http://example.test" + gmail.CALLBACK_PATH,
             "JOB_RADAR_GMAIL_OWNER_USER_ID": "7",
             "JOB_RADAR_GMAIL_OWNER_EMAIL": "owner@example.test",
             "JOB_RADAR_GMAIL_TOKEN_ENCRYPTION_KEY": self.key,
@@ -125,6 +126,43 @@ class GmailIntegrationTests(unittest.TestCase):
             gmail.load_config(env)
         env["JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI"] = "https://example.test" + gmail.CALLBACK_PATH
         env["JOB_RADAR_GMAIL_TOKEN_ENCRYPTION_KEY"] = "not-a-fernet-key"
+        with self.assertRaises(gmail.GoogleAlertsGmailError):
+            gmail.load_config(env)
+
+    def test_polling_config_accepts_localhost_and_requires_no_pubsub_resources(self):
+        env = {
+            "JOB_RADAR_GMAIL_OAUTH_CLIENT_ID": "id",
+            "JOB_RADAR_GMAIL_OAUTH_CLIENT_SECRET": "secret",
+            "JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI": "http://localhost:8080" + gmail.CALLBACK_PATH,
+            "JOB_RADAR_GMAIL_OWNER_USER_ID": "7",
+            "JOB_RADAR_GMAIL_OWNER_EMAIL": "owner@example.test",
+            "JOB_RADAR_GMAIL_TOKEN_ENCRYPTION_KEY": self.key,
+            "JOB_RADAR_GMAIL_POLL_INTERVAL_SECONDS": "240",
+        }
+        config = gmail.load_config(env)
+        self.assertEqual(config.sync_mode, "polling")
+        self.assertEqual(config.poll_interval_seconds, 240)
+        self.assertIsNone(config.pubsub_topic)
+        self.assertFalse(config.live_access_enabled)
+
+        env["JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI"] = "https://130.210.27.197" + gmail.CALLBACK_PATH
+        with self.assertRaises(gmail.GoogleAlertsGmailError):
+            gmail.load_config(env)
+        env["JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI"] = "http://localhost:8080" + gmail.CALLBACK_PATH
+        env["JOB_RADAR_GMAIL_SYNC_MODE"] = "push"
+        with self.assertRaises(gmail.GoogleAlertsGmailError):
+            gmail.load_config(env)
+
+    def test_polling_interval_is_bounded(self):
+        env = {
+            "JOB_RADAR_GMAIL_OAUTH_CLIENT_ID": "id",
+            "JOB_RADAR_GMAIL_OAUTH_CLIENT_SECRET": "secret",
+            "JOB_RADAR_GMAIL_OAUTH_REDIRECT_URI": "http://localhost:8080" + gmail.CALLBACK_PATH,
+            "JOB_RADAR_GMAIL_OWNER_USER_ID": "7",
+            "JOB_RADAR_GMAIL_OWNER_EMAIL": "owner@example.test",
+            "JOB_RADAR_GMAIL_TOKEN_ENCRYPTION_KEY": self.key,
+            "JOB_RADAR_GMAIL_POLL_INTERVAL_SECONDS": "5",
+        }
         with self.assertRaises(gmail.GoogleAlertsGmailError):
             gmail.load_config(env)
 
@@ -348,6 +386,68 @@ class GmailIntegrationTests(unittest.TestCase):
         self.assertEqual(len(session.calls), 2)
         self.assertIn(("format", "metadata"), session.calls[0][2]["params"])
         self.assertEqual(session.calls[1][2]["params"], [("format", "raw")])
+
+    def test_polling_sync_uses_profile_history_cursor_without_watch_or_pubsub(self):
+        from dataclasses import replace
+
+        class PollingClient:
+            def __init__(self):
+                self.watch_calls = 0
+
+            def get_profile(self):
+                return {"email_address": "owner@example.test", "history_id": "900"}
+
+            def resolve_alert_label_id(self):
+                return "Label_123"
+
+            def list_message_page(self, label_id, *, page_token=None, max_results=500):
+                self.assert_label(label_id)
+                return {"messages": []}
+
+            def list_history_page(self, label_id, start_history_id, *, page_token=None):
+                self.assert_label(label_id)
+                if start_history_id != "900":
+                    raise AssertionError("polling baseline history cursor was not preserved")
+                return {"history": [], "historyId": "901"}
+
+            def watch(self, *args, **kwargs):
+                self.watch_calls += 1
+                raise AssertionError("polling mode must not call users.watch")
+
+            @staticmethod
+            def assert_label(label_id):
+                if label_id != "Label_123":
+                    raise AssertionError("label scope lost")
+
+        client = PollingClient()
+        config = replace(self.config, sync_mode="polling", live_access_enabled=True, pubsub_topic=None)
+        with patch.object(gmail, "refresh_access_token", return_value="access-token"), patch.object(
+            gmail, "GmailApiClient", return_value=client
+        ):
+            result = gmail.run_sync_cycle(
+                self.db, config,
+                lambda owner_id, posting, historical: self.fail("no message should be processed"),
+            )
+        self.assertTrue(result["enabled"])
+        self.assertEqual(result["sync_mode"], "polling")
+        self.assertEqual(result["stage"], "complete")
+        self.assertEqual(client.watch_calls, 0)
+        with sqlite3.connect(self.db) as conn:
+            state = conn.execute(
+                "SELECT history_id,initial_history_id,watch_expiration_ms,backfill_state "
+                "FROM google_alerts_gmail_sync_state"
+            ).fetchone()
+        self.assertEqual(state, ("901", "900", None, "complete"))
+
+    def test_polling_baseline_and_expired_cursor_recovery_do_not_require_watch_expiry(self):
+        gmail.save_sync_baseline(self.db, 7, "Label_123", "700")
+        gmail.restart_full_backfill(self.db, 7, "Label_123", {"history_id": "800"})
+        with sqlite3.connect(self.db) as conn:
+            state = conn.execute(
+                "SELECT history_id,initial_history_id,watch_expiration_ms,backfill_state "
+                "FROM google_alerts_gmail_sync_state"
+            ).fetchone()
+        self.assertEqual(state, ("800", "800", None, "scanning"))
 
     def test_watch_baseline_and_full_backfill_history_catchup_stage_ids(self):
         gmail.save_watch_baseline(

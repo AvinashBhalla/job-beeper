@@ -796,7 +796,14 @@
 
             <div class="settings-block" id="googleAlertsGmailPanel" hidden>
               <span class="settings-block-title">Google Alerts Gmail connection</span>
-              <p class="auth-description">Personal inbox integration for Google Alerts only. The app reads messages carrying your <strong>JobBeeper/GoogleAlerts</strong> label. Create the label and Gmail filter yourself; Job Beeper never edits mailbox labels or filters.</p>
+              <p class="auth-description">Personal inbox integration for Google Alerts only. Job Beeper reads messages carrying your <strong>JobBeeper/GoogleAlerts</strong> label. Create the label and Gmail filter yourself; Job Beeper never edits mailbox labels or filters.</p>
+              <div class="form-help-text" id="googleAlertsGmailDataUseDisclosure">
+                <p><strong>How this data is used:</strong> Job Beeper checks message metadata and sender authentication, then temporarily parses eligible message bodies in memory to extract destination links. It does not save raw email bodies, email snippets, alert search queries, subjects or sender addresses. A one-way message-key digest and sync/processing status are retained for deduplication and sync recovery.</p>
+                <p>Job Beeper follows each destination link, fetches and verifies the public job posting, and saves public posting fields (such as title, company, location, description and public URL) as a private job discovery in your account. Those records are matched against your Job Beeper preferences and displayed in your dashboard.</p>
+                <p><strong>Telegram:</strong> if you separately enable Job Beeper Telegram notifications, matching job details and public posting links may be sent to your linked private Telegram chat. Telegram is a separate service. Gmail connection alone does not turn Telegram notifications on.</p>
+                <p><strong>Disconnect and deletion:</strong> disconnect revokes the Gmail grant where possible and removes Gmail credentials, sync/message metadata and Gmail-only private discoveries. Pending Gmail historical notifications are cancelled; notification-ledger history may remain. Job records also known independently from public sources are retained.</p>
+              </div>
+              <p><label for="googleAlertsGmailDataUseConsent"><input type="checkbox" id="googleAlertsGmailDataUseConsent"> I have read this notice and authorize Job Beeper to process messages in my Google Alerts label for the personal job-discovery feature described above. I understand Telegram delivery requires a separate notification opt-in.</label></p>
               <p id="googleAlertsGmailStatus" class="auth-description" role="status" aria-live="polite">Checking personal Gmail connection…</p>
               <p id="googleAlertsGmailSyncProgress" class="form-help-text" role="status" aria-live="polite">Sync progress will appear here after the connection is enabled.</p>
               <p id="googleAlertsGmailDeliveryProgress" class="form-help-text" role="status" aria-live="polite">Historical Telegram delivery status will appear here after sync begins.</p>

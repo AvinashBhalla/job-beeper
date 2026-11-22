@@ -1918,6 +1918,7 @@
     const syncProgress = $('googleAlertsGmailSyncProgress');
     const deliveryProgress = $('googleAlertsGmailDeliveryProgress');
     const connectButton = $('connectGoogleAlertsGmailBtn');
+    const dataUseConsent = $('googleAlertsGmailDataUseConsent');
     const disconnectButton = $('disconnectGoogleAlertsGmailBtn');
     const pauseButton = $('pauseGoogleAlertsBackfillBtn');
     const resumeButton = $('resumeGoogleAlertsBackfillBtn');
@@ -1939,7 +1940,10 @@
               ? 'Personal Gmail is connected. Only the dedicated Google Alerts label is processed; message bodies and alert search queries are not shown here.'
               : 'Ready to connect. Use the personal Gmail account that owns your Google Alerts and has the dedicated label/filter.';
       }
-      if (connectButton) connectButton.hidden = !configured || !enabled || connected;
+      if (connectButton) {
+        connectButton.hidden = !configured || !enabled || connected;
+        connectButton.disabled = !dataUseConsent || !dataUseConsent.checked;
+      }
       if (disconnectButton) disconnectButton.hidden = !connected;
 
       const sync = data.sync || null;
@@ -2015,6 +2019,12 @@
   }
 
   function connectGoogleAlertsGmail() {
+    const consent = $('googleAlertsGmailDataUseConsent');
+    if (!consent || !consent.checked) {
+      const status = $('googleAlertsGmailStatus');
+      if (status) status.textContent = 'Read the Google Alerts data-use notice and confirm it before connecting Gmail.';
+      return;
+    }
     window.location.assign(`${API}/integrations/google-alerts/gmail/connect`);
   }
 
@@ -3003,6 +3013,10 @@
     if ($('refreshTelegramStatusBtn')) $('refreshTelegramStatusBtn').addEventListener('click', loadTelegramStatus);
     if ($('disconnectTelegramBtn')) $('disconnectTelegramBtn').addEventListener('click', disconnectTelegram);
     if ($('connectGoogleAlertsGmailBtn')) $('connectGoogleAlertsGmailBtn').addEventListener('click', connectGoogleAlertsGmail);
+    if ($('googleAlertsGmailDataUseConsent')) $('googleAlertsGmailDataUseConsent').addEventListener('change', () => {
+      const button = $('connectGoogleAlertsGmailBtn');
+      if (button) button.disabled = !$('googleAlertsGmailDataUseConsent').checked;
+    });
     if ($('refreshGoogleAlertsGmailBtn')) $('refreshGoogleAlertsGmailBtn').addEventListener('click', loadGoogleAlertsGmailStatus);
     if ($('disconnectGoogleAlertsGmailBtn')) $('disconnectGoogleAlertsGmailBtn').addEventListener('click', disconnectGoogleAlertsGmail);
     if ($('pauseGoogleAlertsBackfillBtn')) $('pauseGoogleAlertsBackfillBtn').addEventListener('click', () => updateGoogleAlertsGmailBackfill('pause'));

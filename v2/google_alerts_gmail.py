@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
 import json
 import os
 import secrets
@@ -67,15 +68,17 @@ class GmailIntegrationConfig:
     owner_user_id: int
     owner_email: str
     token_encryption_key: str
-    pubsub_topic: str
-    pubsub_subscription: str
-    push_audience: str
-    push_service_account_email: str
+    pubsub_topic: str | None = None
+    pubsub_subscription: str | None = None
+    push_audience: str | None = None
+    push_service_account_email: str | None = None
     live_access_enabled: bool = False
+    sync_mode: str = "polling"
+    poll_interval_seconds: int = 180
 
 
 def load_config(environ: dict[str, str] | None = None) -> GmailIntegrationConfig | None:
-    """Return None when wholly disabled; reject partially configured credentials."""
+    """Load owner-only Gmail config; polling needs no public webhook resources."""
     values = os.environ if environ is None else environ
     names = {
         "client_id": "JOB_RADAR_GMAIL_OAUTH_CLIENT_ID",
@@ -92,7 +95,8 @@ def load_config(environ: dict[str, str] | None = None) -> GmailIntegrationConfig
     raw = {key: str(values.get(env_name, "")).strip() for key, env_name in names.items()}
     if not any(raw.values()):
         return None
-    if any(not value for value in raw.values()):
+    required = ("client_id", "client_secret", "redirect_uri", "owner_user_id", "owner_email", "token_encryption_key")
+    if any(not raw[key] for key in required):
         raise GoogleAlertsGmailError("gmail_integration_configuration_incomplete")
     try:
         owner_user_id = int(raw["owner_user_id"])
@@ -102,33 +106,59 @@ def load_config(environ: dict[str, str] | None = None) -> GmailIntegrationConfig
         raise GoogleAlertsGmailError("gmail_owner_user_id_invalid")
 
     redirect = urlsplit(raw["redirect_uri"])
+    try:
+        redirect_port = redirect.port
+    except ValueError:
+        raise GoogleAlertsGmailError("gmail_redirect_uri_invalid") from None
+    hostname = (redirect.hostname or "").casefold()
+    local_callback = hostname == "localhost"
     if (
-        redirect.scheme.lower() != "https"
-        or not redirect.netloc
-        or redirect.username
-        or redirect.password
-        or redirect.query
-        or redirect.fragment
-        or redirect.path != CALLBACK_PATH
+        not hostname or redirect.username or redirect.password or redirect.query
+        or redirect.fragment or redirect.path != CALLBACK_PATH
+        or (local_callback and redirect.scheme.lower() not in {"http", "https"})
+        or (not local_callback and redirect.scheme.lower() != "https")
     ):
+        raise GoogleAlertsGmailError("gmail_redirect_uri_invalid")
+    if not local_callback:
+        try:
+            ipaddress.ip_address(hostname)
+        except ValueError:
+            pass
+        else:
+            raise GoogleAlertsGmailError("gmail_redirect_uri_invalid")
+    if redirect_port is not None and not 1 <= redirect_port <= 65535:
         raise GoogleAlertsGmailError("gmail_redirect_uri_invalid")
     if "@" not in raw["owner_email"] or len(raw["owner_email"]) > 254:
         raise GoogleAlertsGmailError("gmail_owner_email_invalid")
     _fernet(raw["token_encryption_key"])
 
+    sync_mode = str(values.get("JOB_RADAR_GMAIL_SYNC_MODE", "polling")).strip().lower() or "polling"
+    if sync_mode not in {"polling", "push"}:
+        raise GoogleAlertsGmailError("gmail_sync_mode_invalid")
+    push_keys = ("pubsub_topic", "pubsub_subscription", "push_audience", "push_service_account_email")
+    supplied_push = [bool(raw[key]) for key in push_keys]
+    if any(supplied_push) and not all(supplied_push):
+        raise GoogleAlertsGmailError("gmail_pubsub_configuration_incomplete")
+    if sync_mode == "push" and not all(supplied_push):
+        raise GoogleAlertsGmailError("gmail_pubsub_configuration_incomplete")
+    try:
+        poll_interval = int(values.get("JOB_RADAR_GMAIL_POLL_INTERVAL_SECONDS", "180"))
+    except (TypeError, ValueError):
+        raise GoogleAlertsGmailError("gmail_poll_interval_invalid") from None
+    if not 60 <= poll_interval <= 3600:
+        raise GoogleAlertsGmailError("gmail_poll_interval_invalid")
+
     return GmailIntegrationConfig(
-        client_id=raw["client_id"],
-        client_secret=raw["client_secret"],
-        redirect_uri=raw["redirect_uri"],
-        owner_user_id=owner_user_id,
+        client_id=raw["client_id"], client_secret=raw["client_secret"],
+        redirect_uri=raw["redirect_uri"], owner_user_id=owner_user_id,
         owner_email=raw["owner_email"].casefold(),
         token_encryption_key=raw["token_encryption_key"],
-        pubsub_topic=raw["pubsub_topic"],
-        pubsub_subscription=raw["pubsub_subscription"],
-        push_audience=raw["push_audience"],
-        push_service_account_email=raw["push_service_account_email"].casefold(),
-        live_access_enabled=str(values.get("JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS", "")).strip().lower()
-        in {"1", "true", "yes", "on"},
+        pubsub_topic=raw["pubsub_topic"] or None,
+        pubsub_subscription=raw["pubsub_subscription"] or None,
+        push_audience=raw["push_audience"] or None,
+        push_service_account_email=raw["push_service_account_email"].casefold() or None,
+        live_access_enabled=str(values.get("JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS", "")).strip().lower() in {"1", "true", "yes", "on"},
+        sync_mode=sync_mode, poll_interval_seconds=poll_interval,
     )
 
 
@@ -613,7 +643,7 @@ class GmailApiClient:
         payload = self._request("GET", "users/me/profile")
         email = payload.get("emailAddress")
         history_id = payload.get("historyId")
-        if not isinstance(email, str) or not email or not isinstance(history_id, str):
+        if not isinstance(email, str) or not email or not isinstance(history_id, str) or not history_id.isdigit():
             raise GoogleAlertsGmailError("gmail_profile_invalid")
         return {"email_address": email.casefold(), "history_id": history_id}
 
@@ -817,14 +847,14 @@ def restart_full_backfill(
     db_path: str | Path,
     owner_user_id: int,
     label_id: str,
-    watch: dict[str, Any],
+    baseline: dict[str, Any],
 ) -> None:
-    """Reset the Gmail history cursor with a new watch baseline after HTTP 404."""
+    """Reset a stale history cursor from a fresh profile or watch baseline."""
     _require_label_id(label_id)
-    history_id = str(watch.get("history_id") or "")
-    expiration_ms = int(watch.get("expiration_ms") or 0)
-    if not history_id.isdigit() or expiration_ms <= 0:
-        raise GoogleAlertsGmailError("gmail_watch_response_invalid")
+    history_id = str(baseline.get("history_id") or "")
+    expiration_ms = int(baseline.get("expiration_ms") or 0)
+    if not history_id.isdigit() or expiration_ms < 0:
+        raise GoogleAlertsGmailError("gmail_history_cursor_invalid")
     stamp = _now_iso()
     with DB_LOCK, _connect(db_path) as conn:
         cursor = conn.execute(
@@ -833,7 +863,7 @@ def restart_full_backfill(
                    backfill_page_token=NULL,history_page_token=NULL,
                    history_start_id=NULL,history_candidate_id=NULL,
                    backfill_state='scanning',
-                   watch_expiration_ms=?,last_error_code=NULL,updated_at=?
+                   watch_expiration_ms=NULLIF(?,0),last_error_code=NULL,updated_at=?
                WHERE singleton=1""",
             (int(owner_user_id), label_id, history_id, history_id, expiration_ms, stamp),
         )
@@ -842,7 +872,7 @@ def restart_full_backfill(
                 """INSERT INTO google_alerts_gmail_sync_state(
                      singleton,owner_user_id,label_id,history_id,initial_history_id,
                      backfill_state,watch_expiration_ms,updated_at
-                   ) VALUES(1,?,?,?,?, 'scanning',?,?)""",
+                   ) VALUES(1,?,?,?,?, 'scanning',NULLIF(?,0),?)""",
                 (int(owner_user_id), label_id, history_id, history_id, expiration_ms, stamp),
             )
 
@@ -874,20 +904,17 @@ def run_sync_cycle(
     max_backfill_pages: int = 10,
     message_batch_limit: int = 25,
 ) -> dict[str, Any]:
-    """Run one bounded owner-only sync cycle. Disabled unless explicitly enabled."""
+    """Run one bounded owner-only sync cycle using polling or Pub/Sub push."""
     if not config.live_access_enabled:
         return {"enabled": False, "stage": "disabled"}
     access_token = refresh_access_token(db_path, config)
     client = GmailApiClient(
         access_token,
-        refresh_access_token=lambda: refresh_access_token(
-            db_path, config, force_refresh=True
-        ),
+        refresh_access_token=lambda: refresh_access_token(db_path, config, force_refresh=True),
     )
     profile = client.get_profile()
     if profile["email_address"] != config.owner_email:
         raise GoogleAlertsGmailError("gmail_account_not_owner")
-
     label_id = client.resolve_alert_label_id()
     with _connect(db_path) as conn:
         current = conn.execute(
@@ -897,11 +924,16 @@ def run_sync_cycle(
 
     stamp_ms = int(time.time() * 1000 if now_ms is None else now_ms)
     if current is None:
-        watch = client.watch(label_id, config.pubsub_topic)
-        save_watch_baseline(db_path, config.owner_user_id, label_id, watch)
-        current_state = "scanning"
-        watch_expiration = int(watch["expiration_ms"])
-        last_reconciled = None
+        if config.sync_mode == "push":
+            if not config.pubsub_topic:
+                raise GoogleAlertsGmailError("gmail_pubsub_configuration_incomplete")
+            baseline = client.watch(label_id, config.pubsub_topic)
+            save_sync_baseline(db_path, config.owner_user_id, label_id, baseline["history_id"], watch_expiration_ms=int(baseline["expiration_ms"]))
+            watch_expiration = int(baseline["expiration_ms"])
+        else:
+            save_sync_baseline(db_path, config.owner_user_id, label_id, profile["history_id"])
+            watch_expiration = 0
+        current_state, last_reconciled = "scanning", None
     else:
         if str(current["label_id"]) != label_id:
             raise GoogleAlertsGmailError("gmail_label_changed_reconnect")
@@ -909,9 +941,9 @@ def run_sync_cycle(
         watch_expiration = int(current["watch_expiration_ms"] or 0)
         last_reconciled = current["last_reconciled_at"]
 
-    # Renew well before Gmail's seven-day maximum. Keep the incremental cursor
-    # unchanged; the history worker will reconcile events since that cursor.
-    if watch_expiration <= stamp_ms + 24 * 60 * 60 * 1000:
+    if config.sync_mode == "push" and watch_expiration <= stamp_ms + 24 * 60 * 60 * 1000:
+        if not config.pubsub_topic:
+            raise GoogleAlertsGmailError("gmail_pubsub_configuration_incomplete")
         watch = client.watch(label_id, config.pubsub_topic)
         update_watch_expiration(db_path, int(watch["expiration_ms"]))
 
@@ -930,10 +962,13 @@ def run_sync_cycle(
             except GoogleAlertsGmailError as exc:
                 if exc.status_code != 404:
                     raise
-                watch = client.watch(label_id, config.pubsub_topic)
-                restart_full_backfill(
-                    db_path, config.owner_user_id, label_id, watch
-                )
+                if config.sync_mode == "push":
+                    if not config.pubsub_topic:
+                        raise GoogleAlertsGmailError("gmail_pubsub_configuration_incomplete")
+                    baseline = client.watch(label_id, config.pubsub_topic)
+                else:
+                    baseline = {"history_id": client.get_profile()["history_id"]}
+                restart_full_backfill(db_path, config.owner_user_id, label_id, baseline)
                 current_state = "scanning"
                 stage_info["history_cursor_expired"] = True
                 break
@@ -942,70 +977,78 @@ def run_sync_cycle(
                 current_state = "draining"
                 break
 
-    message_counts = process_queued_messages(
-        db_path, client, process_result, limit=message_batch_limit
-    )
+    message_counts = process_queued_messages(db_path, client, process_result, limit=message_batch_limit)
     sync = sync_state(db_path) or {}
     current_state = str(sync.get("backfill_state") or current_state)
-
+    # The initial history catch-up itself records the reconciliation timestamp.
+    # Reuse it so polling does not immediately repeat the same history request.
+    last_reconciled = sync.get("last_reconciled_at") or last_reconciled
     if current_state == "complete":
+        interval_seconds = config.poll_interval_seconds if config.sync_mode == "polling" else 15 * 60
         reconcile_due = True
         if last_reconciled:
             try:
                 previous = datetime.fromisoformat(str(last_reconciled))
                 if previous.tzinfo is None:
                     previous = previous.replace(tzinfo=timezone.utc)
-                reconcile_due = (
-                    datetime.now(timezone.utc) - previous
-                ).total_seconds() >= 15 * 60
-            except (TypeError, ValueError):
+                reconcile_due = (datetime.fromtimestamp(stamp_ms / 1000, timezone.utc) - previous).total_seconds() >= interval_seconds
+            except (TypeError, ValueError, OverflowError):
                 reconcile_due = True
-        if has_pending_push_events(db_path) or reconcile_due:
+        push_pending = config.sync_mode == "push" and has_pending_push_events(db_path)
+        if push_pending or reconcile_due:
+            incremental_staged = 0
+            incremental_complete = False
             try:
-                incremental = stage_incremental_history(db_path, client)
+                for _ in range(max(1, min(int(max_backfill_pages), 25))):
+                    incremental = stage_incremental_history(db_path, client)
+                    incremental_staged += int(incremental["staged"])
+                    if incremental["complete"]:
+                        incremental_complete = True
+                        break
             except GoogleAlertsGmailError as exc:
                 if exc.status_code != 404:
                     raise
-                watch = client.watch(label_id, config.pubsub_topic)
-                restart_full_backfill(
-                    db_path, config.owner_user_id, label_id, watch
-                )
+                if config.sync_mode == "push":
+                    if not config.pubsub_topic:
+                        raise GoogleAlertsGmailError("gmail_pubsub_configuration_incomplete")
+                    baseline = client.watch(label_id, config.pubsub_topic)
+                else:
+                    baseline = {"history_id": client.get_profile()["history_id"]}
+                restart_full_backfill(db_path, config.owner_user_id, label_id, baseline)
                 current_state = "scanning"
                 stage_info["history_cursor_expired"] = True
             else:
-                stage_info["incremental_staged"] = int(incremental["staged"])
-                stage_info["incremental_complete"] = bool(incremental["complete"])
-                if incremental["complete"]:
+                stage_info["incremental_staged"] = incremental_staged
+                stage_info["incremental_complete"] = incremental_complete
+                if incremental_complete and config.sync_mode == "push":
                     mark_push_events_processed(db_path)
-                message_counts = process_queued_messages(
-                    db_path, client, process_result, limit=message_batch_limit
-                )
-    return {
-        "enabled": True,
-        "stage": current_state,
-        "staging": stage_info,
-        "messages": message_counts,
-        "sync": sync_state(db_path),
-    }
+                message_counts = process_queued_messages(db_path, client, process_result, limit=message_batch_limit)
+    return {"enabled": True, "sync_mode": config.sync_mode, "stage": current_state, "staging": stage_info, "messages": message_counts, "sync": sync_state(db_path)}
 
 
-def save_watch_baseline(
+def save_sync_baseline(
     db_path: str | Path,
     owner_user_id: int,
     label_id: str,
-    watch: dict[str, Any],
+    history_id: str,
+    *,
+    watch_expiration_ms: int | None = None,
 ) -> None:
+    """Persist the history cursor before backfill; no push watch is required."""
     _require_label_id(label_id)
-    history_id = str(watch.get("history_id") or "")
+    history_id = str(history_id or "")
     if not history_id.isdigit():
-        raise GoogleAlertsGmailError("gmail_watch_response_invalid")
+        raise GoogleAlertsGmailError("gmail_history_cursor_invalid")
+    expiration = int(watch_expiration_ms or 0)
+    if expiration < 0:
+        raise GoogleAlertsGmailError("gmail_watch_expiration_invalid")
     stamp = _now_iso()
     with DB_LOCK, _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO google_alerts_gmail_sync_state(
                  singleton,owner_user_id,label_id,history_id,initial_history_id,
                  backfill_state,watch_expiration_ms,updated_at
-               ) VALUES(1,?,?,?,?,'scanning',?,?)
+               ) VALUES(1,?,?,?,?,'scanning',NULLIF(?,0),?)
                ON CONFLICT(singleton) DO UPDATE SET
                  owner_user_id=excluded.owner_user_id,
                  label_id=excluded.label_id,
@@ -1018,11 +1061,21 @@ def save_watch_baseline(
                  END,
                  watch_expiration_ms=excluded.watch_expiration_ms,
                  updated_at=excluded.updated_at""",
-            (
-                int(owner_user_id), label_id, history_id, history_id,
-                int(watch.get("expiration_ms") or 0), stamp,
-            ),
+            (int(owner_user_id), label_id, history_id, history_id, expiration, stamp),
         )
+
+
+def save_watch_baseline(
+    db_path: str | Path,
+    owner_user_id: int,
+    label_id: str,
+    watch: dict[str, Any],
+) -> None:
+    """Backward-compatible wrapper for push-mode tests and watch setup."""
+    save_sync_baseline(
+        db_path, owner_user_id, label_id, str(watch.get("history_id") or ""),
+        watch_expiration_ms=int(watch.get("expiration_ms") or 0),
+    )
 
 
 def stage_initial_backfill_page(
@@ -1463,11 +1516,12 @@ def disconnect(
         # Stop Gmail push delivery before revoking the grant. If the access
         # token is already invalid or the network is unavailable, local data
         # deletion still proceeds and the watch naturally expires within 7 days.
-        try:
-            access_token = refresh_access_token(db_path, config, session=session)
-            GmailApiClient(access_token).stop_watch()
-        except GoogleAlertsGmailError:
-            pass
+        if config.sync_mode == "push":
+            try:
+                access_token = refresh_access_token(db_path, config, session=session)
+                GmailApiClient(access_token).stop_watch()
+            except GoogleAlertsGmailError:
+                pass
 
         client = session or requests
         try:
