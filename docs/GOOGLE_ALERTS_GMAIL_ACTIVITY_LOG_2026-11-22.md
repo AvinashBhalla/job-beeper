@@ -97,6 +97,17 @@ Before any deployment:
 - The ledger stores only the Job Beeper account ID, disclosure version, acceptance time and consumed time. It survives Gmail disconnect as evidence and is removed by Job Beeper account deletion through the user foreign key.
 - Added unit, API-route and dashboard contract coverage. Run the focused tests and record exact results before merge; no Gmail OAuth, mailbox access, Telegram delivery or production deployment is part of this change.
 
+## Validation after server-side consent fix — 22 November 2026
+
+- Focused regression: **3/3 passed**:
+  - `GmailIntegrationTests.test_data_use_consent_is_owner_only_versioned_and_single_use`
+  - `AuthApiTests.test_gmail_connect_requires_a_one_time_server_recorded_consent`
+  - `DashboardAuthContractTests.test_gmail_connect_requires_explicit_data_use_confirmation`
+- The API route test verified direct connect without consent returns 403, stale disclosure version returns 400, current acceptance returns 200, first OAuth-start request returns 302, and replay returns 403. Redirect following was disabled to keep the test offline.
+- `node --check dashboard/app.js`, `python -m py_compile v2/google_alerts_gmail.py v2/radar.py`, and `git diff --check` all passed. The isolated worktree is clean and tracking the updated feature branch.
+- A broader combined run of the Gmail, authentication and dashboard modules reached the local process execution deadline during a later dashboard contract test. No assertion failure was reported before the timeout. The consent-specific bounded rerun completed successfully; do not represent the timed-out command as a complete suite pass.
+- No hosted Actions run was triggered.
+
 ## Final post-change validation and review
 
 - Full local V2 regression after the localhost/polling edits: **34/34 modules, 616 tests passed, zero failures**, run as nine bounded batches to stay within the terminal command limit.
