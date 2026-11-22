@@ -28,10 +28,11 @@ The no-domain personal Gmail route is implemented in the isolated feature checko
 ## Current source-control state
 
 - Branch: `feat/google-alerts-gmail-ingestion`.
-- Published commit: `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1` (`feat: support personal Gmail polling and data disclosures`).
-- Local `HEAD` and `origin/feat/google-alerts-gmail-ingestion` were verified equal at `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`; the isolated checkout is clean.
+- The tested Gmail polling, localhost OAuth and initial disclosure implementation was published in commit `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`.
+- Docs-only follow-up commit `b805d7f9c46d60643e9fb2779a8920bb9ddc73ee` followed that implementation commit. The present consent-hardening changes supersede that checkpoint; read the current PR #102 head rather than treating any SHA in this activity log as a live pointer.
+- Before this follow-up, the isolated checkout was clean and tracking the remote feature branch. Re-check its current commit and status before running tests or making further edits.
 - The commit contains 13 files: Gmail polling and localhost OAuth implementation, dashboard data-use disclosure/unchecked consent gate, regression tests, feature environment example, policy assessment, user data guide, activity log, and updated integration/handover documentation.
-- PR #102: https://github.com/AvinashBhalla/job-beeper/pull/102. GitHub readback confirms it is **open, draft, unmerged and mergeable**, targeting `v2-live-radar`, with head `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`. Its title/body were updated to describe localhost OAuth + polling and the current policy blockers. It has not been marked ready for review or merged.
+- PR #102: https://github.com/AvinashBhalla/job-beeper/pull/102. GitHub readback before this consent-hardening follow-up confirmed it was **open, draft, unmerged and mergeable**, targeting `v2-live-radar`. Re-read the live PR head and state before any review, merge or release action.
 - No GitHub Actions workflow was triggered; the owner's hosted Actions quota remains a cost constraint.
 
 
@@ -83,11 +84,18 @@ Before any deployment:
 - Unresolved server-side assessment: the Gmail scope is Restricted and Google's policy says server-hosted access requires assessment. This backend is VM-hosted; conservatively assume CASA/security assessment applies unless Google confirms otherwise in writing.
 - Code data-flow audit: raw MIME is fetched only after metadata/sender authentication checks and parsed in memory. The worker uses the extracted destination URL to fetch and verify a public JobPosting. Public job-page fields are stored as a private owner discovery; message-key digest, sync/processing metadata and Gmail-origin association remain. Their treatment as derived Google data requires Google's determination.
 - Telegram is a third-party transfer and must be covered by a clear, separate affirmative user opt-in. Gmail connection must not enable Telegram notifications by itself.
-- Added a detailed pre-connect data-use disclosure and initially unchecked confirmation to the Account panel. The Connect button remains disabled until checked. This is an initial UX safeguard, not yet a durable/auditable consent record.
+- Added a detailed pre-connect data-use disclosure and initially unchecked confirmation to the Account panel. This follow-up adds a server-side, versioned consent ledger (Job Beeper user ID, disclosure version, accepted timestamp and one-time consumed timestamp). The OAuth-start endpoint rejects direct/replayed requests without unused current-version consent. Records remain after Gmail disconnect until account deletion; no Gmail content or credential is recorded in the consent ledger.
 - Added a dashboard contract test proving the disclosure is present, Telegram is identified as a separate service, and the consent checkbox is unchecked by default.
 - Added `docs/GOOGLE_ALERTS_GMAIL_USER_DATA_GUIDE.md` and `docs/GOOGLE_GMAIL_RESTRICTED_SCOPE_POLICY_ASSESSMENT_2026-11-22.md`. The help guide still needs a product-hosted public URL and the public privacy-policy/Limited Use statement remains outstanding.
 - Validation after the dashboard disclosure change: 59 focused tests passed across the dashboard auth contract, Gmail parser, Gmail sync and Gmail/radar integration modules; `node --check dashboard/app.js`, Python compilation, and `git diff --check` passed. The full 616-test V2 suite had passed after the backend polling changes before this frontend/docs-only follow-up.
 - Live Gmail remains disabled. Full assessment and remaining gates are documented in the policy file.
+
+## Server-side consent-bypass fix — 22 November 2026
+
+- Added disclosure version `2026-11-22-v2` and a consent ledger with an unused-consent uniqueness constraint.
+- The dashboard now POSTs affirmative acceptance to the authenticated server before opening the OAuth URL. The OAuth-start GET atomically consumes the unused acceptance, so direct authenticated requests and replays are denied.
+- The ledger stores only the Job Beeper account ID, disclosure version, acceptance time and consumed time. It survives Gmail disconnect as evidence and is removed by Job Beeper account deletion through the user foreign key.
+- Added unit, API-route and dashboard contract coverage. Run the focused tests and record exact results before merge; no Gmail OAuth, mailbox access, Telegram delivery or production deployment is part of this change.
 
 ## Final post-change validation and review
 
@@ -99,7 +107,7 @@ Before any deployment:
 
 ## Next safe action
 
-Obtain Google's determination on whether this job-alert-to-job-discovery use case is an approved Gmail-scope use and whether CASA/security assessment applies to the VM-hosted Restricted-scope backend. Resolve derived-data retention, durable consent, public privacy-policy/help and Limited Use requirements. Only then proceed to controlled live-mailbox acceptance under separate approval. Production deployment remains a distinct approval; before any release, take a fresh SQLite online backup and revalidate the release/rollback plan. Do not continue automatically into production deployment.
+Obtain Google's determination on whether this job-alert-to-job-discovery use case is an approved Gmail-scope use and whether CASA/security assessment applies to the VM-hosted Restricted-scope backend. Resolve derived-data retention and any required encryption/storage controls, publish the public privacy-policy/help content and Limited Use statement, then review the implemented server-side consent record. Only then proceed to controlled live-mailbox acceptance under separate approval. Production deployment remains a distinct approval; before any release, take a fresh SQLite online backup and revalidate the release/rollback plan. Do not continue automatically into production deployment.
 
 ## Feature branch publication — 22 November 2026
 
