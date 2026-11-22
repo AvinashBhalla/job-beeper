@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from v2 import auth, radar, user_preferences
+from v2 import auth, radar, user_preferences, user_notifications
 
 
 class UserScopedJobFeedTests(unittest.TestCase):
@@ -318,10 +318,94 @@ class UserScopedJobFeedTests(unittest.TestCase):
             self.assertFalse(self.client.get("/api/telegram/status").json()["connection"]["connected"])
 
     def test_telegram_link_endpoints_reject_admin_and_mutations_require_csrf(self):
-        admin = auth.create_first_admin(self.db_path, "admin@example.com", "admin-password-long")
+        auth.create_first_admin(self.db_path, "admin@example.com", "admin-password-long")
         self.assertEqual(self._login("admin@example.com", "admin-password-long").status_code, 200)
         self.assertEqual(self.client.get("/api/telegram/status").status_code, 403)
-        self.assertEqual(self.client.delete("/api/telegram/link").status_code, 403)
+        self.assertEqual(self.client.get("/api/notifications/settings").status_code, 403)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        self.assertEqual(self.client.post("/api/telegram/link", headers={"X-CSRF-Token": csrf}).status_code, 403)
+        self.assertEqual(self.client.put("/api/notifications/settings", json={"enabled": False}, headers={"X-CSRF-Token": csrf}).status_code, 403)
+        self.assertEqual(self.client.delete("/api/telegram/link", headers={"X-CSRF-Token": csrf}).status_code, 403)
+
+    def test_only_the_configured_gmail_owner_admin_can_use_telegram(self):
+        from types import SimpleNamespace
+
+        owner = auth.create_first_admin(self.db_path, "gmail-owner@example.com", "admin-password-long")
+        other_admin = auth.create_user(self.db_path, "other-admin@example.com", "other-admin-password-long", role="admin")
+        self.assertEqual(self._login("other-admin@example.com", "other-admin-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        with patch.object(radar.google_alerts_gmail, "load_config", return_value=SimpleNamespace(owner_user_id=owner["id"])):
+            self.assertEqual(self.client.get("/api/telegram/status").status_code, 403)
+            self.assertEqual(self.client.get("/api/notifications/settings").status_code, 403)
+            self.assertEqual(self.client.post("/api/telegram/link", headers={"X-CSRF-Token": csrf}).status_code, 403)
+            self.assertEqual(self.client.put("/api/notifications/settings", json={"enabled": False}, headers={"X-CSRF-Token": csrf}).status_code, 403)
+            self.assertEqual(self.client.delete("/api/telegram/link", headers={"X-CSRF-Token": csrf}).status_code, 403)
+
+    def test_admin_config_save_refreshes_first_admin_evaluations_after_preference_sync(self):
+        admin = auth.create_first_admin(self.db_path, "admin-preferences@example.com", "admin-password-long")
+        self.assertEqual(self._login("admin-preferences@example.com", "admin-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        payload = {**radar.get_config(), "locations": ["India"]}
+        with patch.object(radar, "refresh_user_job_evaluations") as refresh:
+            response = self.client.put("/api/config", json=payload, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(response.status_code, 200, response.text)
+        refresh.assert_called_once()
+        self.assertEqual(refresh.call_args.args[0], admin["id"])
+        self.assertEqual(refresh.call_args.args[1]["locations"], ["India"])
+
+    def test_configured_gmail_owner_admin_can_link_private_telegram_and_explicitly_opt_in(self):
+        from types import SimpleNamespace
+        from v2 import telegram_linking
+
+        admin = auth.create_first_admin(self.db_path, "gmail-owner@example.com", "admin-password-long")
+        self.assertEqual(self._login("gmail-owner@example.com", "admin-password-long").status_code, 200)
+        csrf = self.client.cookies.get("job_beeper_csrf")
+        fake_config = SimpleNamespace(owner_user_id=admin["id"])
+        with patch.object(radar.google_alerts_gmail, "load_config", return_value=fake_config), patch.dict("os.environ", {
+            "JOB_BEEPER_TELEGRAM_BOT_USERNAME": "JobBeeperTestBot",
+            "JOB_RADAR_TELEGRAM_BOT_TOKEN": "test-bot-token",
+            "JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret-value",
+        }):
+            status = self.client.get("/api/telegram/status")
+            self.assertEqual(status.status_code, 200, status.text)
+            self.assertTrue(status.json()["configured"])
+            self.assertFalse(status.json()["connection"]["connected"])
+
+            initial = self.client.get("/api/notifications/settings")
+            self.assertEqual(initial.status_code, 200, initial.text)
+            self.assertFalse(initial.json()["settings"]["enabled"])
+            self.assertFalse(initial.json()["telegram_connected"])
+
+            not_linked = self.client.put("/api/notifications/settings", json={"enabled": True}, headers={"X-CSRF-Token": csrf})
+            self.assertEqual(not_linked.status_code, 409)
+            self.assertFalse(user_notifications.get_settings(self.db_path, admin["id"])["enabled"])
+
+            link = self.client.post("/api/telegram/link", headers={"X-CSRF-Token": csrf})
+            self.assertEqual(link.status_code, 200, link.text)
+            self.assertIn("https://t.me/JobBeeperTestBot?start=", link.json()["url"])
+            token = link.json()["url"].split("start=", 1)[1]
+            linked_user = telegram_linking.consume_link_token(self.db_path, token, "123456789", "private")
+            self.assertEqual(linked_user, admin["id"])
+
+            connected = self.client.get("/api/telegram/status")
+            self.assertTrue(connected.json()["connection"]["connected"])
+            enabled = self.client.put("/api/notifications/settings", json={"enabled": True}, headers={"X-CSRF-Token": csrf})
+            self.assertEqual(enabled.status_code, 200, enabled.text)
+            self.assertTrue(enabled.json()["settings"]["enabled"])
+            self.assertIsNotNone(enabled.json()["settings"]["enabled_at"])
+
+            disabled = self.client.put("/api/notifications/settings", json={"enabled": False}, headers={"X-CSRF-Token": csrf})
+            self.assertEqual(disabled.status_code, 200, disabled.text)
+            self.assertFalse(disabled.json()["settings"]["enabled"])
+
+            enabled_again = self.client.put("/api/notifications/settings", json={"enabled": True}, headers={"X-CSRF-Token": csrf})
+            self.assertEqual(enabled_again.status_code, 200, enabled_again.text)
+            disconnected = self.client.delete("/api/telegram/link", headers={"X-CSRF-Token": csrf})
+            self.assertEqual(disconnected.status_code, 200, disconnected.text)
+            self.assertTrue(disconnected.json()["disconnected"])
+            after_disconnect = self.client.get("/api/notifications/settings")
+            self.assertFalse(after_disconnect.json()["settings"]["enabled"])
+            self.assertFalse(after_disconnect.json()["telegram_connected"])
 
     def test_telegram_webhook_rejects_non_private_chat_and_unknown_commands(self):
         with patch.dict("os.environ", {

@@ -1853,13 +1853,13 @@
 
   async function loadTelegramStatus() {
     const panel = $('telegramConnectPanel');
-    if (panel) panel.hidden = Boolean(state.isAdmin);
-    if (state.isAdmin) return;
+    if (panel) panel.hidden = true;
     const status = $('telegramConnectionStatus');
     try {
       const response = await authClient.request('/telegram/status', { cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || 'Could not load Telegram status.');
+      if (panel) panel.hidden = false;
       const connected = Boolean(data.connection?.connected);
       if (status) status.textContent = connected
         ? 'Telegram is connected to your Job Beeper account. Notifications are not enabled by this link.'
@@ -1887,7 +1887,8 @@
         if (notificationStatus) notificationStatus.textContent = settingsError.message || 'Could not load notification settings.';
       }
     } catch (error) {
-      if (status) status.textContent = error.message || 'Could not load Telegram status.';
+      if (panel) panel.hidden = Boolean(state.isAdmin);
+      if (!state.isAdmin && status) status.textContent = error.message || 'Could not load Telegram status.';
     }
   }
 
@@ -3199,7 +3200,7 @@
     handleHashRoute();
 
     await loadConfig();
-    if (!state.isAdmin) await loadTelegramStatus();
+    await loadTelegramStatus();
     if (state.isAdmin) {
       const gmailResult = new URLSearchParams(window.location.search).get('gmail_connect');
       if (gmailResult === 'connected') showToast('Personal Gmail connected. Initial sync will start automatically.', 'success');
