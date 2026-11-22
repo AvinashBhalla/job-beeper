@@ -46,6 +46,16 @@ Do not reuse a key from another service or commit it. Keep a secure backup of th
 
 In the owner Gmail account, create the label `JobBeeper/GoogleAlerts` and a filter for Google Alerts messages from `googlealerts-noreply@google.com` with subject phrase `Google Alert -`. Select **Apply the label** and **Also apply filter to matching conversations** so historical matches are included. Review the result set before applying. Do not include Spam or Trash. JobBeeper uses read-only Gmail calls and never creates or changes the label/filter.
 
+## Verified environment-file location and production Compose distinction
+
+The owner has populated /home/ubuntu/job-beeper/.env. On 22 November 2026, the file was verified as mode 600, owned by ubuntu:ubuntu; all nine Gmail variable names are present with non-empty, non-placeholder values. The feature checkout's configuration parser accepted the values, validated the Fernet key, confirmed the exact localhost callback, 180-second polling mode and JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false. A read-only query inside the production container confirmed that the configured numeric owner ID maps to an active administrator. The updated feature-branch Compose file also passed:
+
+    docker compose --env-file /home/ubuntu/job-beeper/.env -f v2/docker-compose.yml config --quiet
+
+**Important:** the currently running production container was created from /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST/candidate-compose.yml, which uses ./runtime.env from that release directory. That separate root-owned runtime.env currently has only the pre-existing runtime keys; the running container has no JOB_RADAR_GMAIL_* variables. /home/ubuntu/job-beeper/.env is therefore prepared for the updated feature-branch Compose release, but it has not been loaded into the running container. The older /home/ubuntu/job-beeper checkout is also behind the feature branch and must not be used as the release source.
+
+Do not manually modify the archived release bundle's runtime.env or restart the service as a workaround. The approved release must explicitly pass /home/ubuntu/job-beeper/.env using --env-file with the reviewed Compose file (or deliberately stage the same values in the new release's protected runtime env file as part of the reviewed release procedure). No secret values should appear in shell output. The current application has not been restarted and live Gmail remains disabled.
+
 ## Read-only preflight
 
 After the reviewed code and Compose wiring are present in the target deployment, first keep live access disabled and run the preflight inside the app container:

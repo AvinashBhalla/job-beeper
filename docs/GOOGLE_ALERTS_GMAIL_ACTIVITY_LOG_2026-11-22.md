@@ -146,3 +146,13 @@ Obtain Google's determination on whether this job-alert-to-job-discovery use cas
 5. Clarified that `.env.feature` and `v2/docker-compose.feature.yml` are not the Gmail deployment path; the feature stack is a disposable demo with a separate DB and does not pass these settings.
 6. Remaining configuration inputs are not installed in the isolated checkout: dedicated Gmail OAuth client ID/secret, JobBeeper owner admin ID and Fernet key. The existing member-login OAuth client must not be reused. A private environment file must be configured in the actual deployment, followed by the read-only preflight.
 7. No real OAuth request, Gmail mailbox read, Telegram external send, Pub/Sub provisioning, production DB migration, container restart, deployment or live-access activation was performed.
+
+
+## 22 November 2026 — owner private environment validated
+
+1. Verified /home/ubuntu/job-beeper/.env metadata only: mode 600, owner ubuntu:ubuntu. The nine Gmail variable names are present and their values are non-empty/non-placeholder. No credential or key value was displayed.
+2. The isolated branch's google_alerts_gmail.load_config() accepted the private values, confirmed the Fernet key format, exact localhost callback, polling mode/180-second interval, no Pub/Sub configuration and JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS=false.
+3. A read-only query inside v2-radar-1 verified that the configured owner ID maps to an active administrator in the production DB. No email address or account ID was output.
+4. docker compose --env-file /home/ubuntu/job-beeper/.env -f v2/docker-compose.yml config --quiet passed against the feature-branch Compose file.
+5. Critical release-path distinction: the currently running service uses /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST/candidate-compose.yml and that directory's root-owned ./runtime.env. That runtime file has no Gmail keys and the running container has no JOB_RADAR_GMAIL_* variables. The owner .env is ready to be explicitly supplied to the reviewed feature-branch Compose file with --env-file; it has not been loaded into the running container. Do not mutate the archived release bundle's runtime env or restart the service as a workaround.
+6. No deployment, container restart, Gmail OAuth, mailbox access, token creation, Gmail sync, or Telegram external send took place. Live access remains disabled.

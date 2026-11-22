@@ -16,6 +16,14 @@ Current personal path: existing VM `job-radar`; trigger: localhost OAuth callbac
 - Offline validation (22 November 2026): the broad regression covered **34 V2 modules / 620 unique tests**, zero failures. The added Gmail configuration preflight contributes **4 additional tests**; its suite plus the Gmail and radar modules passed **35 tests** in the latest targeted rerun. Compose YAML, JS syntax, Python compilation and `git diff --check` passed. Real Gmail/Telegram acceptance remains outstanding; Pub/Sub is not required for the current polling mode.
 - The initial historical backfill must send eligible Telegram notifications, as the owner explicitly approved. The Gmail-only override bypasses only the no-backlog/enabled-at cutoff; current preferences, freshness, active public posting, Telegram opt-in/private chat, rate limits, retries and idempotency remain required.
 
+## 22 November 2026 — private Gmail environment verified
+
+- Owner populated /home/ubuntu/job-beeper/.env (mode 600, ubuntu:ubuntu). All nine Gmail setting names have non-empty, non-placeholder values. The feature checkout's load_config() accepted them, the Fernet key validated, and localhost/polling defaults checked out; live access is false.
+- The configured numeric owner ID was checked read-only inside the current production container and maps to an active administrator account.
+- The feature Compose file passed: docker compose --env-file /home/ubuntu/job-beeper/.env -f v2/docker-compose.yml config --quiet.
+- **Do not assume the running service is configured yet.** Its current Compose file is /var/backups/job-radar-daily/release-dda6d57-20261118T2210IST/candidate-compose.yml, using that directory's root-owned ./runtime.env; the running container has no Gmail env variables. The new .env is ready for the feature-branch release when that Compose file is used with explicit --env-file. Do not modify the archived runtime env or restart/deploy as a workaround. The old /home/ubuntu/job-beeper checkout is behind the feature branch and is not a release source.
+- No service restart, deployment, Gmail OAuth or mailbox access has occurred. Keep the live-access value false.
+
 ## Safety and go-live gates
 
 1. No live Gmail OAuth or real mailbox access has been run. `JOB_RADAR_GMAIL_ENABLE_LIVE_ACCESS` remains a deliberate gate; all credentials/keys belong in a secure server-side handoff, never chat or GitHub.
