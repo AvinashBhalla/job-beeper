@@ -28,11 +28,12 @@ The no-domain personal Gmail route is implemented in the isolated feature checko
 ## Current source-control state
 
 - Branch: `feat/google-alerts-gmail-ingestion`.
-- `HEAD` and `origin/feat/google-alerts-gmail-ingestion` both point to `9f838eb2c9b2ac6fa22cb336d45d863220392be6` (`Harden Gmail token refresh and disconnect`).
-- The localhost/polling changes are present as uncommitted working-tree changes in seven tracked files: `.env.feature.example`, the Gmail integration design doc, `docs/NEXT_AGENT_START_HERE.md`, `v2/google_alerts_gmail.py`, `v2/radar.py`, `v2/test_google_alerts_gmail.py`, and `v2/test_google_alerts_radar.py`.
-- At the initial source-control check (before this activity log was created), no untracked files were present. The new activity log is now the sole untracked file. No commit or push was made in this preparation step.
-- PR #102 remains draft/open/unmerged as last recorded. Do not treat a feature-branch push as deployment.
-- GitHub Actions were not triggered; the owner's hosted Actions quota remains a cost constraint.
+- Published commit: `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1` (`feat: support personal Gmail polling and data disclosures`).
+- Local `HEAD` and `origin/feat/google-alerts-gmail-ingestion` were verified equal at `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`; the isolated checkout is clean.
+- The commit contains 13 files: Gmail polling and localhost OAuth implementation, dashboard data-use disclosure/unchecked consent gate, regression tests, feature environment example, policy assessment, user data guide, activity log, and updated integration/handover documentation.
+- PR #102: https://github.com/AvinashBhalla/job-beeper/pull/102. GitHub readback confirms it is **open, draft, unmerged and mergeable**, targeting `v2-live-radar`, with head `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`. Its title/body were updated to describe localhost OAuth + polling and the current policy blockers. It has not been marked ready for review or merged.
+- No GitHub Actions workflow was triggered; the owner's hosted Actions quota remains a cost constraint.
+
 
 ## Exact tunnel after the feature is separately released
 
@@ -56,7 +57,7 @@ Do not open the VM IP in the browser for this OAuth flow. The OAuth callback is 
 
 Before any deployment:
 
-1. The seven modified tracked files and test/doc changes have received a final local diff review; all 34 V2 modules passed after the latest code edits. The changes remain uncommitted. Commit/push the reviewed branch and verify PR #102's exact head only after the owner's separate approval. Do not trigger paid GitHub Actions.
+1. The reviewed feature branch is committed and pushed at `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`; remote/local heads matched and the working tree was clean. PR #102 remains draft/open/unmerged. Do not mark it ready or merge until the policy and release gates are resolved. No paid GitHub Actions run was triggered.
 2. Resolve Google's `gmail.readonly` Restricted-scope permitted-use-case, Limited Use/data-transfer, and server-side security-assessment applicability. The personal-use OAuth verification exception must not be represented as a blanket security-assessment waiver.
 3. Agree on the exact deployment target and blast radius. The only live app currently identified is production `v2-radar-1` on port 8000; replacing it affects the existing JobBeeper service. The port-8002 feature Compose file is unsuitable. No isolated single-user deployment config has been prepared or validated yet.
 4. Immediately before an approved release, take a fresh SQLite online backup from the live `v2_radar-data` database while the service is running. Record path, byte size, SHA-256, `PRAGMA integrity_check`, and key table counts. Do not use the 18 November release-bundle snapshot as the pre-deploy backup.
@@ -69,7 +70,7 @@ Before any deployment:
 
 - No `docker compose build`, `docker compose up`, `docker compose down`, container restart, or image replacement.
 - No DB migration, DB write, backup creation, or volume operation.
-- No commit, push, PR merge, or paid CI run.
+- No PR merge, mark-ready transition, or paid CI run. The feature branch commit/push was completed at `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1`.
 - No Gmail OAuth client/consent configuration, Gmail authorization, token storage, mailbox read, or live poller activation.
 - No Pub/Sub, service account, billing, domain, DNS, certificate, Nginx, or public endpoint changes.
 - No Telegram send or change to existing notification credentials/routing.
@@ -98,4 +99,11 @@ Before any deployment:
 
 ## Next safe action
 
-Resolve the Google Restricted-scope permitted-use-case, Limited Use/data-transfer and server-side security-assessment applicability, then decide whether to approve a branch commit/push and the separate production deployment process. Before any production release, take a fresh SQLite online backup and revalidate the release/rollback plan. Do not continue automatically into production deployment.
+Obtain Google's determination on whether this job-alert-to-job-discovery use case is an approved Gmail-scope use and whether CASA/security assessment applies to the VM-hosted Restricted-scope backend. Resolve derived-data retention, durable consent, public privacy-policy/help and Limited Use requirements. Only then proceed to controlled live-mailbox acceptance under separate approval. Production deployment remains a distinct approval; before any release, take a fresh SQLite online backup and revalidate the release/rollback plan. Do not continue automatically into production deployment.
+
+## Feature branch publication — 22 November 2026
+
+- Committed the reviewed feature work as `62989e8e2bbfc7c5642ee1a8ce724eb04c00a3e1` and pushed `feat/google-alerts-gmail-ingestion` to `origin` successfully.
+- Verified remote branch SHA equals local `HEAD`.
+- Updated PR #102 title and description to reflect localhost OAuth, default polling, updated test results, and outstanding policy/consent/privacy gates. GitHub confirms the PR is still open, draft, unmerged and mergeable.
+- No GitHub Actions run was triggered. No merge, production deployment, OAuth grant, live mailbox request, Pub/Sub, database write or Telegram send occurred.
