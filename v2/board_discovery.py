@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import requests
 from bs4 import BeautifulSoup
 
-from v2 import recruitee
+from v2 import public_job_boards, recruitee
 
 USER_AGENT = "JobBeeper-BoardDiscovery/1.0 (+public-careers-discovery)"
 MAX_HTML_BYTES = 1_500_000
@@ -58,6 +58,7 @@ COLLECTOR_SOURCES = {
     "keka": "keka",
     "darwinbox": "darwinbox",
     "recruitee": "recruitee",
+    **{source: source for source in public_job_boards.LABELS},
 }
 
 
@@ -171,6 +172,14 @@ def detect_ats_board(value: str) -> dict[str, Any] | None:
                 "collector_available": True,
             }
         url = _normalise_candidate_url(value)
+        public_board = public_job_boards.detect(url)
+        if public_board:
+            return {
+                "provider": public_board.source, "board_key": public_board.key,
+                "display_key": public_board.key, "board_url": public_board.url,
+                "host": public_board.host, "collector_source": public_board.source,
+                "collector_available": True,
+            }
         parsed = urlsplit(url)
         host = (parsed.hostname or "").lower()
         segments = [segment for segment in parsed.path.split("/") if segment]
@@ -263,6 +272,20 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
     if not candidate or candidate["provider"] != provider:
         raise ValueError("Board URL no longer matches its discovered ATS provider.")
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    if provider in public_job_boards.LABELS:
+        public_board = public_job_boards.detect(candidate["board_url"])
+        if not public_board:
+            raise ValueError("Board URL is not supported by this public feed.")
+
+        def get(url, *, accept, **kwargs):
+            return requests.get(url, headers={**headers, "Accept": accept}, timeout=REQUEST_TIMEOUT_SECONDS,
+                                allow_redirects=False, stream=True, **kwargs)
+
+        jobs = public_job_boards.list_jobs(public_board, get, probe=True)
+        return {
+            "provider": provider, "verified": True, "http_status": 200,
+            "jobs_observed": len(jobs), "verification_method": "public_board_endpoint_probe",
+        }
     if provider == "workday":
         tenant = candidate["tenant"]
         site = candidate["site"]

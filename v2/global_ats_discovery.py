@@ -35,12 +35,18 @@ COMMONCRAWL_TIMEOUT_SECONDS = 20
 COMMONCRAWL_CATALOGUE_MAX_BYTES = 1_000_000
 COMMONCRAWL_RESPONSE_MAX_BYTES = 1_500_000
 COMMONCRAWL_MAX_RECORDS = 200
-COMMONCRAWL_PROVIDERS = ("workday", "keka", "darwinbox")
 COMMONCRAWL_DOMAIN = {
     "workday": "myworkdayjobs.com",
     "keka": "keka.com",
     "darwinbox": "darwinbox.in",
+    "recruitee": "recruitee.com",
+    "teamtailor": "teamtailor.com",
+    "breezy": "breezy.hr",
+    "bamboohr": "bamboohr.com",
+    "jobvite": "jobs.jobvite.com",
+    "hireology": "careers.hireology.com",
 }
+COMMONCRAWL_PROVIDERS = tuple(COMMONCRAWL_DOMAIN)
 SITEMAP_USER_AGENT = board_discovery.USER_AGENT
 SITEMAP_MAX_BYTES = 1_500_000
 SITEMAP_ROBOTS_MAX_BYTES = 256_000
@@ -850,7 +856,7 @@ def discover_public_sitemaps(
         career_pages: list[str] = []
         if careers:
             detected = board_discovery.detect_ats_board(careers)
-            if detected and detected.get("provider") in COMMONCRAWL_PROVIDERS:
+            if detected and detected.get("collector_available"):
                 candidates[(detected["provider"], detected["host"], detected["board_key"])] = {
                     "board_url": careers, "discovery_method": "career_link",
                     "source_reference": root_url, "source_captured_at": None,
@@ -902,7 +908,7 @@ def discover_public_sitemaps(
                 except ValueError:
                     continue
                 detected = board_discovery.detect_ats_board(safe_page)
-                if detected and detected.get("provider") in COMMONCRAWL_PROVIDERS:
+                if detected and detected.get("collector_available"):
                     key = (detected["provider"], detected["host"], detected["board_key"])
                     candidates[key] = {
                         "board_url": safe_page, "discovery_method": "sitemap",
@@ -935,7 +941,7 @@ def discover_public_sitemaps(
                 except ValueError:
                     continue
                 detected = board_discovery.detect_ats_board(candidate_url)
-                if not detected or detected.get("provider") not in COMMONCRAWL_PROVIDERS:
+                if not detected or not detected.get("collector_available"):
                     continue
                 key = (detected["provider"], detected["host"], detected["board_key"])
                 candidates[key] = {

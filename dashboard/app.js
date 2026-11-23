@@ -454,7 +454,8 @@
         : 'Not specified'
     );
 
-    let workMode = raw.work_mode || (
+    const workplace = { remote: 'Remote', hybrid: 'Hybrid', on_site: 'On-site' }[raw.source_details?.workplace_type];
+    let workMode = raw.work_mode || workplace || (
       raw.location?.toLowerCase().includes('remote')
         ? 'Remote'
         : raw.location?.toLowerCase().includes('hybrid')
@@ -1554,6 +1555,8 @@
     greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
     smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka',
     darwinbox: 'Darwinbox', recruitee: 'Recruitee', hirebase: 'Hirebase',
+    teamtailor: 'Teamtailor', breezy: 'Breezy HR', bamboohr: 'BambooHR',
+    jobvite: 'Jobvite', hireology: 'Hireology',
   };
 
   function describeSourceStatus(source) {
@@ -1697,11 +1700,6 @@
     const inactive = Number(data.inactive_boards || 0);
     summary.textContent = `${active} active employer boards · ${inactive} inactive history records · up to ${Number(data.max_concurrent_hosts || 0)} concurrent API hosts · one active board per host · ${Number(data.host_min_interval_seconds || 0)}s minimum host spacing. ${boards.length ? 'All due times and outcomes are persisted in SQLite.' : 'No explicitly configured ATS employer boards are currently scheduled.'}`;
 
-    const providerLabels = {
-      greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
-      smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka', darwinbox: 'Darwinbox',
-      recruitee: 'Recruitee',
-    };
     tbody.innerHTML = boards.length ? boards.map(board => {
       const isActive = Boolean(board.is_active);
       const leased = Boolean(board.lease_until);
@@ -1717,7 +1715,7 @@
         ? '<span class="signal-pill signal-warning">PENDING</span>'
         : '<span class="signal-pill signal-success">CLEAR</span>';
       return `<tr>
-        <td><b>${esc(providerLabels[board.source] || board.source)}</b></td>
+        <td><b>${esc(sourceLabels[board.source] || board.source)}</b></td>
         <td>${esc(board.company_name || 'Unknown employer')}</td>
         <td class="meta-mono">${esc(board.board_key)}</td>
         <td class="meta-mono">${esc(board.host_key)}</td>
@@ -2901,19 +2899,7 @@
   function populateSourceFilterOptions(_jobs) {
     const opts = [
       { value: '', label: 'All Sources' },
-      { value: 'linkedin', label: 'LinkedIn' },
-      { value: 'naukri', label: 'Naukri' },
-      { value: 'greenhouse', label: 'Greenhouse' },
-      { value: 'ashby', label: 'Ashby' },
-      { value: 'instahyre', label: 'Instahyre' },
-      { value: 'lever', label: 'Lever' },
-      { value: 'workday', label: 'Workday' },
-      { value: 'smartrecruiters', label: 'SmartRecruiters' },
-      { value: 'workable', label: 'Workable' },
-      { value: 'keka', label: 'Keka' },
-      { value: 'darwinbox', label: 'Darwinbox' },
-      { value: 'recruitee', label: 'Recruitee' },
-      { value: 'hirebase', label: 'Hirebase' },
+      ...Object.entries(sourceLabels).map(([value, label]) => ({ value, label })),
     ];
     if (dropdowns.source) {
       const selected = opts.some(opt => opt.value === state.filters.source) ? state.filters.source : '';

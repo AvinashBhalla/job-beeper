@@ -12,6 +12,11 @@
     "keka": 600,
     "darwinbox": 600,
     "recruitee": 300,
+    "teamtailor": 300,
+    "breezy": 600,
+    "bamboohr": 600,
+    "jobvite": 600,
+    "hireology": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -122,6 +127,11 @@
     "keka": true,
     "darwinbox": true,
     "recruitee": true,
+    "teamtailor": true,
+    "breezy": true,
+    "bamboohr": true,
+    "jobvite": true,
+    "hireology": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -199,5 +209,21 @@
   ],
   "recruitee_boards": [
     {"board": "tether", "company": "Tether"}
+  ],
+  "teamtailor_boards": [
+    {"careers_url": "https://career.teamtailor.com/jobs", "company": "Teamtailor"},
+    {"careers_url": "https://drdoctor.teamtailor.com/jobs", "company": "DrDoctor"}
+  ],
+  "breezy_boards": [
+    {"careers_url": "https://themis-insight.breezy.hr", "company": "Themis Insight"}
+  ],
+  "bamboohr_boards": [
+    {"careers_url": "https://flyio.bamboohr.com/careers", "company": "Fly.io"}
+  ],
+  "jobvite_boards": [
+    {"careers_url": "https://jobs.jobvite.com/aarete/", "company": "AArete"}
+  ],
+  "hireology_boards": [
+    {"careers_url": "https://careers.hireology.com/smartstart", "company": "Smart Start"}
   ]
 }

@@ -12,6 +12,11 @@
     "keka": 120,
     "darwinbox": 120,
     "recruitee": 300,
+    "teamtailor": 600,
+    "breezy": 600,
+    "bamboohr": 600,
+    "jobvite": 600,
+    "hireology": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -122,6 +127,11 @@
     "keka": false,
     "darwinbox": false,
     "recruitee": false,
+    "teamtailor": false,
+    "breezy": false,
+    "bamboohr": false,
+    "jobvite": false,
+    "hireology": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -155,5 +165,10 @@
   "workable_boards": [],
   "keka_boards": [],
   "darwinbox_boards": [],
-  "recruitee_boards": []
+  "recruitee_boards": [],
+  "teamtailor_boards": [],
+  "breezy_boards": [],
+  "bamboohr_boards": [],
+  "jobvite_boards": [],
+  "hireology_boards": []
 }

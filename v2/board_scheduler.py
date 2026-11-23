@@ -13,7 +13,7 @@ import sqlite3
 from typing import Any
 from urllib.parse import urlsplit
 
-from v2 import board_discovery
+from v2 import board_discovery, public_job_boards
 from v2.recruitee import BOARD_NAME as RECRUITEE_BOARD_NAME
 from v2.sqlite_store import DB_LOCK, connect
 
@@ -28,6 +28,7 @@ BOARD_CONFIG_KEYS = {
     "keka": "keka_boards",
     "darwinbox": "darwinbox_boards",
     "recruitee": "recruitee_boards",
+    **{source: f"{source}_boards" for source in public_job_boards.LABELS},
 }
 BOARD_SCHEDULER_MAX_CONCURRENT_HOSTS = 3
 BOARD_HOST_MIN_INTERVAL_SECONDS = 5
@@ -57,6 +58,9 @@ def _workday_identity(url: str) -> tuple[str, str] | None:
 
 def _identity(source: str, board: dict[str, Any]) -> tuple[str, str] | None:
     """Return stable board key + host budget key for one allowlisted config entry."""
+    if source in public_job_boards.LABELS:
+        detected = public_job_boards.detect(board.get("careers_url"))
+        return (detected.key, detected.host) if detected and detected.source == source else None
     if source == "greenhouse":
         key = str(board.get("token") or "").strip().lower()
         return (key, "boards-api.greenhouse.io") if key else None

@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 
 from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, google_alerts_gmail, google_alerts_job_verifier, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
-from v2 import recruitee
+from v2 import public_job_boards, recruitee
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
@@ -99,8 +99,8 @@ HIREBASE_PROVIDER_LIMIT = 4
 HIREBASE_MAX_MONTHLY_JOBS = 400
 HIREBASE_MAX_DAILY_JOBS = 12
 HIREBASE_PROVIDER_DAILY_JOBS = 4
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "recruitee", "hirebase"})
-INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "recruitee", "hirebase"})
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "recruitee", "hirebase", *public_job_boards.LABELS})
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "recruitee", "hirebase", *public_job_boards.LABELS})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -616,6 +616,29 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
+    for source, label in public_job_boards.LABELS.items():
+        key = f"{source}_boards"
+        entries = config.get(key, [])
+        if not isinstance(entries, list) or len(entries) > public_job_boards.MAX_BOARDS:
+            raise HTTPException(status_code=422, detail=f"{key} must list at most {public_job_boards.MAX_BOARDS} boards.")
+        normalized = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise HTTPException(status_code=422, detail=f"Each {label} board must be an object.")
+            board = public_job_boards.detect(entry.get("careers_url"))
+            company = entry.get("company")
+            if not board or board.source != source or not isinstance(company, str) or not 1 <= len(company.strip()) <= 120:
+                raise HTTPException(status_code=422, detail=f"Each {label} board requires a public careers URL and company name.")
+            if board.key in normalized:
+                raise HTTPException(status_code=422, detail=f"Duplicate {label} board: {board.key}.")
+            saved = {"careers_url": board.url, "company": company.strip()}
+            registry_id = _optional_registry_id(entry, label)
+            if registry_id is not None:
+                saved["registry_id"] = registry_id
+            normalized[board.key] = saved
+        if source_enabled.get(source) and not normalized:
+            raise HTTPException(status_code=422, detail=f"Add at least one public {label} careers board before enabling {label}.")
+        config[key] = list(normalized.values())
     config["source_enabled"] = {
         "linkedin": bool(source_enabled.get("linkedin", True)),
         "naukri": bool(source_enabled.get("naukri", True)),
@@ -630,6 +653,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "darwinbox": bool(source_enabled.get("darwinbox", False)),
         "recruitee": bool(source_enabled.get("recruitee", False)),
         "hirebase": bool(source_enabled.get("hirebase", False)),
+        **{source: bool(source_enabled.get(source)) for source in public_job_boards.LABELS},
     }
     if config["source_enabled"]["hirebase"] and not hirebase.api_key_configured():
         raise HTTPException(status_code=422, detail="Configure HIREBASE_API_KEY in the isolated server environment before enabling Hirebase.")
@@ -667,6 +691,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "darwinbox": 120,
             "recruitee": 300,
             "hirebase": 86400,
+            **{source: 600 for source in public_job_boards.LABELS},
         }.items()
     }
 
@@ -1571,7 +1596,7 @@ def upsert_jobs(
                        description_format, experience_min_years,
                        experience_max_years, experience_provenance,
                        experience_confidence, title, experience_extraction_version,
-                       source_owner_user_id
+                       source_owner_user_id, location, source_details_json
                    FROM jobs
                    WHERE source=? AND source_job_id=?""",
                 (j["source"], j["source_job_id"]),
@@ -1648,6 +1673,13 @@ def upsert_jobs(
                     posted_at_for_update = None
                     precision_for_update = "unknown"
 
+                public_board_job = j["source"] in public_job_boards.LABELS
+                incoming_location = j.get("location") if public_board_job else None
+                next_precision = existing[4]
+                if precision_for_update == "minute" or (
+                    public_board_job and precision_for_update == "date" and next_precision == "unknown"
+                ):
+                    next_precision = precision_for_update
                 conn.execute("""
                     UPDATE jobs SET
                     last_seen_at=CASE
@@ -1655,7 +1687,7 @@ def upsert_jobs(
                         ELSE last_seen_at
                     END,
                     source_posted_at=COALESCE(?, source_posted_at),
-                    posted_precision=CASE WHEN ?='minute' THEN ? ELSE posted_precision END,
+                    posted_precision=?,
                     description=CASE
                         WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
                         ELSE description
@@ -1675,6 +1707,7 @@ def upsert_jobs(
                         ELSE experience_confidence
                     END,
                     experience_extraction_version=?,
+                    location=COALESCE(?,location),
                     source_details_json=CASE
                         WHEN ? <> '{}' THEN ?
                         ELSE source_details_json
@@ -1684,14 +1717,14 @@ def upsert_jobs(
                 """, (
                     iso(last_seen_at) or j["discovered_at"],
                     iso(last_seen_at) or j["discovered_at"],
-                    posted_at_for_update, precision_for_update,
-                    precision_for_update,
+                    posted_at_for_update, next_precision,
                     incoming_description_format, incoming_description, incoming_description,
                     incoming_description_format, incoming_description, incoming_description_format,
                     j["experience_min_years"], j["experience_max_years"],
                     j["experience_provenance"], j["experience_provenance"],
                     j["experience_confidence"], j["experience_confidence"],
                     EXPERIENCE_EXTRACTION_VERSION,
+                    incoming_location or None,
                     source_details_json, source_details_json,
                     j.get("source_owner_user_id"), existing[0],
                 ))
@@ -1723,11 +1756,6 @@ def upsert_jobs(
                     incoming_description_format if update_description else existing_format
                 )
                 next_posted_at = posted_at_for_update or existing[3]
-                next_precision = (
-                    precision_for_update
-                    if precision_for_update == "minute"
-                    else existing[4]
-                )
                 experience_inputs_changed = (
                     j["experience_min_years"] != existing[7]
                     or j["experience_max_years"] != existing[8]
@@ -1740,6 +1768,10 @@ def upsert_jobs(
                     or next_posted_at != existing[3]
                     or next_precision != existing[4]
                     or experience_inputs_changed
+                    or (public_board_job and (
+                        (incoming_location and incoming_location != existing[14])
+                        or source_details_json != existing[15]
+                    ))
                 )
                 if evaluation_inputs_changed and j.get("source_owner_user_id") is None:
                     _persist_job_evaluation(conn, int(existing[0]), config)
@@ -3955,6 +3987,9 @@ def alertability_details(job: dict[str, Any], details: dict[str, Any], config: d
 
     if not config.get("notifications_enabled", True):
         return {"alertable": False, "reasons": ["Telegram notifications disabled"]}
+
+    if job.get("source") in public_job_boards.LABELS and not job.get("description"):
+        return {"alertable": False, "reasons": ["waiting for the employer job description"]}
 
     # Unknown experience is neutral for profile matching. Explicit incompatible
     # experience is already rejected by match_details(); do not add a hidden
@@ -7061,6 +7096,82 @@ def recruitee_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def _hydrate_public_postings(board, postings, get) -> None:
+    prefix = f"{board.source}:{board.key}:"
+    with connect_sqlite(DB_PATH) as conn:
+        existing = {
+            row[0][len(prefix):]: row[1:]
+            for row in conn.execute(
+                """SELECT source_job_id, description, location, source_details_json
+                   FROM jobs WHERE source=? AND source_job_id>=? AND source_job_id<?""",
+                (board.source, prefix, prefix + "~"),
+            )
+        }
+
+    pending = []
+    for job in postings:
+        description, location, details_json = existing.get(job.id, ("", "", "{}"))
+        stored_details = json.loads(details_json or "{}")
+        job.details = {**stored_details, **{key: value for key, value in job.details.items() if value}}
+        if description:
+            job.description = description
+            if not job.locations and location:
+                job.locations = [location]
+        else:
+            pending.append(job)
+
+    pending.sort(key=lambda job: (job.id in existing, job.details.get("detail_attempted_at", "")))
+    for job in pending[:public_job_boards.DETAILS_PER_POLL]:
+        job.details["detail_attempted_at"] = iso(now())
+        try:
+            public_job_boards.hydrate(board, job, get)
+        except (requests.RequestException, ValueError) as exc:
+            log.info("public career detail: source=%s board=%s error_type=%s", board.source, board.key, type(exc).__name__)
+            if getattr(getattr(exc, "response", None), "status_code", None) == 429:
+                break
+
+
+def public_job_board_collect(source: str, config: dict[str, Any]) -> list[dict[str, Any]]:
+    jobs = []
+    succeeded = 0
+
+    def get(url, *, accept, **kwargs):
+        response = _tracked_source_get(
+            source, url, headers={**UA, "Accept": accept}, timeout=10,
+            allow_redirects=False, stream=True, **kwargs,
+        )
+        if response.status_code == 429:
+            _set_source_rate_limit(source, response)
+        return response
+
+    for entry in config.get(f"{source}_boards", []):
+        board = public_job_boards.detect(entry.get("careers_url"))
+        if not board or board.source != source:
+            continue
+        try:
+            postings = public_job_boards.list_jobs(board, get)
+            if source != "teamtailor":
+                _hydrate_public_postings(board, postings, get)
+        except Exception as exc:
+            _record_source_board(source, False)
+            log.warning("public career board: source=%s board=%s error_type=%s", source, board.key, type(exc).__name__)
+            continue
+        succeeded += 1
+        _record_source_board(source, True)
+        for posting in postings:
+            jobs.append(normalize_job(
+                source, f"{source}:{board.key}:{posting.id}", entry["company"], posting.title,
+                " / ".join(posting.locations), posting.url, posting.published_at, posting.precision,
+                posting.description, source_details={
+                    **posting.details,
+                    "board_key": board.key, "board_registry_id": entry.get("registry_id"),
+                },
+            ))
+    if not succeeded:
+        raise RuntimeError(f"No {public_job_boards.LABELS[source]} public career board could be fetched.")
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -7076,6 +7187,8 @@ COLLECTORS = {
     "recruitee": recruitee_collect,
     "hirebase": hirebase_collect,
 }
+for _public_source in public_job_boards.LABELS:
+    COLLECTORS[_public_source] = lambda config, source=_public_source: public_job_board_collect(source, config)
 SOURCE_NAMES = tuple(COLLECTORS)
 
 
@@ -7627,6 +7740,8 @@ async def startup() -> None:
     restore_source_rate_limit_state("keka")
     restore_source_rate_limit_state("darwinbox")
     restore_source_rate_limit_state("hirebase")
+    for source in public_job_boards.LABELS:
+        restore_source_rate_limit_state(source)
     ensure_runtime_config()
     config = get_config()
     refresh_job_evaluations(config)
@@ -8506,7 +8621,7 @@ GLOBAL_DISCOVERY_METHODS = frozenset({
 })
 GLOBAL_DISCOVERY_PROVIDERS = frozenset({
     "workday", "keka", "darwinbox", "greenhouse", "ashby", "lever",
-    "smartrecruiters", "workable", "recruitee",
+    "smartrecruiters", "workable", "recruitee", *public_job_boards.LABELS,
 })
 
 
@@ -8527,6 +8642,12 @@ def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
         raise ValueError("Candidate URL must be HTTPS without credentials, a custom port, query or fragment.")
     host = parsed.hostname.lower().rstrip(".")
     segments = [segment for segment in parsed.path.split("/") if segment]
+    public_board = public_job_boards.detect(value)
+    if public_board:
+        return {
+            "provider": public_board.source, "board_key": public_board.key,
+            "board_url": public_board.url, "candidate_host": public_board.host,
+        }
 
     if re.fullmatch(r"[a-z0-9-]{1,80}\.wd[0-9]{1,3}\.myworkdayjobs\.com", host):
         if segments and re.fullmatch(r"[a-z]{2}-[A-Z]{2}", segments[0]):
@@ -9577,6 +9698,9 @@ def activate_discovered_board(board_id: int):
     elif provider == "darwinbox":
         config_key = "darwinbox_boards"
         registry_entry = {"careers_url": board["board_url"], "company": company}
+    elif provider in public_job_boards.LABELS:
+        config_key = board_scheduler.BOARD_CONFIG_KEYS[provider]
+        registry_entry = {"careers_url": board["board_url"], "company": company}
     else:
         raise HTTPException(status_code=409, detail="This board provider has no activation mapping.")
 
@@ -9603,7 +9727,7 @@ def activate_discovered_board(board_id: int):
         if provider == "workday":
             parsed = _parse_workday_board_url(item.get("url"))
             return bool(parsed and f"{parsed['tenant']}:{parsed['site']}".lower() == key.lower())
-        if provider in {"keka", "darwinbox"}:
+        if provider in {"keka", "darwinbox", *public_job_boards.LABELS}:
             value = item.get("careers_url") or item.get("url")
             detected = board_discovery.detect_ats_board(value) if isinstance(value, str) else None
             return bool(detected and detected.get("provider") == provider and str(detected.get("board_key", "")).lower() == key.lower())
@@ -9670,17 +9794,7 @@ def deactivate_discovered_board(board_id: int):
         raise HTTPException(status_code=409, detail="Only an active board can be disabled.")
 
     source = str(board["collector_source"] or "")
-    config_key = {
-        "greenhouse": "greenhouse_boards",
-        "ashby": "ashby_boards",
-        "lever": "lever_boards",
-        "workday": "workday_boards",
-        "smartrecruiters": "smartrecruiters_boards",
-        "workable": "workable_boards",
-        "recruitee": "recruitee_boards",
-        "keka": "keka_boards",
-        "darwinbox": "darwinbox_boards",
-    }.get(str(board["provider"]))
+    config_key = board_scheduler.BOARD_CONFIG_KEYS.get(str(board["provider"]))
     if not source or not config_key:
         raise HTTPException(status_code=409, detail="This board has no supported collector configuration.")
     if source_state.get(source, {}).get("running"):
