@@ -28,6 +28,7 @@ LABELS = {
     "hrsmart": "HRsmart",
     "ukg": "UKG Pro / UltiPro",
     "phenom": "Phenom People",
+    "zoho": "Zoho Recruit",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 PHENOM_PATHS = {
@@ -41,6 +42,7 @@ HOST_LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
 TENANT = r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}"
 UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
 ORACLE_API = "/hcmRestApi/resources/latest/recruitingCEJobRequisition"
+ZOHO_OPENINGS = "/recruit/v2/public/Job_Openings"
 TEAMTAILOR_NS = "{https://teamtailor.com/locations}"
 WORKPLACE = {
     "remote": "remote", "fully_remote": "remote", "hybrid": "hybrid",
@@ -144,6 +146,11 @@ def detect(value: str) -> Board | None:
         prefix = PHENOM_PATHS[host]
         if re.fullmatch(rf"{prefix}/(?:search-results|job/{TENANT}(?:/[^/]+)?)", path):
             return Board("phenom", host, origin + prefix + "/search-results", host)
+    if re.fullmatch(rf"{HOST_LABEL}\.zohorecruit\.(?:com|eu|in)", host):
+        match = re.fullmatch(rf"/jobs/({TENANT})(?:/\d{{1,30}}(?:/[^/]+)?)?", path)
+        if match:
+            page = match[1]
+            return Board("zoho", f"{host}:{page.lower()}", f"{origin}/jobs/{page}", host, page)
     return None
 
 
@@ -689,6 +696,44 @@ def _phenom(board: Board, get, *, probe: bool) -> list[Posting]:
     return jobs
 
 
+def _zoho_rows(board: Board, get, job_id: str = "") -> list:
+    endpoint = f"https://{board.host}{ZOHO_OPENINGS}"
+    if job_id:
+        endpoint += f"/{job_id}"
+    data = json.loads(_read(get, endpoint, "application/json", params={"pagename": board.tenant}))
+    rows = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("Zoho Recruit did not return public job openings for this career page.")
+    return rows
+
+
+def _zoho_metadata(job: Posting, item: dict) -> None:
+    location = _location(*(_text(item.get(key)) for key in ("City", "State", "Country")))
+    if location:
+        job.locations = [location]
+    job.details.update({key: value for key, value in {
+        "employment_type": _text(item.get("Job_Type")),
+        "department": _text(item.get("Team")),
+        "minimum_experience": _text(item.get("Work_Experience")),
+        "workplace_type": "remote" if _text(item.get("Remote_Job")).lower() == "yes" else None,
+    }.items() if value})
+
+
+def _zoho(board: Board, get) -> list[Posting]:
+    jobs = []
+    for item in _zoho_rows(board, get):
+        if not isinstance(item, dict) or item.get("Publish") is False:
+            continue
+        job_id = _text(item.get("id"))
+        title = _text(item.get("Posting_Title")) or _text(item.get("Job_Opening_Name"))
+        if not re.fullmatch(r"\d{1,30}", job_id) or not title:
+            continue
+        job = Posting(job_id, title, f"{board.url}/{job_id}")
+        _zoho_metadata(job, item)
+        jobs.append(job)
+    return jobs
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -716,6 +761,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _ukg(board, get, probe=probe)
     elif board.source == "phenom":
         jobs = _phenom(board, get, probe=probe)
+    elif board.source == "zoho":
+        jobs = _zoho(board, get)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -737,6 +784,17 @@ def _structured_items(node):
 
 
 def hydrate(board: Board, job: Posting, get) -> None:
+    if board.source == "zoho":
+        rows = _zoho_rows(board, get, job.id)
+        item = next((row for row in rows if isinstance(row, dict) and _text(row.get("id")) == job.id), None)
+        if not item or item.get("Publish") is False:
+            raise ValueError("Zoho Recruit did not return the expected public opening.")
+        _zoho_metadata(job, item)
+        job.description = _description(item.get("Job_Description"))
+        opened = _text(item.get("Date_Opened"))
+        if opened:
+            job.details["date_opened"] = opened
+        return
     if board.source == "bamboohr":
         data = json.loads(_read(get, job.url + "/detail", "application/json"))
         result = data.get("result") if isinstance(data, dict) else None

@@ -27,6 +27,7 @@
     "hrsmart": 900,
     "ukg": 900,
     "phenom": 900,
+    "zoho": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -152,6 +153,7 @@
     "hrsmart": false,
     "ukg": false,
     "phenom": false,
+    "zoho": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -200,5 +202,6 @@
   "cutshort_boards": [],
   "hrsmart_boards": [],
   "ukg_boards": [],
-  "phenom_boards": []
+  "phenom_boards": [],
+  "zoho_boards": []
 }

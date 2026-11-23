@@ -27,6 +27,7 @@
     "hrsmart": 900,
     "ukg": 900,
     "phenom": 900,
+    "zoho": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -152,6 +153,7 @@
     "hrsmart": true,
     "ukg": true,
     "phenom": true,
+    "zoho": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -275,5 +277,9 @@
   ],
   "phenom_boards": [
     {"careers_url": "https://www.careers.philips.com/global/en/search-results", "company": "Philips"}
+  ],
+  "zoho_boards": [
+    {"careers_url": "https://madiffpl.zohorecruit.com/jobs/careers", "company": "MADIFF Polska"},
+    {"careers_url": "https://exoscale.zohorecruit.com/jobs/Careers", "company": "Exoscale"}
   ]
 }

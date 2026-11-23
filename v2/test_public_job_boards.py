@@ -179,6 +179,31 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(job.details["workplace_type"], "hybrid")
         self.assertIsNone(public_job_boards.detect("https://unverified.example/global/en/search-results"))
 
+    def test_zoho_preserves_page_name_and_only_keeps_public_job_fields(self):
+        url = "https://sample.zohorecruit.com/jobs/Engineering"
+        board = public_job_boards.detect(url + "/1234/Data-Engineer")
+        listing = {"data": [
+            {"id": "1234", "Posting_Title": "Data Engineer", "Publish": True, "City": "Pune",
+             "Country": "India", "$url": "https://unexpected.example/"},
+            {"id": "9999", "Posting_Title": "Draft", "Publish": False},
+        ]}
+        detail = {"data": [{
+            "id": "1234", "Posting_Title": "Data Engineer", "Publish": True,
+            "Date_Opened": "2026-11-18", "Job_Description": "<p>Three years with Python.</p>",
+            "Remote_Job": "Yes", "Assigned_Recruiter": {"email": "recruiter@example.invalid"},
+        }]}
+        with patch.object(requests, "get", side_effect=[response(listing), response(detail)]) as get:
+            job, = public_job_boards.list_jobs(board, get)
+            self.assertEqual(get.call_args.kwargs["params"], {"pagename": "Engineering"})
+            public_job_boards.hydrate(board, job, get)
+        self.assertEqual(job.url, url + "/1234")
+        self.assertEqual(job.locations, ["Pune, India"])
+        self.assertEqual(job.description, "Three years with Python.")
+        self.assertEqual(job.details["workplace_type"], "remote")
+        self.assertEqual(job.details["date_opened"], "2026-11-18")
+        self.assertIsNone(job.published_at)
+        self.assertNotIn("recruiter@", str(job))
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [
