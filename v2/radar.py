@@ -3021,7 +3021,7 @@ def _tracked_source_post(
     allow_redirects: bool = True,
     stream: bool = False,
     session: requests.Session | None = None,
-    form_data: dict[str, str] | None = None,
+    form_data: dict[str, str] | list[tuple[str, str]] | None = None,
 ) -> requests.Response:
     """Record safe request metadata for API and public search-form requests."""
     started_monotonic = time.monotonic()

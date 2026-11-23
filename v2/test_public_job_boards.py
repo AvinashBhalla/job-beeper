@@ -204,6 +204,32 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertIsNone(job.published_at)
         self.assertNotIn("recruiter@", str(job))
 
+    def test_taleo_replays_the_anonymous_listing_and_detail_with_the_session(self):
+        board = public_job_boards.detect("https://example.taleo.net/careersection/100/jobdetail.ftl?job=1234")
+        form = ('<form id="ftlform"><input name="ftlpageid" type="hidden" value="public-page">'
+                '<input name="csrftoken" type="hidden" value="anonymous-form-state"></form>')
+        listing = "Ignored!$!requisitionListInterface!|!validateTimeZoneId!$!" + "!|!".join([
+            "1234", "Software Engineer", "1234", "Software Engineer", *["1234"] * 5,
+            "", "Nov 22, 2026", "REQ-42",
+        ])
+        description = "!*!%3Cp%3ELocation%3A Chicago, Illinois%3C/p%3E%3Cp%3EBuild with Python.%3C/p%3E"
+        detail = "Ignored!$!requisitionDescriptionInterface!|!validateTimeZoneId!$!" + "!|!".join([
+            "Software Engineer", description, description,
+        ])
+        with patch.object(requests, "get", side_effect=[
+            response(form), response(listing), response(form), response(detail),
+        ]) as get:
+            job, = public_job_boards.list_jobs(board, get)
+            landing, search = get.call_args_list[:2]
+            self.assertIs(landing.kwargs["session"], search.kwargs["session"])
+            self.assertEqual(search.args[0], "https://example.taleo.net/careersection/100/jobsearch.ajax")
+            public_job_boards.hydrate(board, job, get)
+        self.assertEqual(job.url, "https://example.taleo.net/careersection/100/jobdetail.ftl?job=1234")
+        self.assertEqual(job.precision, "date")
+        self.assertEqual(job.locations, ["Chicago, Illinois"])
+        self.assertEqual(job.description.count("Build with Python."), 1)
+        self.assertEqual(job.details, {"requisition_number": "REQ-42"})
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [

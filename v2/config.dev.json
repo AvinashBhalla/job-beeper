@@ -28,6 +28,7 @@
     "ukg": 900,
     "phenom": 900,
     "zoho": 600,
+    "taleo": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -154,6 +155,7 @@
     "ukg": true,
     "phenom": true,
     "zoho": true,
+    "taleo": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -281,5 +283,8 @@
   "zoho_boards": [
     {"careers_url": "https://madiffpl.zohorecruit.com/jobs/careers", "company": "MADIFF Polska"},
     {"careers_url": "https://exoscale.zohorecruit.com/jobs/Careers", "company": "Exoscale"}
+  ],
+  "taleo_boards": [
+    {"careers_url": "https://chicago.taleo.net/careersection/100/jobsearch.ftl", "company": "City of Chicago"}
   ]
 }

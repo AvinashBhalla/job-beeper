@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from urllib.parse import parse_qs, urljoin, urlsplit
+from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -29,6 +29,7 @@ LABELS = {
     "ukg": "UKG Pro / UltiPro",
     "phenom": "Phenom People",
     "zoho": "Zoho Recruit",
+    "taleo": "Oracle Taleo",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 PHENOM_PATHS = {
@@ -151,6 +152,12 @@ def detect(value: str) -> Board | None:
         if match:
             page = match[1]
             return Board("zoho", f"{host}:{page.lower()}", f"{origin}/jobs/{page}", host, page)
+    if re.fullmatch(rf"{HOST_LABEL}\.taleo\.net", host):
+        match = re.fullmatch(rf"/careersection/({TENANT})(?:/(?:jobsearch|joblist|jobdetail|moresearch|default)\.ftl)?", path)
+        if match:
+            section = match[1]
+            return Board("taleo", f"{host}:{section.lower()}",
+                         f"{origin}/careersection/{section}/jobsearch.ftl", host, section)
     return None
 
 
@@ -734,6 +741,86 @@ def _zoho(board: Board, get) -> list[Posting]:
     return jobs
 
 
+def _taleo_fields(url: str, interface: str, get) -> list[str]:
+    # Fetch a new anonymous form and submit the same read action as the public page.
+    with requests.Session() as session:
+        page = BeautifulSoup(bytes(_read(get, url, "text/html", session=session)), "html.parser")
+        form = page.select_one("form#ftlform")
+        if not form:
+            raise ValueError("Taleo did not return its public career search form.")
+        hidden = [(item["name"], item.get("value", "")) for item in form.select('input[type="hidden"][name]')]
+        state = dict(hidden)
+        if not state.get("ftlpageid") or not state.get("csrftoken"):
+            raise ValueError("Taleo did not return the anonymous career form state.")
+        action = [
+            ("ftlpageid", state["ftlpageid"]),
+            ("ftlinterfaceid", interface),
+            ("ftlcompid", "validateTimeZoneId"),
+            ("jsfCmdId", "validateTimeZoneId"),
+            ("ftlcompclass", "InitTimeZoneAction"),
+            ("ftlcallback", "requisition_restoreDatesValues"),
+            ("ftlajaxid", "ftlx1"),
+            ("tz", "GMT+00:00"),
+            ("tzname", "UTC"),
+        ]
+        session.headers.update({"Referer": url, "X-Requested-With": "XMLHttpRequest"})
+        endpoint = url.split("?", 1)[0].removesuffix(".ftl") + ".ajax"
+        response = _read(get, endpoint, "text/html", session=session, form_data=action + hidden)
+    parts = response.decode("utf-8").split("!$!", 3)
+    if len(parts) < 3 or parts[1] != interface + "!|!validateTimeZoneId":
+        raise ValueError("Taleo returned an unexpected public career response.")
+    return [unquote(field) for field in parts[2].split("!|!")]
+
+
+def _taleo(board: Board, get) -> list[Posting]:
+    fields = _taleo_fields(board.url, "requisitionListInterface", get)
+    jobs = []
+    root = board.url.removesuffix("jobsearch.ftl")
+    # The classic listing sends the job ID for several row actions and repeats the title.
+    for index in range(len(fields) - 11):
+        job_id, title = fields[index:index + 2]
+        if not re.fullmatch(r"\d{1,18}", job_id) or not title or title.isdecimal():
+            continue
+        if fields[index + 2:index + 9] != [job_id, title, *[job_id] * 5]:
+            continue
+        published, precision = None, "unknown"
+        try:
+            published = datetime.strptime(fields[index + 10], "%b %d, %Y").replace(tzinfo=timezone.utc)
+            precision = "date"
+        except ValueError:
+            pass
+        jobs.append(Posting(
+            job_id, title, f"{root}jobdetail.ftl?job={job_id}", published_at=published, precision=precision,
+            details={"requisition_number": fields[index + 11]},
+        ))
+    if not jobs and "No jobs available" not in fields and "No jobs found" not in fields:
+        raise ValueError("Taleo returned no recognizable public requisitions in this layout.")
+    return jobs
+
+
+def _taleo_detail(job: Posting, get) -> None:
+    fields = _taleo_fields(job.url, "requisitionDescriptionInterface", get)
+    if job.title not in fields:
+        raise ValueError("Taleo did not return the expected requisition title.")
+    snippets = dict.fromkeys(
+        field.removeprefix("!*!")
+        for field in fields if field.startswith("!*!") and "<" in field
+    )
+    documents = [BeautifulSoup(value, "html.parser") for value in snippets]
+    job.description = "\n\n".join(document.get_text("\n", strip=True) for document in documents).replace(r"\:", ":")
+    for document in documents:
+        label = document.find(string=re.compile(r"^\s*location\\?:", re.I))
+        if label is None:
+            continue
+        line = label.find_parent(["p", "div", "li"])
+        text = line.get_text(" ", strip=True) if line else str(label).strip()
+        location = re.fullmatch(r"location:\s*(.{3,140})", text.replace(r"\:", ":"), re.I)
+        if location:
+            value = re.sub(r"(\d)\s+(st|nd|rd|th)\b", r"\1\2", location.group(1))
+            job.locations = [value.strip()]
+            break
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -763,6 +850,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _phenom(board, get, probe=probe)
     elif board.source == "zoho":
         jobs = _zoho(board, get)
+    elif board.source == "taleo":
+        jobs = _taleo(board, get)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -784,6 +873,9 @@ def _structured_items(node):
 
 
 def hydrate(board: Board, job: Posting, get) -> None:
+    if board.source == "taleo":
+        _taleo_detail(job, get)
+        return
     if board.source == "zoho":
         rows = _zoho_rows(board, get, job.id)
         item = next((row for row in rows if isinstance(row, dict) and _text(row.get("id")) == job.id), None)

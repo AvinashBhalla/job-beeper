@@ -28,6 +28,7 @@
     "ukg": 900,
     "phenom": 900,
     "zoho": 600,
+    "taleo": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -154,6 +155,7 @@
     "ukg": false,
     "phenom": false,
     "zoho": false,
+    "taleo": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -203,5 +205,6 @@
   "hrsmart_boards": [],
   "ukg_boards": [],
   "phenom_boards": [],
-  "zoho_boards": []
+  "zoho_boards": [],
+  "taleo_boards": []
 }
