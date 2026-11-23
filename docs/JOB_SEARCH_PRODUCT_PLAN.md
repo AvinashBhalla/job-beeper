@@ -41,9 +41,9 @@ Track parity with all 36 sources from the reference product's Delivery schedule.
 
 | Status as of 23 November 2026 | Providers |
 | --- | --- |
-| Eight live on the development VM | Ashby, Darwinbox, Greenhouse, Keka, Lever, Recruitee, SmartRecruiters, Workable. Six also have successful recent production polls. Recruitee has a separate release observation window. |
-| Four with existing adapters that need separate acceptance | LinkedIn, Naukri, Instahyre, Workday. LinkedIn is intermittently live in production. The Naukri publisher is paused, and Workday returned repeated 429s. Instahyre is disabled in the compared environments. |
-| 24 remaining parity targets | Avature, BambooHR, Breezy HR, Cutshort, Eightfold AI, Freshteam, Hireology, Hirist, HRsmart, iCIMS, Jibe (iCIMS), Jobvite, Oracle Cloud Recruiting, Paycom, PeopleStrong, Phenom People, Rippling ATS, SAP SuccessFactors, Oracle Taleo, Teamtailor, UKG Pro / UltiPro, Wellfound, Y Combinator, Zoho Recruit. Some have board detection and still need a fetching path and live acceptance. |
+| 24 with successful development polls | Ashby, Avature, BambooHR, Breezy HR, Cutshort, Darwinbox, Freshteam, Greenhouse, Hireology, HRsmart, iCIMS, Instahyre, Jobvite, Keka, Lever, Oracle Cloud Recruiting, Phenom People, Recruitee, Rippling ATS, SmartRecruiters, Teamtailor, UKG Pro / UltiPro, Workable, Y Combinator. Six of the original cohort also had successful recent production polls. New cohorts have their own release observation windows. |
+| Three existing adapters that need separate acceptance | LinkedIn, Naukri, Workday. LinkedIn is intermittently live in production. The Naukri publisher is paused, and Workday returned repeated 429s. |
+| Nine remaining parity targets | Eightfold AI, Hirist, Jibe (iCIMS), Paycom, PeopleStrong, SAP SuccessFactors, Oracle Taleo, Wellfound, Zoho Recruit. |
 | Additional requested coverage | Indeed and Flexiple. Indeed can start with authorized saved-search email intake while partner-feed access is evaluated. Flexiple's own company openings, its syndicated listings, and client opportunities are distinct. For client opportunities, evaluate a permitted integration or user-authorized intake. |
 
 In the production check around 15:00 IST, SmartRecruiters completed 281 of 281 runs and added 54 records over 24 hours. LinkedIn completed 16 of 22 runs, added 90 records, and recorded six HTTP 429 responses. Naukri completed zero of 287 runs, and its relay had no recent snapshot. Preserve the owner's publisher pause until authorized to resume it. Workday recorded 24 rate-limit responses across 24 production runs. Marketplace email timings must be reported separately from direct-board discovery timings.
@@ -56,7 +56,7 @@ The production bot has a linked private chat, with per-user opt-in currently off
 
 Source Health opens with enabled sources, plain-language status, jobs added in the past 24 hours, and last check time in IST. Paused sources and optional tools are collapsed. Use **Configure sources** to open the provider toggles in Preferences, then **Save Preferences**. Use **Employer boards** to find, verify, and activate a public career board. Directory and manifest imports are under **Candidate imports**. **Technical diagnostics** contains board schedules, host limits, and raw run errors. These tools load when opened, and **Refresh status** also refreshes the open tools.
 
-### Recruitee and the next provider
+### Recruitee pilot
 
 Recruitee uses its [documented public formatted XML feed](https://support.recruitee.com/en/articles/8213076-faq-api). The development pilot uses the public Tether board at a five-minute interval. The production default is off. The collector streams a bounded response, uses feed publication timestamps, keeps multiple locations and explicit workplace flags, and uses a stable per-board offer ID. It participates in verification, activation, host cooldowns, and first-snapshot alert suppression.
 
@@ -66,7 +66,37 @@ The next scheduled poll at 16:15 IST again saw 206 postings and inserted zero du
 
 Development revision `d9a2519` applies Jobs Feed filters before pagination. Keep **Last 72 hours** to browse recent postings or select **Any posting date** to include older postings discovered in the current feed window. The 43 focused Linux tests passed. In the browser, Source Health showed Recruitee as healthy. Searching Recruitee for India showed zero postings under **Last 72 hours** and 21 under **Any posting date**. The Delhi QA listing displayed its description, four-year minimum, location, and direct application link.
 
-Teamtailor is a candidate for the next collector. Its [documented RSS example](https://support.teamtailor.com/en/articles/11171756-rss-feed-how-to-guide) returned 16 live items from `career.teamtailor.com/jobs.rss`, with a GUID, publication date, location metadata, and remote status. Only the feed was probed.
+### Expanded public board rollout · 23 November 2026
+
+The following groups ran through the same persistent scheduler and left their first inventory marked for alert suppression. First-poll counts are unique source listings. They can include jobs published before the rollout.
+
+| Development revision | Scheduled boards and first-poll counts | Verification |
+| --- | --- | --- |
+| `64481a4` | Teamtailor and DrDoctor on Teamtailor (16 and 2), Themis Insight on Breezy HR (38), Fly.io on BambooHR (9), AArete on Jobvite (23), and Smart Start on Hireology (2) | 333 Linux tests. All six boards already repeated successfully with zero new rows and zero 429s. Breezy HR and Jobvite each filled 10 more descriptions on the repeat. |
+| `6e884dc` | Bloomberg on Avature (72), Amyx on iCIMS (96), Black Box on Oracle Cloud Recruiting (390), RealWork on Rippling ATS (4), and Y Combinator’s India listing page (28) | 77 Linux tests. All first polls succeeded without rate limiting. |
+| `1f2edad` | Getinz on Freshteam (50) and Cutshort’s software engineering listing (38) | 43 Linux tests. Both first polls succeeded. All 38 Cutshort jobs had descriptions and employer-stated experience bounds. |
+| `d6e0e22` and `adcc9fc` | BC Public Service on HRsmart (25), TVO on UKG Pro (3), and Philips on Phenom People (56) | 112 Linux tests after normalizing timestamp offsets for Python compatibility. The three sources first ran together on `aece006`. |
+| `aece006` | Instahyre’s Bangalore city search (140) | 43 focused Linux tests passed. The first development poll marked the initial city inventory for alert suppression. Instahyre runs as a scheduled city search. |
+
+The new public board path reuses configuration validation, host limits, persistent schedules, baseline suppression, and source-health reporting. The verification and collector use the same public listing source. Employer jobs can be added through **Source Health → Employer boards**. Search for candidates first, verify the public endpoint, then activate the board. Employer site scanning and applicable Common Crawl domains can discover and stage additional boards.
+
+Teamtailor serves a [public RSS feed](https://support.teamtailor.com/en/articles/11171756-rss-feed-how-to-guide). Oracle Cloud’s [public requisition list](https://docs.oracle.com/en/cloud/saas/human-resources/farws/api-recruiting-ce-job-requisitions.html) and [requisition details](https://docs.oracle.com/en/cloud/saas/human-resources/farws/Recruiting__Recruiting_CE_Job_Requisition_Details.html) provide distinct list and detail fields. Where a list omits its full description, the collector fetches up to ten details per board per poll. It prioritizes newly observed jobs and revisits pending ones. The title and reference appear immediately, and Telegram eligibility waits for a description. A field remains unknown until its source supplies a usable value. Date-only postings and jobs lacking a publication timestamp cannot supply minute-level discovery-lag measurements.
+
+The development providers in these groups default to off in production. Each cohort needs repeated live polling, description verification, a genuinely fresh posting for latency measurement, and the Telegram receipt check before promotion.
+
+The browser showed 24 enabled sources and zero needing attention. In **Jobs Feed**, choosing **Cutshort**, **Any posting date**, and searching for **Jaipur** displayed two listings. The KDK Software listing showed Jaipur, an employer-stated range of four to six years, TypeScript among the source skills, its description, and a direct link to the same posting.
+
+At approximately 17:52 IST, the development scheduler had 39 active employer boards, each with a successful latest poll. Instahyre was also healthy on its ten-minute city search. The 16 sources added in these groups had stored 993 distinct source listings, including 992 first-snapshot rows. There were 396 full descriptions at this checkpoint, with remaining details scheduled under the per-poll cap where available. The 44 recorded runs were successful, including 26 runs that added zero rows, with no HTTP 429s. The only listing observed after its baseline had been published more than ten days earlier, so these runs did not provide a fresh discovery-latency sample. The earlier release cohort had accumulated about three hours of its 24-hour observation window. The expanded development bot was still unconfigured.
+
+### Provider data still needed
+
+| Providers | Evidence and integration path |
+| --- | --- |
+| Eightfold AI, Hirist, SAP SuccessFactors, Wellfound | The tested Eightfold listing request and the tested Hirist, SAP, and Wellfound career URLs returned access restrictions. Use a provider-approved feed, an authorized alert, or a verified employer portal with its own public listings. |
+| Jibe (iCIMS), Paycom, PeopleStrong, Zoho Recruit | The checked Jibe and Paycom frontends returned page templates. The tested Zoho career sites did not expose listings through the checked public route. PeopleStrong still needs a live employer feed to validate. Record a source only after it returns real public postings and their direct links. |
+| Oracle Taleo | The Chicago search page returned a template and the RSS path redirected to an unsupported page. Taleo allows employers to enable an RSS feed per career section. A live enabled feed is the next validation input. [Oracle Taleo RSS configuration](https://docs.oracle.com/en/cloud/saas/taleo-enterprise/20d/otcug/social-media.html) |
+| Indeed | Evaluate an approved publisher or partner integration. User-authorized saved-search alerts are a separate intake option. [Indeed publisher documentation](https://docs.indeed.com/indeed-plus/publisher-js-plugin) |
+| Flexiple | The checked public jobs path redirects to the talent page, which describes matching for members. Validate an approved talent opportunity feed or user-authorized alerts. [Flexiple talent page](https://flexiple.com/talent) |
 
 ## After discovery is proven
 
