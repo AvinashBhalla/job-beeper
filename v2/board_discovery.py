@@ -277,9 +277,17 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         if not public_board:
             raise ValueError("Board URL is not supported by this public feed.")
 
-        def get(url, *, accept, **kwargs):
-            return requests.get(url, headers={**headers, "Accept": accept}, timeout=REQUEST_TIMEOUT_SECONDS,
-                                allow_redirects=False, stream=True, **kwargs)
+        def get(url, *, accept, session=None, form_data=None, json_body=None, **kwargs):
+            client = session or requests
+            options = {
+                "headers": {**headers, "Accept": accept}, "timeout": REQUEST_TIMEOUT_SECONDS,
+                "allow_redirects": False, "stream": True, **kwargs,
+            }
+            if form_data is not None:
+                return client.post(url, data=form_data, **options)
+            if json_body is not None:
+                return client.post(url, json=json_body, **options)
+            return client.get(url, **options)
 
         jobs = public_job_boards.list_jobs(public_board, get, probe=True)
         return {

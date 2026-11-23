@@ -2980,11 +2980,13 @@ def _tracked_source_get(
     retry_attempt: bool = False,
     allow_redirects: bool = True,
     stream: bool = False,
+    session: requests.Session | None = None,
 ) -> requests.Response:
     """Record safe request metadata; never persist URLs, query strings or payloads."""
     started_monotonic = time.monotonic()
     try:
-        response = requests.get(
+        client = session or requests
+        response = client.get(
             endpoint, params=params, headers=headers, timeout=timeout,
             allow_redirects=allow_redirects,
             **({"stream": True} if stream else {}),
@@ -3011,17 +3013,22 @@ def _tracked_source_post(
     source: str,
     endpoint: str,
     *,
-    json_body: dict[str, Any],
+    json_body: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = 20,
     allow_redirects: bool = True,
+    stream: bool = False,
+    session: requests.Session | None = None,
+    form_data: dict[str, str] | None = None,
 ) -> requests.Response:
-    """Record safe request metadata for a JSON POST; never persist payloads or URLs."""
+    """Record safe request metadata for API and public search-form requests."""
     started_monotonic = time.monotonic()
     try:
-        response = requests.post(
-            endpoint, json=json_body, headers=headers, timeout=timeout,
-            allow_redirects=allow_redirects,
+        client = session or requests
+        content = {"data": form_data} if form_data is not None else {"json": json_body}
+        response = client.post(
+            endpoint, headers=headers, timeout=timeout, allow_redirects=allow_redirects,
+            **content, **({"stream": True} if stream else {}),
         )
     except Exception:
         _record_source_request(
@@ -7141,11 +7148,12 @@ def public_job_board_collect(source: str, config: dict[str, Any]) -> list[dict[s
     jobs = []
     succeeded = 0
 
-    def get(url, *, accept, **kwargs):
-        response = _tracked_source_get(
-            source, url, headers={**UA, "Accept": accept}, timeout=10,
-            allow_redirects=False, stream=True, **kwargs,
-        )
+    def get(url, *, accept, session=None, form_data=None, json_body=None, **kwargs):
+        options = {"headers": {**UA, "Accept": accept}, "timeout": 10, "allow_redirects": False, "stream": True}
+        if form_data is not None or json_body is not None:
+            response = _tracked_source_post(source, url, json_body=json_body, form_data=form_data, session=session, **options)
+        else:
+            response = _tracked_source_get(source, url, session=session, **options, **kwargs)
         if response.status_code == 429:
             _set_source_rate_limit(source, response)
         return response

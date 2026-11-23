@@ -1560,6 +1560,7 @@
     rippling: 'Rippling ATS', oraclecloud: 'Oracle Cloud Recruiting', avature: 'Avature',
     ycombinator: 'Y Combinator', icims: 'iCIMS',
     freshteam: 'Freshteam', cutshort: 'Cutshort',
+    hrsmart: 'HRsmart', ukg: 'UKG Pro / UltiPro',
   };
 
   function describeSourceStatus(source) {

@@ -21,6 +21,7 @@ RSS = """<rss xmlns:tt="https://teamtailor.com/locations"><channel><item>
   <description><![CDATA[<p>2+ years of Python.</p>]]></description><remoteStatus>hybrid</remoteStatus>
   <tt:locations><tt:location><tt:city>Puducherry</tt:city><tt:country>India</tt:country></tt:location></tt:locations>
 </item><item><title>Outside</title><link>https://example.com/jobs/124</link></item></channel></rss>"""
+PUBLIC_DNS_RESULT = [(None, None, None, None, ("1.1.1.1", 443))]
 
 
 class PublicJobBoardTests(unittest.TestCase):
@@ -28,7 +29,9 @@ class PublicJobBoardTests(unittest.TestCase):
         candidate = board_discovery.detect_ats_board("https://drdoctor.teamtailor.com/jobs/123-example?ref=public")
         self.assertEqual(candidate["board_url"], "https://drdoctor.teamtailor.com/jobs")
         self.assertEqual(candidate["collector_source"], "teamtailor")
-        with patch.object(board_discovery.requests, "get", return_value=response(RSS)):
+        with patch.object(board_discovery.socket, "getaddrinfo", return_value=PUBLIC_DNS_RESULT), patch.object(
+            board_discovery.requests, "get", return_value=response(RSS),
+        ):
             self.assertEqual(board_discovery.probe_public_board(candidate)["jobs_observed"], 1)
         config = radar._default_config()
         config["source_enabled"] = {"teamtailor": True}
@@ -125,6 +128,41 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(radar._experience_provenance_details(job), {
             "min_years": 3, "max_years": 5, "provenance": "employer_stated", "confidence": "high",
         })
+
+    def test_hrsmart_submits_only_the_public_search_form_on_the_verified_host(self):
+        board = public_job_boards.detect("https://example.hua.hrsmart.com/hr/ats/Posting/view/15")
+        form = ('<form id="jobSearchForm" action="/hr/ats/JobSearch/search">'
+                '<input type="hidden" name="submittedFormId" value="public-form">'
+                '<input type="text" name="with_all" value="ignored"></form>')
+        results = '<a href="/hr/ats/Posting/view/15?ref=example">Analyst</a>'
+        with patch.object(board_discovery.socket, "getaddrinfo", return_value=PUBLIC_DNS_RESULT), patch.object(
+            requests.Session, "get", return_value=response(form),
+        ), patch.object(
+            requests.Session, "post", return_value=response(results),
+        ) as post:
+            candidate = board_discovery.detect_ats_board(board.url)
+            verified = board_discovery.probe_public_board(candidate)
+        self.assertEqual(verified["jobs_observed"], 1)
+        self.assertEqual(post.call_args.args[0], "https://example.hua.hrsmart.com/hr/ats/JobSearch/search")
+        self.assertEqual(post.call_args.kwargs["data"], {"submittedFormId": "public-form", "with_all": ""})
+        self.assertFalse(post.call_args.kwargs["allow_redirects"])
+
+    def test_ukg_keeps_board_host_posting_timestamp_and_braces_in_description(self):
+        url = "https://recruiting2.ultipro.ca/SAMPLE/JobBoard/5ff80775-069d-4e87-9adc-94455820b5c9"
+        board = public_job_boards.detect(url)
+        job_id = "5cdb53c0-4ac2-42ff-8deb-64c8c4d4f364"
+        listing = {"totalCount": 1, "opportunities": [{
+            "Id": job_id, "Title": "Business Systems Owner", "PostedDate": "2026-11-20T20:21:15.106Z",
+        }]}
+        details = {"Id": job_id, "Description": "<p>Use templates with {variables}.</p>"}
+        html = "<script>new US.Opportunity.CandidateOpportunityDetail(" + json.dumps(details) + ");</script>"
+        with patch.object(requests, "get", side_effect=[response(listing), response(html)]) as get:
+            job, = public_job_boards.list_jobs(board, get)
+            self.assertEqual(get.call_args.kwargs["json_body"]["opportunitySearch"]["Top"], 50)
+            public_job_boards.hydrate(board, job, get)
+        self.assertEqual(job.url, f"{url}/OpportunityDetail?opportunityId={job_id}")
+        self.assertEqual(job.precision, "minute")
+        self.assertEqual(job.description, "Use templates with {variables}.")
 
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")

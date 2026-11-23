@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import parse_qs, urljoin, urlsplit
 
+import requests
 from bs4 import BeautifulSoup
 
 LABELS = {
@@ -24,6 +25,8 @@ LABELS = {
     "icims": "iCIMS",
     "freshteam": "Freshteam",
     "cutshort": "Cutshort",
+    "hrsmart": "HRsmart",
+    "ukg": "UKG Pro / UltiPro",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 MAX_BOARDS = 30
@@ -122,6 +125,16 @@ def detect(value: str) -> Board | None:
         match = re.fullmatch(r"/jobs/([a-z0-9-]{1,100})", path)
         if match:
             return Board("cutshort", match[1], origin + path, host)
+    if re.fullmatch(rf"{HOST_LABEL}(?:\.hua)?\.hrsmart\.com", host) and re.fullmatch(
+        r"/hr/ats/(?:JobSearch/(?:index|search)|Posting/view/\d+)", path,
+    ):
+        return Board("hrsmart", host.removesuffix(".hrsmart.com"), origin + "/hr/ats/JobSearch/index", host)
+    if re.fullmatch(r"recruiting\d*\.ultipro\.(?:com|ca)", host):
+        match = re.fullmatch(rf"/({TENANT})/JobBoard/({UUID})(?:/OpportunityDetail|/OpportunityList)?", path, re.I)
+        if match:
+            tenant, board_id = match.groups()
+            return Board("ukg", f"{tenant.lower()}:{board_id.lower()}",
+                         f"{origin}/{tenant}/JobBoard/{board_id.lower()}", host, tenant)
     return None
 
 
@@ -538,6 +551,86 @@ def _cutshort(board: Board, get) -> list[Posting]:
     return postings
 
 
+def _hrsmart(board: Board, get) -> list[Posting]:
+    with requests.Session() as session:
+        html = _read(get, board.url, "text/html", session=session)
+        page = BeautifulSoup(bytes(html), "html.parser")
+        form = page.select_one('form#jobSearchForm[action="/hr/ats/JobSearch/search"]')
+        if not form:
+            raise ValueError("HRsmart career site did not expose its public search form.")
+        form_data = {
+            item["name"]: item.get("value", "") if item.get("type") == "hidden" else ""
+            for item in form.select('input[name][type="hidden"], input[name][type="text"]')
+        }
+        html = _read(get, f"https://{board.host}/hr/ats/JobSearch/search", "text/html",
+                     session=session, form_data=form_data)
+        results = BeautifulSoup(bytes(html), "html.parser")
+    jobs = []
+    for anchor in results.select('a[href*="/hr/ats/Posting/view/"]'):
+        link = _posting_link(anchor["href"], board, r"/hr/ats/Posting/view/(\d+)")
+        title = anchor.get_text(" ", strip=True)
+        if link and title:
+            jobs.append(Posting(link[0], title, link[1]))
+    if not jobs and not results.select_one('[id*="jobSearch"]'):
+        raise ValueError("HRsmart returned no recognizable job search results.")
+    return jobs
+
+
+def _ukg_locations(item: dict) -> list[str]:
+    places = item.get("Locations")
+    locations = []
+    for place in places if isinstance(places, list) else []:
+        if not isinstance(place, dict):
+            continue
+        address = place.get("Address")
+        address = address if isinstance(address, dict) else {}
+        state, country = address.get("State"), address.get("Country")
+        location = _location(
+            _text(address.get("City")),
+            _text(state.get("Name")) if isinstance(state, dict) else "",
+            _text(country.get("Name")) if isinstance(country, dict) else "",
+        ) or _text(place.get("LocalizedName"))
+        if location and location not in locations:
+            locations.append(location)
+    return locations
+
+
+def _ukg(board: Board, get, *, probe: bool) -> list[Posting]:
+    postings = []
+    page_size = 50
+    for page in range(1 if probe else 6):
+        raw = _read(get, board.url + "/JobBoardView/LoadSearchResults", "application/json", json_body={
+            "opportunitySearch": {
+                "Top": page_size, "Skip": page * page_size, "QueryString": "", "OrderBy": [], "Filters": [],
+            },
+        })
+        listing = json.loads(raw)
+        rows = listing.get("opportunities") if isinstance(listing, dict) else None
+        if not isinstance(rows, list):
+            raise ValueError("UKG did not return its public opportunity list.")
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            job_id = _text(item.get("Id")).lower()
+            title = _text(item.get("Title"))
+            if not re.fullmatch(UUID, job_id) or not title:
+                continue
+            employment = item.get("FullTime")
+            details = {
+                "employment_type": "Full-time" if employment is True else "Part-time" if employment is False else "",
+                "department": _text(item.get("JobCategoryName")),
+            }
+            published, precision = _publication(_text(item.get("PostedDate")))
+            postings.append(Posting(
+                job_id, title, f"{board.url}/OpportunityDetail?opportunityId={job_id}",
+                _ukg_locations(item), published_at=published, precision=precision, details=details,
+            ))
+        total = listing.get("totalCount")
+        if len(rows) < page_size or (isinstance(total, int) and (page + 1) * page_size >= total):
+            break
+    return postings
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -559,6 +652,10 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _freshteam(board, get)
     elif board.source == "cutshort":
         jobs = _cutshort(board, get)
+    elif board.source == "hrsmart":
+        jobs = _hrsmart(board, get)
+    elif board.source == "ukg":
+        jobs = _ukg(board, get, probe=probe)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -624,6 +721,34 @@ def hydrate(board: Board, job: Posting, get) -> None:
         if field:
             job.description = field.get_text("\n", strip=True)
         return
+    if board.source == "hrsmart":
+        field = page.select_one("#job_details_ats_requisition_description")
+        location = page.select_one("#job_details_hua_location_id")
+        employment = page.select_one("#job_details_f_job_type_displayed_on_posting_0")
+        workplace = page.select_one("#job_details_f_work_options_0")
+        if field:
+            job.description = field.get_text("\n", strip=True)
+        if location:
+            job.locations = list(dict.fromkeys(location.stripped_strings))
+        if employment:
+            job.details["employment_type"] = employment.get_text(" ", strip=True)
+        if workplace:
+            mode = workplace.get_text(" ", strip=True).casefold().replace("-", "_").replace(" ", "_")
+            job.details["workplace_type"] = WORKPLACE.get(mode)
+        return
+    if board.source == "ukg":
+        for script in page.select("script"):
+            code = script.get_text()
+            beginning = re.search(r"new US\.Opportunity\.CandidateOpportunityDetail\(\s*(\{)", code)
+            if not beginning:
+                continue
+            item, _ = json.JSONDecoder().raw_decode(code, beginning.start(1))
+            if _text(item.get("Id")).lower() != job.id or item.get("OpportunityIsClosed") is True:
+                raise ValueError("UKG did not return the expected open job.")
+            job.description = _description(item.get("Description"))
+            job.locations = _ukg_locations(item) or job.locations
+            return
+        raise ValueError("UKG did not expose the public opportunity details.")
     for script in page.select('script[type="application/ld+json"]'):
         try:
             item = next(_structured_items(json.loads(script.get_text())), None)

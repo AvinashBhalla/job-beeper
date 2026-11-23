@@ -24,6 +24,8 @@
     "icims": 900,
     "freshteam": 600,
     "cutshort": 600,
+    "hrsmart": 900,
+    "ukg": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -146,6 +148,8 @@
     "icims": true,
     "freshteam": true,
     "cutshort": true,
+    "hrsmart": true,
+    "ukg": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -260,5 +264,11 @@
   ],
   "cutshort_boards": [
     {"careers_url": "https://cutshort.io/jobs/software-engineering-jobs", "company": "Cutshort"}
+  ],
+  "hrsmart_boards": [
+    {"careers_url": "https://bcpublicservice.hua.hrsmart.com/hr/ats/JobSearch/index", "company": "BC Public Service"}
+  ],
+  "ukg_boards": [
+    {"careers_url": "https://recruiting.ultipro.ca/TVO5000TVOO/JobBoard/5ff80775-069d-4e87-9adc-94455820b5c9", "company": "TVO"}
   ]
 }

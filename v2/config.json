@@ -24,6 +24,8 @@
     "icims": 900,
     "freshteam": 600,
     "cutshort": 600,
+    "hrsmart": 900,
+    "ukg": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -146,6 +148,8 @@
     "icims": false,
     "freshteam": false,
     "cutshort": false,
+    "hrsmart": false,
+    "ukg": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -191,5 +195,7 @@
   "ycombinator_boards": [],
   "icims_boards": [],
   "freshteam_boards": [],
-  "cutshort_boards": []
+  "cutshort_boards": [],
+  "hrsmart_boards": [],
+  "ukg_boards": []
 }
