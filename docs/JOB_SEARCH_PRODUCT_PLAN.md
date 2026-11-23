@@ -52,6 +52,10 @@ Promote the additional boards for the six healthy production providers and the n
 
 The production bot has a linked private chat, with per-user opt-in currently off. The ledger has historical per-user LinkedIn sends, plus older legacy LinkedIn and Naukri sends. Production SmartRecruiters already fetches jobs, so an opted-in private account can test a new matching posting without waiting for the expanded-board release. The default development container has no bot, links, or opt-ins. Use a separate bot and explicitly linked private recipient for testing the expanded board set in development. Verify receipt, the source label and apply link, replay the poll, and check that it generates no duplicate alert or first-snapshot backfill.
 
+### Source Health administration
+
+Source Health opens with enabled sources, plain-language status, jobs added in the past 24 hours, and last check time in IST. Paused sources and optional tools are collapsed. Use **Configure sources** to open the provider toggles in Preferences, then **Save Preferences**. Use **Employer boards** to find, verify, and activate a public career board. Directory and manifest imports are under **Candidate imports**. **Technical diagnostics** contains board schedules, host limits, and raw run errors. These tools load when opened, and **Refresh status** also refreshes the open tools.
+
 ## After discovery is proven
 
 | Milestone | User experience |
