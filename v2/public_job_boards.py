@@ -22,7 +22,10 @@ LABELS = {
     "avature": "Avature",
     "ycombinator": "Y Combinator",
     "icims": "iCIMS",
+    "freshteam": "Freshteam",
+    "cutshort": "Cutshort",
 }
+BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 MAX_BOARDS = 30
 DETAILS_PER_POLL = 10
 MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -113,6 +116,12 @@ def detect(value: str) -> Board | None:
         return Board("ycombinator", key, origin + path, host)
     if re.fullmatch(rf"{HOST_LABEL}\.icims\.com", host) and re.fullmatch(r"/jobs(?:/search|/\d+/[^/]+/job)?", path):
         return Board("icims", host.removesuffix(".icims.com"), origin + "/jobs/search", host)
+    if re.fullmatch(rf"{HOST_LABEL}\.freshteam\.com", host) and re.fullmatch(r"/jobs(?:/[-A-Za-z0-9_]{3,50}/[^/]+)?", path):
+        return Board("freshteam", host.removesuffix(".freshteam.com"), origin + "/jobs", host)
+    if host == "cutshort.io":
+        match = re.fullmatch(r"/jobs/([a-z0-9-]{1,100})", path)
+        if match:
+            return Board("cutshort", match[1], origin + path, host)
     return None
 
 
@@ -136,7 +145,7 @@ class _PublicFeedTree(ET.TreeBuilder):
 
 def _publication(value: str, *, rss: bool = False) -> tuple[datetime | None, str]:
     try:
-        stamp = parsedate_to_datetime(value) if rss else datetime.fromisoformat(value)
+        stamp = parsedate_to_datetime(value) if rss else datetime.fromisoformat(re.sub(r" UTC$", "+00:00", value))
     except (ValueError, TypeError, OverflowError):
         return None, "unknown"
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
@@ -347,22 +356,22 @@ def _oracle(board: Board, get, *, probe: bool) -> list[Posting]:
     return jobs
 
 
-def _rippling_page(get, url, **kwargs) -> dict:
+def _next_page(get, url, **kwargs) -> dict:
     page = BeautifulSoup(bytes(_read(get, url, "text/html", **kwargs)), "html.parser")
     script = page.select_one("script#__NEXT_DATA__")
     if script is None:
-        raise ValueError("Rippling page did not contain public board data.")
+        raise ValueError("Career page did not contain public board data.")
     payload = json.loads(script.get_text())
     props = payload.get("props", {}).get("pageProps", {})
     if not isinstance(props, dict):
-        raise ValueError("Rippling page contained an unexpected board format.")
+        raise ValueError("Career page contained an unexpected board format.")
     return props
 
 
 def _rippling(board: Board, get, *, probe: bool) -> list[Posting]:
     jobs = []
     for page in range(1 if probe else 8):
-        props = _rippling_page(get, board.url, params={"page": page} if page else None)
+        props = _next_page(get, board.url, params={"page": page} if page else None)
         queries = props.get("dehydratedState", {}).get("queries", [])
         listing = next((
             query.get("state", {}).get("data") for query in queries
@@ -470,6 +479,65 @@ def _ycombinator(board: Board, get) -> list[Posting]:
     return jobs
 
 
+def _freshteam(board: Board, get) -> list[Posting]:
+    page = BeautifulSoup(bytes(_read(get, board.url, "text/html")), "html.parser")
+    jobs = []
+    for anchor in page.select('a[href*="/jobs/"]'):
+        link = _posting_link(anchor["href"], board, r"/jobs/([-A-Za-z0-9_]{3,50})/[^/]+")
+        heading = anchor.select_one(".job-title")
+        if link and heading:
+            title = heading.get_text(" ", strip=True)
+            if title:
+                jobs.append(Posting(link[0], title, link[1]))
+    if not jobs and not page.select_one('.job-list, [class*="job-listing"]'):
+        raise ValueError("Freshteam returned no recognizable public jobs list.")
+    return jobs
+
+
+def _cutshort(board: Board, get) -> list[Posting]:
+    props = _next_page(get, board.url)
+    queries = props.get("dehydratedState", {}).get("queries", [])
+    listing = next((
+        query.get("state", {}).get("data") for query in queries
+        if query.get("queryKey") == ["jobListData", board.key]
+    ), None)
+    page = listing.get("data", {}).get("pageData", {}) if isinstance(listing, dict) else {}
+    rows = page.get("jobs")
+    if not isinstance(rows, list):
+        raise ValueError("Cutshort returned no public job category data.")
+    postings = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        link = _posting_link(_text(item.get("publicUrl")), board, r"/job/([A-Za-z0-9_-]{2,300})")
+        title = _text(item.get("headline"))
+        job_id = _text(item.get("_id"))
+        company_data = item.get("companyDetails")
+        company = _text(company_data.get("name")) if isinstance(company_data, dict) else ""
+        if not link or not title or not company or not re.fullmatch(r"[0-9a-f]{24}", job_id):
+            continue
+        experience = item.get("expRange")
+        experience = experience if isinstance(experience, dict) else {}
+        low, high = experience.get("min"), experience.get("max")
+        if not (type(low) in {int, float} and type(high) in {int, float} and 0 <= low <= high <= 60):
+            low = high = None
+        locations = item.get("locations")
+        skills = item.get("allSkills")
+        roles = item.get("roleTypes")
+        details = {
+            "workplace_type": {"remote_only": "remote", "remote_not_okay": "on_site", "hybrid": "hybrid"}.get(
+                _text(item.get("remoteType"))
+            ),
+            "employment_type": ", ".join(filter(None, map(_text, roles))) if isinstance(roles, list) else "",
+            "experience_min_years": low, "experience_max_years": high,
+            "key_skills": list(dict.fromkeys(filter(None, map(_text, skills))))[:50] if isinstance(skills, list) else [],
+        }
+        places = list(filter(None, map(_text, locations))) if isinstance(locations, list) else []
+        postings.append(Posting(job_id, title, link[1], places, _description(item.get("sanitizedComment")),
+                                details=details, company=company))
+    return postings
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -487,6 +555,10 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _ycombinator(board, get)
     elif board.source == "icims":
         jobs = _icims(board, get, probe=probe)
+    elif board.source == "freshteam":
+        jobs = _freshteam(board, get)
+    elif board.source == "cutshort":
+        jobs = _cutshort(board, get)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -533,7 +605,7 @@ def hydrate(board: Board, job: Posting, get) -> None:
         job.description = "\n\n".join(dict.fromkeys(filter(None, parts)))
         return
     if board.source == "rippling":
-        data = _rippling_page(get, job.url).get("apiData", {}).get("jobPost", {})
+        data = _next_page(get, job.url).get("apiData", {}).get("jobPost", {})
         if data.get("uuid") != job.id:
             raise ValueError("Rippling detail did not contain the expected public job.")
         description = data.get("description")

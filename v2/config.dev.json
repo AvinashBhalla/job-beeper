@@ -22,6 +22,8 @@
     "avature": 900,
     "ycombinator": 600,
     "icims": 900,
+    "freshteam": 600,
+    "cutshort": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -142,6 +144,8 @@
     "avature": true,
     "ycombinator": true,
     "icims": true,
+    "freshteam": true,
+    "cutshort": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -250,5 +254,11 @@
   ],
   "icims_boards": [
     {"careers_url": "https://careers-amyx.icims.com/jobs/search", "company": "Amyx"}
+  ],
+  "freshteam_boards": [
+    {"careers_url": "https://getinz-people.freshteam.com/jobs", "company": "Getinz"}
+  ],
+  "cutshort_boards": [
+    {"careers_url": "https://cutshort.io/jobs/software-engineering-jobs", "company": "Cutshort"}
   ]
 }

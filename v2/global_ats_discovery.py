@@ -49,6 +49,7 @@ COMMONCRAWL_DOMAIN = {
     "oraclecloud": "oraclecloud.com",
     "avature": "avature.net",
     "icims": "icims.com",
+    "freshteam": "freshteam.com",
 }
 COMMONCRAWL_PROVIDERS = tuple(COMMONCRAWL_DOMAIN)
 SITEMAP_USER_AGENT = board_discovery.USER_AGENT

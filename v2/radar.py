@@ -1602,6 +1602,7 @@ def upsert_jobs(
                 (j["source"], j["source_job_id"]),
             ).fetchone()
             if existing:
+                public_board_job = j["source"] in public_job_boards.LABELS
                 incoming_owner_id = j.get("source_owner_user_id")
                 existing_owner_id = existing[13]
                 if existing_owner_id != incoming_owner_id:
@@ -1618,6 +1619,7 @@ def upsert_jobs(
                     and str(j.get("title") or "") == str(existing[11] or "")
                     and int(existing[12] or 0) == EXPERIENCE_EXTRACTION_VERSION
                     and j.get("jd_experience_source") != "gemini_verified"
+                    and (not public_board_job or source_details_json == existing[15])
                 )
                 if experience_inputs_unchanged:
                     experience_details = {
@@ -1673,7 +1675,6 @@ def upsert_jobs(
                     posted_at_for_update = None
                     precision_for_update = "unknown"
 
-                public_board_job = j["source"] in public_job_boards.LABELS
                 incoming_location = j.get("location") if public_board_job else None
                 next_precision = existing[4]
                 if precision_for_update == "minute" or (
@@ -3583,6 +3584,11 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
     if source == "linkedin":
         low, high = extract_linkedin_labeled_experience(description)
         if low is not None or high is not None:
+            return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
+    if source == "cutshort" and isinstance(job.get("source_details"), dict):
+        details = job["source_details"]
+        low, high = details.get("experience_min_years"), details.get("experience_max_years")
+        if type(low) in {int, float} and type(high) in {int, float} and 0 <= low <= high <= 60:
             return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
 
     low, high = extract_jd_experience(description)
@@ -7150,7 +7156,7 @@ def public_job_board_collect(source: str, config: dict[str, Any]) -> list[dict[s
             continue
         try:
             postings = public_job_boards.list_jobs(board, get)
-            if source != "teamtailor":
+            if source not in public_job_boards.BOARDS_WITH_DESCRIPTIONS:
                 _hydrate_public_postings(board, postings, get)
         except Exception as exc:
             _record_source_board(source, False)
@@ -7159,8 +7165,9 @@ def public_job_board_collect(source: str, config: dict[str, Any]) -> list[dict[s
         succeeded += 1
         _record_source_board(source, True)
         for posting in postings:
+            source_id = f"{source}:{posting.id}" if source == "cutshort" else f"{source}:{board.key}:{posting.id}"
             jobs.append(normalize_job(
-                source, f"{source}:{board.key}:{posting.id}", posting.company or entry["company"], posting.title,
+                source, source_id, posting.company or entry["company"], posting.title,
                 " / ".join(posting.locations), posting.url, posting.published_at, posting.precision,
                 posting.description, source_details={
                     **posting.details,

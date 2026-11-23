@@ -22,6 +22,8 @@
     "avature": 900,
     "ycombinator": 600,
     "icims": 900,
+    "freshteam": 600,
+    "cutshort": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -142,6 +144,8 @@
     "avature": false,
     "ycombinator": false,
     "icims": false,
+    "freshteam": false,
+    "cutshort": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -185,5 +189,7 @@
   "oraclecloud_boards": [],
   "avature_boards": [],
   "ycombinator_boards": [],
-  "icims_boards": []
+  "icims_boards": [],
+  "freshteam_boards": [],
+  "cutshort_boards": []
 }

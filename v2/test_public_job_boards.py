@@ -106,6 +106,26 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(get.call_args.args[0], board.url + "/")
         self.assertEqual(get.call_args.kwargs["params"]["jobOffset"], 12)
 
+    def test_cutshort_keeps_employer_skills_and_explicit_experience(self):
+        slug = "software-engineering-jobs"
+        document = {"props": {"pageProps": {"dehydratedState": {"queries": [{
+            "queryKey": ["jobListData", slug],
+            "state": {"data": {"data": {"pageData": {"jobs": [{
+                "_id": "a" * 24, "headline": "Backend Engineer", "publicUrl": "https://cutshort.io/job/sample-posting",
+                "companyDetails": {"name": "Example"}, "expRange": {"min": 3, "max": 5},
+                "allSkills": ["Go", "SQL"], "locations": ["Bengaluru"], "sanitizedComment": "<p>Build services.</p>",
+            }]}}}},
+        }]}}}}
+        page = '<script type="application/json" id="__NEXT_DATA__">' + json.dumps(document) + "</script>"
+        config = {"cutshort_boards": [{"careers_url": f"https://cutshort.io/jobs/{slug}", "company": "Cutshort"}]}
+        with patch.object(radar, "_tracked_source_get", return_value=response(page)):
+            job, = radar.COLLECTORS["cutshort"](config)
+        self.assertEqual(job["company"], "Example")
+        self.assertEqual(job["source_details"]["key_skills"], ["Go", "SQL"])
+        self.assertEqual(radar._experience_provenance_details(job), {
+            "min_years": 3, "max_years": 5, "provenance": "employer_stated", "confidence": "high",
+        })
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [
