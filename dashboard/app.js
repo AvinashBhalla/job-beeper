@@ -1562,7 +1562,7 @@
     freshteam: 'Freshteam', cutshort: 'Cutshort',
     hrsmart: 'HRsmart', ukg: 'UKG Pro / UltiPro', phenom: 'Phenom People', zoho: 'Zoho Recruit',
     taleo: 'Oracle Taleo', successfactors: 'SAP SuccessFactors', peoplestrong: 'PeopleStrong',
-    eightfold: 'Eightfold AI',
+    eightfold: 'Eightfold AI', jibe: 'Jibe (iCIMS)',
   };
 
   function describeSourceStatus(source) {

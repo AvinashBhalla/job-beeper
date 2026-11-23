@@ -32,6 +32,7 @@
     "successfactors": 900,
     "peoplestrong": 900,
     "eightfold": 900,
+    "jibe": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -162,6 +163,7 @@
     "successfactors": false,
     "peoplestrong": false,
     "eightfold": false,
+    "jibe": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -215,5 +217,6 @@
   "taleo_boards": [],
   "successfactors_boards": [],
   "peoplestrong_boards": [],
-  "eightfold_boards": []
+  "eightfold_boards": [],
+  "jibe_boards": []
 }

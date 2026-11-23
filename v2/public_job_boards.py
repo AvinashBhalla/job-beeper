@@ -33,8 +33,9 @@ LABELS = {
     "successfactors": "SAP SuccessFactors",
     "peoplestrong": "PeopleStrong",
     "eightfold": "Eightfold AI",
+    "jibe": "Jibe (iCIMS)",
 }
-BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
+BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort", "jibe"})
 PHENOM_PATHS = {
     "www.careers.philips.com": "/global/en",
     "jobs.cvshealth.com": "/us/en",
@@ -53,6 +54,10 @@ PEOPLESTRONG_API = "/api/cp/rest/altone/cp"
 PEOPLESTRONG_JOB = rf"/job/detail/({TENANT})"
 EIGHTFOLD_TENANTS = {"app.eightfold.ai": "volkscience.com"}
 EIGHTFOLD_JOB = r"/careers/job/(\d{1,18})(?:-[^/]+)?"
+JIBE_SITES = {
+    "www.pepsicojobs.com": ("/main/jobs", "India"),
+    "careers.costco.com": ("/jobs", ""),
+}
 TEAMTAILOR_NS = "{https://teamtailor.com/locations}"
 WORKPLACE = {
     "remote": "remote", "fully_remote": "remote", "hybrid": "hybrid",
@@ -179,6 +184,15 @@ def detect(value: str) -> Board | None:
         tenant = EIGHTFOLD_TENANTS[host]
         if parse_qs(url.query).get("domain", [tenant]) == [tenant]:
             return Board("eightfold", host, f"{origin}/careers/search", host, tenant)
+    jibe_path, country = JIBE_SITES.get(host, ("", ""))
+    if not jibe_path and re.fullmatch(rf"{HOST_LABEL}\.jibeapply\.com", host):
+        jibe_path = "/jobs"
+    if jibe_path and re.fullmatch(rf"{jibe_path}(?:/{TENANT})?", path):
+        filters = parse_qs(url.query, keep_blank_values=True).get("country", [])
+        if not filters or (country and filters == [country]):
+            suffix = f"?country={country}" if country else ""
+            key = f"{host}:{country.lower()}" if country else host
+            return Board("jibe", key, f"{origin}{jibe_path}{suffix}", host, country)
     return None
 
 
@@ -1012,6 +1026,45 @@ def _eightfold(board: Board, get, *, probe: bool) -> list[Posting]:
     return jobs
 
 
+def _jibe(board: Board, get, *, probe: bool) -> list[Posting]:
+    jobs = []
+    page_size = 100 if board.tenant and not probe else 10
+    query = {"limit": page_size}
+    if board.tenant:
+        query["country"] = board.tenant
+    root = board.url.split("?", 1)[0]
+    for page in range(1, 2 if probe else 4):
+        data = json.loads(_read(
+            get, f"https://{board.host}/api/jobs", "application/json", params={**query, "page": page},
+        ))
+        rows = data.get("jobs") if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            raise ValueError("Jibe did not return a public jobs list.")
+        for row in rows:
+            item = row.get("data") if isinstance(row, dict) else None
+            if not isinstance(item, dict) or item.get("internal") is True or item.get("searchable") is not True:
+                continue
+            job_id, title = _text(item.get("req_id")), _text(item.get("title"))
+            slug = _text(item.get("slug")) or job_id
+            if not re.fullmatch(TENANT, job_id) or not re.fullmatch(TENANT, slug) or not title:
+                continue
+            description = "\n\n".join(dict.fromkeys(filter(None, (
+                _description(item.get(field)) for field in ("description", "responsibilities", "qualifications")
+            ))))
+            place = _location(*(_text(item.get(field)) for field in ("city", "state", "country")))
+            stamp, precision = _publication(_text(item.get("posted_date")))
+            jobs.append(Posting(
+                job_id, title, f"{root}/{slug}", [place] if place else [], description, stamp, precision,
+                {"department": _text(item.get("category")), "employment_type": _text(item.get("employment_type"))},
+            ))
+        total = data.get("totalCount")
+        if len(rows) < page_size or (type(total) is int and page * page_size >= total):
+            break
+    if not jobs and (rows or total != 0):
+        raise ValueError("Jibe returned no recognizable public jobs.")
+    return jobs
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -1049,6 +1102,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _peoplestrong(board, get)
     elif board.source == "eightfold":
         jobs = _eightfold(board, get, probe=probe)
+    elif board.source == "jibe":
+        jobs = _jibe(board, get, probe=probe)
     else:
         jobs = _html_list(board, get)
     unique = {}

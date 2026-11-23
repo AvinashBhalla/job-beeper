@@ -32,6 +32,7 @@
     "successfactors": 900,
     "peoplestrong": 900,
     "eightfold": 900,
+    "jibe": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -162,6 +163,7 @@
     "successfactors": true,
     "peoplestrong": true,
     "eightfold": true,
+    "jibe": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -302,5 +304,8 @@
   ],
   "eightfold_boards": [
     {"careers_url": "https://app.eightfold.ai/careers/search", "company": "Eightfold AI"}
+  ],
+  "jibe_boards": [
+    {"careers_url": "https://www.pepsicojobs.com/main/jobs?country=India", "company": "PepsiCo"}
   ]
 }

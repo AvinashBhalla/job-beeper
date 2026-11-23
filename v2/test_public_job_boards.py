@@ -341,6 +341,30 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(job.locations, ["Bengaluru, India", "Noida, India"])
         self.assertEqual(job.details["workplace_type"], "hybrid")
 
+    def test_jibe_reads_the_filtered_public_board_and_keeps_qualifications(self):
+        url = "https://www.pepsicojobs.com/main/jobs?country=India"
+        board = public_job_boards.detect(url)
+        self.assertEqual(board.key, "www.pepsicojobs.com:india")
+        self.assertEqual(board_discovery.detect_ats_board(url)["board_url"], url)
+        self.assertIsNone(public_job_boards.detect("https://outside.example/main/jobs?country=India"))
+        self.assertIsNone(public_job_boards.detect(url + "&country=Canada"))
+        item = {
+            "req_id": "123", "slug": "P1-123", "title": "Data Engineer", "searchable": True,
+            "posted_date": "2026-11-23T08:00:00+0000", "city": "Hyderabad", "country": "India",
+            "description": "<p>Build data pipelines.</p>", "qualifications": "<p>3+ years of experience with Python.</p>",
+            "apply_url": "https://example.icims.com/jobs/123/login",
+        }
+        rows = [item, {**item, "req_id": "456", "internal": True}, {**item, "req_id": "789", "slug": "../other"}]
+        with patch.object(requests, "get", return_value=response({
+            "jobs": [{"data": row} for row in rows], "totalCount": len(rows),
+        })) as get:
+            job, = public_job_boards.list_jobs(board, get)
+        self.assertEqual(get.call_args.args[0], "https://www.pepsicojobs.com/api/jobs")
+        self.assertEqual(get.call_args.kwargs["params"], {"limit": 100, "country": "India", "page": 1})
+        self.assertEqual((job.id, job.url, job.locations, job.precision),
+                         ("123", "https://www.pepsicojobs.com/main/jobs/P1-123", ["Hyderabad, India"], "minute"))
+        self.assertIn("3+ years of experience with Python", job.description)
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [
