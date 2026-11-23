@@ -41,9 +41,9 @@ Track parity with all 36 sources from the reference product's Delivery schedule.
 
 | Status as of 23 November 2026 | Providers |
 | --- | --- |
-| 24 with successful development polls | Ashby, Avature, BambooHR, Breezy HR, Cutshort, Darwinbox, Freshteam, Greenhouse, Hireology, HRsmart, iCIMS, Instahyre, Jobvite, Keka, Lever, Oracle Cloud Recruiting, Phenom People, Recruitee, Rippling ATS, SmartRecruiters, Teamtailor, UKG Pro / UltiPro, Workable, Y Combinator. Six of the original cohort also had successful recent production polls. New cohorts have their own release observation windows. |
+| 29 development providers with successful scheduled ingestion | Ashby, Avature, BambooHR, Breezy HR, Cutshort, Darwinbox, Eightfold AI, Freshteam, Greenhouse, Hireology, HRsmart, iCIMS, Instahyre, Jobvite, Keka, Lever, Oracle Cloud Recruiting, Oracle Taleo, PeopleStrong, Phenom People, Recruitee, Rippling ATS, SAP SuccessFactors, SmartRecruiters, Teamtailor, UKG Pro / UltiPro, Workable, Y Combinator, Zoho Recruit. Six of the original cohort also had successful recent production polls. New cohorts have their own release observation windows. |
 | Three existing adapters that need separate acceptance | LinkedIn, Naukri, Workday. LinkedIn is intermittently live in production. The Naukri publisher is paused, and Workday returned repeated 429s. |
-| Nine remaining parity targets | Eightfold AI, Hirist, Jibe (iCIMS), Paycom, PeopleStrong, SAP SuccessFactors, Oracle Taleo, Wellfound, Zoho Recruit. |
+| Four remaining parity targets | Hirist, Jibe (iCIMS), Paycom, Wellfound. |
 | Additional requested coverage | Indeed and Flexiple. Indeed can start with authorized saved-search email intake while partner-feed access is evaluated. Flexiple's own company openings, its syndicated listings, and client opportunities are distinct. For client opportunities, evaluate a permitted integration or user-authorized intake. |
 
 In the production check around 15:00 IST, SmartRecruiters completed 281 of 281 runs and added 54 records over 24 hours. LinkedIn completed 16 of 22 runs, added 90 records, and recorded six HTTP 429 responses. Naukri completed zero of 287 runs, and its relay had no recent snapshot. Preserve the owner's publisher pause until authorized to resume it. Workday recorded 24 rate-limit responses across 24 production runs. Marketplace email timings must be reported separately from direct-board discovery timings.
@@ -51,6 +51,8 @@ In the production check around 15:00 IST, SmartRecruiters completed 281 of 281 r
 Promote the additional boards for the six healthy production providers and the new Lever provider in a bounded production batch. Before approval, observe 24 hours of recurring development runs, check baseline suppression and idempotency across the proposed boards, and verify one fresh matching posting reaches a private pilot Telegram chat. Record the image revision, backup, source flags, and rollback command. Run the same gate separately for recovering and new providers. The earliest candidate window is the afternoon of 24 November IST, conditional on the evidence, Telegram pilot readiness, and release approval.
 
 The production bot has a linked private chat, with per-user opt-in currently off. The ledger has historical per-user LinkedIn sends, plus older legacy LinkedIn and Naukri sends. Production SmartRecruiters already fetches jobs, so an opted-in private account can test a new matching posting without waiting for the expanded-board release. The default development container has no bot, links, or opt-ins. Use a separate bot and explicitly linked private recipient for testing the expanded board set in development. Verify receipt, the source label and apply link, replay the poll, and check that it generates no duplicate alert or first-snapshot backfill.
+
+The owner confirmed the dedicated pilot handle `@YourJobBeeperDevBot`. The active VM development container and the checked feature deployment locations had no usable pilot credentials. Revision `f8b2fa5` allows development Compose to load a dedicated bot from a private `--env-file`. The VM file `/home/ubuntu/.config/job-beeper/dev-telegram.env` has mode 0600, the confirmed bot username, and a generated webhook secret. Its `JOB_BEEPER_DEV_TELEGRAM_BOT_TOKEN` entry awaits the pilot token. Compose validation passed with this file. Keep the legacy broadcast chat ID blank. Before enabling the pilot, verify the bot identity and its HTTPS webhook, then link and opt in with the pilot account.
 
 ### Source Health administration
 
@@ -88,13 +90,62 @@ The browser showed 24 enabled sources and zero needing attention. In **Jobs Feed
 
 At approximately 17:52 IST, the development scheduler had 39 active employer boards, each with a successful latest poll. Instahyre was also healthy on its ten-minute city search. The 16 sources added in these groups had stored 993 distinct source listings, including 992 first-snapshot rows. There were 396 full descriptions at this checkpoint, with remaining details scheduled under the per-poll cap where available. The 44 recorded runs were successful, including 26 runs that added zero rows, with no HTTP 429s. The only listing observed after its baseline had been published more than ten days earlier, so these runs did not provide a fresh discovery-latency sample. The earlier release cohort had accumulated about three hours of its 24-hour observation window. The expanded development bot was still unconfigured.
 
+### Fresh posting measurements · 23 November 2026
+
+At approximately 19:51 IST, development had measured 46 non-baseline listings whose sources reported a minute-precision publication time within the current observation window. This includes MongoDB’s Software Engineer 3 on Greenhouse, observed 103 seconds after its reported publication time. The p95 below uses the nearest rank within each provider’s sample.
+
+| Provider | Timed listings | Within 180 seconds | p95 |
+| --- | ---: | ---: | ---: |
+| Ashby | 2 | 1 | 350 s |
+| Greenhouse | 8 | 7 | 201 s |
+| Recruitee | 1 | 0 | 241 s |
+| SmartRecruiters | 35 | 4 | 1,071 s |
+
+These timings cover discovery. Telegram delivery still needs a receipt from the private pilot. The original observation window had run for 5.12 hours at this checkpoint. The checked Adobe and Mastercard public Workday boards both returned HTTP 429 from the VM, so Workday still needs a healthy public or approved feed before another rollout.
+
+At 21:39 IST, the sample had grown to 56 eligible postings. Discovery took at most three minutes for eight of 11 Greenhouse postings, one of three Ashby postings, and four of 41 SmartRecruiters postings. The single Recruitee sample took 241 seconds. The expanded p95 was 1,061 seconds for Greenhouse, 583 seconds for Ashby, and 1,071 seconds for SmartRecruiters. The broader sample supports provider-specific latency reporting and further tuning before offering a delivery-time guarantee.
+
+During the same observation window, Lever’s Palantir board intermittently timed out on listing pages. The scheduler retained the successful first page when page two timed out and applied board-level backoff. The production batch can include only boards with healthy recurring polls and idempotent replay.
+
+### Zoho Recruit and Oracle Taleo · 23 November 2026
+
+Zoho Recruit revision `47adc9f` passed 100 Linux tests. Its public career pages use a case-preserving page name to select the published list and per-job details. Exoscale returned seven openings. MADIFF Polska returned 38 on its scheduled retry after the first list request timed out. All 45 jobs were marked as initial inventory for alert suppression. Both boards repeated successfully with zero duplicates. By 21:07 IST the scheduler had recorded 15 successful Zoho runs, and all 45 jobs had descriptions. The adapter stores Zoho’s opening date as source metadata where present and leaves the publication timestamp unknown, so the field does not enter discovery-lag calculations.
+
+Oracle Taleo revision `cf476ee` uses the classic public search layout. Chicago’s first scheduled poll returned ten distinct requisitions with day-precision posting dates and marked them as initial inventory. The collector uses the employer’s anonymous page and form for each read. It retains the posting ID, publication day, description, qualifications, and available location. The pilot polls the newest results page. Oracle separately offers per-career-section RSS when enabled by the employer. [Oracle Taleo RSS configuration](https://docs.oracle.com/en/cloud/saas/taleo-enterprise/20d/otcug/social-media.html)
+
+Chicago’s scheduled repeat at 21:17 IST returned the same ten jobs and added zero duplicates. Seven had full descriptions. Three public detail requests still failed on the repeat, including a reproduced HTTP 500 from the provider. Jobs awaiting a description remain in the feed but do not qualify for alerts.
+
+The Linux suites passed 123 tests for Taleo, 143 after revision `2f4ab5d` added support for parenthesized experience requirements, and 37 Telegram tests using a simulated sender. In the deployed browser, both provider rows were healthy. The Taleo Director of Public Affairs listing showed Chicago, its direct application link, and the nine-year minimum from the description. The Zoho filter showed Exoscale’s Site Reliability Engineer listing with its description and direct application link.
+
+For another employer, use the complete Zoho public career-page URL or the Oracle Taleo public career-section search URL in **Employer boards**. Verify the endpoint before activation. The Taleo probe expects the classic page layout used by Chicago; a different layout needs its own verification.
+
+### SAP SuccessFactors and PeopleStrong · 23 November 2026
+
+SAP SuccessFactors revision `c9920fa` reads the newest public search results from the verified Boston Scientific and Lubrizol career sites. Each test request returned 25 distinct openings. Canonical links retain the employer domain and requisition ID, including URLs with non-English titles. The adapter reads the public job description and stores provider dates at day precision. More custom career domains can be added after verifying their search layout. [SAP career-site search settings](https://help.sap.com/docs/successfactors-recruiting/setting-up-and-maintaining-sap-successfactors-recruiting/career-site-admin-search-settings)
+
+PeopleStrong revision `03b36dc` uses the Muthoot Pappachan Group candidate portal. Its public feed returned 45 jobs from the first page. It takes only the fields shown to applicants and requests the public description separately. A Muthoot Fincorp Business Development Officer posting supplied Chikiti, a zero-to-four-year range, business development skills, and a full description. Use the `/job/joblist` URL for another compatible PeopleStrong board and run **Verify** in **Employer boards**. [Muthoot candidate portal](https://mpgcareers.peoplestrong.com/job/joblist)
+
+Revision `c596d1a` adds explicit provider skills to preference matching. Job descriptions and provider skill labels both contribute to the skill score, and a skill found in both contributes once. The matcher continues to distinguish an employer-stated experience range from a range inferred from a job description.
+
+### Eightfold AI · 23 November 2026
+
+Revision `b126d1e` uses the candidate site’s public **Latest** search with the verified tenant for Eightfold’s own openings. The live adapter test returned all 43 current public results in five pages. It retains direct job links, multiple locations where the source provides them, workplace type, posting timestamp, and public descriptions. It polls every 15 minutes in development and keeps the employer-specific host and tenant fixed. Other employer career sites require verification before adding them. Eightfold also offers employer-enabled XML distribution and daily public sitemaps. [Eightfold public careers](https://app.eightfold.ai/careers/search) · [Eightfold job feed documentation](https://docs.eightfold.ai/source-tracking/pcs-source-implementation-checklist-and-configuration)
+
+By 21:35 IST, the seven new boards across Zoho, Taleo, SuccessFactors, PeopleStrong and Eightfold had saved 193 public listings as initial inventory. Development had 46 active employer schedules across 28 ATS and marketplace sources, plus Instahyre’s city search. The two SAP sites supplied 25 listings each, PeopleStrong supplied 45, and Eightfold supplied 43. The first snapshots seeded the feed and were suppressed for Telegram.
+
+The deployed browser showed these five providers in **Source Health** and returned jobs from each provider in **Jobs Feed**. PeopleStrong’s Chikiti posting showed its employer-stated 0–4 years, key skills, description, and direct link. Lubrizol’s Senior Process Engineer posting showed Corona and a description-derived 5+ years. Eightfold’s Product Manager II posting showed Bengaluru, hybrid work, its description and direct link, and a separately labeled low-confidence experience inference.
+
+The scheduled repeats on both Zoho boards, PeopleStrong, Boston Scientific, Eightfold, and the first Taleo repeat added zero duplicates. On later runs, Lubrizol added Manufacturing Regional Process Technologist and Chicago added Program Manager as new-to-feed requisitions beyond initial inventory. Both carried day-precision dates, so these observations are excluded from minute-precision latency measurements.
+
+All 655 Linux tests passed on `b126d1e`. After the full suite, the browser showed 29 enabled sources with zero needing attention and reopened the Bengaluru Eightfold job with its direct link. Palantir's Lever board also completed its next scheduled retry. Its earlier timeouts remain relevant to the production observation window.
+
 ### Provider data still needed
 
 | Providers | Evidence and integration path |
 | --- | --- |
-| Eightfold AI, Hirist, SAP SuccessFactors, Wellfound | The tested Eightfold listing request and the tested Hirist, SAP, and Wellfound career URLs returned access restrictions. Use a provider-approved feed, an authorized alert, or a verified employer portal with its own public listings. |
-| Jibe (iCIMS), Paycom, PeopleStrong, Zoho Recruit | The checked Jibe and Paycom frontends returned page templates. The tested Zoho career sites did not expose listings through the checked public route. PeopleStrong still needs a live employer feed to validate. Record a source only after it returns real public postings and their direct links. |
-| Oracle Taleo | The Chicago search page returned a template and the RSS path redirected to an unsupported page. Taleo allows employers to enable an RSS feed per career section. A live enabled feed is the next validation input. [Oracle Taleo RSS configuration](https://docs.oracle.com/en/cloud/saas/taleo-enterprise/20d/otcug/social-media.html) |
+| Hirist and Wellfound | The tested public pages returned access restrictions. Wellfound documents daily or weekly saved-search email alerts. An authorized email stream can grow coverage at the vendor’s cadence. [Wellfound saved searches](https://help.wellfound.com/article/782-saved-searches) |
+| Jibe (iCIMS) | iCIMS offers an approved, OAuth-authenticated XML feed for its job board partners that includes iCIMS Career Sites, formerly Attract. Its standard feed publishes three times daily, so measure that cadence separately from direct employer polling. [iCIMS partner XML feed](https://developer-community.icims.com/platform/services/standard-xml-feed-job-boards) |
+| Paycom | A public job detail returned JobPosting data. The checked career portal opened an app shell with no rendered list. A recurring listing feed or public index remains necessary for discovery. [Paycom public job example](https://www.paycomonline.net/v4/ats/web.php/portal/D52435485532E6BB0432223C90E2B6D7/jobs/439148) |
 | Indeed | Evaluate an approved publisher or partner integration. User-authorized saved-search alerts are a separate intake option. [Indeed publisher documentation](https://docs.indeed.com/indeed-plus/publisher-js-plugin) |
 | Flexiple | The checked public jobs path redirects to the talent page, which describes matching for members. Validate an approved talent opportunity feed or user-authorized alerts. [Flexiple talent page](https://flexiple.com/talent) |
 
