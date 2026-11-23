@@ -22,11 +22,11 @@ services:
       JOB_BEEPER_COOKIE_SECURE: ${JOB_BEEPER_COOKIE_SECURE:-false}
       # Set this only when the dashboard is accessed through a different public TLS origin.
       JOB_BEEPER_PUBLIC_ORIGIN: ${JOB_BEEPER_PUBLIC_ORIGIN:-}
-      # Deliberately blank: development must never Telegram-alert users.
-      JOB_RADAR_TELEGRAM_BOT_TOKEN: ""
+      # Only a dedicated development bot may run a per-user pilot.
+      JOB_RADAR_TELEGRAM_BOT_TOKEN: ${JOB_BEEPER_DEV_TELEGRAM_BOT_TOKEN:-}
       JOB_RADAR_TELEGRAM_CHAT_ID: ""
-      JOB_BEEPER_TELEGRAM_BOT_USERNAME: ""
-      JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET: ""
+      JOB_BEEPER_TELEGRAM_BOT_USERNAME: ${JOB_BEEPER_DEV_TELEGRAM_BOT_USERNAME:-}
+      JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET: ${JOB_BEEPER_DEV_TELEGRAM_WEBHOOK_SECRET:-}
       LOG_LEVEL: INFO
       # Shadow-only Gemini JD extraction; never changes match decisions or alerts.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
