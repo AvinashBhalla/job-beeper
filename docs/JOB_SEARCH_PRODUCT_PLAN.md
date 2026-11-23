@@ -41,9 +41,9 @@ Track parity with all 36 sources from the reference product's Delivery schedule.
 
 | Status as of 23 November 2026 | Providers |
 | --- | --- |
-| Seven live on the development VM | Ashby, Darwinbox, Greenhouse, Keka, Lever, SmartRecruiters, Workable. Six also have successful recent production polls. Lever is the new provider in the development batch. |
+| Eight live on the development VM | Ashby, Darwinbox, Greenhouse, Keka, Lever, Recruitee, SmartRecruiters, Workable. Six also have successful recent production polls. Recruitee has a separate release observation window. |
 | Four with existing adapters that need separate acceptance | LinkedIn, Naukri, Instahyre, Workday. LinkedIn is intermittently live in production. The Naukri publisher is paused, and Workday returned repeated 429s. Instahyre is disabled in the compared environments. |
-| 25 remaining parity targets | Avature, BambooHR, Breezy HR, Cutshort, Eightfold AI, Freshteam, Hireology, Hirist, HRsmart, iCIMS, Jibe (iCIMS), Jobvite, Oracle Cloud Recruiting, Paycom, PeopleStrong, Phenom People, Recruitee, Rippling ATS, SAP SuccessFactors, Oracle Taleo, Teamtailor, UKG Pro / UltiPro, Wellfound, Y Combinator, Zoho Recruit. Some have board detection and still need a fetching path and live acceptance. |
+| 24 remaining parity targets | Avature, BambooHR, Breezy HR, Cutshort, Eightfold AI, Freshteam, Hireology, Hirist, HRsmart, iCIMS, Jibe (iCIMS), Jobvite, Oracle Cloud Recruiting, Paycom, PeopleStrong, Phenom People, Rippling ATS, SAP SuccessFactors, Oracle Taleo, Teamtailor, UKG Pro / UltiPro, Wellfound, Y Combinator, Zoho Recruit. Some have board detection and still need a fetching path and live acceptance. |
 | Additional requested coverage | Indeed and Flexiple. Indeed can start with authorized saved-search email intake while partner-feed access is evaluated. Flexiple's own company openings, its syndicated listings, and client opportunities are distinct. For client opportunities, evaluate a permitted integration or user-authorized intake. |
 
 In the production check around 15:00 IST, SmartRecruiters completed 281 of 281 runs and added 54 records over 24 hours. LinkedIn completed 16 of 22 runs, added 90 records, and recorded six HTTP 429 responses. Naukri completed zero of 287 runs, and its relay had no recent snapshot. Preserve the owner's publisher pause until authorized to resume it. Workday recorded 24 rate-limit responses across 24 production runs. Marketplace email timings must be reported separately from direct-board discovery timings.
@@ -55,6 +55,18 @@ The production bot has a linked private chat, with per-user opt-in currently off
 ### Source Health administration
 
 Source Health opens with enabled sources, plain-language status, jobs added in the past 24 hours, and last check time in IST. Paused sources and optional tools are collapsed. Use **Configure sources** to open the provider toggles in Preferences, then **Save Preferences**. Use **Employer boards** to find, verify, and activate a public career board. Directory and manifest imports are under **Candidate imports**. **Technical diagnostics** contains board schedules, host limits, and raw run errors. These tools load when opened, and **Refresh status** also refreshes the open tools.
+
+### Recruitee and the next provider
+
+Recruitee uses its [documented public formatted XML feed](https://support.recruitee.com/en/articles/8213076-faq-api). The development pilot uses the public Tether board at a five-minute interval. The production default is off. The collector streams a bounded response, uses feed publication timestamps, keeps multiple locations and explicit workplace flags, and uses a stable per-board offer ID. It participates in verification, activation, host cooldowns, and first-snapshot alert suppression.
+
+On 23 November, development revision `5d3dab3` passed 303 provider, scheduler, and dashboard tests on Linux. The first scheduled poll at 16:09 IST saved 206 unique Tether listings and marked each as initial inventory for alert suppression. The development schedule now has 23 boards across eight providers. The feed supplied a description, a minute-precision publication time, and a direct Tether link for every listing. Twenty-one included India in their locations. The saved jobs include 53 description-derived experience values and 57 lower-confidence inferred values. For example, the Delhi Automation QA Engineer listing included “4+ years in QA automation” and TypeScript, and the normalized minimum was four years. The initial snapshot cannot establish fresh discovery or delivery latency.
+
+The next scheduled poll at 16:15 IST again saw 206 postings and inserted zero duplicates. Both polls succeeded without HTTP 429 responses.
+
+Development revision `d9a2519` applies Jobs Feed filters before pagination. Keep **Last 72 hours** to browse recent postings or select **Any posting date** to include older postings discovered in the current feed window. The 43 focused Linux tests passed. In the browser, Source Health showed Recruitee as healthy. Searching Recruitee for India showed zero postings under **Last 72 hours** and 21 under **Any posting date**. The Delhi QA listing displayed its description, four-year minimum, location, and direct application link.
+
+Teamtailor is a candidate for the next collector. Its [documented RSS example](https://support.teamtailor.com/en/articles/11171756-rss-feed-how-to-guide) returned 16 live items from `career.teamtailor.com/jobs.rss`, with a GUID, publication date, location metadata, and remote status. Only the feed was probed.
 
 ## After discovery is proven
 
