@@ -78,7 +78,8 @@ WORKDAY_MAX_FACET_DEPTH = 4
 WORKDAY_MAX_FACET_PARTITIONS = 500
 WORKDAY_SUBDIVISION_FACETS = ("jobFamilyGroup", "timeType", "locations", "workerSubType")
 WORKDAY_MAX_BOARDS = 20
-WORKDAY_DETAIL_DELAY_SECONDS = 0.1
+WORKDAY_DETAIL_DELAY_SECONDS = 0.5
+WORKDAY_DETAIL_REFRESH_HOURS = 24
 WORKDAY_DEFAULT_429_COOLDOWN_SECONDS = 300
 WORKDAY_MAX_429_COOLDOWN_SECONDS = 3600
 SMARTRECRUITERS_PAGE_SIZE = 100
@@ -4484,6 +4485,7 @@ NAUKRI_RELAY_URL = (
 )
 NAUKRI_RELAY_MAX_AGE_SECONDS = 15 * 60
 NAUKRI_RELAY_FUTURE_TOLERANCE_SECONDS = 5 * 60
+NAUKRI_LOCAL_RELAY_MAX_BYTES = 8 * 1024 * 1024
 
 
 def _record_naukri_feed_state(
@@ -4527,9 +4529,7 @@ def _record_naukri_feed_state(
 
 
 
-def naukri_collect() -> list[dict[str, Any]]:
-    # The public relay exposes a full snapshot with one relay-run timestamp.
-    # Reject stale or empty snapshots before changing local job observations.
+def _fetch_naukri_public_relay() -> requests.Response:
     relay_headers = {**UA, "Accept": "application/json"}
     response: requests.Response | None = None
     retryable_statuses = {429, 500, 502, 503, 504}
@@ -4571,9 +4571,26 @@ def naukri_collect() -> list[dict[str, Any]]:
     if response is None:
         _record_source_page("naukri", False)
         raise RuntimeError("Naukri relay fetch returned no response")
+    return response
 
+
+def _read_naukri_local_relay() -> Any:
     try:
-        payload = response.json()
+        with Path(DB_PATH).with_name("naukri-relay.json").open("rb") as snapshot:
+            data = snapshot.read(NAUKRI_LOCAL_RELAY_MAX_BYTES + 1)
+    except OSError as exc:
+        raise RuntimeError("Naukri local relay snapshot is unavailable") from exc
+    if len(data) > NAUKRI_LOCAL_RELAY_MAX_BYTES:
+        raise RuntimeError("Naukri local relay snapshot exceeds the size limit")
+    return json.loads(data)
+
+
+def naukri_collect() -> list[dict[str, Any]]:
+    # Both relay transports use the same freshness and snapshot checks.
+    local_relay = os.getenv("JOB_BEEPER_NAUKRI_RELAY_MODE") == "local"
+    response = None if local_relay else _fetch_naukri_public_relay()
+    try:
+        payload = _read_naukri_local_relay() if local_relay else response.json()
         if not isinstance(payload, dict):
             raise RuntimeError("Naukri relay payload must be a JSON object")
 
@@ -5613,6 +5630,39 @@ def _workday_inventory_is_due(state: dict[str, Any], current: dt.datetime) -> bo
     return (current - parsed).total_seconds() >= WORKDAY_INVENTORY_PAGE_INTERVAL_SECONDS
 
 
+def _workday_details_from_cache(board_url: str, postings: list) -> dict:
+    urls = [
+        board_url + item["externalPath"]
+        for item in postings
+        if isinstance(item, dict) and isinstance(item.get("externalPath"), str)
+    ]
+    if not urls or not Path(DB_PATH).exists():
+        return {}
+    placeholders = ",".join("?" for _ in urls)
+    try:
+        with connect_sqlite(DB_PATH) as conn:
+            rows = conn.execute(
+                f"""SELECT url,source_job_id,title,location,description,source_details_json,first_seen_at
+                    FROM jobs WHERE source='workday' AND url IN ({placeholders}) AND description<>''""",
+                urls,
+            ).fetchall()
+    except sqlite3.Error:
+        return {}
+    oldest = now() - dt.timedelta(hours=WORKDAY_DETAIL_REFRESH_HOURS)
+    cache = {}
+    for url, source_id, title, location, description, raw_details, first_seen in rows:
+        try:
+            details = json.loads(raw_details)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(details, dict) or not details.get("details_fetched"):
+            continue
+        refreshed = parse_relative(details.get("details_fetched_at") or first_seen)
+        if refreshed is not None and refreshed >= oldest:
+            cache[url] = (source_id, title, location, description, details)
+    return cache
+
+
 def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     """Collect a bounded set of public Workday career-site postings.
 
@@ -5812,6 +5862,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 )
                 break
 
+            detail_cache = _workday_details_from_cache(board_url, postings)
             for item in postings:
                 if not isinstance(item, dict):
                     continue
@@ -5839,6 +5890,24 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                      if isinstance(value, (str, int)) and str(value).strip()][:10]
                     if isinstance(bullet_fields, list) else []
                 )
+
+                job_url = board_url + external_path
+                cached = detail_cache.get(job_url)
+                if cached:
+                    source_id, cached_title, location, description, details = cached
+                    if source_id not in seen_ids:
+                        seen_ids.add(source_id)
+                        board_jobs.append(normalize_job(
+                            "workday", source_id, company, cached_title, location, job_url,
+                            None, "unknown", description,
+                            source_details={
+                                **details, "board_registry_id": board.get("registry_id"),
+                                "posted_on_label": item.get("postedOn") or details.get("posted_on_label"),
+                                "locations_text": item.get("locationsText"),
+                                "listing_bullet_fields": safe_bullet_fields,
+                            },
+                        ))
+                    continue
 
                 detail_info: dict[str, Any] = {}
                 # Detail retrieval does not depend on the administrator's role or
@@ -5937,6 +6006,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                         extra_locations if isinstance(extra_locations, list) else []
                     ),
                     "details_fetched": bool(detail_info),
+                    "details_fetched_at": iso(now()) if detail_info else None,
                     "listing_bullet_fields": safe_bullet_fields,
                 }
                 board_jobs.append(normalize_job(
@@ -5945,7 +6015,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                     company,
                     str(detail_info.get("title") or title).strip(),
                     location,
-                    board_url + external_path,
+                    job_url,
                     None,
                     "unknown",
                     description,

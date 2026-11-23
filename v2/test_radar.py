@@ -1,7 +1,7 @@
 import unittest
 import json
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import sqlite3
 from pathlib import Path
@@ -3415,6 +3415,19 @@ class NaukriRelayFreshnessTests(unittest.TestCase):
         self.assertEqual(canonical[0], row[1])
         self.assertEqual(canonical[1], row[2])
 
+    def test_naukri_local_relay_validates_freshness_without_github(self):
+        path = radar.DB_PATH.with_name("naukri-relay.json")
+        path.write_text(json.dumps(self._payload()), encoding="utf-8")
+        with patch.dict("os.environ", {"JOB_BEEPER_NAUKRI_RELAY_MODE": "local"}), patch.object(
+            radar.requests, "get",
+        ) as request:
+            job, = radar.naukri_collect()
+            self.assertEqual(job["source_job_id"], "naukri-1")
+            path.write_text(json.dumps(self._payload(age_seconds=3600)), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "snapshot is stale"):
+                radar.naukri_collect()
+            request.assert_not_called()
+
     def test_upsert_never_moves_last_seen_backwards(self):
         first_seen = radar.now() - radar.dt.timedelta(minutes=10)
         last_seen = radar.now() - radar.dt.timedelta(minutes=2)
@@ -5185,6 +5198,31 @@ class WorkdayCollectorTests(unittest.TestCase):
             parsed["url"],
             "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
         )
+
+    def test_workday_reuses_successful_details_on_the_next_scheduled_poll(self):
+        url = "https://cisco.wd5.myworkdayjobs.com/Cisco_Careers"
+        config = {"workday_boards": [{"url": url, "company": "Cisco"}]}
+        listing = Mock(status_code=200)
+        listing.json.return_value = {"total": 1, "jobPostings": [{
+            "title": "Software Engineer", "externalPath": "/job/Software-Engineer_123",
+            "locationsText": "Bengaluru", "postedOn": "Posted Today",
+        }]}
+        detail = Mock(status_code=200)
+        detail.json.return_value = {"jobPostingInfo": {
+            "jobReqId": "123", "location": "Bengaluru, India",
+            "jobDescription": "<p>Requires three (3) years of Python development.</p>",
+        }}
+        with patch.object(radar.requests, "post", return_value=listing), patch.object(
+            radar.requests, "get", return_value=detail,
+        ) as get:
+            first, = radar.workday_collect(config)
+            radar.upsert_jobs([first])
+            second, = radar.workday_collect(config)
+        self.assertEqual(get.call_count, 1)
+        self.assertEqual(second["source_job_id"], first["source_job_id"])
+        self.assertEqual(second["description"], first["description"])
+        self.assertEqual(second["location"], "Bengaluru, India")
+        self.assertEqual(second["source_details"]["details_fetched_at"], first["source_details"]["details_fetched_at"])
 
     def test_board_url_parser_rejects_non_workday_or_unsafe_urls(self):
         for value in (
