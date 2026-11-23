@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import datetime as dt
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
 from v2 import board_scheduler
+from v2.sqlite_store import connect
 
 UTC = dt.timezone.utc
 
@@ -16,7 +16,7 @@ class BoardSchedulerTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "scheduler.sqlite3"
-        with sqlite3.connect(self.db_path) as conn:
+        with connect(self.db_path) as conn:
             conn.execute("CREATE TABLE source_runs(source TEXT NOT NULL,outcome TEXT)")
             conn.execute("""
                 CREATE TABLE ats_board_registry(
@@ -68,7 +68,7 @@ class BoardSchedulerTests(unittest.TestCase):
         self.assertEqual(by_source["darwinbox"]["board_key"], "123")
 
     def test_new_board_baselines_even_when_provider_has_prior_success(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect(self.db_path) as conn:
             conn.execute("INSERT INTO source_runs(source,outcome) VALUES('greenhouse','success')")
         config = self.config()
         config["greenhouse_boards"] = [{"token": "new-employer", "company": "New Employer"}]
@@ -139,6 +139,33 @@ class BoardSchedulerTests(unittest.TestCase):
         self.assertEqual(row["last_jobs_new"], 20)
         self.assertEqual(row["consecutive_failures"], 0)
         self.assertEqual(row["next_due_at"], (self.now + dt.timedelta(seconds=140)).isoformat())
+
+    def test_shorter_cadence_advances_healthy_polls_and_preserves_rate_limit_backoff(self):
+        db = str(self.db_path)
+        config = self.config()
+        config["source_enabled"] = {"greenhouse": True}
+        config["greenhouse_boards"] = config["greenhouse_boards"][:1]
+        board_scheduler.sync_config(db, config, self.now)
+        claim = board_scheduler.claim_due_board(db, at=self.now)
+        board_scheduler.finish_poll(db, claim, outcome="success", at=self.now)
+
+        config["poll_seconds"]["greenhouse"] = 120
+        due = self.now + dt.timedelta(seconds=120)
+        board_scheduler.sync_config(db, config, due)
+        claim = board_scheduler.claim_due_board(db, at=due)
+        self.assertIsNotNone(claim)
+        config["poll_seconds"]["greenhouse"] = 60
+        board_scheduler.sync_config(db, config, due)
+        next_poll = board_scheduler.finish_poll(db, claim, outcome="success", at=due)
+        self.assertEqual(next_poll["next_due_at"], (due + dt.timedelta(seconds=60)).isoformat())
+
+        due += dt.timedelta(seconds=60)
+        claim = board_scheduler.claim_due_board(db, at=due)
+        throttled = board_scheduler.finish_poll(db, claim, outcome="rate_limited", at=due)
+        board_scheduler.sync_config(db, config, due)
+        row = board_scheduler.status(db)["boards"][0]
+        self.assertEqual(row["next_due_at"], throttled["next_due_at"])
+        self.assertIsNone(board_scheduler.claim_due_board(db, at=due + dt.timedelta(seconds=60)))
 
     def test_failure_backoff_is_per_board_and_does_not_block_other_host(self):
         board_scheduler.sync_config(str(self.db_path), self.config(), self.now)
@@ -269,7 +296,7 @@ class BoardSchedulerTests(unittest.TestCase):
     def test_registry_reactivation_restarts_baseline_and_due_time(self):
         config = self.config()
         config["greenhouse_boards"] = [{"token": "alpha", "company": "Alpha", "registry_id": 7}]
-        with sqlite3.connect(self.db_path) as conn:
+        with connect(self.db_path) as conn:
             conn.execute("INSERT INTO ats_board_registry(id,baseline_pending,review_status) VALUES(7,1,'active')")
         board_scheduler.sync_config(str(self.db_path), config, self.now)
         claim = board_scheduler.claim_due_board(str(self.db_path), at=self.now)

@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from v2 import board_scheduler, radar
+from v2.sqlite_store import connect
 
 UTC = dt.timezone.utc
 
@@ -20,7 +20,7 @@ class BoardSchedulerOrchestrationTests(unittest.TestCase):
         self.db_path = Path(self.temp_dir.name) / "orchestration.sqlite3"
         self.db_patch = patch.object(radar, "DB_PATH", self.db_path)
         self.db_patch.start()
-        with sqlite3.connect(self.db_path) as conn:
+        with connect(self.db_path) as conn:
             conn.execute("CREATE TABLE source_runs(source TEXT,outcome TEXT)")
             conn.execute("CREATE TABLE ats_board_registry(id INTEGER PRIMARY KEY,baseline_pending INTEGER,review_status TEXT)")
         board_scheduler.init_schema(str(self.db_path))

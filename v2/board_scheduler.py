@@ -175,7 +175,7 @@ def init_schema(db_path: str) -> None:
 
 
 def sync_config(db_path: str, config: dict[str, Any], at: dt.datetime | None = None) -> int:
-    """Sync the configured allowlist while preserving due times and poll history."""
+    """Sync configured boards, preserving poll history and failure backoff."""
     timestamp = _iso(at)
     entries = configured_boards(config)
     active_keys = {(item["source"], item["board_key"]) for item in entries}
@@ -185,13 +185,13 @@ def sync_config(db_path: str, config: dict[str, Any], at: dt.datetime | None = N
             source = item["source"]
             board_key = item["board_key"]
             existing = conn.execute(
-                "SELECT is_active,poll_interval_seconds FROM ats_board_poll_schedule WHERE source=? AND board_key=?",
+                "SELECT is_active,next_due_at,last_finished_at,last_outcome "
+                "FROM ats_board_poll_schedule WHERE source=? AND board_key=?",
                 (source, board_key),
             ).fetchone()
             if existing:
                 was_active = bool(existing[0])
-                # Re-activation must begin immediately and silently baseline the
-                # board again; ordinary config refreshes preserve due timestamps.
+                # Re-activation starts immediately with a fresh, silent baseline.
                 if not was_active:
                     # Every reactivation is a new trust boundary, even when this
                     # provider has polled other employers successfully before.
@@ -200,9 +200,17 @@ def sync_config(db_path: str, config: dict[str, Any], at: dt.datetime | None = N
                         (timestamp, item["poll_interval_seconds"], item["config_key"], json.dumps(item["board_config"], sort_keys=True), item["registry_id"], item["company_name"], item["host_key"], timestamp, source, board_key),
                     )
                 else:
+                    next_due = existing[1]
+                    # A tighter cadence can advance a healthy board's next poll.
+                    # Failed polls keep their independently calculated backoff.
+                    if existing[2] and existing[3] == "success":
+                        on_new_cadence = dt.datetime.fromisoformat(existing[2]) + dt.timedelta(
+                            seconds=item["poll_interval_seconds"]
+                        )
+                        next_due = min(next_due, _iso(on_new_cadence))
                     conn.execute(
-                        "UPDATE ats_board_poll_schedule SET poll_interval_seconds=?,config_key=?,board_config_json=?,registry_id=?,company_name=?,host_key=?,updated_at=? WHERE source=? AND board_key=?",
-                        (item["poll_interval_seconds"], item["config_key"], json.dumps(item["board_config"], sort_keys=True), item["registry_id"], item["company_name"], item["host_key"], timestamp, source, board_key),
+                        "UPDATE ats_board_poll_schedule SET next_due_at=?,poll_interval_seconds=?,config_key=?,board_config_json=?,registry_id=?,company_name=?,host_key=?,updated_at=? WHERE source=? AND board_key=?",
+                        (next_due, item["poll_interval_seconds"], item["config_key"], json.dumps(item["board_config"], sort_keys=True), item["registry_id"], item["company_name"], item["host_key"], timestamp, source, board_key),
                     )
             else:
                 # Baseline belongs to the employer board, not its provider. A
@@ -340,12 +348,13 @@ def finish_poll(
     source = claim["source"]
     board_key = claim["board_key"]
     host_key = claim["host_key"]
-    interval = max(60, int(claim["poll_interval_seconds"]))
     with DB_LOCK, connect(db_path) as conn:
         row = conn.execute(
-            "SELECT consecutive_failures,baseline_pending FROM ats_board_poll_schedule WHERE source=? AND board_key=?",
+            "SELECT consecutive_failures,baseline_pending,poll_interval_seconds "
+            "FROM ats_board_poll_schedule WHERE source=? AND board_key=?",
             (source, board_key),
         ).fetchone()
+        interval = max(60, int(row[2] if row else claim["poll_interval_seconds"]))
         failures = int(row[0] or 0) if row else 0
         baseline_pending = bool(row[1]) if row else False
         rate_limited = outcome in {"rate_limited", "partial_rate_limited"}
