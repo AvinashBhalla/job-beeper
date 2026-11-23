@@ -59,6 +59,7 @@ LINKEDIN_RATE_LIMIT_BASE_COOLDOWN_SECONDS = 300
 LINKEDIN_RATE_LIMIT_MAX_COOLDOWN_SECONDS = 4 * 60 * 60
 LINKEDIN_RATE_LIMIT_STREAK_RESET_SECONDS = 24 * 60 * 60
 LINKEDIN_DETAIL_WORKERS = 1
+LINKEDIN_DETAIL_REFRESH_HOURS = 24
 LINKEDIN_FAST_TARGETS_PER_SCAN = 2
 LINKEDIN_DEEP_SCAN_SECONDS = 1800
 LINKEDIN_DEEP_PAGE_BATCH = 1
@@ -3747,15 +3748,44 @@ def _linkedin_job_description(url: str) -> str:
     return ""
 
 
+def _recent_linkedin_description(job_id: str) -> tuple[str, str] | None:
+    if not job_id or not Path(DB_PATH).exists():
+        return None
+    try:
+        with connect_sqlite(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT description, source_details_json FROM jobs WHERE source='linkedin' AND source_job_id=?",
+                (job_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        details = json.loads(row[1])
+    except (sqlite3.Error, TypeError, ValueError):
+        return None
+    if not isinstance(details, dict):
+        return None
+    saved_at = details.get("linkedin_details_fetched_at")
+    stamp = parse_relative(saved_at) if isinstance(saved_at, str) else None
+    current = now()
+    if stamp is None or not current - dt.timedelta(hours=LINKEDIN_DETAIL_REFRESH_HOURS) <= stamp <= current:
+        return None
+    match = re.search(r"\bJD:\s*(.+)$", row[0] or "", flags=re.I | re.S)
+    return (match.group(1).strip(), saved_at) if match else None
+
+
 def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
     if job.get("source") != "linkedin":
         return job
 
-    # Always inspect the actual LinkedIn JD when available. Search-result
-    # snippets can contain unrelated numbers (or omit requirements entirely),
-    # so a generic experience hit must not short-circuit JD enrichment.
+    # Reuse a recently fetched full description. Listing snippets can contain
+    # unrelated numbers, so they do not qualify as cached employer details.
     existing_description = job.get("description") or ""
-    detail = _linkedin_job_description(job.get("url", ""))
+    cached = _recent_linkedin_description(str(job.get("source_job_id") or ""))
+    if cached:
+        detail, fetched_at = cached
+    else:
+        detail = _linkedin_job_description(job.get("url", ""))
+        fetched_at = iso(now())
     if not detail:
         job.pop("needs_jd_enrichment", None)
         return job
@@ -3771,6 +3801,7 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
     job["description"] = (
         f"{existing_description} JD: {detail}".strip()
     )[:30000]
+    job["source_details"] = {**_job_source_details(job), "linkedin_details_fetched_at": fetched_at}
 
     # The labeled LinkedIn metadata is more reliable than incidental years
     # mentioned elsewhere in the JD (for example, '2 years of Python experience').
@@ -3783,6 +3814,8 @@ def enrich_linkedin_job(job: dict[str, Any]) -> dict[str, Any]:
 
     job.pop("needs_jd_enrichment", None)
     return job
+
+
 def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
     config = config or get_config()
     title = job.get("title") or ""
@@ -5678,6 +5711,7 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
 
     jobs: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    seen_urls: set[str] = set()
     successful_boards = 0
     failures: list[str] = []
     headers = {**UA, "Accept": "application/json", "Content-Type": "application/json"}
@@ -5892,6 +5926,9 @@ def workday_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 )
 
                 job_url = board_url + external_path
+                if job_url in seen_urls:
+                    continue
+                seen_urls.add(job_url)
                 cached = detail_cache.get(job_url)
                 if cached:
                     source_id, cached_title, location, description, details = cached

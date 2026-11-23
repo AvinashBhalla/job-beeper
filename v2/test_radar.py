@@ -2606,6 +2606,27 @@ class MatcherTests(unittest.TestCase):
             enriched["description"],
         )
 
+    def test_linkedin_reuses_verified_detail_until_it_expires(self):
+        job = normalize_job(
+            "linkedin", "li-cached-detail", "Acme", "Engineer", "Bengaluru",
+            "https://www.linkedin.com/jobs/view/12345", None, "unknown", "Listing text",
+        )
+        with TemporaryDirectory() as directory, patch.object(
+            radar, "DB_PATH", Path(directory) / "linkedin-cache.db",
+        ), patch.object(
+            radar, "_linkedin_job_description", return_value="Requires 2+ years of experience.",
+        ) as fetch_detail:
+            radar.init_db()
+            first = radar.enrich_linkedin_job(dict(job))
+            radar.upsert_jobs([first], BASE_CONFIG)
+            repeated = radar.enrich_linkedin_job({**job, "description": "Updated snippet"})
+            self.assertEqual(fetch_detail.call_count, 1)
+            self.assertEqual(repeated["description"], "Updated snippet JD: Requires 2+ years of experience.")
+            expires = radar.now() + radar.dt.timedelta(hours=radar.LINKEDIN_DETAIL_REFRESH_HOURS + 1)
+            with patch.object(radar, "now", return_value=expires):
+                radar.enrich_linkedin_job(dict(job))
+            self.assertEqual(fetch_detail.call_count, 2)
+
     def test_jobs_search_runs_before_limit_and_is_case_insensitive(self):
         from datetime import timedelta
 
