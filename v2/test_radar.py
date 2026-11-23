@@ -2195,6 +2195,16 @@ class MatcherTests(unittest.TestCase):
         )
         self.assertNotIn("skills: ai", result["reasons"])
 
+    def test_skill_matching_reads_employer_fields_from_collected_and_stored_jobs(self):
+        job = make_job("Software Engineer", "Build services with Python.")
+        config = {**BASE_CONFIG, "skills": ["Python", "SQL", "sql kafka"]}
+        for structured_fields in (
+            {"source_details": {"key_skills": ["Python", "SQL", "Kafka"]}},
+            {"source_details_json": '{"key_skills":["Python","SQL","Kafka"]}'},
+        ):
+            result = match_details({**job, **structured_fields}, config)
+            self.assertIn("skills: Python, SQL", result["reasons"])
+
     def test_unknown_experience_match_is_alertable_at_configured_threshold(self):
         job = make_job("AI Engineer", "Build AI systems with Python.")
         result = match_details(job, BASE_CONFIG)

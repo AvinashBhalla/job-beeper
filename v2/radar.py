@@ -1994,7 +1994,7 @@ async def google_alerts_gmail_worker() -> None:
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
-MATCHER_RULES_VERSION = 3
+MATCHER_RULES_VERSION = 4
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
@@ -3356,15 +3356,25 @@ def extract_explicit_work_location(description: str) -> str | None:
     return value
 
 
+def _job_source_details(job: dict[str, Any]) -> dict[str, Any]:
+    details = job.get("source_details")
+    if isinstance(details, dict):
+        return details
+    raw = job.get("source_details_json")
+    if not isinstance(raw, str) or raw in {"", "{}"}:
+        return {}
+    try:
+        details = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return details if isinstance(details, dict) else {}
+
+
 def job_location_for_matching(
     job: dict[str, Any],
     remote_only: bool = False,
 ) -> str:
-    """Prefer explicit work location and source-provided remote workplace data.
-
-    Structured workplace metadata is consulted only for remote-only profiles so
-    the normal high-volume matcher does not pay a JSON parsing cost.
-    """
+    """Prefer explicit work location and source-provided remote workplace data."""
     location = (
         extract_explicit_work_location(str(job.get("description") or ""))
         or str(job.get("location") or "")
@@ -3372,18 +3382,7 @@ def job_location_for_matching(
     if not remote_only:
         return location
 
-    source_details = job.get("source_details")
-    if not isinstance(source_details, dict):
-        raw_details = job.get("source_details_json")
-        if isinstance(raw_details, str) and raw_details:
-            try:
-                parsed = json.loads(raw_details)
-            except (TypeError, json.JSONDecodeError):
-                parsed = {}
-            source_details = parsed if isinstance(parsed, dict) else {}
-        else:
-            source_details = {}
-
+    source_details = _job_source_details(job)
     workplace = str(
         source_details.get("workplace_type")
         or job.get("workplace_type")
@@ -3900,7 +3899,16 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
     else:
         reasons.append("no configured target-role match")
 
-    skill_hits = phrase_hits(config.get("skills", []), combined)
+    configured_skills = config.get("skills", [])
+    skill_hits = phrase_hits(configured_skills, combined)
+    if configured_skills:
+        listed_skills = _job_source_details(job).get("key_skills")
+        if isinstance(listed_skills, list):
+            source_hits = {
+                hit for skill in listed_skills if isinstance(skill, str)
+                for hit in phrase_hits(configured_skills, skill)
+            }
+            skill_hits = [skill for skill in configured_skills if skill in source_hits or skill in skill_hits]
     if skill_hits:
         score += min(30, 6 * len(skill_hits))
         reasons.append("skills: " + ", ".join(skill_hits[:5]))
