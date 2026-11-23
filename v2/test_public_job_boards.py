@@ -278,6 +278,40 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(second.locations, ["Bengaluru, IN"])
         self.assertEqual((second.published_at.isoformat(), second.precision), ("2026-11-23T00:00:00+00:00", "date"))
 
+    def test_peoplestrong_collects_candidate_fields_and_keeps_zero_years(self):
+        host = "https://mpgcareers.peoplestrong.com"
+        public_url = host + "/job/detail/MFL_BDO_123"
+        candidate = board_discovery.detect_ats_board(public_url)
+        self.assertEqual(candidate["board_url"], host + "/job/joblist")
+        self.assertEqual(candidate["collector_source"], "peoplestrong")
+        row = {
+            "jobDetailUrl": public_url, "jobTitle": "Engineer", "organizationUnit": "Employer",
+            "locationHierarchy": "Kochi", "expRange": "0-4 years", "jobPostedDate": "2026-11-23",
+            "skills": {"mustTohave": ["Python"], "goodtohave": ["Python", "SQL"]},
+        }
+        listing = {"messageCode": {"code": 200}, "response": [
+            row, {**row, "jobDetailUrl": "https://outside.example/job/detail/other"},
+        ]}
+        detail = {"messageCode": {"code": 200}, "response": {
+            "jobDescription": "<p>Build services.</p>", "internalJobDescription": "internal field",
+        }}
+        config = {"peoplestrong_boards": [{"careers_url": candidate["board_url"], "company": "Example"}]}
+        with (
+            patch.object(radar, "connect_sqlite"),
+            patch.object(radar, "_tracked_source_post", return_value=response(listing)) as post,
+            patch.object(radar, "_tracked_source_get", return_value=response(detail)) as get,
+        ):
+            job, = radar.COLLECTORS["peoplestrong"](config)
+        self.assertEqual(post.call_args.kwargs["json_body"], {})
+        self.assertEqual(get.call_args.kwargs["params"], {"part": "descriprion", "isReqId": "false"})
+        self.assertEqual((job["url"], job["company"], job["location"]), (public_url, "Employer", "Kochi"))
+        self.assertEqual(job["description"], "Build services.")
+        self.assertEqual(job["source_details"]["key_skills"], ["Python", "SQL"])
+        self.assertEqual(job["posted_precision"], "date")
+        self.assertEqual(radar._experience_provenance_details(job), {
+            "min_years": 0, "max_years": 4, "provenance": "employer_stated", "confidence": "high",
+        })
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [

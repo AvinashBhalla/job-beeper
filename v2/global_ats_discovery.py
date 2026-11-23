@@ -54,6 +54,7 @@ COMMONCRAWL_DOMAIN = {
     "ukg": "ultipro.com",
     "zoho": "zohorecruit.com",
     "taleo": "taleo.net",
+    "peoplestrong": "peoplestrong.com",
 }
 COMMONCRAWL_PROVIDERS = tuple(COMMONCRAWL_DOMAIN)
 SITEMAP_USER_AGENT = board_discovery.USER_AGENT

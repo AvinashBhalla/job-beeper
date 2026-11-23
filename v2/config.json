@@ -30,6 +30,7 @@
     "zoho": 600,
     "taleo": 900,
     "successfactors": 900,
+    "peoplestrong": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -158,6 +159,7 @@
     "zoho": false,
     "taleo": false,
     "successfactors": false,
+    "peoplestrong": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -209,5 +211,6 @@
   "phenom_boards": [],
   "zoho_boards": [],
   "taleo_boards": [],
-  "successfactors_boards": []
+  "successfactors_boards": [],
+  "peoplestrong_boards": []
 }

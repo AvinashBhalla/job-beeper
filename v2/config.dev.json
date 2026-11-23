@@ -30,6 +30,7 @@
     "zoho": 600,
     "taleo": 900,
     "successfactors": 900,
+    "peoplestrong": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -158,6 +159,7 @@
     "zoho": true,
     "taleo": true,
     "successfactors": true,
+    "peoplestrong": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -292,5 +294,8 @@
   "successfactors_boards": [
     {"careers_url": "https://jobs.bostonscientific.com/search/", "company": "Boston Scientific"},
     {"careers_url": "https://jobs.lubrizol.com/search/", "company": "Lubrizol"}
+  ],
+  "peoplestrong_boards": [
+    {"careers_url": "https://mpgcareers.peoplestrong.com/job/joblist", "company": "Muthoot Pappachan Group"}
   ]
 }

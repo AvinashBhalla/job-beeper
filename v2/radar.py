@@ -3594,7 +3594,7 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         low, high = extract_linkedin_labeled_experience(description)
         if low is not None or high is not None:
             return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
-    if source == "cutshort" and isinstance(job.get("source_details"), dict):
+    if source in {"cutshort", "peoplestrong"} and isinstance(job.get("source_details"), dict):
         details = job["source_details"]
         low, high = details.get("experience_min_years"), details.get("experience_max_years")
         if type(low) in {int, float} and type(high) in {int, float} and 0 <= low <= high <= 60:
@@ -7127,7 +7127,9 @@ def _hydrate_public_postings(board, postings, get) -> None:
     for job in postings:
         description, location, details_json = existing.get(job.id, ("", "", "{}"))
         stored_details = json.loads(details_json or "{}")
-        job.details = {**stored_details, **{key: value for key, value in job.details.items() if value}}
+        job.details = {**stored_details, **{
+            key: value for key, value in job.details.items() if value or type(value) in {int, float}
+        }}
         if description:
             job.description = description
             if not job.locations and location:

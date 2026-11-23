@@ -31,6 +31,7 @@ LABELS = {
     "zoho": "Zoho Recruit",
     "taleo": "Oracle Taleo",
     "successfactors": "SAP SuccessFactors",
+    "peoplestrong": "PeopleStrong",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 PHENOM_PATHS = {
@@ -47,6 +48,8 @@ TENANT = r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}"
 UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
 ORACLE_API = "/hcmRestApi/resources/latest/recruitingCEJobRequisition"
 ZOHO_OPENINGS = "/recruit/v2/public/Job_Openings"
+PEOPLESTRONG_API = "/api/cp/rest/altone/cp"
+PEOPLESTRONG_JOB = rf"/job/detail/({TENANT})"
 TEAMTAILOR_NS = "{https://teamtailor.com/locations}"
 WORKPLACE = {
     "remote": "remote", "fully_remote": "remote", "hybrid": "hybrid",
@@ -163,6 +166,10 @@ def detect(value: str) -> Board | None:
                          f"{origin}/careersection/{section}/jobsearch.ftl", host, section)
     if host in SUCCESSFACTORS_HOSTS and (path == "/search" or re.fullmatch(SUCCESSFACTORS_JOB, path)):
         return Board("successfactors", host, f"{origin}/search/", host)
+    if re.fullmatch(rf"{HOST_LABEL}\.peoplestrong\.com", host) and (
+        path == "/job/joblist" or re.fullmatch(PEOPLESTRONG_JOB, path)
+    ):
+        return Board("peoplestrong", host, f"{origin}/job/joblist", host)
     return None
 
 
@@ -893,6 +900,54 @@ def _successfactors_detail(board: Board, job: Posting, page: BeautifulSoup) -> N
                 job.published_at, job.precision = _publication(day.isoformat())
 
 
+def _peoplestrong_payload(get, url: str, **kwargs):
+    result = json.loads(_read(get, url, "application/json", **kwargs))
+    status = result.get("messageCode") if isinstance(result, dict) else None
+    if not isinstance(status, dict) or status.get("code") != 200:
+        raise ValueError("PeopleStrong did not return a successful public career response.")
+    data = result.get("response")
+    return [] if data is None and result.get("totalRecords") == 0 else data
+
+
+def _peoplestrong(board: Board, get) -> list[Posting]:
+    # The candidate portal loads a public page of 45 jobs with an empty search.
+    url = f"https://{board.host}{PEOPLESTRONG_API}/jobs/v1?offset=0&limit=45"
+    rows = _peoplestrong_payload(get, url, json_body={})
+    if not isinstance(rows, list):
+        raise ValueError("PeopleStrong did not return a public jobs list.")
+    jobs = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        link = _posting_link(_text(item.get("jobDetailUrl")), board, PEOPLESTRONG_JOB)
+        title = _text(item.get("jobTitle"))
+        if not link or not title:
+            continue
+        skills = item.get("skills")
+        values = (
+            _text(skill)
+            for key in ("mustTohave", "goodtohave")
+            for skill in (skills[key] if isinstance(skills, dict) and isinstance(skills.get(key), list) else [])
+        )
+        details = {"key_skills": list(dict.fromkeys(filter(None, values)))[:50]}
+        experience = re.fullmatch(r"(\d{1,2})\s*-\s*(\d{1,2})\s+years?", _text(item.get("expRange")), re.I)
+        if experience:
+            low, high = map(int, experience.groups())
+            if low <= high <= 60:
+                details.update(experience_min_years=low, experience_max_years=high)
+        location = _text(item.get("locationHierarchy"))
+        date = _text(item.get("jobPostedDate"))
+        published, precision = _publication(date) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date) else (None, "unknown")
+        jobs.append(Posting(
+            link[0], title, link[1], [location] if location else [],
+            published_at=published, precision=precision, details=details,
+            company=_text(item.get("organizationUnit")),
+        ))
+    if rows and not jobs:
+        raise ValueError("PeopleStrong returned no recognizable public job records.")
+    return jobs
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -926,6 +981,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _taleo(board, get)
     elif board.source == "successfactors":
         jobs = _successfactors(board, get)
+    elif board.source == "peoplestrong":
+        jobs = _peoplestrong(board, get)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -947,6 +1004,14 @@ def _structured_items(node):
 
 
 def hydrate(board: Board, job: Posting, get) -> None:
+    if board.source == "peoplestrong":
+        url = f"https://{board.host}{PEOPLESTRONG_API}/job/{job.id}/v2"
+        # The provider spells this selector "descriprion". It returns only the public description.
+        item = _peoplestrong_payload(get, url, params={"part": "descriprion", "isReqId": "false"})
+        if not isinstance(item, dict):
+            raise ValueError("PeopleStrong did not return a public job description.")
+        job.description = _description(item.get("jobDescription"))
+        return
     if board.source == "taleo":
         _taleo_detail(job, get)
         return
