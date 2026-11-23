@@ -173,6 +173,8 @@ def detect_ats_board(value: str) -> dict[str, Any] | None:
             }
         url = _normalise_candidate_url(value)
         public_board = public_job_boards.detect(url)
+        if public_board and public_board.source == "jibe":
+            public_board = public_job_boards.detect(value)
         if public_board:
             return {
                 "provider": public_board.source, "board_key": public_board.key,

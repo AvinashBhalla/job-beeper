@@ -348,6 +348,7 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(board_discovery.detect_ats_board(url)["board_url"], url)
         self.assertIsNone(public_job_boards.detect("https://outside.example/main/jobs?country=India"))
         self.assertIsNone(public_job_boards.detect(url + "&country=Canada"))
+        self.assertIsNone(board_discovery.detect_ats_board(url + "&country=Canada"))
         item = {
             "req_id": "123", "slug": "P1-123", "title": "Data Engineer", "searchable": True,
             "posted_date": "2026-11-23T08:00:00+0000", "city": "Hyderabad", "country": "India",
