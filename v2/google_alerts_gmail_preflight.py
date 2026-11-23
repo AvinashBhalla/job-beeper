@@ -12,6 +12,7 @@ import argparse
 import os
 import sqlite3
 import sys
+from contextlib import closing
 from pathlib import Path
 
 from v2 import google_alerts_gmail
@@ -27,7 +28,7 @@ def check_owner_account(db_path: Path, owner_user_id: int) -> None:
         raise PreflightError("configured_database_not_found")
     uri = db_path.resolve().as_uri() + "?mode=ro"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=5) as conn:
+        with closing(sqlite3.connect(uri, uri=True, timeout=5)) as conn:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA query_only=ON")
             row = conn.execute(

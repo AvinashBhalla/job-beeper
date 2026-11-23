@@ -13,6 +13,8 @@ from urllib.parse import urlencode, urlsplit
 
 import requests
 
+from v2.sqlite_store import connect as connect_sqlite
+
 GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 STATE_TTL_SECONDS = 600
@@ -46,8 +48,7 @@ def load_config() -> GoogleOAuthConfig | None:
 
 
 def _connect(db_path):
-    conn = sqlite3.connect(str(db_path), timeout=10)
-    conn.execute("PRAGMA busy_timeout = 10000")
+    conn = connect_sqlite(db_path)
     return conn
 
 

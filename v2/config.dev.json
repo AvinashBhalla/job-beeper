@@ -105,9 +105,9 @@
   "notifications_enabled": false,
   "source_enabled": {
     "linkedin": false,
-    "naukri": true,
+    "naukri": false,
     "instahyre": false,
-    "greenhouse": false,
+    "greenhouse": true,
     "ashby": false,
     "lever": false,
     "hirebase": false

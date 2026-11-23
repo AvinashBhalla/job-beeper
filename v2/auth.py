@@ -14,6 +14,8 @@ from typing import Any
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
+from v2.sqlite_store import connect as connect_sqlite
+
 PASSWORD_MIN_LENGTH = 5
 PASSWORD_MAX_BYTES = 1024
 SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -26,7 +28,7 @@ _DUMMY_PASSWORD_HASH = _PASSWORD_HASHER.hash(secrets.token_urlsafe(32))
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(db_path), timeout=10)
+    conn = connect_sqlite(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 10000")

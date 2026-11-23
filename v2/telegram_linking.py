@@ -9,11 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from v2.sqlite_store import connect as connect_sqlite
+
 TOKEN_TTL_SECONDS = 10 * 60
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(str(db_path), timeout=10)
+    connection = connect_sqlite(db_path)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA busy_timeout=10000")

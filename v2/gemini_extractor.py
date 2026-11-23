@@ -18,6 +18,7 @@ from typing import Any, Callable
 import requests
 
 from v2 import llm_router
+from v2.sqlite_store import connect as connect_sqlite
 
 log = logging.getLogger("job-radar.gemini")
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -319,7 +320,7 @@ def shadow_extract_jobs(
         max_per_run, max_per_day = DEFAULT_MAX_CALLS_PER_RUN, DEFAULT_MAX_CALLS_PER_DAY
 
     skills = [str(skill).strip().casefold() for skill in configured_skills if str(skill).strip()]
-    with sqlite3.connect(str(db_path), timeout=5) as conn:
+    with connect_sqlite(db_path) as conn:
         _ensure_cache(conn)
         conn.commit()
         calls_this_run = 0
@@ -468,7 +469,7 @@ def shadow_status(db_path: str | Path) -> dict[str, Any]:
     if not Path(db_path).exists():
         return result
     try:
-        with sqlite3.connect(str(db_path), timeout=5) as conn:
+        with connect_sqlite(db_path) as conn:
             _ensure_cache(conn)
             result["calls_today"] = conn.execute(
                 "SELECT COUNT(*) FROM gemini_shadow_cache WHERE substr(created_at,1,10)=? AND model=?",
