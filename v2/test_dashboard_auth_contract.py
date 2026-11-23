@@ -229,7 +229,7 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             "sort_order: sortParameters.sort_order",
             "params.set('source', state.filters.source)",
             "params.set('min_score', String(state.filters.minScore))",
-            "params.set('max_age_hours', String(state.filters.maxAge))",
+            "if (state.filters.maxAge > 0) params.set('max_age_hours', String(state.filters.maxAge))",
             "params.set('alertable_only', 'true')",
             "params.set('remote_only', 'true')",
             "previousJobsPageBtn",
@@ -237,6 +237,10 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         ):
             self.assertIn(required, source, f"dashboard feed must implement {required}")
         self.assertIn('id="feedPagination"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
+        render_feed = source.split("function renderFeed()", 1)[1].split("function updateFeedPagination", 1)[0]
+        self.assertIn("container.innerHTML = jobs.map", render_feed)
+        self.assertNotIn("state.jobs.filter", render_feed)
+        self.assertIn("{ value: '0', label: 'Any posting date' }", source)
 
     def test_job_cards_label_experience_provenance(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")

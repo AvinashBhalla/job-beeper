@@ -947,55 +947,15 @@
     const container = $('jobsListContainer');
     if (!container) return;
 
-    const query = state.filters.search.toLowerCase().trim();
-    const source = state.filters.source;
-    const minScore = state.filters.minScore;
-    const maxAge = state.filters.maxAge;
-    const alertableOnly = state.filters.alertableOnly;
-    const remoteOnly = state.filters.remoteOnly;
-
-    let filtered = state.jobs.filter(job => {
-      const ts = jobTimestamp(job);
-      const textHaystack = [
-        job.title,
-        job.company,
-        job.location,
-        job.source,
-        job.description,
-        JSON.stringify(job.source_details || {}),
-        ...(job.match_reasons || []),
-        ...(job.skills_detected || []),
-      ].join(' ').toLowerCase();
-
-      const matchesQuery = !query || textHaystack.includes(query);
-      const matchesSource = !source || job.source.toLowerCase() === source.toLowerCase();
-      const configuredThreshold = state.config?.match_threshold ?? 55;
-      const matchesScore = job.match_score >= minScore
-        && (minScore < configuredThreshold || job.likely_match);
-      const matchesAge = ageHours(ts) <= maxAge;
-      const matchesAlertable = !alertableOnly || job.alertable;
-      const matchesRemote = !remoteOnly || job.work_mode.toLowerCase().includes('remote') || job.location.toLowerCase().includes('remote') || job.description.toLowerCase().includes('remote');
-
-      return matchesQuery && matchesSource && matchesScore && matchesAge && matchesAlertable && matchesRemote;
-    });
-
-    // Sorting
-    if (state.filters.sort === 'match') {
-      filtered.sort((a, b) => b.match_score - a.match_score || String(jobTimestamp(b) || '').localeCompare(String(jobTimestamp(a) || '')));
-    } else if (state.filters.sort === 'company') {
-      filtered.sort((a, b) => a.company.localeCompare(b.company));
-    } else {
-      filtered.sort((a, b) => String(jobTimestamp(b) || '').localeCompare(String(jobTimestamp(a) || '')) || b.match_score - a.match_score);
-    }
-
-    // Update Counter & Active Filter Pills.
+    // The API applies filters and sorting before cutting the page.
+    const jobs = state.jobs;
     const pagination = state.pagination || {
       page: state.feedPage, per_page: state.feedPageSize,
-      total: state.jobs.length, total_pages: 1,
+      total: jobs.length, total_pages: 1,
       has_previous: state.feedPage > 1, has_next: false,
     };
-    const firstItem = pagination.total ? ((pagination.page - 1) * pagination.per_page) + 1 : 0;
-    const lastItem = firstItem ? firstItem + filtered.length - 1 : 0;
+    const firstItem = jobs.length ? ((pagination.page - 1) * pagination.per_page) + 1 : 0;
+    const lastItem = firstItem ? firstItem + jobs.length - 1 : 0;
     const countText = $('feedCountText');
     if (countText) {
       countText.innerHTML = 'Showing <b>' + firstItem +
@@ -1008,7 +968,7 @@
 
     renderActiveFiltersBar();
 
-    if (filtered.length === 0) {
+    if (jobs.length === 0) {
       container.innerHTML = `
         <div style="text-align:center;padding:48px 24px;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:12px;">
           <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
@@ -1022,7 +982,7 @@
     }
 
     // Render Opportunity Rows
-    container.innerHTML = filtered.map(job => {
+    container.innerHTML = jobs.map(job => {
       const ts = jobTimestamp(job);
       const isSelected = String(state.selectedJobId) === String(job.id);
       const applied = isJobApplied(job.id);
@@ -1156,7 +1116,7 @@
     if (state.filters.minScore > 0) {
       tags.push(`Score &ge; ${state.filters.minScore}%`);
     }
-    if (state.filters.maxAge < 72) {
+    if (state.filters.maxAge > 0 && state.filters.maxAge < 72) {
       tags.push(`Age &le; ${state.filters.maxAge}h`);
     }
     if (state.filters.alertableOnly) {
@@ -2318,7 +2278,7 @@
     if (searchQuery) params.set('search', searchQuery);
     if (state.filters.source) params.set('source', state.filters.source);
     if (state.filters.minScore > 0) params.set('min_score', String(state.filters.minScore));
-    if (state.filters.maxAge < 72) params.set('max_age_hours', String(state.filters.maxAge));
+    if (state.filters.maxAge > 0) params.set('max_age_hours', String(state.filters.maxAge));
     if (state.filters.alertableOnly) params.set('alertable_only', 'true');
     if (state.filters.remoteOnly) params.set('remote_only', 'true');
 
@@ -3173,6 +3133,7 @@
         { value: '24', label: 'Last 24 hours' },
         { value: '6', label: 'Last 6 hours' },
         { value: '1', label: 'Last hour' },
+        { value: '0', label: 'Any posting date' },
       ],
       value: String(state.filters.maxAge),
       onChange: (val) => {
