@@ -4715,7 +4715,8 @@ class InitialSourceBaselineMarkerTests(unittest.TestCase):
                 self.assertIn("source_initial_baseline", columns)
                 self.assertEqual(value[0], 0)
                 self.assertIn("experience_extraction_version", columns)
-                self.assertEqual(value[1], radar.EXPERIENCE_EXTRACTION_VERSION)
+                # Adding the column does not run extraction on the legacy description.
+                self.assertEqual(value[1], 1)
             finally:
                 radar.DB_PATH = original
 
