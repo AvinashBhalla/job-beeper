@@ -33,6 +33,7 @@
     isAdmin: false,
     userPreferences: null,
     sourceStatus: [],
+    sourceStatusError: false,
     boardSchedulerStatus: null,
     discoveredBoards: [],
     globalCandidates: [],
@@ -886,7 +887,7 @@
           target.id === 'jobsSection' ? 'Jobs Feed' :
           target.id === 'appliedSection' ? 'Applied Jobs' :
           target.id === 'preferencesSection' ? 'Matching Preferences' :
-          target.id === 'sourcesSection' ? 'Coverage & Health' :
+          target.id === 'sourcesSection' ? 'Source Health' :
           target.id === 'accessSection' ? 'Account' : 'Jobs Feed';
       }
 
@@ -895,9 +896,7 @@
       } else if (target.id === 'sourcesSection') {
         renderSourceHealth();
         void loadSourceStatusTelemetry();
-        void loadGlobalDiscoveryCompanies();
-        void loadGlobalDiscoveryCandidates();
-        void loadCompanyWatchManifest();
+        loadOpenSourceTools();
       }
 
       if (pushHash) {
@@ -1590,12 +1589,76 @@
   // =========================================================================
   // 12. Source Health Matrix Controller
   // =========================================================================
+  const sourceLabels = {
+    linkedin: 'LinkedIn', naukri: 'Naukri', instahyre: 'Instahyre',
+    greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
+    smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka',
+    darwinbox: 'Darwinbox', hirebase: 'Hirebase',
+  };
+
+  function describeSourceStatus(source) {
+    const runtime = source.runtime || {};
+    const outcome = source.last_run_outcome || runtime.last_run_outcome;
+    if (Date.parse(runtime.rate_limited_until) > Date.now() || outcome === 'rate_limited' || outcome === 'partial_rate_limited') {
+      return { rank: 0, label: 'Rate limited', detail: 'The provider asked us to slow down.' };
+    }
+    if (source.source === 'naukri' && source.last_feed?.fresh === false) {
+      return { rank: 0, label: 'Feed is stale', detail: 'Waiting for a fresh snapshot from the relay.' };
+    }
+    if (outcome === 'partial_failed') {
+      return { rank: 0, label: 'Partial results', detail: 'Some boards or pages could not be fetched.' };
+    }
+    if (outcome === 'failed' || runtime.error || source.last_error) {
+      return { rank: 0, label: 'Fetch failed', detail: 'Open Technical diagnostics for the error.' };
+    }
+    if (runtime.running) return { rank: 1, label: 'Fetching now' };
+    if (!source.last_run) return { rank: 1, label: 'Waiting for first check' };
+    return { rank: 2, label: 'Healthy' };
+  }
+
   function renderSourceHealth() {
+    const sources = state.sourceStatus;
+    const enabled = [];
+    const paused = [];
+    for (const source of sources) {
+      const name = sourceLabels[source.source] || source.source;
+      if (source.enabled === false) {
+        paused.push(name);
+      } else {
+        enabled.push({ ...source, name, status: describeSourceStatus(source) });
+      }
+    }
+    enabled.sort((a, b) => a.status.rank - b.status.rank || a.name.localeCompare(b.name));
+    paused.sort((a, b) => a.localeCompare(b));
+    const issues = enabled.filter(source => source.status.rank === 0).length;
+    const overview = $('sourceOverviewStatus');
+    const message = state.sourceStatusError ? 'Source status is unavailable. Try Refresh status.'
+      : !sources.length ? 'Loading sources…'
+        : !enabled.length ? 'No sources enabled. Use Configure sources to turn on a provider.'
+          : `${enabled.length} enabled · ${issues} ${issues === 1 ? 'needs' : 'need'} attention`;
+    if (overview.textContent !== message) overview.textContent = message;
+    $('sourceOverviewTable').hidden = !enabled.length;
+    $('sourceOverviewTableBody').innerHTML = enabled.map(source => `
+      <tr>
+        <th scope="row">${esc(source.name)}</th>
+        <td><span class="signal-pill ${source.status.rank === 0 ? 'signal-warning' : source.status.rank === 2 ? 'signal-success' : 'signal-neutral'}">${esc(source.status.label)}</span>
+          ${source.status.detail ? `<span class="source-status-detail">${esc(source.status.detail)}</span>` : ''}</td>
+        <td class="meta-mono">${Number(source.last_24h?.new_jobs || 0).toLocaleString('en-IN')}</td>
+        <td>${esc(source.last_run ? fmtTimestamp(source.last_run, 'minute') : '—')}</td>
+      </tr>
+    `).join('');
+    $('pausedSourcesPanel').hidden = !paused.length;
+    $('pausedSourcesLabel').textContent = `Paused sources (${paused.length})`;
+    $('pausedSourcesList').innerHTML = paused.map(name => `<li>${esc(name)}</li>`).join('');
+    if ($('sourceDiagnostics').open) renderSourceDiagnostics();
+  }
+
+  function renderSourceDiagnostics() {
     const tbody = $('sourceHealthTableBody');
     if (!tbody) return;
 
     if (state.sourceStatus.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:var(--space-20);">Loading source telemetry…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:var(--space-20);">${state.sourceStatusError ? 'Source telemetry is unavailable.' : 'Loading source telemetry…'}</td></tr>`;
       return;
     }
 
@@ -1622,20 +1685,6 @@
       const isError = Boolean(errorText) && !isPartial;
       const isRunning = Boolean(runtime.running);
       const isDisabled = src.enabled === false;
-      const sourceLabels = {
-        linkedin: 'LinkedIn',
-        naukri: 'Naukri (Relay)',
-        instahyre: 'Instahyre',
-        greenhouse: 'Greenhouse',
-        ashby: 'Ashby',
-        lever: 'Lever',
-        workday: 'Workday',
-        smartrecruiters: 'SmartRecruiters',
-        workable: 'Workable',
-        keka: 'Keka',
-        darwinbox: 'Darwinbox',
-        hirebase: 'Hirebase (budgeted index)',
-      };
       const sourceName = sourceLabels[src.source] || src.source;
       let statusBadge = `<span class="signal-pill signal-success">${SVG_ICONS.check} ACTIVE</span>`;
       if (isDisabled) {
@@ -2325,28 +2374,48 @@
       state.sourceStatus = [];
       return;
     }
+    if (state.activeSection !== 'sourcesSection') return;
     try {
       const res = await authClient.request('/source-status', { cache: 'no-store' });
       if (res.status === 401) { window.location.reload(); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
       state.sourceStatus = data.sources || [];
+      state.sourceStatusError = false;
     } catch (e) {
-      state.sourceStatus = [
-        { source: 'linkedin', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'naukri', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'greenhouse', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-        { source: 'instahyre', runtime: { running: false, error: 'Dashboard API unavailable', last_success: null }, jobs_seen: 0, new_jobs: 0 },
-      ];
+      state.sourceStatus = [];
+      state.sourceStatusError = true;
     }
-    if (state.activeSection === 'sourcesSection') {
-      renderSourceHealth();
-      void loadDiscoveredBoards();
-      void loadDirectoryCoverageSummary();
-      void loadHirebaseBudgetStatus();
-      void loadWorkdayInventoryStatus();
-      void loadBoardSchedulerStatus();
+    if (state.activeSection === 'sourcesSection') renderSourceHealth();
+  }
+
+  const sourceToolLoaders = {
+    sourceBoardTools: loadDiscoveredBoards,
+    sourceImportTools: () => Promise.all([
+      loadDirectoryCoverageSummary(), loadGlobalDiscoveryCompanies(),
+      loadGlobalDiscoveryCandidates(), loadCompanyWatchManifest(),
+    ]),
+    sourceDiagnostics: () => {
+      renderSourceDiagnostics();
+      return Promise.all([loadWorkdayInventoryStatus(), loadBoardSchedulerStatus()]);
+    },
+    hirebaseBudgetPanel: loadHirebaseBudgetStatus,
+  };
+
+  function loadOpenSourceTools() {
+    for (const [id, load] of Object.entries(sourceToolLoaders)) {
+      if ($(id)?.open) void load();
     }
+  }
+
+  function revealSourcePanel(sectionId, panelId) {
+    if (!state.isAdmin) return;
+    window.showSection(sectionId);
+    const panel = $(panelId);
+    if (!panel) return;
+    panel.open = true;
+    panel.querySelector('summary')?.focus({ preventScroll: true });
+    panel.scrollIntoView({ block: 'start' });
   }
 
   async function loadDirectoryCoverageSummary() {
@@ -2965,7 +3034,20 @@
 
     // Refresh buttons
     if ($('refreshFeedBtn')) $('refreshFeedBtn').addEventListener('click', () => loadJobsFeed());
-    if ($('refreshSourcesBtn')) $('refreshSourcesBtn').addEventListener('click', () => loadSourceStatusTelemetry());
+    $('refreshSourcesBtn')?.addEventListener('click', () => {
+      void loadSourceStatusTelemetry();
+      loadOpenSourceTools();
+    });
+    $('configureSourcesBtn')?.addEventListener('click', () => revealSourcePanel('preferencesSection', 'sourceSettings'));
+    $('sourceSettingsBoardLink')?.addEventListener('click', event => {
+      event.preventDefault();
+      revealSourcePanel('sourcesSection', 'sourceBoardTools');
+    });
+    for (const [id, load] of Object.entries(sourceToolLoaders)) {
+      $(id)?.addEventListener('toggle', event => {
+        if (event.currentTarget.open && state.activeSection === 'sourcesSection') void load();
+      });
+    }
     if ($('importLastRoundDirectoryBtn')) $('importLastRoundDirectoryBtn').addEventListener('click', (event) => importLastRoundDirectory(event.currentTarget));
     if ($('importCompanyWatchManifestBtn')) $('importCompanyWatchManifestBtn').addEventListener('click', (event) => importCompanyWatchManifest(event.currentTarget));
     const hirebaseSourceToggle = document.querySelector('#cfgSourcesWrap input[data-source="hirebase"]');

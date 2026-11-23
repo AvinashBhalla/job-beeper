@@ -169,6 +169,23 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         self.assertIn(".nav-link-item {\n  display: flex;", css)
         self.assertIn(".mobile-tab-btn {\n  display: flex;", css)
 
+    def test_source_health_leads_with_overview_and_collapses_optional_tools(self):
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        section = html.split('id="sourcesSection"', 1)[1].split("</section>", 1)[0]
+        overview = section.index('id="sourceOverviewTable"')
+        settings = html.split('id="sourceSettings"', 1)[1].split('id="sourcesSection"', 1)[0]
+        self.assertIn('id="cfgSourcesWrap"', settings)
+        self.assertIn('id="configureSourcesBtn"', section[:overview])
+        for panel, child in (
+            ("sourceBoardTools", "boardDiscoveryForm"),
+            ("sourceImportTools", "importLastRoundDirectoryBtn"),
+            ("sourceDiagnostics", "sourceHealthTableBody"),
+            ("hirebaseBudgetPanel", "hirebaseEstimateResults"),
+        ):
+            panel_markup = f'<details class="source-disclosure" id="{panel}">'
+            self.assertGreater(section.index(panel_markup), overview)
+            self.assertIn(f'id="{child}"', section.split(panel_markup, 1)[1].split("</details>", 1)[0])
+
     def test_mobile_telemetry_header_uses_a_wrapping_grid_at_390px(self):
         css = (ROOT / "dashboard" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 560px)", css)

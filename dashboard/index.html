@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=obsidian_v4">
+  <link rel="stylesheet" href="styles.css?v=source_health_v1">
 </head>
 
 <body>
@@ -562,7 +562,11 @@
 
               <!-- Sources & Toggles -->
               <div style="display:flex;flex-direction:column;gap:var(--space-6);margin-top:var(--space-8);">
-                <div class="admin-only-setting" style="display:flex;gap:var(--space-12);flex-wrap:wrap;" id="cfgSourcesWrap">
+                <details class="source-disclosure admin-only-setting" id="sourceSettings">
+                  <summary>Source settings</summary>
+                  <div class="source-disclosure-content">
+                    <p class="auth-description">Choose which providers can fetch jobs, then use Save Preferences below. To add an employer, use <a href="#sources" id="sourceSettingsBoardLink">Employer boards</a> in Source Health.</p>
+                <div class="source-health-actions" id="cfgSourcesWrap">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="linkedin" checked> LinkedIn</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="naukri" checked> Naukri</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="greenhouse"> Greenhouse</label>
@@ -576,14 +580,16 @@
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="darwinbox"> Darwinbox</label>
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" data-source="hirebase"> Hirebase (optional, budgeted)</label>
                 </div>
-                <p class="auth-description" style="margin:0;">Hirebase is an optional external job index. It stays off by default, estimates every query before spending, and is capped locally at 400 results per billing period / 12 per day / 4 per ATS. Its key is server-side only. Commercial product use requires vendor licence approval.</p>
-                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
+                <details class="source-disclosure">
+                  <summary>Advanced board configuration (JSON)</summary>
+                  <div class="source-disclosure-content">
+                <div class="form-field-group">
                   <label class="form-field-label" for="cfgWorkdayBoards">Workday public career boards (JSON)</label>
                   <textarea id="cfgWorkdayBoards" rows="4" spellcheck="false" placeholder='[{"url":"https://company.wd5.myworkdayjobs.com/CareerSite","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
                   <span style="font-size:11px;color:var(--text-muted);">Add only verified public myworkdayjobs.com URLs. Use the employer's real careers URL; tenant and site identifiers are derived from it. Workday remains off until a board is added and the source is enabled.</span>
                 </div>
 
-                <div class="admin-only-setting" style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-6);">
+                <div class="form-field-group">
                   <label class="form-field-label" for="cfgSmartRecruitersBoards">SmartRecruiters company identifiers (JSON)</label>
                   <textarea id="cfgSmartRecruitersBoards" rows="3" spellcheck="false" placeholder='[{"company_identifier":"BoschGroup","company":"Bosch Group"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
                   <label class="form-field-label" for="cfgWorkableBoards">Workable public account slugs (JSON)</label>
@@ -592,8 +598,12 @@
                   <textarea id="cfgKekaBoards" rows="3" spellcheck="false" placeholder='[{"careers_url":"https://company.keka.com/careers","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
                   <label class="form-field-label" for="cfgDarwinboxBoards">Darwinbox public careers URLs (JSON)</label>
                   <textarea id="cfgDarwinboxBoards" rows="3" spellcheck="false" placeholder='[{"careers_url":"https://tenant.darwinbox.in/ms/candidatev2/companyId/careers/allJobs","company":"Company"}]' style="width:100%;font-family:var(--font-mono);font-size:12px;"></textarea>
-                  <span style="font-size:11px;color:var(--text-muted);">Use identifiers discovered and verified from the employer's public careers board. All sources remain off until explicitly enabled.</span>
+                  <span class="form-help-text">Use verified public board identifiers. Provider checkboxes control which boards are scheduled.</span>
                 </div>
+                  </div>
+                </details>
+                  </div>
+                </details>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);">
                   <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cfgRemoteOnly"> Remote opportunities only</label>
                   <span class="form-help-text">Remote only uses explicit remote workplace evidence, excludes hybrid/on-site roles, and intersects with a selected location. With no location selected, explicitly remote jobs worldwide are eligible.</span>
@@ -616,42 +626,39 @@
         <!-- ===================================================================
              4. SOURCE HEALTH SECTION
              =================================================================== -->
-        <section id="sourcesSection" class="workspace-page admin-only-section" aria-label="Source Health Workspace" hidden>
-          <div class="view-content-wrapper">
+        <section id="sourcesSection" class="workspace-page admin-only-section" aria-label="Source Health" hidden>
+          <div class="view-content-wrapper source-health-page">
             <div class="view-headline-row">
               <div>
-                <h2 class="view-title-main">Source Health &amp; Ingestion Telemetry</h2>
-                <p class="view-subtitle-main">Latest source health and measured request, retry, rate-limit and partial-failure totals over the last 24 hours. Historical runs are marked Not measured.</p>
+                <h2 class="view-title-main">Source Health</h2>
+                <p class="view-subtitle-main">See which job sources are fetching and what needs attention.</p>
               </div>
-              <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh Telemetry</button>
+              <div class="source-health-actions">
+                <button type="button" class="btn-pill btn-pill-secondary" id="refreshSourcesBtn">Refresh status</button>
+                <button type="button" class="btn-pill btn-pill-primary" id="configureSourcesBtn">Configure sources</button>
+              </div>
             </div>
 
-            <div class="settings-block" id="hirebaseBudgetPanel" style="margin-top:var(--space-10);">
-              <span class="settings-block-title">Optional global job index — Hirebase</span>
-              <p class="auth-description">Use the Free API only as a small coverage sample. JobBeeper estimates before any paid-result search, reserves credits before requests and caps local use at 400 per billing period, 12/day and 4 per ATS. This preserves 100 credits below the published 500-job Free allowance. The key is read from the development server environment only; it is never shown here.</p>
-              <div id="hirebaseBudgetStatus" class="auth-description" role="status" aria-live="polite">Loading Hirebase configuration and local budget…</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:var(--space-6);">
-                <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="workday">Estimate Workday (free)</button>
-                <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="keka">Estimate Keka (free)</button>
-                <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="darwinbox">Estimate Darwinbox (free)</button>
+            <div class="source-overview">
+              <p id="sourceOverviewStatus" class="auth-description" role="status">Loading sources…</p>
+              <div class="data-table-container source-table-scroll" id="sourceOverviewTable" hidden>
+                <table class="table-dataset" aria-label="Enabled job sources">
+                  <thead><tr><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Jobs added (24h)</th><th scope="col">Last check (IST)</th></tr></thead>
+                  <tbody id="sourceOverviewTableBody"></tbody>
+                </table>
               </div>
-              <div id="hirebaseEstimateResults" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Estimates do not consume job-result credits. Searches do.</div>
             </div>
-            <div class="settings-block" id="lastRoundDirectoryPanel" style="margin-top:var(--space-10);">
-              <span class="settings-block-title">Global ATS directory seed</span>
-              <p class="auth-description">Import an attributed LastRound AI August 2026 snapshot of 9,935 Greenhouse, Lever and Ashby boards. These are candidate URLs, not verified live boards; they will not be activated or polled by this import. This snapshot does not cover Workday, Keka or Darwinbox.</p>
-              <button type="button" class="btn-pill btn-pill-secondary" id="importLastRoundDirectoryBtn">Import 9,935 candidate boards</button>
-              <div id="directoryCoverageSummary" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Loading current registry coverage…</div>
-              <p id="lastRoundDirectoryStatus" class="auth-description" role="status" aria-live="polite" style="margin-top:var(--space-6);">Directory has not been imported in this session.</p>
-            </div>
-            <div class="settings-block" id="workdayInventoryPanel" style="margin-top:var(--space-10);">
-              <span class="settings-block-title">Workday board inventory progress</span>
-              <p class="auth-description">The newest page is checked on the normal source cadence. A separate inventory cursor adds at most one more page per configured board every 15 minutes. Boards reporting the 2,000-result cap are subdivided by available Workday facets over time; leaves that cannot be safely subdivided remain explicitly incomplete.</p>
-              <div id="workdayInventoryStatus" class="auth-description" role="status" aria-live="polite">Loading Workday inventory cursors…</div>
-            </div>
-            <div class="settings-block" id="boardDiscoveryPanel" style="margin-top:var(--space-10);">
-              <span class="settings-block-title">Employer &amp; Career Board Discovery</span>
-              <p class="auth-description">Enter a company's normal website or careers URL. Job Beeper checks public careers links, identifies supported ATS board patterns and adds candidates to this review queue. Discovery does not enable a collector or send Telegram alerts.</p>
+            <details class="source-disclosure" id="pausedSourcesPanel" hidden>
+              <summary id="pausedSourcesLabel">Paused sources</summary>
+              <div class="source-disclosure-content"><ul id="pausedSourcesList"></ul></div>
+            </details>
+
+            <details class="source-disclosure" id="sourceBoardTools">
+              <summary>Employer boards <span>Find and activate company career boards</span></summary>
+              <div class="source-disclosure-content">
+              <p class="auth-description">Enter the employer name and website. Add its careers URL if you know it. Verify the board, then activate it to start fetching jobs.</p>
+            <div class="settings-block" id="boardDiscoveryPanel">
+              <span class="settings-block-title">Find an employer board</span>
               <form id="boardDiscoveryForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--space-8);align-items:end;">
                 <div class="form-field-group">
                   <label class="form-field-label" for="discoveryCompanyName">Company name</label>
@@ -679,7 +686,19 @@
                 </table>
               </div>
             </div>
-            <div class="settings-block" id="globalCandidatesPanel" style="margin-top:var(--space-10);">
+              </div>
+            </details>
+            <details class="source-disclosure" id="sourceImportTools">
+              <summary>Candidate imports <span>Stage boards for review</span></summary>
+              <div class="source-disclosure-content">
+            <div class="settings-block" id="lastRoundDirectoryPanel">
+              <span class="settings-block-title">LastRound AI directory</span>
+              <p class="auth-description">Stage Greenhouse, Lever, and Ashby boards from the attributed August 2026 directory. Imported boards need verification and activation.</p>
+              <button type="button" class="btn-pill btn-pill-secondary" id="importLastRoundDirectoryBtn">Import 9,935 candidate boards</button>
+              <div id="directoryCoverageSummary" class="auth-description" role="status" aria-live="polite">Loading current registry coverage…</div>
+              <p id="lastRoundDirectoryStatus" class="auth-description" role="status" aria-live="polite"></p>
+            </div>
+            <div class="settings-block" id="globalCandidatesPanel">
               <span class="settings-block-title">Unmatched global ATS candidates</span>
               <p class="auth-description">Stage public Workday, Keka and Darwinbox URLs without inventing an employer record. Preserve the capture source, link a candidate to an existing employer after review, or reject it. Linking only adds a discovered board; verification and activation are separate steps.</p>
               <form id="globalCandidateForm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--space-8);align-items:end;">
@@ -717,7 +736,7 @@
               </div>
             </div>
 
-            <div class="settings-block" id="companyWatchManifestPanel" style="margin-top:var(--space-10);">
+            <div class="settings-block" id="companyWatchManifestPanel">
               <span class="settings-block-title">Company Watch manifest — review only</span>
               <p class="auth-description">Import the pinned 100-company manifest into the V2 review queue. The import stages supported ATS candidates and retains ambiguous, disabled, generic and unsupported records for manual review. It does not create employers, verify or activate boards, poll sources, change schedules or send notifications.</p>
               <button type="button" class="btn-pill btn-pill-secondary" id="importCompanyWatchManifestBtn">Validate and import 100-company manifest</button>
@@ -730,7 +749,16 @@
               </div>
             </div>
 
-            <div class="settings-block" id="boardSchedulerPanel" style="margin-top:var(--space-10);">
+              </div>
+            </details>
+            <details class="source-disclosure" id="sourceDiagnostics">
+              <summary>Technical diagnostics <span>Polling schedules, request counts, and errors</span></summary>
+              <div class="source-disclosure-content">
+            <div class="settings-block" id="workdayInventoryPanel">
+              <span class="settings-block-title">Workday board inventory progress</span>
+              <div id="workdayInventoryStatus" class="auth-description" role="status" aria-live="polite">Loading Workday inventory cursors…</div>
+            </div>
+            <div class="settings-block" id="boardSchedulerPanel">
               <span class="settings-block-title">Persistent employer-board scheduler</span>
               <p class="auth-description">Each explicitly activated employer board has its own persisted due time and outcome. API-host budgets allow one active board poll per host, apply a small request spacing interval, and retain cooldowns after HTTP 429. Discovered or merely verified boards are never scheduled.</p>
               <div id="boardSchedulerSummary" class="auth-description" role="status" aria-live="polite">Loading persistent board schedules…</div>
@@ -772,6 +800,20 @@
                 </tbody>
               </table>
             </div>
+              </div>
+            </details>
+            <details class="source-disclosure" id="hirebaseBudgetPanel">
+              <summary>Optional Hirebase index</summary>
+              <div class="source-disclosure-content">
+                <div id="hirebaseBudgetStatus" class="auth-description" role="status" aria-live="polite">Loading Hirebase configuration…</div>
+                <div class="source-health-actions">
+                  <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="workday">Estimate Workday (free)</button>
+                  <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="keka">Estimate Keka (free)</button>
+                  <button type="button" class="btn-pill btn-pill-secondary hirebase-estimate-btn" data-provider="darwinbox">Estimate Darwinbox (free)</button>
+                </div>
+                <div id="hirebaseEstimateResults" class="auth-description" role="status" aria-live="polite">Estimates do not use job credits. The API key is configured on the server.</div>
+              </div>
+            </details>
           </div>
         </section>
 
@@ -848,7 +890,7 @@
   <div class="toast-notifications-host" id="toastContainer" aria-live="polite"></div>
 
   <script src="auth.js?v=auth_v3"></script>
-  <script src="app.js?v=shared_workspace_v2"></script>
+  <script src="app.js?v=source_health_v1"></script>
 </body>
 
 </html>
