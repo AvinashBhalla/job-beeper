@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from v2 import board_discovery
+from v2.recruitee import BOARD_NAME as RECRUITEE_BOARD_NAME
 from v2.sqlite_store import DB_LOCK, connect
 
 UTC = dt.timezone.utc
@@ -26,6 +27,7 @@ BOARD_CONFIG_KEYS = {
     "workable": "workable_boards",
     "keka": "keka_boards",
     "darwinbox": "darwinbox_boards",
+    "recruitee": "recruitee_boards",
 }
 BOARD_SCHEDULER_MAX_CONCURRENT_HOSTS = 3
 BOARD_HOST_MIN_INTERVAL_SECONDS = 5
@@ -61,6 +63,9 @@ def _identity(source: str, board: dict[str, Any]) -> tuple[str, str] | None:
     if source == "ashby":
         key = str(board.get("board") or "").strip().lower()
         return (key, "api.ashbyhq.com") if key else None
+    if source == "recruitee":
+        key = str(board.get("board") or "").strip().lower()
+        return (key, f"{key}.recruitee.com") if RECRUITEE_BOARD_NAME.fullmatch(key) else None
     if source == "lever":
         site = str(board.get("site") or "").strip().lower()
         instance = str(board.get("instance") or "global").strip().lower()

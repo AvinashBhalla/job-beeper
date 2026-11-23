@@ -11,6 +11,7 @@
     "workable": 120,
     "keka": 120,
     "darwinbox": 120,
+    "recruitee": 300,
     "hirebase": 86400
   },
   "locations": [
@@ -120,6 +121,7 @@
     "workable": false,
     "keka": false,
     "darwinbox": false,
+    "recruitee": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -152,5 +154,6 @@
   "smartrecruiters_boards": [],
   "workable_boards": [],
   "keka_boards": [],
-  "darwinbox_boards": []
+  "darwinbox_boards": [],
+  "recruitee_boards": []
 }

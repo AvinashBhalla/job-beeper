@@ -1593,7 +1593,7 @@
     linkedin: 'LinkedIn', naukri: 'Naukri', instahyre: 'Instahyre',
     greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
     smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka',
-    darwinbox: 'Darwinbox', hirebase: 'Hirebase',
+    darwinbox: 'Darwinbox', recruitee: 'Recruitee', hirebase: 'Hirebase',
   };
 
   function describeSourceStatus(source) {
@@ -1740,6 +1740,7 @@
     const providerLabels = {
       greenhouse: 'Greenhouse', ashby: 'Ashby', lever: 'Lever', workday: 'Workday',
       smartrecruiters: 'SmartRecruiters', workable: 'Workable', keka: 'Keka', darwinbox: 'Darwinbox',
+      recruitee: 'Recruitee',
     };
     tbody.innerHTML = boards.length ? boards.map(board => {
       const isActive = Boolean(board.is_active);
@@ -2951,6 +2952,7 @@
       { value: 'workable', label: 'Workable' },
       { value: 'keka', label: 'Keka' },
       { value: 'darwinbox', label: 'Darwinbox' },
+      { value: 'recruitee', label: 'Recruitee' },
       { value: 'hirebase', label: 'Hirebase' },
     ];
     if (dropdowns.source) {

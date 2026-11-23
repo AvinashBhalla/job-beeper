@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 
 from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, google_alerts_gmail, google_alerts_job_verifier, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
+from v2 import recruitee
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
@@ -98,8 +99,8 @@ HIREBASE_PROVIDER_LIMIT = 4
 HIREBASE_MAX_MONTHLY_JOBS = 400
 HIREBASE_MAX_DAILY_JOBS = 12
 HIREBASE_PROVIDER_DAILY_JOBS = 4
-PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "hirebase"})
-INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "hirebase"})
+PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "recruitee", "hirebase"})
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "recruitee", "hirebase"})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 
@@ -592,6 +593,26 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized_darwinbox.append(entry)
     config["darwinbox_boards"] = normalized_darwinbox
 
+    recruitee_boards = config.get("recruitee_boards", [])
+    if not isinstance(recruitee_boards, list) or len(recruitee_boards) > recruitee.MAX_BOARDS:
+        raise HTTPException(status_code=422, detail=f"recruitee_boards must be a list with at most {recruitee.MAX_BOARDS} entries.")
+    normalized_recruitee: dict[str, dict[str, Any]] = {}
+    for board in recruitee_boards:
+        if not isinstance(board, dict):
+            raise HTTPException(status_code=422, detail="Each Recruitee board must be an object.")
+        name = str(board.get("board") or "").strip().lower()
+        company = board.get("company")
+        if not recruitee.BOARD_NAME.fullmatch(name) or not isinstance(company, str) or not 1 <= len(company.strip()) <= 120:
+            raise HTTPException(status_code=422, detail="Each Recruitee board requires a careers subdomain and a company name.")
+        if name in normalized_recruitee:
+            raise HTTPException(status_code=422, detail=f"Duplicate Recruitee board: {name}.")
+        entry = {"board": name, "company": company.strip()}
+        registry_id = _optional_registry_id(board, "Recruitee")
+        if registry_id is not None:
+            entry["registry_id"] = registry_id
+        normalized_recruitee[name] = entry
+    config["recruitee_boards"] = list(normalized_recruitee.values())
+
     source_enabled = config.get("source_enabled", {})
     if not isinstance(source_enabled, dict):
         raise HTTPException(status_code=422, detail="source_enabled must be an object.")
@@ -607,6 +628,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         "workable": bool(source_enabled.get("workable", False)),
         "keka": bool(source_enabled.get("keka", False)),
         "darwinbox": bool(source_enabled.get("darwinbox", False)),
+        "recruitee": bool(source_enabled.get("recruitee", False)),
         "hirebase": bool(source_enabled.get("hirebase", False)),
     }
     if config["source_enabled"]["hirebase"] and not hirebase.api_key_configured():
@@ -621,6 +643,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         ("workable", normalized_workable),
         ("keka", normalized_keka),
         ("darwinbox", normalized_darwinbox),
+        ("recruitee", normalized_recruitee),
     ):
         if config["source_enabled"][source] and not configured_boards:
             raise HTTPException(status_code=422, detail=f"Add at least one verified {source.title()} public career board before enabling {source.title()}.")
@@ -642,6 +665,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             "workable": 120,
             "keka": 120,
             "darwinbox": 120,
+            "recruitee": 300,
             "hirebase": 86400,
         }.items()
     }
@@ -2922,6 +2946,7 @@ def _tracked_source_get(
     timeout: int = 20,
     retry_attempt: bool = False,
     allow_redirects: bool = True,
+    stream: bool = False,
 ) -> requests.Response:
     """Record safe request metadata; never persist URLs, query strings or payloads."""
     started_monotonic = time.monotonic()
@@ -2929,6 +2954,7 @@ def _tracked_source_get(
         response = requests.get(
             endpoint, params=params, headers=headers, timeout=timeout,
             allow_redirects=allow_redirects,
+            **({"stream": True} if stream else {}),
         )
     except Exception:
         _record_source_request(
@@ -6992,6 +7018,49 @@ def hirebase_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
+def recruitee_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Fetch published offers from verified public Recruitee boards."""
+    boards = config.get("recruitee_boards", [])
+    jobs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    succeeded = 0
+    for board in boards:
+        name = board["board"]
+        try:
+            response = _tracked_source_get(
+                "recruitee", recruitee.feed_url(name), headers={**UA, "Accept": "application/xml"},
+                timeout=20, allow_redirects=False, stream=True,
+            )
+            offers = recruitee.read_offers(response)
+        except Exception as exc:
+            _record_source_board("recruitee", False)
+            if getattr(getattr(exc, "response", None), "status_code", None) == 429:
+                _set_source_rate_limit("recruitee", exc.response)
+            log.warning("recruitee: board=%s failed error_type=%s", name, type(exc).__name__)
+            continue
+        succeeded += 1
+        _record_source_board("recruitee", True)
+        for offer in offers:
+            item = recruitee.posting(offer, name)
+            if item is None:
+                continue
+            source_id = f"recruitee-{name}-{item['id']}"
+            if source_id in seen_ids:
+                continue
+            seen_ids.add(source_id)
+            jobs.append(normalize_job(
+                "recruitee", source_id, board["company"], item["title"], item["location"],
+                item["url"], item["published_at"], item["precision"], item["description"],
+                source_details={
+                    "board_key": name, "board_registry_id": board.get("registry_id"),
+                    "workplace_type": item["workplace"], "locations": item["locations"],
+                },
+            ))
+    if not succeeded:
+        raise RuntimeError("No Recruitee board could be fetched.")
+    return jobs
+
+
 COLLECTORS = {
     "linkedin": linkedin_collect,
     "naukri": lambda config: naukri_collect(),
@@ -7004,6 +7073,7 @@ COLLECTORS = {
     "workable": workable_collect,
     "keka": keka_collect,
     "darwinbox": darwinbox_collect,
+    "recruitee": recruitee_collect,
     "hirebase": hirebase_collect,
 }
 SOURCE_NAMES = tuple(COLLECTORS)
@@ -7553,6 +7623,7 @@ async def startup() -> None:
     restore_workday_rate_limit_state()
     restore_source_rate_limit_state("smartrecruiters")
     restore_source_rate_limit_state("workable")
+    restore_source_rate_limit_state("recruitee")
     restore_source_rate_limit_state("keka")
     restore_source_rate_limit_state("darwinbox")
     restore_source_rate_limit_state("hirebase")
@@ -8435,7 +8506,7 @@ GLOBAL_DISCOVERY_METHODS = frozenset({
 })
 GLOBAL_DISCOVERY_PROVIDERS = frozenset({
     "workday", "keka", "darwinbox", "greenhouse", "ashby", "lever",
-    "smartrecruiters", "workable",
+    "smartrecruiters", "workable", "recruitee",
 })
 
 
@@ -8493,11 +8564,13 @@ def _normalise_global_ats_candidate_url(value: Any) -> dict[str, str]:
 
     detected = board_discovery.detect_ats_board(value.strip())
     if detected and detected.get("provider") in {
-        "greenhouse", "ashby", "lever", "smartrecruiters", "workable"
+        "greenhouse", "ashby", "lever", "smartrecruiters", "workable", "recruitee"
     }:
         provider = str(detected["provider"])
         board_key = str(detected["board_key"])
-        if provider == "greenhouse":
+        if provider == "recruitee":
+            root_path = ""
+        elif provider == "greenhouse":
             root_path = "/" + urlsplit(value.strip()).path.strip("/").split("/")[0]
         else:
             root_path = "/" + board_key
@@ -9483,6 +9556,9 @@ def activate_discovered_board(board_id: int):
     elif provider == "ashby":
         config_key = "ashby_boards"
         registry_entry = {"board": key, "company": company}
+    elif provider == "recruitee":
+        config_key = "recruitee_boards"
+        registry_entry = {"board": key, "company": company}
     elif provider == "lever":
         config_key = "lever_boards"
         registry_entry = {
@@ -9512,7 +9588,7 @@ def activate_discovered_board(board_id: int):
             return False
         if provider == "greenhouse":
             return str(item.get("token") or "").strip().lower() == key.lower()
-        if provider == "ashby":
+        if provider in {"ashby", "recruitee"}:
             return str(item.get("board") or "").strip().lower() == key.lower()
         if provider == "lever":
             item_instance = str(item.get("instance") or "global").strip().lower()
@@ -9601,6 +9677,7 @@ def deactivate_discovered_board(board_id: int):
         "workday": "workday_boards",
         "smartrecruiters": "smartrecruiters_boards",
         "workable": "workable_boards",
+        "recruitee": "recruitee_boards",
         "keka": "keka_boards",
         "darwinbox": "darwinbox_boards",
     }.get(str(board["provider"]))

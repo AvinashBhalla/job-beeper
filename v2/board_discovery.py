@@ -16,6 +16,8 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import requests
 from bs4 import BeautifulSoup
 
+from v2 import recruitee
+
 USER_AGENT = "JobBeeper-BoardDiscovery/1.0 (+public-careers-discovery)"
 MAX_HTML_BYTES = 1_500_000
 MAX_PAGES_PER_SCAN = 6
@@ -55,6 +57,7 @@ COLLECTOR_SOURCES = {
     "workable": "workable",
     "keka": "keka",
     "darwinbox": "darwinbox",
+    "recruitee": "recruitee",
 }
 
 
@@ -361,6 +364,12 @@ def probe_public_board(board: dict[str, Any]) -> dict[str, Any]:
         jobs = payload.get("data") if isinstance(payload, dict) and payload.get("status") == "success" else None
         if not isinstance(jobs, list):
             raise ValueError("Darwinbox candidate API did not return a successful public jobs list.")
+    elif provider == "recruitee":
+        response = requests.get(
+            recruitee.feed_url(candidate["board_key"].lower()), headers={**headers, "Accept": "application/xml"},
+            timeout=REQUEST_TIMEOUT_SECONDS, allow_redirects=False, stream=True,
+        )
+        jobs = recruitee.read_offers(response)
     elif provider == "lever":
         api_host = "api.eu.lever.co" if ".eu." in candidate["host"] else "api.lever.co"
         endpoint = f"https://{api_host}/v0/postings/{candidate['board_key']}"
