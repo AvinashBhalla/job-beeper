@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -17,12 +17,19 @@ LABELS = {
     "bamboohr": "BambooHR",
     "jobvite": "Jobvite",
     "hireology": "Hireology",
+    "rippling": "Rippling ATS",
+    "oraclecloud": "Oracle Cloud Recruiting",
+    "avature": "Avature",
+    "ycombinator": "Y Combinator",
+    "icims": "iCIMS",
 }
 MAX_BOARDS = 30
 DETAILS_PER_POLL = 10
 MAX_BODY_BYTES = 8 * 1024 * 1024
 HOST_LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
 TENANT = r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}"
+UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+ORACLE_API = "/hcmRestApi/resources/latest/recruitingCEJobRequisition"
 TEAMTAILOR_NS = "{https://teamtailor.com/locations}"
 WORKPLACE = {
     "remote": "remote", "fully_remote": "remote", "hybrid": "hybrid",
@@ -50,6 +57,7 @@ class Posting:
     published_at: datetime | None = None
     precision: str = "unknown"
     details: dict = field(default_factory=dict)
+    company: str = ""
 
 
 def detect(value: str) -> Board | None:
@@ -81,6 +89,30 @@ def detect(value: str) -> Board | None:
         if match:
             tenant = match[1]
             return Board("hireology", tenant.lower(), f"{origin}/{tenant}", host, tenant)
+    if host == "ats.rippling.com":
+        match = re.fullmatch(rf"/({TENANT})/jobs(?:/{UUID}(?:/apply)?)?", path)
+        if match:
+            tenant = match[1]
+            return Board("rippling", tenant.lower(), f"{origin}/{tenant}/jobs", host, tenant)
+    if re.fullmatch(rf"{HOST_LABEL}\.fa\.{HOST_LABEL}\.oraclecloud\.com", host):
+        match = re.fullmatch(
+            rf"/hcmUI/CandidateExperience/[A-Za-z-]{{2,12}}/sites/({TENANT})(?:/jobs|/job/{TENANT})?", path,
+        )
+        if match:
+            site = match[1]
+            return Board("oraclecloud", f"{host}:{site.lower()}",
+                         f"{origin}/hcmUI/CandidateExperience/en/sites/{site}/jobs", host, site)
+    if re.fullmatch(rf"{HOST_LABEL}\.avature\.net", host):
+        match = re.fullmatch(rf"/({TENANT})(?:/SearchJobs(?:/.*)?|/JobDetail/[^/]+/\d+)?", path)
+        if match:
+            portal = match[1]
+            return Board("avature", f"{host.removesuffix('.avature.net')}:{portal.lower()}",
+                         f"{origin}/{portal}/SearchJobs", host, portal)
+    if host == "www.ycombinator.com" and path in {"/jobs/role/all", "/jobs/role/all/india"}:
+        key = "india" if path.endswith("/india") else "all"
+        return Board("ycombinator", key, origin + path, host)
+    if re.fullmatch(rf"{HOST_LABEL}\.icims\.com", host) and re.fullmatch(r"/jobs(?:/search|/\d+/[^/]+/job)?", path):
+        return Board("icims", host.removesuffix(".icims.com"), origin + "/jobs/search", host)
     return None
 
 
@@ -278,6 +310,166 @@ def _html_list(board: Board, get) -> list[Posting]:
     return postings
 
 
+def _oracle(board: Board, get, *, probe: bool) -> list[Posting]:
+    jobs = []
+    page_size = 50
+    endpoint = f"https://{board.host}{ORACLE_API}s"
+    for page in range(1 if probe else 8):
+        body = _read(get, endpoint, "application/json", params={
+            "onlyData": "true", "expand": "requisitionList",
+            "finder": f"findReqs;siteNumber={board.tenant},limit={page_size},offset={page * page_size}",
+        })
+        payload = json.loads(body)
+        items = payload.get("items") if isinstance(payload, dict) else None
+        search = items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else {}
+        rows = search.get("requisitionList")
+        if not isinstance(rows, list):
+            raise ValueError("Oracle Cloud did not return its public requisition list.")
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            job_id = _text(item.get("Id"))
+            title = _text(item.get("Title"))
+            if not re.fullmatch(TENANT, job_id) or not title:
+                continue
+            link = board.url.removesuffix("/jobs") + "/job/" + job_id
+            location = _text(item.get("PrimaryLocation"))
+            published, precision = _publication(_text(item.get("PostedDate")))
+            details = {
+                "department": _text(item.get("Department")),
+                "workplace_type": WORKPLACE.get(_text(item.get("WorkplaceType")).lower()),
+                "employment_type": _text(item.get("JobSchedule")),
+            }
+            jobs.append(Posting(job_id, title, link, [location] if location else [], published_at=published,
+                                precision=precision, details=details))
+        if len(rows) < page_size:
+            break
+    return jobs
+
+
+def _rippling_page(get, url, **kwargs) -> dict:
+    page = BeautifulSoup(bytes(_read(get, url, "text/html", **kwargs)), "html.parser")
+    script = page.select_one("script#__NEXT_DATA__")
+    if script is None:
+        raise ValueError("Rippling page did not contain public board data.")
+    payload = json.loads(script.get_text())
+    props = payload.get("props", {}).get("pageProps", {})
+    if not isinstance(props, dict):
+        raise ValueError("Rippling page contained an unexpected board format.")
+    return props
+
+
+def _rippling(board: Board, get, *, probe: bool) -> list[Posting]:
+    jobs = []
+    for page in range(1 if probe else 8):
+        props = _rippling_page(get, board.url, params={"page": page} if page else None)
+        queries = props.get("dehydratedState", {}).get("queries", [])
+        listing = next((
+            query.get("state", {}).get("data") for query in queries
+            if isinstance(query.get("queryKey"), list)
+            and query["queryKey"][:3] == ["board", board.tenant, "job-posts"]
+        ), None)
+        if not isinstance(listing, dict) or not isinstance(listing.get("items"), list):
+            raise ValueError("Rippling page did not contain its public jobs list.")
+        for item in listing["items"]:
+            if not isinstance(item, dict):
+                continue
+            link = _posting_link(_text(item.get("url")), board, rf"/{re.escape(board.tenant)}/jobs/({UUID})")
+            title = _text(item.get("name"))
+            if not link or not title or item.get("id") != link[0]:
+                continue
+            department = item.get("department") or {}
+            locations = [
+                _location(_text(place.get("city")), _text(place.get("state")), _text(place.get("country")))
+                or _text(place.get("name"))
+                for place in item.get("locations", []) if isinstance(place, dict)
+            ]
+            modes = {
+                WORKPLACE.get(_text(place.get("workplaceType")).lower())
+                for place in item.get("locations", []) if isinstance(place, dict)
+            }
+            details = {
+                "department": _text(department.get("displayName")) if isinstance(department, dict) else "",
+                "workplace_type": next(iter(modes)) if len(modes) == 1 else None,
+            }
+            jobs.append(Posting(link[0], title, link[1], list(dict.fromkeys(filter(None, locations))), details=details))
+        total_pages = listing.get("totalPages")
+        if not isinstance(total_pages, int) or page + 1 >= total_pages or not listing["items"]:
+            break
+    return jobs
+
+
+def _avature(board: Board, get, *, probe: bool) -> list[Posting]:
+    jobs = []
+    params = None
+    offset = 0
+    for page in range(1 if probe else 6):
+        endpoint = board.url + "/" if params else board.url
+        body = _read(get, endpoint, "text/html", params=params)
+        listing = BeautifulSoup(bytes(body), "html.parser")
+        cards = listing.select('h3 a[href*="/JobDetail/"]')
+        for anchor in cards:
+            link = _posting_link(anchor["href"], board, rf"/{re.escape(board.tenant)}/JobDetail/[^/]+/(\d+)")
+            title = anchor.get_text(" ", strip=True)
+            card = anchor.find_parent("article")
+            place = card.select_one(".list-item-location") if card else None
+            location = place.get_text(" ", strip=True) if place else ""
+            if link and title:
+                jobs.append(Posting(link[0], title, link[1], [location] if location else []))
+        offsets = {}
+        for link in listing.select('a[href*="jobOffset="]'):
+            query = parse_qs(urlsplit(link["href"]).query)
+            value = query.get("jobOffset", [""])[0]
+            size = query.get("jobRecordsPerPage", [""])[0]
+            if re.fullmatch(r"\d{1,5}", value) and re.fullmatch(r"\d{1,2}", size) and int(value) > offset:
+                offsets[int(value)] = int(size)
+        if not offsets:
+            break
+        offset = min(offsets)
+        params = {"jobRecordsPerPage": offsets[offset], "jobOffset": offset}
+    if not jobs and not listing.select_one('form[action*="SearchJobs"], [class*="list--jobs"]'):
+        raise ValueError("Avature returned no recognizable public careers listing.")
+    return jobs
+
+
+def _icims(board: Board, get, *, probe: bool) -> list[Posting]:
+    postings = []
+    for page in range(1 if probe else 8):
+        body = _read(get, board.url, "text/html", params={"pr": page, "in_iframe": 1})
+        listing = BeautifulSoup(bytes(body), "html.parser")
+        links = listing.select('a[href*="/jobs/"][href*="/job"]')
+        added = 0
+        for anchor in links:
+            link = _posting_link(anchor["href"], board, r"/jobs/(\d+)/[^/]+/job")
+            title = re.sub(r"^Title\s+", "", anchor.get_text(" ", strip=True))
+            if link and title:
+                added += 1
+                postings.append(Posting(link[0], title, link[1]))
+        if not added or not listing.select_one(f'a[href*="pr={page + 1}&"]'):
+            break
+    if not postings and not listing.select_one('[class*="iCIMS"]'):
+        raise ValueError("iCIMS returned no recognizable careers page.")
+    return postings
+
+
+def _ycombinator(board: Board, get) -> list[Posting]:
+    page = BeautifulSoup(bytes(_read(get, board.url, "text/html")), "html.parser")
+    jobs = []
+    path = rf"/companies/({TENANT})/jobs/[A-Za-z0-9]+-[A-Za-z0-9_-]+"
+    for anchor in page.select('a[href*="/companies/"][href*="/jobs/"]'):
+        link = _posting_link(anchor["href"], board, path)
+        title = anchor.get_text(" ", strip=True)
+        if not link or not title:
+            continue
+        label = anchor.parent.parent.select_one("span.font-bold")
+        company = re.sub(r"\s*\([A-Z]\d{2}\)$", "", label.get_text(" ", strip=True)) if label else ""
+        job_id = urlsplit(link[1]).path.rsplit("/", 1)[-1].split("-", 1)[0]
+        jobs.append(Posting(job_id, title, link[1], company=company or link[0]))
+    if not jobs:
+        raise ValueError("Y Combinator returned no recognizable job cards.")
+    return jobs
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -285,6 +477,16 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _breezy(board, get)
     elif board.source == "bamboohr":
         jobs = _bamboohr(board, get)
+    elif board.source == "oraclecloud":
+        jobs = _oracle(board, get, probe=probe)
+    elif board.source == "rippling":
+        jobs = _rippling(board, get, probe=probe)
+    elif board.source == "avature":
+        jobs = _avature(board, get, probe=probe)
+    elif board.source == "ycombinator":
+        jobs = _ycombinator(board, get)
+    elif board.source == "icims":
+        jobs = _icims(board, get, probe=probe)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -316,7 +518,40 @@ def hydrate(board: Board, job: Posting, get) -> None:
         job.description = _description(opening.get("description"))
         job.published_at, job.precision = _publication(_text(opening.get("datePosted")))
         return
-    page = BeautifulSoup(bytes(_read(get, job.url, "text/html")), "html.parser")
+    if board.source == "oraclecloud":
+        endpoint = f"https://{board.host}{ORACLE_API}Details"
+        body = _read(get, endpoint, "application/json", params={
+            "onlyData": "true", "finder": f"ById;Id={job.id},siteNumber={board.tenant}",
+        })
+        result = json.loads(body)
+        item = next((row for row in result.get("items", []) if _text(row.get("Id")) == job.id), None)
+        if not item:
+            raise ValueError("Oracle Cloud returned no matching public requisition detail.")
+        parts = (_description(item.get(key)) for key in (
+            "ExternalDescriptionStr", "ExternalResponsibilitiesStr", "ExternalQualificationsStr",
+        ))
+        job.description = "\n\n".join(dict.fromkeys(filter(None, parts)))
+        return
+    if board.source == "rippling":
+        data = _rippling_page(get, job.url).get("apiData", {}).get("jobPost", {})
+        if data.get("uuid") != job.id:
+            raise ValueError("Rippling detail did not contain the expected public job.")
+        description = data.get("description")
+        job.description = _description(description.get("role") if isinstance(description, dict) else description)
+        employment = _text(data.get("employmentType"))
+        if employment:
+            job.details["employment_type"] = employment
+        schema = data.get("jsonLd")
+        if isinstance(schema, dict):
+            job.published_at, job.precision = _publication(_text(schema.get("datePosted")))
+        return
+    params = {"in_iframe": 1} if board.source == "icims" else None
+    page = BeautifulSoup(bytes(_read(get, job.url, "text/html", params=params)), "html.parser")
+    if board.source == "avature":
+        field = page.select_one("article.article--details .field--rich-text")
+        if field:
+            job.description = field.get_text("\n", strip=True)
+        return
     for script in page.select('script[type="application/ld+json"]'):
         try:
             item = next(_structured_items(json.loads(script.get_text())), None)
@@ -339,6 +574,11 @@ def hydrate(board: Board, job: Posting, get) -> None:
                         job.locations.append(location)
         if _text(item.get("jobLocationType")).upper() == "TELECOMMUTE":
             job.details["workplace_type"] = "remote"
+        if not job.locations:
+            places = item.get("applicantLocationRequirements")
+            for place in places if isinstance(places, list) else [places]:
+                if isinstance(place, dict) and _text(place.get("name")):
+                    job.locations.append(_text(place["name"]))
         employment = _text(item.get("employmentType"))
         if employment and not job.details.get("employment_type"):
             job.details["employment_type"] = employment

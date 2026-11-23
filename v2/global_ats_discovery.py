@@ -45,6 +45,10 @@ COMMONCRAWL_DOMAIN = {
     "bamboohr": "bamboohr.com",
     "jobvite": "jobs.jobvite.com",
     "hireology": "careers.hireology.com",
+    "rippling": "ats.rippling.com",
+    "oraclecloud": "oraclecloud.com",
+    "avature": "avature.net",
+    "icims": "icims.com",
 }
 COMMONCRAWL_PROVIDERS = tuple(COMMONCRAWL_DOMAIN)
 SITEMAP_USER_AGENT = board_discovery.USER_AGENT

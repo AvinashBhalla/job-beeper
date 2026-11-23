@@ -7160,7 +7160,7 @@ def public_job_board_collect(source: str, config: dict[str, Any]) -> list[dict[s
         _record_source_board(source, True)
         for posting in postings:
             jobs.append(normalize_job(
-                source, f"{source}:{board.key}:{posting.id}", entry["company"], posting.title,
+                source, f"{source}:{board.key}:{posting.id}", posting.company or entry["company"], posting.title,
                 " / ".join(posting.locations), posting.url, posting.published_at, posting.precision,
                 posting.description, source_details={
                     **posting.details,

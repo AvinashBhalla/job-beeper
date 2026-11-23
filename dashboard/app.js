@@ -1557,6 +1557,8 @@
     darwinbox: 'Darwinbox', recruitee: 'Recruitee', hirebase: 'Hirebase',
     teamtailor: 'Teamtailor', breezy: 'Breezy HR', bamboohr: 'BambooHR',
     jobvite: 'Jobvite', hireology: 'Hireology',
+    rippling: 'Rippling ATS', oraclecloud: 'Oracle Cloud Recruiting', avature: 'Avature',
+    ycombinator: 'Y Combinator', icims: 'iCIMS',
   };
 
   function describeSourceStatus(source) {

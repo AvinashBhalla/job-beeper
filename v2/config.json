@@ -17,6 +17,11 @@
     "bamboohr": 600,
     "jobvite": 600,
     "hireology": 600,
+    "rippling": 600,
+    "oraclecloud": 900,
+    "avature": 900,
+    "ycombinator": 600,
+    "icims": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -132,6 +137,11 @@
     "bamboohr": false,
     "jobvite": false,
     "hireology": false,
+    "rippling": false,
+    "oraclecloud": false,
+    "avature": false,
+    "ycombinator": false,
+    "icims": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -170,5 +180,10 @@
   "breezy_boards": [],
   "bamboohr_boards": [],
   "jobvite_boards": [],
-  "hireology_boards": []
+  "hireology_boards": [],
+  "rippling_boards": [],
+  "oraclecloud_boards": [],
+  "avature_boards": [],
+  "ycombinator_boards": [],
+  "icims_boards": []
 }

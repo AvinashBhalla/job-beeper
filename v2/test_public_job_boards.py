@@ -71,6 +71,41 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(job.url, "https://jobs.jobvite.com/Acme/job/AbCd")
         self.assertEqual(board.host, "jobs.jobvite.com")
 
+    def test_oracle_uses_site_scoped_requests_and_preserves_day_precision(self):
+        board = public_job_boards.detect(
+            "https://tenant.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/0123"
+        )
+        listing = {"items": [{"requisitionList": [
+            {"Id": "0123", "Title": "Backend Engineer", "PostedDate": "2026-11-22", "PrimaryLocation": "Pune, India"},
+        ]}]}
+        detail = {"items": [{
+            "Id": "0123", "ExternalDescriptionStr": "<p>Build with Go.</p>",
+            "ExternalQualificationsStr": "<p>Three years of software development.</p>",
+            "InternalQualificationsStr": "internal data excluded",
+        }]}
+        with patch.object(requests, "get", side_effect=[response(listing), response(detail)]) as get:
+            job, = public_job_boards.list_jobs(board, get)
+            public_job_boards.hydrate(board, job, get)
+        self.assertEqual(job.id, "0123")
+        self.assertEqual(job.precision, "date")
+        self.assertEqual(job.locations, ["Pune, India"])
+        self.assertIn("Three years", job.description)
+        self.assertNotIn("internal data", job.description)
+        self.assertIn("siteNumber=CX_1", get.call_args.kwargs["params"]["finder"])
+
+    def test_avature_follows_advertised_offsets_without_changing_host(self):
+        board = public_job_boards.detect("https://employer.avature.net/careers/SearchJobs")
+        first = """<article><h3><a href="/careers/JobDetail/Engineer/1">Engineer</a></h3>
+            <span class="list-item-location">Pune, India</span></article>
+            <a href="/careers/SearchJobs/?jobRecordsPerPage=12&amp;jobOffset=12">2</a>"""
+        second = '<h3><a href="/careers/JobDetail/Analyst/2">Analyst</a></h3>'
+        with patch.object(requests, "get", side_effect=[response(first), response(second)]) as get:
+            jobs = public_job_boards.list_jobs(board, get)
+        self.assertEqual([job.id for job in jobs], ["1", "2"])
+        self.assertEqual(jobs[0].locations, ["Pune, India"])
+        self.assertEqual(get.call_args.args[0], board.url + "/")
+        self.assertEqual(get.call_args.kwargs["params"]["jobOffset"], 12)
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [

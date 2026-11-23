@@ -17,6 +17,11 @@
     "bamboohr": 600,
     "jobvite": 600,
     "hireology": 600,
+    "rippling": 600,
+    "oraclecloud": 900,
+    "avature": 900,
+    "ycombinator": 600,
+    "icims": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -132,6 +137,11 @@
     "bamboohr": true,
     "jobvite": true,
     "hireology": true,
+    "rippling": true,
+    "oraclecloud": true,
+    "avature": true,
+    "ycombinator": true,
+    "icims": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -225,5 +235,20 @@
   ],
   "hireology_boards": [
     {"careers_url": "https://careers.hireology.com/smartstart", "company": "Smart Start"}
+  ],
+  "rippling_boards": [
+    {"careers_url": "https://ats.rippling.com/realwork/jobs", "company": "RealWork"}
+  ],
+  "oraclecloud_boards": [
+    {"careers_url": "https://eoje.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/jobs", "company": "Black Box"}
+  ],
+  "avature_boards": [
+    {"careers_url": "https://bloomberg.avature.net/careers/SearchJobs", "company": "Bloomberg"}
+  ],
+  "ycombinator_boards": [
+    {"careers_url": "https://www.ycombinator.com/jobs/role/all/india", "company": "Y Combinator"}
+  ],
+  "icims_boards": [
+    {"careers_url": "https://careers-amyx.icims.com/jobs/search", "company": "Amyx"}
   ]
 }
