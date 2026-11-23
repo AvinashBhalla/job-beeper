@@ -353,6 +353,24 @@ class UserScopedJobFeedTests(unittest.TestCase):
         self.assertEqual(refresh.call_args.args[0], admin["id"])
         self.assertEqual(refresh.call_args.args[1]["locations"], ["India"])
 
+    def test_dedicated_telegram_pilot_admin_can_link_without_gmail(self):
+        pilot = auth.create_first_admin(self.db_path, "pilot@example.com", "pilot-password-long")
+        auth.create_user(self.db_path, "other-admin@example.com", "other-admin-password-long", role="admin")
+        with patch.object(radar.google_alerts_gmail, "load_config", return_value=None), patch.dict("os.environ", {
+            "JOB_BEEPER_TELEGRAM_PILOT_ADMIN_ID": str(pilot["id"]),
+            "JOB_BEEPER_TELEGRAM_BOT_USERNAME": "JobBeeperTestBot",
+            "JOB_RADAR_TELEGRAM_BOT_TOKEN": "test-bot-token",
+            "JOB_BEEPER_TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret",
+        }):
+            self.assertEqual(self._login("pilot@example.com", "pilot-password-long").status_code, 200)
+            self.assertTrue(self.client.get("/api/telegram/status").json()["configured"])
+            csrf = self.client.cookies.get("job_beeper_csrf")
+            link = self.client.post("/api/telegram/link", headers={"X-CSRF-Token": csrf})
+            self.assertEqual(link.status_code, 200, link.text)
+            self.assertFalse(self.client.get("/api/notifications/settings").json()["settings"]["enabled"])
+            self.assertEqual(self._login("other-admin@example.com", "other-admin-password-long").status_code, 200)
+            self.assertEqual(self.client.get("/api/telegram/status").status_code, 403)
+
     def test_configured_gmail_owner_admin_can_link_private_telegram_and_explicitly_opt_in(self):
         from types import SimpleNamespace
         from v2 import telegram_linking

@@ -8103,14 +8103,11 @@ def google_auth_callback(
 
 
 def _require_telegram_account_access(user: dict[str, Any]) -> int:
-    """Allow members and only the configured personal Gmail owner admin.
-
-    Telegram account linking is normally member-scoped. The personal Gmail
-    integration is intentionally owner-admin scoped, so that exact configured
-    owner may opt in to Telegram without opening these APIs to other admins.
-    """
+    """Allow members and an explicitly designated owner or pilot administrator."""
     user_id = int(user["id"])
     if user.get("role") != "admin":
+        return user_id
+    if os.getenv("JOB_BEEPER_TELEGRAM_PILOT_ADMIN_ID", "").strip() == str(user_id):
         return user_id
     try:
         config = google_alerts_gmail.load_config()
@@ -8119,7 +8116,7 @@ def _require_telegram_account_access(user: dict[str, Any]) -> int:
     if config is None or user_id != int(config.owner_user_id):
         raise HTTPException(
             status_code=403,
-            detail="Telegram linking for administrator accounts is restricted to the configured personal Gmail owner.",
+            detail="Telegram linking for administrators requires a configured pilot or personal Gmail owner account.",
         )
     return user_id
 
