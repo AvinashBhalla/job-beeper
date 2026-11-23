@@ -27,8 +27,13 @@ LABELS = {
     "cutshort": "Cutshort",
     "hrsmart": "HRsmart",
     "ukg": "UKG Pro / UltiPro",
+    "phenom": "Phenom People",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
+PHENOM_PATHS = {
+    "www.careers.philips.com": "/global/en",
+    "jobs.cvshealth.com": "/us/en",
+}
 MAX_BOARDS = 30
 DETAILS_PER_POLL = 10
 MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -135,6 +140,10 @@ def detect(value: str) -> Board | None:
             tenant, board_id = match.groups()
             return Board("ukg", f"{tenant.lower()}:{board_id.lower()}",
                          f"{origin}/{tenant}/JobBoard/{board_id.lower()}", host, tenant)
+    if host in PHENOM_PATHS:
+        prefix = PHENOM_PATHS[host]
+        if re.fullmatch(rf"{prefix}/(?:search-results|job/{TENANT}(?:/[^/]+)?)", path):
+            return Board("phenom", host, origin + prefix + "/search-results", host)
     return None
 
 
@@ -157,8 +166,10 @@ class _PublicFeedTree(ET.TreeBuilder):
 
 
 def _publication(value: str, *, rss: bool = False) -> tuple[datetime | None, str]:
+    iso_date = re.sub(r"(?: UTC|Z)$", "+00:00", value)
+    iso_date = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", iso_date)
     try:
-        stamp = parsedate_to_datetime(value) if rss else datetime.fromisoformat(re.sub(r" UTC$", "+00:00", value))
+        stamp = parsedate_to_datetime(value) if rss else datetime.fromisoformat(iso_date)
     except (ValueError, TypeError, OverflowError):
         return None, "unknown"
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
@@ -631,6 +642,53 @@ def _ukg(board: Board, get, *, probe: bool) -> list[Posting]:
     return postings
 
 
+def _phenom(board: Board, get, *, probe: bool) -> list[Posting]:
+    jobs = []
+    seen = set()
+    offset = 0
+    for _ in range(1 if probe else 6):
+        body = _read(get, board.url, "text/html", params={"from": offset, "s": 1} if offset else None)
+        page = BeautifulSoup(bytes(body), "html.parser")
+        listing = None
+        for script in page.select("script"):
+            code = script.get_text()
+            marker = re.search(r"phApp\.ddo\s*=\s*(\{)", code)
+            if marker:
+                data, _ = json.JSONDecoder().raw_decode(code, marker.start(1))
+                listing = data.get("eagerLoadRefineSearch", {}).get("data", {}).get("jobs")
+                if isinstance(listing, list):
+                    break
+        if not isinstance(listing, list):
+            raise ValueError("Phenom did not expose its public search results.")
+        added = 0
+        for item in listing:
+            if not isinstance(item, dict):
+                continue
+            job_id, title = _text(item.get("jobSeqNo")), _text(item.get("title"))
+            if not re.fullmatch(TENANT, job_id) or not title or job_id in seen:
+                continue
+            seen.add(job_id)
+            added += 1
+            places = item.get("multi_location_array")
+            locations = list(dict.fromkeys(filter(None, map(_text, places)))) if isinstance(places, list) else []
+            place = _text(item.get("cityStateCountry")) or _text(item.get("location"))
+            if not locations and place:
+                locations = [place]
+            published, precision = _publication(_text(item.get("postedDate")).split("T", 1)[0])
+            mode = _text(item.get("remote")).casefold().replace("-", "_").replace(" ", "_")
+            details = {
+                "department": _text(item.get("department")) or _text(item.get("category")),
+                "employment_type": _text(item.get("type")),
+                "workplace_type": WORKPLACE.get(mode),
+            }
+            url = board.url.removesuffix("/search-results") + "/job/" + job_id
+            jobs.append(Posting(job_id, title, url, locations, published_at=published, precision=precision, details=details))
+        if not added:
+            break
+        offset += len(listing)
+    return jobs
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -656,6 +714,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _hrsmart(board, get)
     elif board.source == "ukg":
         jobs = _ukg(board, get, probe=probe)
+    elif board.source == "phenom":
+        jobs = _phenom(board, get, probe=probe)
     else:
         jobs = _html_list(board, get)
     unique = {}

@@ -26,6 +26,7 @@
     "cutshort": 600,
     "hrsmart": 900,
     "ukg": 900,
+    "phenom": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -150,6 +151,7 @@
     "cutshort": true,
     "hrsmart": true,
     "ukg": true,
+    "phenom": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -270,5 +272,8 @@
   ],
   "ukg_boards": [
     {"careers_url": "https://recruiting.ultipro.ca/TVO5000TVOO/JobBoard/5ff80775-069d-4e87-9adc-94455820b5c9", "company": "TVO"}
+  ],
+  "phenom_boards": [
+    {"careers_url": "https://www.careers.philips.com/global/en/search-results", "company": "Philips"}
   ]
 }

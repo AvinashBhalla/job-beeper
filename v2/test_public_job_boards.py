@@ -164,6 +164,21 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(job.precision, "minute")
         self.assertEqual(job.description, "Use templates with {variables}.")
 
+    def test_phenom_uses_verified_employer_host_and_date_only_list_value(self):
+        board = public_job_boards.detect("https://www.careers.philips.com/global/en/search-results")
+        data = {"eagerLoadRefineSearch": {"data": {"jobs": [{
+            "jobSeqNo": "PHILUS123ENGLOBAL", "title": "Engineer", "postedDate": "2026-11-18T00:00:00.000+0000",
+            "cityStateCountry": "Pune, Maharashtra, India", "remote": "Hybrid",
+        }]}}}
+        page = "<script>phApp.ddo=" + json.dumps(data) + ";</script>"
+        with patch.object(requests, "get", return_value=response(page)) as get:
+            job, = public_job_boards.list_jobs(board, get, probe=True)
+        self.assertEqual(job.url, "https://www.careers.philips.com/global/en/job/PHILUS123ENGLOBAL")
+        self.assertEqual(job.precision, "date")
+        self.assertEqual(job.locations, ["Pune, Maharashtra, India"])
+        self.assertEqual(job.details["workplace_type"], "hybrid")
+        self.assertIsNone(public_job_boards.detect("https://unverified.example/global/en/search-results"))
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [
