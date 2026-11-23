@@ -212,7 +212,10 @@ class PublicJobBoardTests(unittest.TestCase):
             "1234", "Software Engineer", "1234", "Software Engineer", *["1234"] * 5,
             "", "Nov 22, 2026", "REQ-42",
         ])
-        description = "!*!%3Cp%3ELocation%3A Chicago, Illinois%3C/p%3E%3Cp%3EBuild with Python.%3C/p%3E"
+        description = (
+            "!*!%3Cp%3ELocation%3A Chicago, Illinois%3C/p%3E%3Cp%3EBuild with Python.%3C/p%3E"
+            "%3Cp%3ENine (9) years of work experience are required.%3C/p%3E"
+        )
         detail = "Ignored!$!requisitionDescriptionInterface!|!validateTimeZoneId!$!" + "!|!".join([
             "Software Engineer", description, description,
         ])
@@ -229,6 +232,9 @@ class PublicJobBoardTests(unittest.TestCase):
         self.assertEqual(job.locations, ["Chicago, Illinois"])
         self.assertEqual(job.description.count("Build with Python."), 1)
         self.assertEqual(job.details, {"requisition_number": "REQ-42"})
+        self.assertEqual(radar._experience_provenance_details({
+            "source": "taleo", "title": job.title, "description": job.description,
+        }), {"min_years": 9, "max_years": 9, "provenance": "description", "confidence": "medium"})
 
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")

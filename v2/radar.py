@@ -1523,7 +1523,7 @@ def init_db() -> None:
 # Bump when _experience_provenance_details() parsing rules change. Existing
 # rows are migrated with version 1 because their persisted values were produced
 # by the current parser before the unchanged-text reuse optimization.
-EXPERIENCE_EXTRACTION_VERSION = 1
+EXPERIENCE_EXTRACTION_VERSION = 2
 
 
 def upsert_jobs(
@@ -3406,7 +3406,7 @@ def _clean_experience_text(text: str) -> str:
     raw = html_lib.unescape(str(text or "")).replace("\xa0", " ")
     raw = re.sub(r"[‐‑‒–—−]", "-", raw)
     raw = re.sub(r"\s+", " ", raw).strip().lower()
-    return raw
+    return re.sub(r"\((\d{1,2})\)(?=\s+(?:years?|yrs?)\b)", r"\1", raw)
 
 
 def extract_experience(text: str) -> tuple[float | None, float | None]:
@@ -3606,7 +3606,7 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         r"|\bwork\s+experience\b"
         r"|\bexperience\b[^.!?]{0,80}\b(?:required|minimum|at\s+least)\b"
         r"|\b(?:minimum|at\s+least|required|requires?)\b[^.!?]{0,100}\bexperience\b"
-        r"|\b\d+(?:\.\d+)?\s*\+?\s*(?:years?|yrs?)\s+of\s+experience\b",
+        r"|(?:\b\d+(?:\.\d+)?|\(\d{1,2}\))\s*\+?\s*(?:years?|yrs?)\s+of\s+experience\b",
         description,
         re.I,
     ))
