@@ -100,7 +100,9 @@ HIREBASE_MAX_MONTHLY_JOBS = 400
 HIREBASE_MAX_DAILY_JOBS = 12
 HIREBASE_PROVIDER_DAILY_JOBS = 4
 PUBLIC_ATS_RATE_LIMIT_SOURCES = frozenset({"workday", "smartrecruiters", "workable", "keka", "darwinbox", "recruitee", "hirebase", *public_job_boards.LABELS})
-INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({"lever", "workday", "recruitee", "hirebase", *public_job_boards.LABELS})
+INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({
+    "instahyre", "lever", "workday", "recruitee", "hirebase", *public_job_boards.LABELS,
+})
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
 

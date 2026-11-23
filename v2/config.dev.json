@@ -127,7 +127,7 @@
   "source_enabled": {
     "linkedin": false,
     "naukri": false,
-    "instahyre": false,
+    "instahyre": true,
     "greenhouse": true,
     "ashby": true,
     "lever": true,
