@@ -32,6 +32,7 @@ LABELS = {
     "taleo": "Oracle Taleo",
     "successfactors": "SAP SuccessFactors",
     "peoplestrong": "PeopleStrong",
+    "eightfold": "Eightfold AI",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 PHENOM_PATHS = {
@@ -50,6 +51,8 @@ ORACLE_API = "/hcmRestApi/resources/latest/recruitingCEJobRequisition"
 ZOHO_OPENINGS = "/recruit/v2/public/Job_Openings"
 PEOPLESTRONG_API = "/api/cp/rest/altone/cp"
 PEOPLESTRONG_JOB = rf"/job/detail/({TENANT})"
+EIGHTFOLD_TENANTS = {"app.eightfold.ai": "volkscience.com"}
+EIGHTFOLD_JOB = r"/careers/job/(\d{1,18})(?:-[^/]+)?"
 TEAMTAILOR_NS = "{https://teamtailor.com/locations}"
 WORKPLACE = {
     "remote": "remote", "fully_remote": "remote", "hybrid": "hybrid",
@@ -170,6 +173,12 @@ def detect(value: str) -> Board | None:
         path == "/job/joblist" or re.fullmatch(PEOPLESTRONG_JOB, path)
     ):
         return Board("peoplestrong", host, f"{origin}/job/joblist", host)
+    if host in EIGHTFOLD_TENANTS and (
+        path in {"/careers", "/careers/search"} or re.fullmatch(EIGHTFOLD_JOB, path)
+    ):
+        tenant = EIGHTFOLD_TENANTS[host]
+        if parse_qs(url.query).get("domain", [tenant]) == [tenant]:
+            return Board("eightfold", host, f"{origin}/careers/search", host, tenant)
     return None
 
 
@@ -948,6 +957,61 @@ def _peoplestrong(board: Board, get) -> list[Posting]:
     return jobs
 
 
+def _eightfold_data(board: Board, get, resource: str, **params) -> dict:
+    endpoint = f"https://{board.host}/api/pcsx/{resource}"
+    result = json.loads(_read(get, endpoint, "application/json", params={"domain": board.tenant, **params}))
+    data = result.get("data") if isinstance(result, dict) else None
+    if not isinstance(data, dict) or result.get("status") != 200:
+        raise ValueError("Eightfold did not return public career data.")
+    return data
+
+
+def _eightfold(board: Board, get, *, probe: bool) -> list[Posting]:
+    jobs = []
+    seen = set()
+    start = 0
+    for _ in range(1 if probe else 5):
+        data = _eightfold_data(board, get, "search", query="", location="", start=start, sort_by="timestamp")
+        rows = data.get("positions")
+        if not isinstance(rows, list) or data.get("sortBy") != "timestamp":
+            raise ValueError("Eightfold did not return its latest public listings.")
+        added = 0
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            job_id = str(item.get("id"))
+            link = _posting_link(_text(item.get("positionUrl")), board, EIGHTFOLD_JOB)
+            title = _text(item.get("name"))
+            if not link or job_id != link[0] or not title or job_id in seen:
+                continue
+            seen.add(job_id)
+            added += 1
+            places = item.get("locations")
+            locations = list(dict.fromkeys(filter(None, map(_text, places)))) if isinstance(places, list) else []
+            timestamp = item.get("postedTs")
+            published = None
+            if type(timestamp) is int and timestamp > 0:
+                try:
+                    published = datetime.fromtimestamp(timestamp, timezone.utc)
+                except (ValueError, OverflowError, OSError):
+                    pass
+            jobs.append(Posting(
+                job_id, title, link[1], locations, published_at=published,
+                precision="minute" if published else "unknown",
+                details={
+                    "department": _text(item.get("department")),
+                    "workplace_type": WORKPLACE.get(_text(item.get("workLocationOption")).lower()),
+                },
+            ))
+        total = data.get("count")
+        start += len(rows)
+        if not added or len(rows) < 10 or (isinstance(total, int) and start >= total):
+            break
+    if not jobs and rows:
+        raise ValueError("Eightfold returned no recognizable public job records.")
+    return jobs
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -983,6 +1047,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _successfactors(board, get)
     elif board.source == "peoplestrong":
         jobs = _peoplestrong(board, get)
+    elif board.source == "eightfold":
+        jobs = _eightfold(board, get, probe=probe)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -1004,6 +1070,15 @@ def _structured_items(node):
 
 
 def hydrate(board: Board, job: Posting, get) -> None:
+    if board.source == "eightfold":
+        item = _eightfold_data(board, get, "position_details", position_id=job.id, hl="en")
+        if str(item.get("id")) != job.id:
+            raise ValueError("Eightfold did not return the expected public position.")
+        job.description = _description(item.get("jobDescription"))
+        location = _text(item.get("location"))
+        if not job.locations and location:
+            job.locations = [location]
+        return
     if board.source == "peoplestrong":
         url = f"https://{board.host}{PEOPLESTRONG_API}/job/{job.id}/v2"
         # The provider spells this selector "descriprion". It returns only the public description.

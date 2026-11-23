@@ -31,6 +31,7 @@
     "taleo": 900,
     "successfactors": 900,
     "peoplestrong": 900,
+    "eightfold": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -160,6 +161,7 @@
     "taleo": true,
     "successfactors": true,
     "peoplestrong": true,
+    "eightfold": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -297,5 +299,8 @@
   ],
   "peoplestrong_boards": [
     {"careers_url": "https://mpgcareers.peoplestrong.com/job/joblist", "company": "Muthoot Pappachan Group"}
+  ],
+  "eightfold_boards": [
+    {"careers_url": "https://app.eightfold.ai/careers/search", "company": "Eightfold AI"}
   ]
 }

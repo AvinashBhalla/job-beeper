@@ -312,6 +312,35 @@ class PublicJobBoardTests(unittest.TestCase):
             "min_years": 0, "max_years": 4, "provenance": "employer_stated", "confidence": "high",
         })
 
+    def test_eightfold_follows_newest_page_offsets_and_rejects_unverified_tenants(self):
+        host = "https://app.eightfold.ai"
+        self.assertIsNone(public_job_boards.detect(host + "/careers/search?domain=other.example"))
+        board = public_job_boards.detect(host + "/careers/job/100")
+        first_page = [
+            {
+                "id": number, "positionUrl": f"/careers/job/{number}", "name": "Platform Engineer",
+                "locations": ["Bengaluru, India", "Noida, India"], "workLocationOption": "hybrid",
+                "postedTs": 1795201949,
+            }
+            for number in range(100, 110)
+        ]
+        second_page = [{**first_page[0], "id": 110, "positionUrl": "/careers/job/110"}]
+        with patch.object(requests, "get", side_effect=[
+            response({"status": 200, "data": {"count": 11, "sortBy": "timestamp", "positions": page}})
+            for page in (first_page, second_page)
+        ] + [response({"status": 200, "data": {"id": 100, "jobDescription": "<p>Work with Python.</p>"}})]) as get:
+            jobs = public_job_boards.list_jobs(board, get)
+            job = jobs[0]
+            public_job_boards.hydrate(board, job, get)
+        self.assertEqual(len(jobs), 11)
+        self.assertEqual([call.kwargs["params"]["start"] for call in get.call_args_list[:2]], [0, 10])
+        self.assertEqual(get.call_args_list[0].kwargs["params"]["sort_by"], "timestamp")
+        self.assertEqual(get.call_args_list[-1].kwargs["params"]["position_id"], "100")
+        self.assertEqual((job.url, job.precision, job.description),
+                         (host + "/careers/job/100", "minute", "Work with Python."))
+        self.assertEqual(job.locations, ["Bengaluru, India", "Noida, India"])
+        self.assertEqual(job.details["workplace_type"], "hybrid")
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [
