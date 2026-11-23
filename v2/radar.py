@@ -7041,8 +7041,8 @@ def run_source(
     jobs: list[dict[str, Any]] = []
     new_jobs = 0
     request_metrics: dict[str, Any] | None = None
-    _begin_source_run_metrics(source)
     try:
+        _begin_source_run_metrics(source)
         collector_started = time.monotonic()
         try:
             jobs = COLLECTORS[source](config)
@@ -7353,6 +7353,13 @@ def run_source(
             "%s collector failed run_id=%s outcome=%s error_type=%s",
             source, run_id, outcome, metadata["error_type"],
         )
+    finally:
+        # A failed telemetry write can escape the error handler. Release the
+        # provider marker so the scheduler can claim its next due board.
+        runtime = source_state.get(source, {})
+        if runtime.get("current_run_id") == run_id:
+            runtime["running"] = False
+            runtime["current_run_id"] = None
 
 
 async def notification_worker() -> None:

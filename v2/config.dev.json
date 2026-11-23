@@ -115,7 +115,7 @@
     "greenhouse": true,
     "ashby": true,
     "lever": true,
-    "workday": true,
+    "workday": false,
     "smartrecruiters": true,
     "workable": true,
     "keka": true,

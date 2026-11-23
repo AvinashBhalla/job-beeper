@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -75,6 +76,23 @@ class BoardSchedulerOrchestrationTests(unittest.TestCase):
         self.assertEqual(row["last_jobs_new"], 2)
         beta = next(item for item in board_scheduler.status(str(self.db_path))["boards"] if item["board_key"] == "beta")
         self.assertIsNone(beta["last_outcome"])
+
+    def test_failed_fetch_and_telemetry_do_not_leave_source_running(self):
+        claim = board_scheduler.claim_due_board(str(self.db_path), at=self.now)
+        with (
+            patch.dict(radar.COLLECTORS, {"greenhouse": lambda config: []}),
+            patch.object(radar, "upsert_jobs", side_effect=sqlite3.OperationalError("database is locked")),
+            patch.object(radar, "record_run", side_effect=sqlite3.OperationalError("database is locked")),
+        ):
+            asyncio.run(radar._run_scheduled_board(claim, self.config))
+
+        runtime = radar.source_state["greenhouse"]
+        self.assertFalse(runtime["running"])
+        self.assertIsNone(runtime["current_run_id"])
+        rows = board_scheduler.status(str(self.db_path))["boards"]
+        alpha = next(row for row in rows if row["board_key"] == "alpha")
+        self.assertEqual(alpha["last_error_type"], "SchedulerTaskError")
+        self.assertIsNone(alpha["lease_until"])
 
 
 if __name__ == "__main__":
