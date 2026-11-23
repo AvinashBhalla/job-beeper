@@ -4477,6 +4477,16 @@ class AshbyCollectorTests(unittest.TestCase):
         with patch.object(radar.requests,"get",return_value=self._response({"jobs":[]})):
             self.assertEqual(radar.ashby_collect({"ashby_boards":[{"board":"openai","company":"OpenAI"}]}),[])
 
+    def test_dotted_board_name_is_supported_by_config_and_collector(self):
+        config = radar._default_config()
+        config["ashby_boards"] = [{"board": "mistral.ai", "company": "Mistral AI"}]
+        config = radar.validate_config(config)
+        item = self._job(jobUrl="https://jobs.ashbyhq.com/mistral.ai/role-123")
+        with patch.object(radar.requests, "get", return_value=self._response({"jobs": [item]})) as request:
+            jobs = radar.ashby_collect(config)
+        self.assertEqual(jobs[0]["source_job_id"], "ashby-mistral.ai-role-123")
+        self.assertEqual(request.call_args.args[0], "https://api.ashbyhq.com/posting-api/job-board/mistral.ai")
+
     def test_malformed_board_payload_does_not_discard_good_board(self):
         cfg={"ashby_boards":[{"board":"bad","company":"Bad"},{"board":"good","company":"Good"}]}
         def get(url,**kwargs):

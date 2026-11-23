@@ -66,6 +66,7 @@ LINKEDIN_DEEP_TPR = "r21600"
 LEVER_PAGE_SIZE = 100
 LEVER_MAX_PAGES_PER_BOARD = 5
 LEVER_MAX_BOARDS = 20
+ASHBY_BOARD_NAME_RE = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.-]{0,79}")
 WORKDAY_PAGE_SIZE = 20
 WORKDAY_MAX_PAGES_PER_BOARD = 2  # Freshness page plus at most one inventory page.
 WORKDAY_MAX_DETAILS_PER_BOARD = 20
@@ -413,7 +414,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             raise HTTPException(status_code=422, detail="Each Ashby board must be an object.")
         name = board.get("board")
         company = board.get("company")
-        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", name.strip()):
+        if not isinstance(name, str) or not ASHBY_BOARD_NAME_RE.fullmatch(name.strip()):
             raise HTTPException(status_code=422, detail="Each Ashby board requires a valid public board name.")
         if not isinstance(company, str) or not company.strip() or len(company.strip()) > 120:
             raise HTTPException(status_code=422, detail="Each Ashby board requires a company label of at most 120 characters.")
@@ -4959,7 +4960,7 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
     for board in boards:
         name = str(board.get("board") or "").strip() if isinstance(board, dict) else ""
         company = str(board.get("company") or "").strip() if isinstance(board, dict) else ""
-        if not name or not company or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", name):
+        if not company or not ASHBY_BOARD_NAME_RE.fullmatch(name):
             _record_source_board("ashby", False)
             failures.append(f"{name or '<missing-board>'}: invalid board configuration")
             continue

@@ -4,8 +4,13 @@
     "naukri": 300,
     "instahyre": 600,
     "greenhouse": 120,
-    "ashby": 1800,
-    "lever": 1800,
+    "ashby": 600,
+    "lever": 600,
+    "workday": 900,
+    "smartrecruiters": 1200,
+    "workable": 600,
+    "keka": 600,
+    "darwinbox": 600,
     "hirebase": 86400
   },
   "locations": [
@@ -108,8 +113,13 @@
     "naukri": false,
     "instahyre": false,
     "greenhouse": true,
-    "ashby": false,
-    "lever": false,
+    "ashby": true,
+    "lever": true,
+    "workday": true,
+    "smartrecruiters": true,
+    "workable": true,
+    "keka": true,
+    "darwinbox": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -125,6 +135,22 @@
     {
       "token": "zocdoc",
       "company": "Zocdoc"
+    },
+    {
+      "token": "cloudflare",
+      "company": "Cloudflare"
+    },
+    {
+      "token": "databricks",
+      "company": "Databricks"
+    },
+    {
+      "token": "mongodb",
+      "company": "MongoDB"
+    },
+    {
+      "token": "rubrik",
+      "company": "Rubrik"
     }
   ],
   "ashby_boards": [
@@ -135,7 +161,38 @@
     {
       "board": "posthog",
       "company": "PostHog"
+    },
+    {
+      "board": "ramp",
+      "company": "Ramp"
+    },
+    {
+      "board": "mistral.ai",
+      "company": "Mistral AI"
     }
   ],
-  "lever_boards": []
+  "lever_boards": [
+    {"site": "palantir", "company": "Palantir Technologies"},
+    {"site": "spotify", "company": "Spotify"},
+    {"site": "toku", "company": "Toku"},
+    {"site": "cyderes", "company": "Cyderes"}
+  ],
+  "workday_boards": [
+    {"url": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "company": "NVIDIA"}
+  ],
+  "smartrecruiters_boards": [
+    {"company_identifier": "boschgroup", "company": "Bosch Group"},
+    {"company_identifier": "canva", "company": "Canva"},
+    {"company_identifier": "axiado", "company": "Axiado"}
+  ],
+  "workable_boards": [
+    {"account": "huggingface", "company": "Hugging Face"},
+    {"account": "caxton", "company": "Caxton Associates"}
+  ],
+  "keka_boards": [
+    {"careers_url": "https://bridgestone1.keka.com/careers", "company": "Bridgestone"}
+  ],
+  "darwinbox_boards": [
+    {"careers_url": "https://arvind.darwinbox.in/ms/candidatev2/main/careers", "company": "Arvind Group"}
+  ]
 }
