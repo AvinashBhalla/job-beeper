@@ -35,6 +35,23 @@ The rollout uses the existing public provider adapters. Individual boards from t
 
 At 14:55 IST, all 22 active boards across seven providers had completed a successful scheduled poll and cleared their first-snapshot baselines. The development database had 4,653 canonical opportunities, up from 338 before rollout. Counts by source were Greenhouse 2,366, Ashby 1,307, Lever 409, SmartRecruiters 383, Keka 107, Darwinbox 41, and Workable 40. Repeated Greenhouse and Darwinbox polls completed, and no HTTP 429 responses were recorded for the seven active providers in this rollout window. The browser confirmed the expanded schedules and rendered newly ingested Lever postings. This snapshot establishes live fetching and ingestion; the added rows include existing employer inventory.
 
+### Provider coverage and production promotion
+
+Track parity with all 36 sources from the reference product's Delivery schedule. Integrations may use public employer feeds, approved partner feeds, or user-authorized alerts. Mark a source live only when a scheduled or event-driven run ingests a real posting, normalizes it, and handles a repeat without creating duplicate jobs.
+
+| Status as of 23 November 2026 | Providers |
+| --- | --- |
+| Seven live on the development VM | Ashby, Darwinbox, Greenhouse, Keka, Lever, SmartRecruiters, Workable. Six also have successful recent production polls. Lever is the new provider in the development batch. |
+| Four with existing adapters that need separate acceptance | LinkedIn, Naukri, Instahyre, Workday. LinkedIn is intermittently live in production. The Naukri publisher is paused, and Workday returned repeated 429s. Instahyre is disabled in the compared environments. |
+| 25 remaining parity targets | Avature, BambooHR, Breezy HR, Cutshort, Eightfold AI, Freshteam, Hireology, Hirist, HRsmart, iCIMS, Jibe (iCIMS), Jobvite, Oracle Cloud Recruiting, Paycom, PeopleStrong, Phenom People, Recruitee, Rippling ATS, SAP SuccessFactors, Oracle Taleo, Teamtailor, UKG Pro / UltiPro, Wellfound, Y Combinator, Zoho Recruit. Some have board detection and still need a fetching path and live acceptance. |
+| Additional requested coverage | Indeed and Flexiple. Indeed can start with authorized saved-search email intake while partner-feed access is evaluated. Flexiple's own company openings, its syndicated listings, and client opportunities are distinct. For client opportunities, evaluate a permitted integration or user-authorized intake. |
+
+In the production check around 15:00 IST, SmartRecruiters completed 281 of 281 runs and added 54 records over 24 hours. LinkedIn completed 16 of 22 runs, added 90 records, and recorded six HTTP 429 responses. Naukri completed zero of 287 runs, and its relay had no recent snapshot. Preserve the owner's publisher pause until authorized to resume it. Workday recorded 24 rate-limit responses across 24 production runs. Marketplace email timings must be reported separately from direct-board discovery timings.
+
+Promote the additional boards for the six healthy production providers and the new Lever provider in a bounded production batch. Before approval, observe 24 hours of recurring development runs, check baseline suppression and idempotency across the proposed boards, and verify one fresh matching posting reaches a private pilot Telegram chat. Record the image revision, backup, source flags, and rollback command. Run the same gate separately for recovering and new providers. The earliest candidate window is the afternoon of 24 November IST, conditional on the evidence, Telegram pilot readiness, and release approval.
+
+The production bot has a linked private chat, with per-user opt-in currently off. The ledger has historical per-user LinkedIn sends, plus older legacy LinkedIn and Naukri sends. Production SmartRecruiters already fetches jobs, so an opted-in private account can test a new matching posting without waiting for the expanded-board release. The default development container has no bot, links, or opt-ins. Use a separate bot and explicitly linked private recipient for testing the expanded board set in development. Verify receipt, the source label and apply link, replay the poll, and check that it generates no duplicate alert or first-snapshot backfill.
+
 ## After discovery is proven
 
 | Milestone | User experience |
