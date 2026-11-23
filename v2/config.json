@@ -29,6 +29,7 @@
     "phenom": 900,
     "zoho": 600,
     "taleo": 900,
+    "successfactors": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -156,6 +157,7 @@
     "phenom": false,
     "zoho": false,
     "taleo": false,
+    "successfactors": false,
     "hirebase": false
   },
   "config_version": 17,
@@ -206,5 +208,6 @@
   "ukg_boards": [],
   "phenom_boards": [],
   "zoho_boards": [],
-  "taleo_boards": []
+  "taleo_boards": [],
+  "successfactors_boards": []
 }

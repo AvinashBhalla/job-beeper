@@ -29,6 +29,7 @@
     "phenom": 900,
     "zoho": 600,
     "taleo": 900,
+    "successfactors": 900,
     "hirebase": 86400
   },
   "locations": [
@@ -156,6 +157,7 @@
     "phenom": true,
     "zoho": true,
     "taleo": true,
+    "successfactors": true,
     "hirebase": false
   },
   "config_version": 17,
@@ -286,5 +288,9 @@
   ],
   "taleo_boards": [
     {"careers_url": "https://chicago.taleo.net/careersection/100/jobsearch.ftl", "company": "City of Chicago"}
+  ],
+  "successfactors_boards": [
+    {"careers_url": "https://jobs.bostonscientific.com/search/", "company": "Boston Scientific"},
+    {"careers_url": "https://jobs.lubrizol.com/search/", "company": "Lubrizol"}
   ]
 }

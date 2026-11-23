@@ -236,6 +236,48 @@ class PublicJobBoardTests(unittest.TestCase):
             "source": "taleo", "title": job.title, "description": job.description,
         }), {"min_years": 9, "max_years": 9, "provenance": "description", "confidence": "medium"})
 
+    def test_successfactors_preserves_public_identity_and_uses_day_precision(self):
+        url = "https://jobs.lubrizol.com/search/"
+        board = public_job_boards.detect(url)
+        self.assertIsNone(public_job_boards.detect("https://unverified.example/search/"))
+        listing = """
+          <link href="//rmkcdn.successfactors.com/site.css" rel="stylesheet">
+          <table>
+            <tr class="data-row">
+              <td><a class="jobTitle-link" href="/job/Corona-Process-Engineer/123/?tracking=x">Process Engineer</a></td>
+              <td class="jobLocation">Corona, CA</td><td class="jobDate">Nov 23, 2026</td>
+            </tr>
+            <tr class="data-row">
+              <td><a class="jobTitle-link" href="/job/Bengaluru-Engineer/456/">Engineer</a></td>
+            </tr>
+            <tr class="data-row">
+              <td><a class="jobTitle-link" href="https://other.example/job/Outside/321/">Outside</a></td>
+            </tr>
+          </table>
+        """
+        detail = """
+          <link rel="canonical" href="https://jobs.lubrizol.com/job/Bengaluru-Engineer/456/">
+          <section itemtype="https://schema.org/JobPosting">
+            <meta itemprop="datePosted" content="Mon Nov 23 08:00:00 UTC 2026">
+            <div itemprop="jobLocation"><div itemprop="address">
+              <span itemprop="addressLocality">Bengaluru</span><span itemprop="addressCountry">IN</span>
+            </div></div>
+            <article itemprop="description"><p>Requires three (3) years of Python.</p></article>
+          </section>
+          <form>Candidate information</form>
+        """
+        jobs = public_job_boards.list_jobs(board, lambda *a, **k: response(listing))
+        first, second = jobs
+        self.assertEqual(first.url, "https://jobs.lubrizol.com/job/Corona-Process-Engineer/123/")
+        self.assertEqual((first.title, first.locations, first.precision), ("Process Engineer", ["Corona, CA"], "date"))
+        self.assertEqual(second.precision, "unknown")
+        with self.assertRaises(ValueError):
+            public_job_boards.hydrate(board, first, lambda *a, **k: response(detail))
+        public_job_boards.hydrate(board, second, lambda *a, **k: response(detail))
+        self.assertEqual(second.description, "Requires three (3) years of Python.")
+        self.assertEqual(second.locations, ["Bengaluru, IN"])
+        self.assertEqual((second.published_at.isoformat(), second.precision), ("2026-11-23T00:00:00+00:00", "date"))
+
     def test_feed_rejects_redirect_dtd_and_oversized_body(self):
         board = public_job_boards.detect("https://career.teamtailor.com/jobs")
         for body, status, message in [

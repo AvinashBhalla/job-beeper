@@ -30,12 +30,15 @@ LABELS = {
     "phenom": "Phenom People",
     "zoho": "Zoho Recruit",
     "taleo": "Oracle Taleo",
+    "successfactors": "SAP SuccessFactors",
 }
 BOARDS_WITH_DESCRIPTIONS = frozenset({"teamtailor", "cutshort"})
 PHENOM_PATHS = {
     "www.careers.philips.com": "/global/en",
     "jobs.cvshealth.com": "/us/en",
 }
+SUCCESSFACTORS_HOSTS = frozenset({"jobs.bostonscientific.com", "jobs.lubrizol.com"})
+SUCCESSFACTORS_JOB = r"/job/[^/]+/(\d{1,18})"
 MAX_BOARDS = 30
 DETAILS_PER_POLL = 10
 MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -158,6 +161,8 @@ def detect(value: str) -> Board | None:
             section = match[1]
             return Board("taleo", f"{host}:{section.lower()}",
                          f"{origin}/careersection/{section}/jobsearch.ftl", host, section)
+    if host in SUCCESSFACTORS_HOSTS and (path == "/search" or re.fullmatch(SUCCESSFACTORS_JOB, path)):
+        return Board("successfactors", host, f"{origin}/search/", host)
     return None
 
 
@@ -821,6 +826,73 @@ def _taleo_detail(job: Posting, get) -> None:
             break
 
 
+def _successfactors(board: Board, get) -> list[Posting]:
+    body = _read(get, board.url, "text/html", params={
+        "locale": "en_US", "sortColumn": "referencedate", "sortDirection": "desc",
+    })
+    page = BeautifulSoup(bytes(body), "html.parser")
+    if not page.select_one('link[href^="//rmkcdn.successfactors.com/"], link[href^="https://rmkcdn.successfactors.com/"]'):
+        raise ValueError("The search page did not identify itself as a SuccessFactors career site.")
+    jobs = []
+    for row in page.select("tr.data-row"):
+        anchor = row.select_one("a.jobTitle-link[href]")
+        if not anchor:
+            continue
+        link = _posting_link(anchor["href"], board, SUCCESSFACTORS_JOB)
+        title = anchor.get_text(" ", strip=True)
+        if not link or not title:
+            continue
+        location = row.select_one(".jobLocation")
+        date = row.select_one(".jobDate")
+        place = location.get_text(" ", strip=True) if location else ""
+        published = None
+        if date:
+            try:
+                published = datetime.strptime(date.get_text(" ", strip=True), "%b %d, %Y").replace(tzinfo=timezone.utc)
+            except ValueError:
+                pass
+        jobs.append(Posting(
+            link[0], title, link[1] + "/", [place] if place else [],
+            published_at=published, precision="date" if published else "unknown",
+        ))
+    if not jobs and not page.select_one(".noresults, .no-results"):
+        raise ValueError("SuccessFactors returned no recognizable public job results.")
+    return jobs
+
+
+def _successfactors_detail(board: Board, job: Posting, page: BeautifulSoup) -> None:
+    canonical = page.select_one('link[rel="canonical"][href]')
+    link = _posting_link(canonical["href"], board, SUCCESSFACTORS_JOB) if canonical else None
+    detail = page.select_one('[itemtype$="/JobPosting"]')
+    description = detail.select_one('[itemprop="description"]') if detail else None
+    if not link or link[0] != job.id or not description:
+        raise ValueError("SuccessFactors did not return the expected public job detail.")
+    job.description = description.get_text("\n", strip=True)
+    if not job.locations:
+        address = detail.select_one('[itemprop="jobLocation"] [itemprop="address"]')
+        if address:
+            fields = [
+                address.select_one(f'[itemprop="{key}"]')
+                for key in ("addressLocality", "addressRegion", "addressCountry")
+            ]
+            place = _location(*(field.get_text(" ", strip=True) for field in fields if field))
+            if not place:
+                street = address.select_one('[itemprop="streetAddress"]')
+                place = street.get_text(" ", strip=True) if street else ""
+            if place:
+                job.locations = [place]
+    if not job.published_at:
+        date = detail.select_one('[itemprop="datePosted"]')
+        value = _text(date.get("content")) if date else ""
+        if value:
+            try:
+                day = datetime.strptime(value, "%a %b %d %H:%M:%S UTC %Y").date()
+            except ValueError:
+                job.published_at, job.precision = _publication(value[:10])
+            else:
+                job.published_at, job.precision = _publication(day.isoformat())
+
+
 def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
     if board.source == "teamtailor":
         jobs = _teamtailor(board, get, probe=probe)
@@ -852,6 +924,8 @@ def list_jobs(board: Board, get, *, probe: bool = False) -> list[Posting]:
         jobs = _zoho(board, get)
     elif board.source == "taleo":
         jobs = _taleo(board, get)
+    elif board.source == "successfactors":
+        jobs = _successfactors(board, get)
     else:
         jobs = _html_list(board, get)
     unique = {}
@@ -926,6 +1000,9 @@ def hydrate(board: Board, job: Posting, get) -> None:
         return
     params = {"in_iframe": 1} if board.source == "icims" else None
     page = BeautifulSoup(bytes(_read(get, job.url, "text/html", params=params)), "html.parser")
+    if board.source == "successfactors":
+        _successfactors_detail(board, job, page)
+        return
     if board.source == "avature":
         field = page.select_one("article.article--details .field--rich-text")
         if field:

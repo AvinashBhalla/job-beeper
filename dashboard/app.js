@@ -1561,7 +1561,7 @@
     ycombinator: 'Y Combinator', icims: 'iCIMS',
     freshteam: 'Freshteam', cutshort: 'Cutshort',
     hrsmart: 'HRsmart', ukg: 'UKG Pro / UltiPro', phenom: 'Phenom People', zoho: 'Zoho Recruit',
-    taleo: 'Oracle Taleo',
+    taleo: 'Oracle Taleo', successfactors: 'SAP SuccessFactors',
   };
 
   function describeSourceStatus(source) {
