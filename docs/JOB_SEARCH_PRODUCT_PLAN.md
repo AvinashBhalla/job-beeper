@@ -19,8 +19,12 @@ The isolated dev Compose configuration uses two-minute Greenhouse polls over Coi
 Read the pilot window from the application's data volume using the deployment start time as the cutoff. The tool reads the existing database without changing it or delivering alerts.
 
 ```sh
-docker exec job-radar-dev python -m v2.discovery_pilot --db /data/jobs.db --source greenhouse --since <cutoff-in-ISO-8601-with-timezone>
+docker exec job-radar-dev python -m v2.discovery_pilot --db /data/jobs.db --source greenhouse --since 2026-11-23T07:44:42Z
 ```
+
+On 23 November 2026, development commit `5f62427` passed 48 focused tests on both Windows and the Linux VM, plus four baseline and database tests on Linux. The first live cycle recorded 252 Coinbase jobs, 20 Graviton Research Capital jobs, and 66 Zocdoc jobs. All three polls succeeded with zero new rows and zero HTTP 429s. The browser showed the existing feed, description-derived experience, direct links, and all three boards scheduled at 120 seconds. That cycle yielded zero publication-lag and Telegram delivery samples.
+
+When a configured interval decreases, the scheduler now advances a healthy board's next due time from its last successful poll. The host request spacing, active leases, and failure cooldowns still apply. Verify the next checkpoint with a newly observed posting before assessing latency targets or promoting the pilot into a wider rollout.
 
 ## After discovery is proven
 
