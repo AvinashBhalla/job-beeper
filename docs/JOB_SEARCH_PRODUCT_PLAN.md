@@ -185,3 +185,5 @@ Keep the existing Python application and separate provider, extraction, and deli
 ### Empty-preference browsing · 24 November 2026
 
 New members can open the shared jobs feed before completing matching preferences. The dashboard still applies its freshness, source, search, score, remote-only, alertable and sort controls, with the default view covering the last 72 hours. Selecting `Any posting date` removes the age cutoff. Personalized matching and alert eligibility begin after the member saves a target role plus a location or Remote only.
+
+The mobile navigation keeps `Preferences` and `Account` as separate destinations so configuration and account access remain discoverable on narrow screens.
