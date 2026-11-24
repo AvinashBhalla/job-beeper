@@ -238,7 +238,8 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             self.assertIn(required, source, f"dashboard feed must implement {required}")
         self.assertIn('id="feedPagination"', (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8"))
         render_feed = source.split("function renderFeed()", 1)[1].split("function updateFeedPagination", 1)[0]
-        self.assertIn("container.innerHTML = jobs.map", render_feed)
+        self.assertIn("rows.innerHTML = jobs.map", render_feed)
+        self.assertIn("current.isEqualNode(row)", render_feed)
         self.assertNotIn("state.jobs.filter", render_feed)
         self.assertIn("params.set('all_time', 'true')", source)
         self.assertIn("{ value: '0', label: 'All time' }", source)

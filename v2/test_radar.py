@@ -3399,6 +3399,18 @@ class InstahyreCollectorTests(unittest.TestCase):
         self.assertEqual(row[:5], (description, "markdown", 2, 5, "description"))
         self.assertEqual(json.loads(row[5]), details)
 
+    def test_instahyre_preserves_distinct_listing_and_skill_experience(self):
+        page = self.DETAIL_HTML.replace("3-5 Years", "4-7 Years").replace(
+            "2–5 years of building and operating production software.",
+            "3–5 years of professional experience with React Native.",
+        )
+        description, details = radar.instahyre_details.parse_listing(page, "446772")
+        extracted = radar._experience_provenance_details({
+            "source": "instahyre", "description": description, "source_details": details,
+        })
+        self.assertEqual((extracted["min_years"], extracted["max_years"], extracted["provenance"]), (3, 5, "description"))
+        self.assertEqual(details["listing_experience"], "4-7 Years")
+
     def test_detail_access_denied_keeps_the_search_feed_and_backs_off(self):
         jobs = [radar.normalize_job(
             "instahyre", str(job_id), "Employer", "Engineer", "Bangalore",

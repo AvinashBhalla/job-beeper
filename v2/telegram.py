@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import logging
 import os
+import re
 import sqlite3
 import time
 from zoneinfo import ZoneInfo
@@ -96,13 +97,31 @@ def format_notification(item: dict[str, Any]) -> str:
     experience_min = item.get("experience_min_years")
     experience_max = item.get("experience_max_years")
 
-    experience = "Not stated"
+    experience = "Not captured" if item.get("has_description") == 0 else "Not stated"
     if experience_min is not None:
         experience = f"{float(experience_min):g}"
-        if experience_max is not None:
-            experience += f"-{float(experience_max):g}"
-        else:
+        if experience_max is None:
             experience += "+"
+        elif experience_max != experience_min:
+            experience += f"-{float(experience_max):g}"
+        experience += " years"
+    elif experience_max is not None:
+        experience = f"Up to {float(experience_max):g} years"
+
+    try:
+        details = json.loads(item.get("source_details_json") or "{}")
+    except (TypeError, ValueError):
+        details = {}
+    details = details if isinstance(details, dict) else {}
+    key_skills = details.get("key_skills")
+    skills = ", ".join(skill[:60] for skill in key_skills[:8] if isinstance(skill, str)) if isinstance(key_skills, list) else ""
+    listing_experience = details.get("listing_experience")
+    if isinstance(listing_experience, str) and listing_experience.strip():
+        header_experience = re.sub(r"\s*[-–—]\s*", "-", listing_experience.strip().casefold())
+        if experience_min is None and experience_max is None:
+            experience = f"{listing_experience[:40]} (listing header)"
+        elif header_experience != experience:
+            experience += f" (listing header: {listing_experience[:40]})"
 
     try:
         reasons = json.loads(item.get("match_reasons_json") or "[]")
@@ -110,8 +129,8 @@ def format_notification(item: dict[str, Any]) -> str:
         reasons = []
 
     reason_lines = []
-    for reason in reasons[:5]:
-        reason_lines.append(f"✓ {reason}")
+    if isinstance(reasons, list):
+        reason_lines = [f"✓ {reason[:180]}" for reason in reasons[:5] if isinstance(reason, str)]
 
     lines = [
         f"🚨 {score}% MATCH",
@@ -122,14 +141,13 @@ def format_notification(item: dict[str, Any]) -> str:
         f"🕐 Posted: {_format_timestamp(posted, posted_precision)}",
         f"🔎 Discovered: {_format_timestamp(discovered)}",
         f"🧾 Experience: {experience}",
+        f"Key skills: {skills or 'Not captured'}",
         f"Source: {source}",
+        "",
+        *(reason_lines or ["Match reasons: None recorded"]),
+        "",
+        f"Apply → {url or 'Link unavailable'}",
     ]
-
-    if reason_lines:
-        lines += ["", *reason_lines]
-
-    if url:
-        lines += ["", f"Apply → {url}"]
 
     return "\n".join(lines)
 
@@ -202,10 +220,12 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
             j.source_posted_at,
             j.posted_precision,
             j.discovered_at,
+            j.source_details_json,
+            j.description != '' AS has_description,
             e.score,
             e.reasons_json AS match_reasons_json,
-            e.experience_min_years,
-            e.experience_max_years
+            COALESCE(j.experience_min_years,e.experience_min_years) AS experience_min_years,
+            COALESCE(j.experience_max_years,e.experience_max_years) AS experience_max_years
         FROM notification_ledger nl
         JOIN jobs j ON j.id = nl.candidate_job_id
         JOIN job_evaluations e ON e.job_id = nl.candidate_job_id

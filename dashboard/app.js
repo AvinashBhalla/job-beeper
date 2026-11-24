@@ -986,7 +986,8 @@
     }
 
     // Render Opportunity Rows
-    container.innerHTML = jobs.map(job => {
+    const rows = document.createElement('template');
+    rows.innerHTML = jobs.map(job => {
       const ts = jobTimestamp(job);
       const isSelected = String(state.selectedJobId) === String(job.id);
       const applied = isJobApplied(job.id);
@@ -1091,6 +1092,31 @@
         </article>
       `;
     }).join('');
+
+    const existing = new Map(Array.from(container.children, row => [row.dataset.jobId, row]));
+    const incoming = Array.from(rows.content.children);
+    const ids = new Set(incoming.map(row => row.dataset.jobId));
+    for (const row of Array.from(container.children)) {
+      if (!ids.has(row.dataset.jobId)) row.remove();
+    }
+    let cursor = container.firstElementChild;
+    for (const row of incoming) {
+      const current = existing.get(row.dataset.jobId);
+      if (current) {
+        if (current === cursor) cursor = cursor.nextElementSibling;
+        else container.insertBefore(current, cursor);
+        if (!current.isEqualNode(row)) {
+          current.className = row.className;
+          current.setAttribute('aria-label', row.getAttribute('aria-label'));
+          Array.from(row.children).forEach((section, index) => {
+            const previous = current.children[index];
+            if (!previous.isEqualNode(section)) previous.replaceWith(section);
+          });
+        }
+      } else {
+        container.insertBefore(row, cursor);
+      }
+    }
   }
 
   function updateFeedPagination(pagination) {
@@ -1283,8 +1309,10 @@
       const blockedInstahyre = job.source === 'instahyre'
         && String(job.source_details?.instahyre_detail_fetch_status || '').startsWith('blocked_http_');
       const description = job.description || (blockedInstahyre
-        ? 'Instahyre blocked the automated detail scan for this listing. Use Apply Direct to view the complete posting; structured fields from the listing feed remain available below.'
-        : 'The source did not expose a full description in this scan. Use the Apply Direct link to view the complete posting.');
+        ? 'Instahyre restricted automated access to the full posting. Open Apply Direct to read it.'
+        : job.source === 'instahyre'
+          ? 'JobBeeper has the Instahyre search listing. Open Apply Direct to read the complete posting.'
+          : 'JobBeeper has no full description for this listing. Open Apply Direct to read the complete posting.');
       if (job.description_format === 'markdown') {
         descEl.innerHTML = renderMarkdownDescription(description);
       } else {
@@ -2292,7 +2320,8 @@
     const requestId = ++jobsFeedRequestSequence;
     const refreshBtn = $('refreshFeedBtn');
     if (refreshBtn) refreshBtn.classList.add('is-loading');
-    renderFeedLoading();
+    if (!state.pagination) renderFeedLoading();
+    else $('jobsListContainer')?.setAttribute('aria-busy', 'true');
 
     const sortParameters = {
       newest: { sort_by: 'created_at', sort_order: 'desc' },
@@ -2331,6 +2360,7 @@
       const summaryData = await summaryRes.json();
       if (requestId !== jobsFeedRequestSequence) return;
 
+      const previousSelection = state.jobs.find(job => job.id === state.selectedJobId);
       state.jobs = (jobsData.jobs || []).map(normalizeJob).filter(Boolean);
       state.pagination = jobsData.pagination || {
         page: state.feedPage, per_page: state.feedPageSize,
@@ -2349,16 +2379,19 @@
       );
       populateSourceFilterOptions(state.jobs);
       renderFeed();
+      const selection = state.jobs.find(job => job.id === state.selectedJobId);
+      if (previousSelection && selection && JSON.stringify(previousSelection) !== JSON.stringify(selection)) {
+        showJobInspector(selection, false);
+      }
     } catch (err) {
       if (requestId !== jobsFeedRequestSequence) return;
-      state.jobs = [];
-      state.pagination = { page: state.feedPage, per_page: state.feedPageSize, total: 0, total_pages: 0, has_previous: false, has_next: false };
-      state.summary = null;
-      state.isStaticFallback = false;
-      updateTelemetry(0, 0, 0, 'Feed Offline');
-      populateSourceFilterOptions([]);
-      renderFeed();
-      showToast('Live jobs API unavailable. Dashboard is offline; no fallback feed is shown.', 'error', 5000);
+      if (!state.pagination) {
+        updateTelemetry(0, 0, 0, 'Feed Offline');
+        renderFeed();
+      }
+      showToast(state.pagination
+        ? 'Sync failed. Showing the last loaded jobs.'
+        : 'Live jobs are unavailable. Try Sync again.', 'error', 5000);
     } finally {
       if (requestId === jobsFeedRequestSequence && refreshBtn) {
         refreshBtn.classList.remove('is-loading');

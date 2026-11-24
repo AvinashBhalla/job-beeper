@@ -265,7 +265,11 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
             )""", (stamp,))
         row = conn.execute("""SELECT l.id,l.user_id,l.attempt_count,l.backlog_override,
           l.canonical_opportunity_id,t.chat_id,j.title,j.company,j.location,j.url,
-          j.source,j.discovered_at,e.score,e.reasons_json
+          j.source,j.source_posted_at,j.posted_precision,j.discovered_at,j.source_details_json,
+          j.description != '' AS has_description,
+          COALESCE(j.experience_min_years,e.experience_min_years) AS experience_min_years,
+          COALESCE(j.experience_max_years,e.experience_max_years) AS experience_max_years,
+          e.score,e.reasons_json AS match_reasons_json
           FROM user_notification_ledger l
           JOIN user_notification_settings s ON s.user_id=l.user_id AND s.enabled=1
           JOIN user_telegram_chats t ON t.user_id=l.user_id AND t.chat_type='private'
@@ -377,6 +381,8 @@ def _still_deliverable(
 
 
 def dispatch(db_path: Path, limit: int = 20, matcher_rules_version: int = 3) -> int:
+    from v2.telegram import format_notification
+
     token = os.getenv("JOB_RADAR_TELEGRAM_BOT_TOKEN", "")
     batch_limit = max(0, min(int(limit), 100))
     if not token or batch_limit == 0:
@@ -411,15 +417,10 @@ def dispatch(db_path: Path, limit: int = 20, matcher_rules_version: int = 3) -> 
                 )
             continue
 
-        message = (
-            f"🚨 {int(item['score'])}% MATCH\n\n{item['title']}\n"
-            f"Company: {item['company']}\n📍 {item['location']}\n"
-            f"Source: {item['source']}\n\nApply → {item['url']}"
-        )
         try:
             response = requests.post(
                 f"{API}/bot{token}/sendMessage",
-                json={"chat_id": item["chat_id"], "text": message},
+                json={"chat_id": item["chat_id"], "text": format_notification(item)},
                 timeout=15,
             )
             if response.status_code == 429 or response.status_code >= 500:

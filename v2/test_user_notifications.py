@@ -58,6 +58,11 @@ class UserNotificationServiceTests(unittest.TestCase):
             ''')
         with user_notifications._connect(self.db) as conn:
             conn.execute("ALTER TABLE jobs ADD COLUMN source_owner_user_id INTEGER")
+            for column in (
+                "source_posted_at TEXT", "posted_precision TEXT", "description TEXT NOT NULL DEFAULT ''",
+                "source_details_json TEXT", "experience_min_years REAL", "experience_max_years REAL",
+            ):
+                conn.execute(f"ALTER TABLE jobs ADD COLUMN {column}")
             conn.execute("""
                 CREATE TABLE google_alerts_gmail_opportunities (
                     user_id INTEGER NOT NULL,
@@ -80,6 +85,8 @@ class UserNotificationServiceTests(unittest.TestCase):
         fingerprint = user_preferences.preferences_fingerprint({**user_preferences.PREFERENCE_DEFAULTS, "match_threshold": 55}, 3)
         with user_notifications._connect(self.db) as conn:
             conn.execute("INSERT INTO user_job_evaluations VALUES(?,?,?,?,?,?)", (1, 3, fingerprint, 1, 99, '[]'))
+            for column in ("experience_min_years REAL", "experience_max_years REAL"):
+                conn.execute(f"ALTER TABLE user_job_evaluations ADD COLUMN {column}")
 
     def tearDown(self):
         self.clock_patcher.stop()
@@ -471,6 +478,10 @@ class UserNotificationServiceTests(unittest.TestCase):
 
     def test_dispatch_sends_only_to_owner_chat_and_marks_sent(self):
         with user_notifications._connect(self.db) as conn:
+            conn.execute("""UPDATE jobs SET source='instahyre', experience_min_years=3,
+                experience_max_years=5, source_details_json=? WHERE id=1""",
+                ('{"key_skills":["React Native","TypeScript"],"listing_experience":"4-7 Years"}',))
+            conn.execute("UPDATE user_job_evaluations SET reasons_json=? WHERE user_id=1 AND job_id=1", ('["target location"]',))
             conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
         response = unittest.mock.Mock(status_code=200)
@@ -478,6 +489,13 @@ class UserNotificationServiceTests(unittest.TestCase):
         with patch.dict('os.environ', {'JOB_RADAR_TELEGRAM_BOT_TOKEN':'test-token'}), patch.object(user_notifications.requests, 'post', return_value=response) as post:
             self.assertEqual(user_notifications.dispatch(self.db, 5), 1)
         self.assertEqual(post.call_args.kwargs['json']['chat_id'], '111')
+        text = post.call_args.kwargs['json']['text']
+        for field in (
+            "Posted: Unknown", "Discovered: 07 Nov 2026, 3:30 PM IST",
+            "Experience: 3-5 years (listing header: 4-7 Years)",
+            "Key skills: React Native, TypeScript", "✓ target location", "Apply → https://example.com/1",
+        ):
+            self.assertIn(field, text)
         with user_notifications._connect(self.db) as conn:
             self.assertEqual(conn.execute('SELECT status FROM user_notification_ledger').fetchone()[0], 'sent')
 
