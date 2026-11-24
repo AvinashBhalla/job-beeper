@@ -1069,6 +1069,13 @@ a:hover {
   position: relative;
   border-left: 3px solid transparent;
   min-width: 0;
+  box-sizing: border-box;
+}
+
+#jobsListContainer {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .opportunity-row:hover {

@@ -3267,15 +3267,14 @@
       else if (gmailResult === 'cancelled') showToast('Personal Gmail connection was cancelled.', 'info');
       await loadGoogleAlertsGmailStatus();
     }
-    if (state.isAdmin || state.config?.onboarding_complete) await loadJobsFeed();
-    else { state.jobs = []; renderFeed(); }
+    // The feed is browseable before preferences are configured. The API
+    // applies personalized matching only after onboarding is complete.
+    await loadJobsFeed();
     await loadSourceStatusTelemetry();
 
     const refreshFeedIfVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      if (state.isAdmin || (state.config && state.config.onboarding_complete)) {
-        void loadJobsFeed();
-      }
+      void loadJobsFeed();
     };
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') refreshFeedIfVisible();
