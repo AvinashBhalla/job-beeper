@@ -969,12 +969,16 @@
     renderActiveFiltersBar();
 
     if (jobs.length === 0) {
+      const hasActiveFilters = Boolean(
+        state.filters.search || state.filters.source || state.filters.minScore > 0 ||
+        state.filters.maxAge !== 72 || state.filters.alertableOnly || state.filters.remoteOnly
+      );
       container.innerHTML = `
         <div style="text-align:center;padding:48px 24px;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:12px;">
           <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
-          <h3 style="font-size:14px;color:var(--text-primary);font-weight:600;">No matching opportunities found</h3>
-          <p style="font-size:12.5px;color:var(--text-muted);max-width:320px;">No job postings meet your active search and filter criteria.</p>
-          <button type="button" class="btn-action-primary" id="resetFiltersEmptyBtn" style="margin-top:4px;">Clear all filters</button>
+          <h3 style="font-size:14px;color:var(--text-primary);font-weight:600;">${hasActiveFilters ? 'No matching opportunities found' : 'No opportunities in this time window'}</h3>
+          <p style="font-size:12.5px;color:var(--text-muted);max-width:320px;">${hasActiveFilters ? 'No job postings meet your active search and filter criteria.' : 'Try a wider freshness range or check back after the next source refresh.'}</p>
+          ${hasActiveFilters ? '<button type="button" class="btn-action-primary" id="resetFiltersEmptyBtn" style="margin-top:4px;">Clear all filters</button>' : ''}
         </div>`;
       const resetBtn = $('resetFiltersEmptyBtn');
       if (resetBtn) resetBtn.onclick = clearAllFilters;

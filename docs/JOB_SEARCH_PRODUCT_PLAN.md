@@ -189,3 +189,5 @@ New members can open the shared jobs feed before completing matching preferences
 The mobile navigation keeps `Preferences` and `Account` as separate destinations so configuration and account access remain discoverable on narrow screens.
 
 Opportunity rows use a wrapped, width-constrained source and action area at split-pane widths. The `aggregated` marker means the job belongs to a canonical opportunity that may represent equivalent records from multiple providers. It does not mean the job was fetched from every provider shown in the row.
+
+The member regression pass covers the complete feed query before pagination, first-visit loading, search debounce, source, score, age, remote, alertable, sort and page navigation controls. An empty result now distinguishes an actual active filter from a time window with no jobs and does not show a misleading Clear all filters action.
