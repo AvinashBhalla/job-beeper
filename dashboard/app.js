@@ -1060,7 +1060,7 @@
           <div class="opportunity-main-col">
             <div class="opportunity-headline-row">
               <span class="opportunity-title">${esc(job.title)}</span>
-              <span class="opportunity-source-text">${esc(job.source)}${job.canonical_opportunity_id ? ' · multi-source' : ''}</span>
+              <span class="opportunity-source-text" title="${job.canonical_opportunity_id ? 'This listing belongs to a canonical opportunity that may combine equivalent postings from multiple sources.' : 'Original job source'}">${esc(job.source)}${job.canonical_opportunity_id ? ' · aggregated' : ''}</span>
             </div>
             <div class="opportunity-company-row">
               <span class="opportunity-company">${esc(job.company)}</span>

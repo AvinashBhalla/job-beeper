@@ -187,3 +187,5 @@ Keep the existing Python application and separate provider, extraction, and deli
 New members can open the shared jobs feed before completing matching preferences. The dashboard still applies its freshness, source, search, score, remote-only, alertable and sort controls, with the default view covering the last 72 hours. Selecting `Any posting date` removes the age cutoff. Personalized matching and alert eligibility begin after the member saves a target role plus a location or Remote only.
 
 The mobile navigation keeps `Preferences` and `Account` as separate destinations so configuration and account access remain discoverable on narrow screens.
+
+Opportunity rows use a wrapped, width-constrained source and action area at split-pane widths. The `aggregated` marker means the job belongs to a canonical opportunity that may represent equivalent records from multiple providers. It does not mean the job was fetched from every provider shown in the row.
