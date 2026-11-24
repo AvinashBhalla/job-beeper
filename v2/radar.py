@@ -4856,9 +4856,12 @@ def _hydrate_instahyre_listings(jobs: list[dict[str, Any]]) -> None:
     pending.sort(key=lambda job: existing.get(job["source_job_id"], {}).get("instahyre_detail_attempted_at", ""))
     for job in pending[:INSTAHYRE_DETAILS_PER_SCAN]:
         job["source_details"]["instahyre_detail_attempted_at"] = iso(now())
+        if not google_alerts_job_verifier._robots_allows(job["url"]):
+            continue
         try:
             with _tracked_source_get(
-                "instahyre", job["url"], headers={**UA, "Accept": "text/html"},
+                "instahyre", job["url"],
+                headers={"User-Agent": google_alerts_job_verifier.USER_AGENT, "Accept": "text/html"},
                 timeout=10, allow_redirects=False, stream=True,
             ) as response:
                 if response.status_code in {401, 403, 429}:

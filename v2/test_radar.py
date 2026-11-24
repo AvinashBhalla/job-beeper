@@ -3384,12 +3384,15 @@ class InstahyreCollectorTests(unittest.TestCase):
             patch.object(radar, "DB_PATH", Path(tmp) / "jobs.db"),
             patch.object(radar, "get_config", return_value=BASE_CONFIG),
             patch.object(radar, "source_state", {}),
+            patch.object(radar.google_alerts_job_verifier, "_robots_allows", side_effect=[False, True]) as robot_policy,
             patch.object(radar, "_tracked_source_get", return_value=blocked) as get,
         ):
             radar.init_db()
             radar._hydrate_instahyre_listings(jobs)
             radar._hydrate_instahyre_listings(jobs)
         get.assert_called_once()
+        self.assertEqual([call.args[0] for call in robot_policy.call_args_list], [job["url"] for job in jobs])
+        self.assertEqual(get.call_args.args[1], jobs[1]["url"])
         self.assertFalse(get.call_args.kwargs["allow_redirects"])
         self.assertEqual([job["description"] for job in jobs], ["", ""])
         self.assertEqual([job["source_details"]["key_skills"] for job in jobs], [["Java"], ["Java"]])
