@@ -3426,6 +3426,8 @@ class InstahyreCollectorTests(unittest.TestCase):
         self.assertFalse(get.call_args.kwargs["allow_redirects"])
         self.assertEqual([job["description"] for job in jobs], ["", ""])
         self.assertEqual([job["source_details"]["key_skills"] for job in jobs], [["Java"], ["Java"]])
+        self.assertNotIn("instahyre_detail_fetch_status", jobs[0]["source_details"])
+        self.assertEqual(jobs[1]["source_details"]["instahyre_detail_fetch_status"], "blocked_http_403")
 
     def test_current_feed_paginates_by_meta_next_and_deduplicates_ids(self):
         first = {

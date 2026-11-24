@@ -2314,6 +2314,7 @@
     if (state.filters.source) params.set('source', state.filters.source);
     if (state.filters.minScore > 0) params.set('min_score', String(state.filters.minScore));
     if (state.filters.maxAge > 0) params.set('max_age_hours', String(state.filters.maxAge));
+    else params.set('all_time', 'true');
     if (state.filters.alertableOnly) params.set('alertable_only', 'true');
     if (state.filters.remoteOnly) params.set('remote_only', 'true');
 
@@ -3169,7 +3170,7 @@
         { value: '24', label: 'Last 24 hours' },
         { value: '6', label: 'Last 6 hours' },
         { value: '1', label: 'Last hour' },
-        { value: '0', label: 'Any posting date' },
+        { value: '0', label: 'All time' },
       ],
       value: String(state.filters.maxAge),
       onChange: (val) => {
@@ -3246,6 +3247,7 @@
     workspaceInitialized = true;
     state.currentUser = user;
     state.isAdmin = user?.role === 'admin';
+    renderFeedLoading();
     document.body.classList.add('auth-ready');
     document.body.classList.remove('user-ready');
     const userWorkspace = $('userWorkspace');

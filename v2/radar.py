@@ -10658,6 +10658,7 @@ def jobs(
     minutes: int = 60,
     limit: int = 100,
     today_only: bool = False,
+    all_time: bool = False,
     q: str = "",
     search: str = "",
     page: int | None = None,
@@ -10683,11 +10684,10 @@ def jobs(
     page_number = max(1, int(page or 1))
     page_size = max(1, min(int(per_page or legacy_limit), 100)) if paginated else legacy_limit
     offset = (page_number - 1) * page_size if paginated else 0
-    cutoff = (
-        iso(current_day_start_utc())
-        if today_only
-        else iso(now() - dt.timedelta(minutes=minutes))
-    )
+    if today_only:
+        cutoff = iso(current_day_start_utc())
+    else:
+        cutoff = "" if all_time else iso(now() - dt.timedelta(minutes=minutes))
 
     query = (search or q or "").strip()[:200]
     escaped_query = (

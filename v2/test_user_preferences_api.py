@@ -75,7 +75,9 @@ class UserScopedJobFeedTests(unittest.TestCase):
         )
 
     def test_incomplete_user_can_browse_jobs_feed(self):
-        user = auth.create_user(self.db_path, "incomplete@example.com", "incomplete-user-password")
+        auth.create_user(self.db_path, "incomplete@example.com", "incomplete-user-password")
+        with radar.connect_sqlite(self.db_path) as conn:
+            conn.execute("UPDATE jobs SET discovered_at='2020-01-01T00:00:00Z' WHERE id=(SELECT MAX(id) FROM jobs)")
         self.assertEqual(
             self.client.post(
                 "/api/auth/login",
@@ -85,7 +87,10 @@ class UserScopedJobFeedTests(unittest.TestCase):
         )
         response = self.client.get("/api/jobs")
         self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(response.json()["pagination"]["total"], 2)
+        recent = self.client.get("/api/jobs?minutes=4320&max_age_hours=72&page=1&per_page=1").json()
+        all_time = self.client.get("/api/jobs?all_time=true&page=2&per_page=1").json()
+        self.assertEqual(all_time["pagination"]["total"], recent["pagination"]["total"] + 1)
+        self.assertEqual(all_time["pagination"]["page"], 2)
 
 
     def test_preference_save_returns_specific_validation_for_missing_target_role(self):

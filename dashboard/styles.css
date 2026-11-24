@@ -2439,7 +2439,7 @@ body.user-ready #userWorkspace {
 
 
 /* Keep the operational header readable on narrow phones without clipping metrics. */
-@media (max-width: 560px) {
+@media (max-width: 700px) {
   .top-header-bar {
     height: auto;
     min-height: var(--header-height);

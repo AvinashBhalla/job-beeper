@@ -240,7 +240,8 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         render_feed = source.split("function renderFeed()", 1)[1].split("function updateFeedPagination", 1)[0]
         self.assertIn("container.innerHTML = jobs.map", render_feed)
         self.assertNotIn("state.jobs.filter", render_feed)
-        self.assertIn("{ value: '0', label: 'Any posting date' }", source)
+        self.assertIn("params.set('all_time', 'true')", source)
+        self.assertIn("{ value: '0', label: 'All time' }", source)
 
     def test_job_cards_label_experience_provenance(self):
         source = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
