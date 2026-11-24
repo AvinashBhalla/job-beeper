@@ -10695,7 +10695,7 @@ def jobs(
         .replace("%", "\\%")
         .replace("_", "\\_")
     )
-    search_pattern = f"%{escaped_query.lower()}%" if query else "%"
+    search_pattern = f"%{escaped_query.lower()}%"
     source_filter = (source or "").strip().casefold()[:64]
     min_score = max(0, min(int(min_score), 100))
     max_age_hours = None if max_age_hours is None else max(1, min(int(max_age_hours), 72))
@@ -10729,7 +10729,7 @@ def jobs(
           OR (?='matched' AND (CASE WHEN ?='admin' THEN COALESCE(ge.match, 0) ELSE COALESCE(e.match, 0) END)=1)
           OR (?='unmatched' AND ?='admin' AND COALESCE(ge.match, 0)=0))
           AND j.discovered_at >= ?
-          AND LOWER(
+          AND (? = '' OR LOWER(
                 COALESCE(j.company, '') || ' ' ||
                 COALESCE(j.title, '') || ' ' ||
                 COALESCE(j.location, '') || ' ' ||
@@ -10739,7 +10739,7 @@ def jobs(
                 COALESCE(j.source_details_json, '{{}}') || ' ' ||
                 COALESCE(e.reasons_json, '') || ' ' ||
                 COALESCE(ge.reasons_json, '')
-              ) LIKE ? ESCAPE '\\'
+              ) LIKE ? ESCAPE '\\')
           AND (?='' OR LOWER(j.source)=?)
           AND (?=0 OR (
                 {score_sql} >= ?
@@ -10753,7 +10753,7 @@ def jobs(
 
     base_params = (
         user["id"], status, status, user["role"], status, user["role"],
-        cutoff, search_pattern,
+        cutoff, query, search_pattern,
         source_filter, source_filter,
         min_score, user["role"], min_score, min_score, threshold, user["role"],
         age_cutoff, age_cutoff,

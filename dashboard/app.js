@@ -3283,6 +3283,8 @@
     handleHashRoute();
 
     await loadConfig();
+    // Preferences determine the feed scope. Telegram and Gmail status do not.
+    const feedRequest = loadJobsFeed();
     await loadTelegramStatus();
     if (state.isAdmin) {
       const gmailResult = new URLSearchParams(window.location.search).get('gmail_connect');
@@ -3291,9 +3293,7 @@
       else if (gmailResult === 'cancelled') showToast('Personal Gmail connection was cancelled.', 'info');
       await loadGoogleAlertsGmailStatus();
     }
-    // The feed is browseable before preferences are configured. The API
-    // applies personalized matching only after onboarding is complete.
-    await loadJobsFeed();
+    await feedRequest;
     await loadSourceStatusTelemetry();
 
     const refreshFeedIfVisible = () => {

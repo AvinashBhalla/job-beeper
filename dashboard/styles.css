@@ -2100,14 +2100,11 @@ a:hover {
 }
 
 @media (max-width: 1080px) {
-  .search-controls-row {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 860px) {
   .app-sidebar {
     display: none;
+  }
+  .app-main {
+    padding-bottom: 56px;
   }
   .mobile-bottom-navigation {
     display: grid;
@@ -2118,11 +2115,9 @@ a:hover {
   }
   .inspector-research-pane {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 56px;
-    width: 100%;
+    inset: 0 0 56px;
+    width: auto;
+    height: auto;
     z-index: 100;
   }
   .applied-kpi-grid {
