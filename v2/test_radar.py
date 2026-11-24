@@ -2700,6 +2700,38 @@ class MatcherTests(unittest.TestCase):
             finally:
                 radar.DB_PATH = original_db
 
+    def test_member_without_preferences_can_browse_all_jobs(self):
+        with TemporaryDirectory() as tmp:
+            original_db = radar.DB_PATH
+            try:
+                radar.DB_PATH = Path(tmp) / "jobs.db"
+                radar.init_db()
+                member = auth.create_user(
+                    radar.DB_PATH, "empty-preferences@example.invalid", "temporary-member-password"
+                )
+                jobs = [
+                    normalize_job(
+                        "instahyre", "empty-pref-new", "New Co", "Backend Engineer",
+                        "Bengaluru", "https://example.com/new", None, "unknown", "Python APIs",
+                    ),
+                    normalize_job(
+                        "linkedin", "empty-pref-old", "Old Co", "Frontend Engineer",
+                        "Remote", "https://example.com/old", None, "unknown", "React UI",
+                    ),
+                ]
+                jobs[0]["discovered_at"] = radar.iso(radar.now())
+                jobs[1]["discovered_at"] = radar.iso(radar.now() - radar.dt.timedelta(hours=100))
+                self.assertEqual(upsert_jobs(jobs, BASE_CONFIG), 2)
+
+                result = radar.jobs(minutes=10080, max_age_hours=None, status="all", limit=10, user=member)
+                self.assertEqual(result["pagination"]["total"], 2)
+                self.assertEqual(result["jobs"][0]["source_job_id"], "empty-pref-new")
+                self.assertEqual(result["jobs"][0]["match_score"], 0)
+                detail = radar.job_detail(result["jobs"][0]["id"], user=member)
+                self.assertEqual(detail["source_job_id"], "empty-pref-new")
+            finally:
+                radar.DB_PATH = original_db
+
     def test_jobs_search_treats_like_wildcards_as_literal_text(self):
         with TemporaryDirectory() as tmp:
             original_db = radar.DB_PATH

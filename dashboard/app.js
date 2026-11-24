@@ -2295,7 +2295,9 @@
       minutes: '4320',
       page: String(state.feedPage),
       per_page: String(state.feedPageSize),
-      status: state.isAdmin ? 'all' : 'matched',
+      // Members without preferences browse the shared inventory until they
+      // opt into personalized matching.
+      status: state.isAdmin || !state.userPreferences?.onboarding_complete ? 'all' : 'matched',
       sort_by: sortParameters.sort_by,
       sort_order: sortParameters.sort_order,
     });

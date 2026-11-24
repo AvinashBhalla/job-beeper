@@ -10667,12 +10667,9 @@ def jobs(
     user: dict[str, Any] = Depends(require_authenticated),
 ):
     preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
-    if not preferences["onboarding_complete"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Complete a target role and either choose a location or enable Remote only before opening the job feed.",
-        )
-    ensure_user_job_evaluations_initialized(user["id"], preferences)
+    browsing_without_preferences = not preferences["onboarding_complete"]
+    if not browsing_without_preferences:
+        ensure_user_job_evaluations_initialized(user["id"], preferences)
     minutes = max(1, min(minutes, 10080))
     legacy_limit = max(1, min(limit, 500))
     paginated = page is not None or per_page is not None
@@ -10695,10 +10692,10 @@ def jobs(
     source_filter = (source or "").strip().casefold()[:64]
     min_score = max(0, min(int(min_score), 100))
     max_age_hours = None if max_age_hours is None else max(1, min(int(max_age_hours), 72))
-    status = (status or ("all" if user["role"] == "admin" else "matched")).strip().casefold()
+    status = (status or ("all" if user["role"] == "admin" or browsing_without_preferences else "matched")).strip().casefold()
     if status not in {"matched", "all", "unmatched"}:
         raise HTTPException(status_code=422, detail="status must be matched, all, or unmatched.")
-    if user["role"] != "admin" and status != "matched":
+    if user["role"] != "admin" and status != "matched" and not browsing_without_preferences:
         raise HTTPException(status_code=403, detail="Users can only view their matched opportunities.")
     legacy_sort = sort if sort in {"newest", "match", "company"} else "newest"
     sort_by = sort_by or {
@@ -10971,12 +10968,8 @@ def llm_shadow_status():
 @app.get("/api/daily-summary")
 def daily_summary(user: dict[str, Any] = Depends(require_authenticated)):
     preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
-    if not preferences["onboarding_complete"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Complete a target role and either choose a location or enable Remote only before opening the job feed.",
-        )
-    ensure_user_job_evaluations_initialized(user["id"], preferences)
+    if preferences["onboarding_complete"]:
+        ensure_user_job_evaluations_initialized(user["id"], preferences)
     cutoff = iso(current_day_start_utc())
     with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -11029,12 +11022,8 @@ def job_detail(
     user: dict[str, Any] = Depends(require_authenticated),
 ):
     preferences = user_preferences.get_user_preferences(DB_PATH, user["id"])
-    if not preferences["onboarding_complete"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Complete a target role and either choose a location or enable Remote only before opening job details.",
-        )
-    ensure_user_job_evaluations_initialized(user["id"], preferences)
+    if preferences["onboarding_complete"]:
+        ensure_user_job_evaluations_initialized(user["id"], preferences)
     with connect_sqlite(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
