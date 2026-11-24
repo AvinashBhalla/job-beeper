@@ -107,7 +107,7 @@ INITIAL_SNAPSHOT_BASELINE_SOURCES = frozenset({
     "instahyre", "lever", "workday", "recruitee", "hirebase", *public_job_boards.LABELS,
 })
 
-app = FastAPI(title="Job Radar V2", version="2.0.0")
+app = FastAPI(title="Job Radar V2", version="2.0.0", openapi_url=None)
 
 cors_origins = [
     origin.strip()

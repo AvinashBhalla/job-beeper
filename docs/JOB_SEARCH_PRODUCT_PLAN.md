@@ -74,6 +74,8 @@ Nine of the 13 rollout boards already have matching production registry candidat
 
 GitHub `v2-live-radar` is the integration branch for the next release. The VM archived the exact tips of the ten GitHub branches merged in PRs #102–111 before removing the branch names. The archive is `~/.local/share/jobbeeper/git-archives/github-merged-20261124T104121Z.bundle` with an adjacent tip manifest. The two Google Alerts branches retain unique history and stay separate from this release. The VM's checked-out development and legacy worktrees retain their local changes.
 
+The rollout candidate is published separately as `codex/member-release-candidate`. Opening a pull request against `v2-live-radar` triggers GitHub Actions. Use the VM regression result for review while the hosted CI allocation is exhausted. All 13 development boards had a successful latest poll at 16:17 IST, with no pending baseline or new member alert from the cohort since the 24-hour checkpoint. The pilot still had one linked, opted-in account.
+
 #### Continuous board discovery and member navigation
 
 Development runs one bounded Common Crawl cycle at startup and every hour. Its existing SQLite lease shares the request budget with the manual admin action. HTTP 429 and 503 pause requests for 24 hours. Other provider-specific errors advance the rotation so an unavailable query cannot stall discovery for every provider. The rotation includes Greenhouse, Lever, Ashby, SmartRecruiters, and Workable alongside Workday, Keka, Darwinbox, and other supported candidates. The scan adds recognized URLs to **Source Health → Candidate imports** automatically. Each employer board still needs live endpoint and employer verification before it can be activated. Scheduled polls continue throughout discovery.
@@ -145,6 +147,8 @@ The shared parser handles written-out minima, explicit experience labels, and a 
 | Workable `2188` and Darwinbox `379` | The apply links returned the application shell to the HTTP check. The full original JD could not be independently compared from that response. |
 
 Development image `50f91c7` passed all 679 Linux tests and 60 targeted tests on Windows. The Linux regression log is `/tmp/jobbeeper-50f91c7-tests.XNQz0R/regression.log` on the VM. On the deployed development database, the Arintra member evaluation is now 0% with a 7–11-year requirement and the candidate-limit rejection. The message formatter produced the six original skills and omitted the stale experience reason during a preview. The original sent row remains in the ledger. The deployed job-detail serializer gave Bridgestone 2–4 years and returned the original title, location, and apply link across the sampled records.
+
+In the initial sample of 13 new Instahyre listings after the deployment, eight had a verified full description and numeric experience. Four came from the JD and four used the employer's listing value. Five had no recorded detail attempt. The collector budgets four detail requests per scan and selects them from its current search results. Check whether the regular schedule completes those pending descriptions and retains a path to details for entries that age out of the search window before approving the Instahyre rollout.
 
 ### Source Health administration
 
@@ -291,3 +295,5 @@ The member regression pass covers the complete feed query before pagination, fir
 ### Online hardening boundary
 
 Browser code cannot be made impossible to reverse engineer. The safe boundary is that secrets, bot tokens, provider credentials, matching authority and paid-source calls remain server-side. The API now defaults to same-origin CORS, adds browser isolation and transport headers, avoids source maps in deployment, and should be served only behind HTTPS with rate limits, dependency updates, access logging and secret rotation. Obfuscation may reduce casual copying but is not a security control.
+
+The production HTTPS check confirmed unauthenticated requests to the jobs feed and job details return 401. The old image exposes FastAPI's generated documentation and schema. The next candidate disables those routes, with an API regression check for 404 on `/docs`, `/redoc`, and `/openapi.json`, 200 on `/health`, and 401 on the unsigned jobs feed.

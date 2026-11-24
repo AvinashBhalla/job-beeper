@@ -74,6 +74,13 @@ class UserScopedJobFeedTests(unittest.TestCase):
             "/api/auth/login", json={"email": email, "password": password}
         )
 
+    def test_generated_api_documentation_is_not_public(self):
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+        self.assertEqual(self.client.get("/health").status_code, 200)
+        self.assertEqual(self.client.get("/api/jobs").status_code, 401)
+
     def test_incomplete_user_can_browse_jobs_feed(self):
         auth.create_user(self.db_path, "incomplete@example.com", "incomplete-user-password")
         with radar.connect_sqlite(self.db_path) as conn:
