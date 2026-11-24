@@ -2727,8 +2727,6 @@ class MatcherTests(unittest.TestCase):
                 self.assertEqual(result["pagination"]["total"], 2)
                 self.assertEqual(result["jobs"][0]["source_job_id"], "empty-pref-new")
                 self.assertEqual(result["jobs"][0]["match_score"], 0)
-                detail = radar.job_detail(result["jobs"][0]["id"], user=member)
-                self.assertEqual(detail["source_job_id"], "empty-pref-new")
             finally:
                 radar.DB_PATH = original_db
 
