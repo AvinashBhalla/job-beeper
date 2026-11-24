@@ -361,7 +361,9 @@ class PublicJobBoardTests(unittest.TestCase):
         })) as get:
             job, = public_job_boards.list_jobs(board, get)
         self.assertEqual(get.call_args.args[0], "https://www.pepsicojobs.com/api/jobs")
-        self.assertEqual(get.call_args.kwargs["params"], {"limit": 100, "country": "India", "page": 1})
+        self.assertEqual(get.call_args.kwargs["params"], {
+            "limit": 100, "country": "India", "page": 1, "sortBy": "posted_date",
+        })
         self.assertEqual((job.id, job.url, job.locations, job.precision),
                          ("123", "https://www.pepsicojobs.com/main/jobs/P1-123", ["Hyderabad, India"], "minute"))
         self.assertIn("3+ years of experience with Python", job.description)

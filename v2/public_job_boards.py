@@ -1029,7 +1029,7 @@ def _eightfold(board: Board, get, *, probe: bool) -> list[Posting]:
 def _jibe(board: Board, get, *, probe: bool) -> list[Posting]:
     jobs = []
     page_size = 100 if board.tenant and not probe else 10
-    query = {"limit": page_size}
+    query = {"limit": page_size, "sortBy": "posted_date"}
     if board.tenant:
         query["country"] = board.tenant
     root = board.url.split("?", 1)[0]
