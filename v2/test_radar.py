@@ -2723,7 +2723,7 @@ class MatcherTests(unittest.TestCase):
                 jobs[1]["discovered_at"] = radar.iso(radar.now() - radar.dt.timedelta(hours=100))
                 self.assertEqual(upsert_jobs(jobs, BASE_CONFIG), 2)
 
-                result = radar.jobs(minutes=10080, max_age_hours=None, status="all", limit=10, user=member)
+                result = radar.jobs(minutes=10080, max_age_hours=None, status="matched", limit=10, user=member)
                 self.assertEqual(result["pagination"]["total"], 2)
                 self.assertEqual(result["jobs"][0]["source_job_id"], "empty-pref-new")
                 self.assertEqual(result["jobs"][0]["match_score"], 0)

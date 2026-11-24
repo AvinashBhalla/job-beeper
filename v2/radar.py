@@ -10693,6 +10693,11 @@ def jobs(
     min_score = max(0, min(int(min_score), 100))
     max_age_hours = None if max_age_hours is None else max(1, min(int(max_age_hours), 72))
     status = (status or ("all" if user["role"] == "admin" or browsing_without_preferences else "matched")).strip().casefold()
+    if browsing_without_preferences:
+        # An empty preference set has no evaluations to match against. This
+        # also protects users with a cached dashboard bundle that still sends
+        # status=matched.
+        status = "all"
     if status not in {"matched", "all", "unmatched"}:
         raise HTTPException(status_code=422, detail="status must be matched, all, or unmatched.")
     if user["role"] != "admin" and status != "matched" and not browsing_without_preferences:
