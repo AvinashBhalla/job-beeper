@@ -484,7 +484,8 @@ class UserNotificationServiceTests(unittest.TestCase):
                 experience_extraction_version=?, description='Requirements: 3–5 years of professional experience.',
                 source_details_json=? WHERE id=1""",
                 (instahyre_details.MIN_EXPERIENCE_EXTRACTION_VERSION,
-                 '{"key_skills":["React Native","TypeScript"],"listing_experience":"4-7 Years","instahyre_detail_verified":true}'))
+                 '{"key_skills":["React Native","TypeScript"],"listing_experience":"4-7 Years",'
+                 '"instahyre_detail_verified":true,"instahyre_detail_attempted_at":"2026-11-07T10:01:00+00:00"}'))
             conn.execute("UPDATE user_job_evaluations SET reasons_json=? WHERE user_id=1 AND job_id=1", ('["target location"]',))
             conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
             user_notifications._queue_new_matches(conn, 1, '2026-11-07T00:00:00+00:00')
@@ -532,8 +533,12 @@ class UserNotificationServiceTests(unittest.TestCase):
                          ('{"instahyre_detail_verified":true,"instahyre_detail_fetch_status":"complete"}',))
         self.assertIsNone(user_notifications._claim_one(self.db))
         with user_notifications._connect(self.db) as conn:
-            conn.execute("UPDATE jobs SET experience_extraction_version=? WHERE id=1",
-                         (instahyre_details.MIN_EXPERIENCE_EXTRACTION_VERSION,))
+            conn.execute("UPDATE jobs SET experience_extraction_version=?, source_details_json=? WHERE id=1",
+                         (instahyre_details.MIN_EXPERIENCE_EXTRACTION_VERSION, '{"instahyre_detail_verified":true}'))
+        self.assertIsNone(user_notifications._claim_one(self.db))
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("UPDATE jobs SET source_details_json=? WHERE id=1",
+                         ('{"instahyre_detail_verified":true,"instahyre_detail_fetch_status":"complete"}',))
         self.assertIsNotNone(user_notifications._claim_one(self.db))
 
     def test_repeated_enable_preserves_the_original_no_backlog_boundary(self):

@@ -18,16 +18,23 @@ ALERT_EXPERIENCE_READY_SQL = f"""(j.source != 'instahyre' OR (
     AND length(trim(j.description)) > 0
     AND CASE WHEN json_valid(j.source_details_json) THEN
         json_type(j.source_details_json, '$.instahyre_detail_verified') = 'true'
-        AND COALESCE(json_extract(j.source_details_json, '$.instahyre_detail_fetch_status'), 'complete') = 'complete'
+        AND (
+            json_extract(j.source_details_json, '$.instahyre_detail_fetch_status') = 'complete'
+            OR (
+                json_extract(j.source_details_json, '$.instahyre_detail_fetch_status') IS NULL
+                AND NULLIF(json_extract(j.source_details_json, '$.instahyre_detail_attempted_at'), '') IS NOT NULL
+            )
+        )
     ELSE 0 END
 ))"""
 
 
 def has_complete_detail(description: str, details: dict) -> bool:
+    status = details.get("instahyre_detail_fetch_status")
     return bool(
         description.strip()
         and details.get("instahyre_detail_verified") is True
-        and details.get("instahyre_detail_fetch_status") in (None, "complete")
+        and (status == "complete" or (status is None and details.get("instahyre_detail_attempted_at")))
     )
 
 
