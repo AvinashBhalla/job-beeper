@@ -1349,9 +1349,12 @@
 
   function renderSourceDetails(job) {
     const section = $('inspSourceDetailsSection');
+    const title = $('inspSourceDetailsTitle');
     const metaContainer = $('inspSourceDetailsMeta');
     const skillsContainer = $('inspSourceKeySkills');
     if (!section || !metaContainer || !skillsContainer) return;
+    const sourceLabel = sourceLabels[job.source];
+    if (title) title.textContent = sourceLabel ? `${sourceLabel} Listing Details` : 'Listing Details';
 
     const details = job.source_details || {};
     const education = details.education && typeof details.education === 'object'
@@ -1362,6 +1365,7 @@
       : String(value || '').trim();
 
     const rows = [
+      ['Experience on listing', valueText(details.listing_experience)],
       ['Role', valueText(details.role)],
       ['Industry Type', valueText(details.industry_type)],
       ['Department', valueText(details.department)],

@@ -3278,6 +3278,22 @@ class InstahyreCollectorTests(unittest.TestCase):
         def json(self):
             return self.payload
 
+    DETAIL_HTML = """
+        <script type="application/ld+json">
+        {"@type":"JobPosting","identifier":{"value":"job-446772-sde-ii-full-stack"}}
+        </script>
+        <div id="floating-header"><span class="experience">3-5 Years</span></div>
+        <div id="job-description">
+          <ul id="job-skills-description"><li>Java</li><li>React</li><li>React.js</li><li>Spring Boot</li></ul>
+          <div class="quill-formatted">
+            <p><strong>Requirements:</strong></p>
+            <ul><li>2–5 years of building and operating production software.</li>
+              <li>Strong fundamentals in Java and Spring Boot, with React experience.</li></ul>
+            <script>doNotCopy()</script>
+          </div>
+        </div>
+    """
+
     def test_current_objects_payload_maps_bengaluru_and_preserves_public_fields(self):
         payload = {
             "meta": {"next": None},
@@ -3291,9 +3307,10 @@ class InstahyreCollectorTests(unittest.TestCase):
                 "keywords": ["Product", "Software", "Technology"],
             }],
         }
-        with patch.object(
-            radar, "_tracked_source_get", return_value=self.Response(payload)
-        ) as get:
+        with (
+            patch.object(radar, "_tracked_source_get", return_value=self.Response(payload)) as get,
+            patch.object(radar, "_hydrate_instahyre_listings"),
+        ):
             jobs = radar.instahyre_collect({
                 "locations": ["Bengaluru, Karnataka, India", "Remote, India"],
             })
@@ -3311,10 +3328,64 @@ class InstahyreCollectorTests(unittest.TestCase):
             jobs[0]["url"],
             "https://www.instahyre.com/job-445690-product/",
         )
-        self.assertEqual(
-            jobs[0]["description"],
-            "Keywords: Product, Software, Technology",
-        )
+        self.assertEqual(jobs[0]["description"], "")
+        self.assertEqual(jobs[0]["source_details"], {"key_skills": ["Product", "Software", "Technology"]})
+
+    def test_detail_experience_and_skills_survive_search_only_rescan(self):
+        description, details = radar.instahyre_details.parse_listing(self.DETAIL_HTML, "446772")
+        self.assertEqual(radar.instahyre_details.parse_listing(self.DETAIL_HTML, "446773"), ("", {}))
+        self.assertIn("**Requirements:**\n\n- 2–5 years", description)
+        self.assertIn("software.\n- Strong fundamentals", description)
+        self.assertNotIn("doNotCopy", description)
+        self.assertEqual(details["listing_experience"], "3-5 Years")
+        self.assertEqual(details["key_skills"], ["Java", "React", "React.js", "Spring Boot"])
+        self.assertEqual(radar._software_experience_range("The company has spent 10 years building software."), (None, None))
+
+        url = "https://www.instahyre.com/job-446772-sde-ii-full-stack/"
+        observation = radar.normalize_job("instahyre", "446772", "Increff", "SDE II", "Bangalore", url, None, "unknown")
+        badge_only = {**observation, "source_details": {"listing_experience": "3-5 Years"}}
+        self.assertEqual(radar._experience_provenance_details(badge_only)["min_years"], 3)
+        full = {**observation, "description": description, "description_format": "markdown", "source_details": details}
+        search_only = {**observation, "source_details": {"key_skills": details["key_skills"]}}
+        with (
+            TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            patch.object(radar, "DB_PATH", Path(tmp) / "jobs.db"),
+            patch.object(radar, "get_config", return_value=BASE_CONFIG),
+        ):
+            radar.init_db()
+            radar.upsert_jobs([badge_only])
+            radar.upsert_jobs([full])
+            radar.upsert_jobs([search_only])
+            with radar.connect_sqlite(radar.DB_PATH) as conn:
+                row = conn.execute("""SELECT description, description_format, experience_min_years,
+                    experience_max_years, experience_provenance, source_details_json FROM jobs""").fetchone()
+        self.assertEqual(row[:5], (description, "markdown", 2, 5, "description"))
+        self.assertEqual(json.loads(row[5]), details)
+
+    def test_detail_access_denied_keeps_the_search_feed_and_backs_off(self):
+        jobs = [radar.normalize_job(
+            "instahyre", str(job_id), "Employer", "Engineer", "Bangalore",
+            f"https://www.instahyre.com/job-{job_id}-engineer/", None, "unknown",
+            source_details={"key_skills": ["Java"]},
+        ) for job_id in (1, 2)]
+        blocked = radar.requests.Response()
+        blocked.status_code = 403
+        blocked._content = b"Access denied"
+        blocked._content_consumed = True
+        with (
+            TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            patch.object(radar, "DB_PATH", Path(tmp) / "jobs.db"),
+            patch.object(radar, "get_config", return_value=BASE_CONFIG),
+            patch.object(radar, "source_state", {}),
+            patch.object(radar, "_tracked_source_get", return_value=blocked) as get,
+        ):
+            radar.init_db()
+            radar._hydrate_instahyre_listings(jobs)
+            radar._hydrate_instahyre_listings(jobs)
+        get.assert_called_once()
+        self.assertFalse(get.call_args.kwargs["allow_redirects"])
+        self.assertEqual([job["description"] for job in jobs], ["", ""])
+        self.assertEqual([job["source_details"]["key_skills"] for job in jobs], [["Java"], ["Java"]])
 
     def test_current_feed_paginates_by_meta_next_and_deduplicates_ids(self):
         first = {

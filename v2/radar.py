@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 
 from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, google_alerts_gmail, google_alerts_job_verifier, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
-from v2 import public_job_boards, recruitee
+from v2 import instahyre_details, public_job_boards, recruitee
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
 from v2.gemini_extractor import cached_matcher_experience, shadow_extract_jobs, shadow_status
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite, enable_wal
@@ -1607,6 +1607,16 @@ def upsert_jobs(
             ).fetchone()
             if existing:
                 public_board_job = j["source"] in public_job_boards.LABELS
+                has_structured_details = public_board_job or j["source"] == "instahyre"
+                if j["source"] == "instahyre":
+                    previous_details = _job_source_details({"source_details_json": existing[15]})
+                    j["source_details"] = {**previous_details, **_job_source_details(j)}
+                    source_details_json = json.dumps(j["source_details"], ensure_ascii=False, sort_keys=True)
+                    if previous_details.get("instahyre_detail_verified") and not (
+                        isinstance(source_details, dict) and source_details.get("instahyre_detail_verified")
+                    ):
+                        incoming_description = j["description"] = str(existing[5] or "")
+                        incoming_description_format = j["description_format"] = str(existing[6] or "plain")
                 incoming_owner_id = j.get("source_owner_user_id")
                 existing_owner_id = existing[13]
                 if existing_owner_id != incoming_owner_id:
@@ -1623,7 +1633,7 @@ def upsert_jobs(
                     and str(j.get("title") or "") == str(existing[11] or "")
                     and int(existing[12] or 0) == EXPERIENCE_EXTRACTION_VERSION
                     and j.get("jd_experience_source") != "gemini_verified"
-                    and (not public_board_job or source_details_json == existing[15])
+                    and (not has_structured_details or source_details_json == existing[15])
                 )
                 if experience_inputs_unchanged:
                     experience_details = {
@@ -1659,7 +1669,12 @@ def upsert_jobs(
                     experience_rank.get(str(j["experience_provenance"]), 0),
                     confidence_rank.get(str(j["experience_confidence"]), 0),
                 )
-                if incoming_experience_rank < existing_experience_rank:
+                jd_supersedes_instahyre_badge = (
+                    j["source"] == "instahyre"
+                    and existing[9] == "employer_stated"
+                    and j["experience_provenance"] == "description"
+                )
+                if incoming_experience_rank < existing_experience_rank and not jd_supersedes_instahyre_badge:
                     j["experience_min_years"] = existing[7]
                     j["experience_max_years"] = existing[8]
                     j["experience_provenance"] = existing[9]
@@ -1773,10 +1788,8 @@ def upsert_jobs(
                     or next_posted_at != existing[3]
                     or next_precision != existing[4]
                     or experience_inputs_changed
-                    or (public_board_job and (
-                        (incoming_location and incoming_location != existing[14])
-                        or source_details_json != existing[15]
-                    ))
+                    or (incoming_location and incoming_location != existing[14])
+                    or (has_structured_details and source_details_json != existing[15])
                 )
                 if evaluation_inputs_changed and j.get("source_owner_user_id") is None:
                     _persist_job_evaluation(conn, int(existing[0]), config)
@@ -3487,6 +3500,10 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
         if values:
             return values[0], None
 
+    software_range = _software_experience_range(text)
+    if software_range != (None, None):
+        return software_range
+
     # Fall back to the normal experience parser, but inspect focused
     # experience-bearing chunks first.
     chunks = [
@@ -3504,6 +3521,24 @@ def extract_jd_experience(text: str) -> tuple[float | None, float | None]:
         if result != (None, None):
             return result
 
+    return None, None
+
+
+def _software_experience_range(text: str) -> tuple[float | None, float | None]:
+    """Recognize a job requirement phrased as years spent building software."""
+    match = re.search(
+        r"(?:^|\n)\s*(?:[-*•]\s+)?(\d{1,2}(?:\.\d+)?)\s*(?:[-–—]|to)\s*"
+        r"(\d{1,2}(?:\.\d+)?)\s+(?:years?|yrs?)\s+of\s+"
+        r"(?:building|developing|designing|operating|maintaining)\s+"
+        r"(?:(?:and|or)\s+(?:building|developing|designing|operating|maintaining)\s+)?"
+        r"(?:production\s+)?(?:software|applications)\b",
+        text,
+        re.I,
+    )
+    if match:
+        low, high = map(float, match.groups())
+        if 0 <= low <= high <= 60:
+            return low, high
     return None, None
 
 
@@ -3611,8 +3646,17 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         description,
         re.I,
     ))
-    if (low is not None or high is not None) and explicit_context:
+    if (low is not None or high is not None) and (
+        explicit_context or (low, high) == _software_experience_range(description)
+    ):
         return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
+
+    if source == "instahyre":
+        badge = _job_source_details(job).get("listing_experience")
+        if isinstance(badge, str):
+            low, high = extract_experience(badge)
+            if low is not None and 0 <= low <= (high if high is not None else low) <= 60:
+                return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
 
     low, high = extract_experience(f"{job.get('title', '')} {description}")
     if low is not None or high is not None:
@@ -4773,6 +4817,59 @@ def naukri_collect() -> list[dict[str, Any]]:
 
 INSTAHYRE_PAGE_SIZE = 35
 INSTAHYRE_MAX_PAGES_PER_SCAN = 4
+INSTAHYRE_DETAILS_PER_SCAN = 4
+
+
+def _hydrate_instahyre_listings(jobs: list[dict[str, Any]]) -> None:
+    pending = [job for job in jobs if instahyre_details.is_listing_url(job["url"], job["source_job_id"])]
+    if not pending:
+        return
+    runtime = source_state.setdefault("instahyre", {})
+    if time.monotonic() < runtime.get("detail_cooldown_until", 0):
+        return
+
+    ids = [job["source_job_id"] for job in pending]
+    placeholders = ",".join("?" for _ in ids)
+    with connect_sqlite(DB_PATH) as conn:
+        existing = {
+            job_id: _job_source_details({"source_details_json": details_json})
+            for job_id, details_json in conn.execute(
+                f"SELECT source_job_id,source_details_json FROM jobs "
+                f"WHERE source='instahyre' AND source_job_id IN ({placeholders})",
+                ids,
+            )
+        }
+    pending = [job for job in pending if not existing.get(job["source_job_id"], {}).get("instahyre_detail_verified")]
+    pending.sort(key=lambda job: existing.get(job["source_job_id"], {}).get("instahyre_detail_attempted_at", ""))
+    for job in pending[:INSTAHYRE_DETAILS_PER_SCAN]:
+        job["source_details"]["instahyre_detail_attempted_at"] = iso(now())
+        try:
+            with _tracked_source_get(
+                "instahyre", job["url"], headers={**UA, "Accept": "text/html"},
+                timeout=10, allow_redirects=False, stream=True,
+            ) as response:
+                if response.status_code in {401, 403, 429}:
+                    retry_after = _retry_after_seconds(response) or 0
+                    runtime["detail_cooldown_until"] = time.monotonic() + max(6 * 3600, retry_after)
+                    log.info("instahyre: detail pages unavailable (HTTP %s); continuing with search feed", response.status_code)
+                    break
+                if not response.ok or response.is_redirect:
+                    continue
+                body = bytearray()
+                for chunk in response.iter_content(16 * 1024):
+                    body.extend(chunk)
+                    if len(body) > instahyre_details.MAX_PAGE_BYTES:
+                        break
+                if len(body) > instahyre_details.MAX_PAGE_BYTES:
+                    continue
+        except requests.RequestException as exc:
+            log.info("instahyre: detail request unavailable (%s)", type(exc).__name__)
+            break
+        description, details = instahyre_details.parse_listing(bytes(body), job["source_job_id"])
+        job["source_details"].update(details)
+        if description:
+            job["description"] = description
+            job["description_format"] = "markdown"
 
 
 def _instahyre_search_location(config: dict[str, Any]) -> str:
@@ -4884,17 +4981,15 @@ def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             else:
                 job_location = str(raw_location)
 
-            description = str(item.get("description") or item.get("descriptionText") or "")
-            if not description:
-                keywords = item.get("keywords")
-                if isinstance(keywords, list):
-                    keyword_values = [
-                        str(value).strip()
-                        for value in keywords
-                        if isinstance(value, (str, int, float)) and str(value).strip()
-                    ]
-                    if keyword_values:
-                        description = "Keywords: " + ", ".join(keyword_values)
+            description = str(item.get("description") or item.get("descriptionText") or "").strip()
+            description_format = "plain"
+            if re.search(r"<(?:p|ul|ol|li|br|div|h[1-6])\b", description, re.I):
+                description = instahyre_details.description_to_markdown(BeautifulSoup(description, "html.parser"))
+                description_format = "markdown" if description else "plain"
+            keywords = item.get("keywords")
+            skills = list(dict.fromkeys(
+                value.strip() for value in keywords if isinstance(value, str) and value.strip()
+            )) if isinstance(keywords, list) else []
 
             jobs.append(normalize_job(
                 "instahyre",
@@ -4906,6 +5001,8 @@ def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 posted_at,
                 "minute" if posted_at else "unknown",
                 description,
+                description_format,
+                source_details={"key_skills": skills} if skills else {},
             ))
 
         if not items or not next_page:
@@ -4919,6 +5016,7 @@ def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             break
         offset = next_offset
 
+    _hydrate_instahyre_listings(jobs)
     return jobs
 
 
@@ -10712,13 +10810,15 @@ def jobs(
         item["description_format"] = (
             "markdown" if item.get("description_format") == "markdown" else "plain"
         )
-        try:
-            parsed_source_details = json.loads(item.pop("source_details_json", "{}") or "{}")
-        except (TypeError, json.JSONDecodeError):
-            parsed_source_details = {}
-        item["source_details"] = (
-            parsed_source_details if isinstance(parsed_source_details, dict) else {}
-        )
+        item["source_details"] = _job_source_details(item)
+        item.pop("source_details_json", None)
+        if item["source"] == "instahyre" and item["description_format"] == "plain":
+            keyword_stub = re.fullmatch(r"Keywords: ([^\r\n]+)", item.get("description") or "")
+            if keyword_stub:
+                item["source_details"].setdefault(
+                    "key_skills", [skill.strip() for skill in keyword_stub[1].split(",") if skill.strip()],
+                )
+                item["description"] = ""
         item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
         score = item.pop("evaluation_score", None)
         item["match_score"] = int(score or 0)
