@@ -122,7 +122,7 @@ def format_notification(item: dict[str, Any]) -> str:
         if experience_min is None and experience_max is None:
             experience = f"{listing_experience[:40]} (listing header)"
         elif header_experience != experience:
-            experience = f"{listing_experience[:40]} (listing header); JD: {experience}"
+            experience = f"{experience} (JD) · Listing header: {listing_experience[:40]}"
 
     try:
         reasons = json.loads(item.get("match_reasons_json") or "[]")

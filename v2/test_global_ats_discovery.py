@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import json
 import sqlite3
@@ -11,7 +12,7 @@ from unittest.mock import patch
 import requests
 
 from v2 import global_ats_discovery as discovery
-from v2 import board_discovery
+from v2 import board_discovery, radar
 
 
 UTC = dt.timezone.utc
@@ -54,6 +55,20 @@ def cdx_record(url: str, timestamp: str = "20261109120000", provider: str | None
         "offset": "123",
         "length": "456",
     }
+
+
+class GlobalDiscoveryWorkerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_worker_runs_an_existing_discovery_cycle_on_startup(self):
+        stop = asyncio.Event()
+        def run_cycle():
+            stop.set()
+
+        with (
+            patch.object(radar, "stop_event", stop),
+            patch.object(radar, "run_commoncrawl_candidate_discovery", side_effect=run_cycle) as run,
+        ):
+            await asyncio.wait_for(radar.global_ats_discovery_worker(), timeout=2)
+        run.assert_called_once_with()
 
 
 class GlobalDiscoveryTests(unittest.TestCase):
@@ -165,6 +180,21 @@ class GlobalDiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(blocked["outcome"], "cooldown")
         self.assertEqual(len(requester.calls), 1)
+
+    def test_provider_http_error_does_not_block_the_rotation(self):
+        with sqlite3.connect(self.db) as conn:
+            conn.execute(
+                """UPDATE global_ats_discovery_state
+                   SET cdx_crawl_id=?,cdx_catalogue_fetched_at=? WHERE id=1""",
+                ("CC-MAIN-2026-43", self.now.isoformat()),
+            )
+        requester = FakeRequester([FakeResponse(504), FakeResponse(200)])
+        first = discovery.run_commoncrawl_once(str(self.db), requester=requester, at=self.now)
+        second = discovery.run_commoncrawl_once(
+            str(self.db), requester=requester, at=self.now + dt.timedelta(hours=1),
+        )
+        self.assertEqual((first["outcome"], first["provider"]), ("cdx_http_error", "workday"))
+        self.assertEqual((second["outcome"], second["provider"]), ("no_candidates", "keka"))
 
     def test_429_also_uses_the_conservative_global_cooldown(self):
         with sqlite3.connect(self.db) as conn:

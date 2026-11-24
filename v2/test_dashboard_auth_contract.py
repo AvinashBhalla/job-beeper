@@ -131,8 +131,8 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
         html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("Configuration Token", html)
         self.assertNotIn("config_token", html)
-        auth_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("auth.js"))
-        app_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("app.js"))
+        auth_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("/dashboard/auth.js"))
+        app_index = next(i for i, src in enumerate(parser.scripts) if src.startswith("/dashboard/app.js"))
         self.assertLess(auth_index, app_index, "auth client must load before the dashboard application")
 
     def test_members_use_the_existing_dashboard_shell_and_user_scoped_preferences(self):

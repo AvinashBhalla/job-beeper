@@ -56,6 +56,11 @@ COMMONCRAWL_DOMAIN = {
     "taleo": "taleo.net",
     "peoplestrong": "peoplestrong.com",
     "jibe": "jibeapply.com",
+    "greenhouse": "greenhouse.io",
+    "lever": "lever.co",
+    "ashby": "jobs.ashbyhq.com",
+    "smartrecruiters": "jobs.smartrecruiters.com",
+    "workable": "apply.workable.com",
 }
 COMMONCRAWL_PROVIDERS = tuple(COMMONCRAWL_DOMAIN)
 SITEMAP_USER_AGENT = board_discovery.USER_AGENT
@@ -368,6 +373,11 @@ def _finish_cdx(
     started_text = _iso(started_at)
     finished_text = _iso(finished)
     ingestion = ingestion or {}
+    next_provider = None
+    if provider and outcome in {"candidates_imported", "no_candidates", "cdx_http_error", "request_error"}:
+        next_provider = COMMONCRAWL_PROVIDERS[
+            (COMMONCRAWL_PROVIDERS.index(provider) + 1) % len(COMMONCRAWL_PROVIDERS)
+        ]
     with DB_LOCK, connect(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         state = conn.execute("SELECT cdx_lease_token FROM global_ats_discovery_state WHERE id=1").fetchone()
@@ -376,6 +386,7 @@ def _finish_cdx(
             return
         conn.execute("""
             UPDATE global_ats_discovery_state SET
+                cdx_next_provider=COALESCE(?,cdx_next_provider),
                 cdx_cooldown_until=?,cdx_cooldown_reason=?,cdx_lease_token=NULL,cdx_lease_until=NULL,
                 cdx_last_finished_at=?,cdx_last_outcome=?,cdx_last_provider=?,
                 cdx_last_http_status=?,cdx_last_response_records=?,cdx_last_candidates=?,
@@ -383,7 +394,7 @@ def _finish_cdx(
                 cdx_last_truncated=?,cdx_last_error_type=?,updated_at=?
             WHERE id=1 AND cdx_lease_token=?
         """, (
-            _iso(cooldown_until) if cooldown_until else None,
+            next_provider, _iso(cooldown_until) if cooldown_until else None,
             "Common Crawl rate limit (HTTP 503/429); automatic requests paused for 24 hours." if cooldown_until else None,
             finished_text, outcome, provider, http_status, response_records,
             len(candidates or []), int(ingestion.get("inserted", 0) or 0),
@@ -476,7 +487,7 @@ def run_commoncrawl_once(
     """Perform at most one Common Crawl HTTP request and at most one provider query.
 
     First invocation with an expired collection cache refreshes collinfo.json only.
-    A later invocation runs one provider query, rotating Workday/Keka/Darwinbox.
+    A later invocation runs one query for the next provider in the rotation.
     No background loop or startup network call is installed by this module.
     """
     init_schema(db_path)
@@ -583,16 +594,6 @@ def run_commoncrawl_once(
                 if importer and candidates:
                     imported = importer({"candidates": candidates})
                     ingestion = imported if isinstance(imported, dict) else {}
-                next_provider = COMMONCRAWL_PROVIDERS[
-                    (COMMONCRAWL_PROVIDERS.index(provider) + 1) % len(COMMONCRAWL_PROVIDERS)
-                ]
-                with DB_LOCK, connect(db_path) as conn:
-                    conn.execute("BEGIN IMMEDIATE")
-                    conn.execute("""
-                        UPDATE global_ats_discovery_state SET cdx_next_provider=?,updated_at=?
-                        WHERE id=1 AND cdx_lease_token=?
-                    """, (next_provider, _iso(current), token))
-                    conn.commit()
                 outcome = "candidates_imported" if candidates else "no_candidates"
         _finish_cdx(
             db_path, token, started_at=started, outcome=outcome, provider=provider,
@@ -606,7 +607,7 @@ def run_commoncrawl_once(
             "candidate_count": len(candidates), "imported": ingestion,
             "truncated": truncated,
             "cooldown_until": _iso(cooldown_until) if cooldown_until else None,
-            "next_provider": None if provider is None else COMMONCRAWL_PROVIDERS[
+            "next_provider": None if provider is None or cooldown_until else COMMONCRAWL_PROVIDERS[
                 (COMMONCRAWL_PROVIDERS.index(provider) + 1) % len(COMMONCRAWL_PROVIDERS)
             ],
         }

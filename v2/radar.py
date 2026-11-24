@@ -25,7 +25,7 @@ import requests
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -1661,6 +1661,8 @@ def upsert_jobs(
                     "description": 2,
                     "employer_stated": 3,
                 }
+                if j["source"] == "instahyre":
+                    experience_rank.update(employer_stated=2, description=3)
                 confidence_rank = {
                     "unknown": 0,
                     "low": 1,
@@ -1675,16 +1677,16 @@ def upsert_jobs(
                     experience_rank.get(str(j["experience_provenance"]), 0),
                     confidence_rank.get(str(j["experience_confidence"]), 0),
                 )
-                jd_supersedes_instahyre_badge = (
-                    j["source"] == "instahyre"
-                    and existing[9] == "employer_stated"
-                    and j["experience_provenance"] == "description"
-                )
-                if incoming_experience_rank < existing_experience_rank and not jd_supersedes_instahyre_badge:
+                if incoming_experience_rank < existing_experience_rank:
                     j["experience_min_years"] = existing[7]
                     j["experience_max_years"] = existing[8]
                     j["experience_provenance"] = existing[9]
                     j["experience_confidence"] = existing[10]
+                if j["source"] != "instahyre" or j["experience_provenance"] not in {"description", "employer_stated"}:
+                    if j["experience_min_years"] is None:
+                        j["experience_min_years"] = existing[7]
+                    if j["experience_max_years"] is None:
+                        j["experience_max_years"] = existing[8]
 
                 posted_at_for_update = j["source_posted_at"]
                 precision_for_update = j["posted_precision"]
@@ -1722,8 +1724,8 @@ def upsert_jobs(
                         WHEN ?='markdown' OR (description_format!='markdown' AND length(?) > length(description)) THEN ?
                         ELSE description_format
                     END,
-                    experience_min_years=COALESCE(?, experience_min_years),
-                    experience_max_years=COALESCE(?, experience_max_years),
+                    experience_min_years=?,
+                    experience_max_years=?,
                     experience_provenance=CASE
                         WHEN ?!='unknown' THEN ?
                         ELSE experience_provenance
@@ -2015,7 +2017,7 @@ async def google_alerts_gmail_worker() -> None:
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
-MATCHER_RULES_VERSION = 5
+MATCHER_RULES_VERSION = 6
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
@@ -4010,21 +4012,18 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
         score += min(30, 6 * len(skill_hits))
         reasons.append("skills: " + ", ".join(skill_hits[:5]))
 
-    # Prefer structured JD extraction, then a JD-focused parse of the
-    # description. Only fall back to generic text parsing when the JD has no
-    # explicit requirement; never let a generic title/snippet override JD data.
     exp_min = job.get("jd_experience_min_years")
     exp_max = job.get("jd_experience_max_years")
     if job.get("source") == "instahyre":
-        header_min, header_max = extract_experience(str(_job_source_details(job).get("listing_experience") or ""))
-        if header_min is not None and 0 <= header_min <= (header_max if header_max is not None else header_min) <= 60:
-            # Instahyre separates the role's overall range from skill-specific
-            # experience in the description. Screen the profile against the role.
-            exp_min, exp_max = header_min, header_max
-    if exp_min is None and exp_max is None:
-        exp_min, exp_max = extract_jd_experience(description)
-    if exp_min is None and exp_max is None:
-        exp_min, exp_max = extract_experience(combined)
+        # Use the same JD-first policy for matching and the stored job details.
+        if exp_min is None and exp_max is None:
+            experience = _experience_provenance_details(job)
+            exp_min, exp_max = experience["min_years"], experience["max_years"]
+    else:
+        if exp_min is None and exp_max is None:
+            exp_min, exp_max = extract_jd_experience(description)
+        if exp_min is None and exp_max is None:
+            exp_min, exp_max = extract_experience(combined)
 
     candidate_years = config.get("candidate_experience_years")
     max_years = float(config.get("max_experience_years", 3))
@@ -5248,13 +5247,13 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 continue
             raw_id = item.get("id")
             title = item.get("title")
-            url = item.get("jobUrl") or item.get("applyUrl")
+            url = next((
+                value.strip() for value in (item.get("applyUrl"), item.get("jobUrl"))
+                if isinstance(value, str) and value.strip().lower().startswith("https://")
+            ), "")
             if raw_id in (None, "") or not isinstance(title, str) or not title.strip():
                 continue
-            if not isinstance(url, str) or not url.strip():
-                continue
-            direct_url = url.strip()
-            if not re.match(r"^https://", direct_url, re.I):
+            if not url:
                 continue
 
             source_id = f"ashby-{name}-{raw_id}"
@@ -5285,7 +5284,7 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             try:
                 jobs.append(normalize_job(
                     "ashby", source_id, company, title.strip(), location,
-                    direct_url, published_at, posted_precision, description,
+                    url, published_at, posted_precision, description,
                     source_details={"board_registry_id": board.get("registry_id"), "board_key": name.lower()},
                 ))
             except (TypeError, ValueError) as exc:
@@ -7990,6 +7989,19 @@ async def scheduler() -> None:
         await asyncio.gather(*list(active_board_tasks.values()), return_exceptions=True)
 
 
+async def global_ats_discovery_worker() -> None:
+    while not stop_event.is_set():
+        try:
+            await asyncio.to_thread(run_commoncrawl_candidate_discovery)
+        except Exception as exc:
+            log.warning("Global ATS discovery cycle failed error_type=%s", type(exc).__name__)
+
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=3600)
+        except asyncio.TimeoutError:
+            pass
+
+
 @app.on_event("startup")
 async def startup() -> None:
     init_db()
@@ -8013,6 +8025,8 @@ async def startup() -> None:
     app.state.google_alerts_gmail_worker_task = asyncio.create_task(
         google_alerts_gmail_worker()
     )
+    if os.getenv("JOB_BEEPER_ENABLE_GLOBAL_ATS_DISCOVERY", "").strip().lower() == "true":
+        app.state.global_ats_discovery_task = asyncio.create_task(global_ats_discovery_worker())
 
 
 @app.on_event("shutdown")
@@ -8020,7 +8034,7 @@ async def shutdown() -> None:
     stop_event.set()
     for task_name in (
         "scheduler_task", "notification_worker_task",
-        "google_alerts_gmail_worker_task",
+        "google_alerts_gmail_worker_task", "global_ats_discovery_task",
     ):
         task = getattr(app.state, task_name, None)
         if task:
@@ -11086,7 +11100,7 @@ def job_detail(
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/dashboard/")
+    return FileResponse(DASHBOARD_PATH / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 if DASHBOARD_PATH.exists():

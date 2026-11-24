@@ -3412,11 +3412,52 @@ class InstahyreCollectorTests(unittest.TestCase):
         self.assertEqual(details["listing_experience"], "4-7 Years")
         job = {"source": "instahyre", "title": "Frontend Engineer", "location": "Bangalore",
                "description": description, "source_details": details}
-        match = radar.match_details(job, {**BASE_CONFIG, "candidate_experience_years": 3.5, "max_experience_years": 7})
-        self.assertFalse(match["match"])
-        self.assertEqual((match["experience_min_years"], match["experience_max_years"]), (4, 7))
+        match = radar.match_details(job, {
+            **BASE_CONFIG, "target_roles": ["frontend engineer"],
+            "candidate_experience_years": 3.5, "max_experience_years": 7,
+        })
+        self.assertTrue(match["match"])
+        self.assertEqual((match["experience_min_years"], match["experience_max_years"]), (3, 5))
         self.assertEqual(radar.alertability_details({"source": "instahyre"}, {"match": True}, BASE_CONFIG),
                          {"alertable": False, "reasons": ["waiting for source-backed Instahyre experience"]})
+
+    def test_instahyre_uses_listing_badge_when_jd_has_no_years(self):
+        job = {
+            "source": "instahyre", "title": "Head of Solution Engineering - Sitecore",
+            "location": "Bangalore, Nagpur", "description": "Lead a global solution engineering team.",
+            "source_details": {"listing_experience": "13–17 Years"},
+        }
+        experience = radar._experience_provenance_details(job)
+        self.assertEqual((experience["min_years"], experience["max_years"], experience["provenance"]),
+                         (13, 17, "employer_stated"))
+        match = radar.match_details(job, {
+            **BASE_CONFIG, "title_exclude": [], "target_roles": ["solution engineering"],
+            "candidate_experience_years": 12, "max_experience_years": 17,
+        })
+        self.assertFalse(match["match"])
+        self.assertEqual((match["experience_min_years"], match["experience_max_years"]), (13, 17))
+
+    def test_instahyre_jd_minimum_replaces_both_badge_bounds(self):
+        job = radar.normalize_job(
+            "instahyre", "1", "Example", "Frontend Engineer", "Bangalore",
+            "https://www.instahyre.com/job-1-frontend-engineer/", None, "unknown",
+            source_details={"listing_experience": "4-7 Years"},
+        )
+        jd = "Requirements: 3+ years of professional experience building web applications."
+        with (
+            TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            patch.object(radar, "DB_PATH", Path(tmp) / "jobs.db"),
+            patch.object(radar, "get_config", return_value=BASE_CONFIG),
+        ):
+            radar.init_db()
+            radar.upsert_jobs([job])
+            radar.upsert_jobs([{**job, "description": jd}])
+            radar.upsert_jobs([job])
+            with radar.connect_sqlite(radar.DB_PATH) as conn:
+                experience = conn.execute(
+                    "SELECT experience_min_years, experience_max_years, experience_provenance FROM jobs"
+                ).fetchone()
+        self.assertEqual(tuple(experience), (3, None, "description"))
 
     def test_detail_access_denied_keeps_the_search_feed_and_backs_off(self):
         jobs = [radar.normalize_job(
@@ -4648,6 +4689,12 @@ class AshbyCollectorTests(unittest.TestCase):
         self.assertIn("Build Python systems.",jobs[0]["description"])
         self.assertEqual(jobs[0]["posted_precision"],"minute")
         self.assertEqual(req.call_args.kwargs["timeout"],15)
+
+    def test_uses_direct_application_url_when_available(self):
+        apply_url = "https://jobs.ashbyhq.com/openai/role-123/application"
+        with patch.object(radar.requests, "get", return_value=self._response({"jobs": [self._job(applyUrl=apply_url)]})):
+            jobs = radar.ashby_collect({"ashby_boards": [{"board": "openai", "company": "OpenAI"}]})
+        self.assertEqual(jobs[0]["url"], apply_url)
 
     def test_empty_jobs_list_returns_empty(self):
         with patch.object(radar.requests,"get",return_value=self._response({"jobs":[]})):

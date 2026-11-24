@@ -10,7 +10,13 @@
   // =========================================================================
   // 1. API Resolution, Constants, State & SVG Icon Registry
   // =========================================================================
-  const requestedApi = new URLSearchParams(location.search).get('api');
+  const startupParams = new URLSearchParams(location.search);
+  const requestedApi = startupParams.get('api');
+  setPortalRoute(location.hash.slice(1) || history.state?.route || 'jobs');
+
+  function setPortalRoute(route) {
+    history.replaceState({ route }, '', '/');
+  }
   // API overrides are restricted to this dashboard's origin so login credentials
   // can never be sent to a URL supplied in a crafted query string.
   const API = window.JobBeeperAuth.resolveApiBase(requestedApi || '/api', window.location);
@@ -864,11 +870,11 @@
     const navLinks = [...document.querySelectorAll('.sidebar-nav-container .nav-link-item, .mobile-tab-btn')];
     const pageViews = [...document.querySelectorAll('.workspace-page')];
 
-    function showSection(sectionId, pushHash = true) {
+    function showSection(sectionId, updateRoute = true) {
       let target = $(sectionId) || $('jobsSection');
       if (!state.isAdmin && target.id === 'sourcesSection') {
         target = $('jobsSection');
-        history.replaceState(null, '', '#jobs');
+        setPortalRoute('jobs');
       }
       state.activeSection = target.id;
 
@@ -900,13 +906,13 @@
         loadOpenSourceTools();
       }
 
-      if (pushHash) {
-        const hash =
-          target.id === 'appliedSection' ? '#applied' :
-          target.id === 'preferencesSection' ? '#preferences' :
-          target.id === 'sourcesSection' ? '#sources' :
-          target.id === 'accessSection' ? '#access' : '#jobs';
-        history.replaceState(null, '', hash);
+      if (updateRoute) {
+        const route =
+          target.id === 'appliedSection' ? 'applied' :
+          target.id === 'preferencesSection' ? 'preferences' :
+          target.id === 'sourcesSection' ? 'sources' :
+          target.id === 'accessSection' ? 'access' : 'jobs';
+        setPortalRoute(route);
       }
     }
 
@@ -919,21 +925,21 @@
       });
     });
 
-    window.addEventListener('popstate', handleHashRoute);
+    window.addEventListener('popstate', handlePortalRoute);
   }
 
-  function handleHashRoute() {
-    const hash = (location.hash || '').slice(1);
-    if (hash.startsWith('job/')) {
+  function handlePortalRoute() {
+    const route = history.state?.route || 'jobs';
+    if (route.startsWith('job/')) {
       window.showSection('jobsSection', false);
-      void openJobFromRoute(hash.slice(4));
-    } else if (hash === 'applied') {
+      void openJobFromRoute(route.slice(4));
+    } else if (route === 'applied') {
       window.showSection('appliedSection', false);
-    } else if (hash === 'preferences' || hash === 'filters') {
+    } else if (route === 'preferences' || route === 'filters') {
       window.showSection('preferencesSection', false);
-    } else if (hash === 'sources') {
+    } else if (route === 'sources') {
       window.showSection('sourcesSection', false);
-    } else if (hash === 'access' || hash === 'settings') {
+    } else if (route === 'access' || route === 'settings') {
       window.showSection('accessSection', false);
     } else {
       window.showSection('jobsSection', false);
@@ -1205,18 +1211,18 @@
       return;
     }
 
-    const hash = location.hash;
+    const route = history.state?.route;
     try {
       const response = await authClient.request(`/jobs/${id}`, { cache: 'no-store' });
       if (!response.ok) throw new Error(response.status === 404 ? 'Job not found.' : 'Could not open the job.');
       const job = normalizeJob(await response.json());
-      if (location.hash === hash) showJobInspector(job, false);
+      if (history.state?.route === route) showJobInspector(job, false);
     } catch (error) {
-      if (location.hash === hash) showToast(error.message, 'error', 5000);
+      if (history.state?.route === route) showToast(error.message, 'error', 5000);
     }
   }
 
-  function showJobInspector(job, pushHistory = true) {
+  function showJobInspector(job, updateRoute = true) {
     if (!job) return;
 
     state.selectedJobId = String(job.id);
@@ -1320,8 +1326,8 @@
       }
     }
 
-    if (pushHistory) {
-      history.replaceState(null, '', `#job/${encodeURIComponent(job.id)}`);
+    if (updateRoute) {
+      setPortalRoute(`job/${encodeURIComponent(job.id)}`);
     }
   }
 
@@ -1453,8 +1459,8 @@
     const pane = $('jobInspector');
     if (pane) pane.classList.add('is-hidden');
     document.querySelectorAll('.opportunity-row').forEach(row => row.classList.remove('is-selected'));
-    if (location.hash.startsWith('#job/')) {
-      history.replaceState(null, '', '#jobs');
+    if (history.state?.route?.startsWith('job/')) {
+      setPortalRoute('jobs');
     }
   }
 
@@ -3313,14 +3319,14 @@
     initTagInput('excludeRolesTagContainer', 'excludeRolesInput');
 
     bindEventListeners();
-    handleHashRoute();
+    handlePortalRoute();
 
     await loadConfig();
     // Preferences determine the feed scope. Telegram and Gmail status do not.
     const feedRequest = loadJobsFeed();
     await loadTelegramStatus();
     if (state.isAdmin) {
-      const gmailResult = new URLSearchParams(window.location.search).get('gmail_connect');
+      const gmailResult = startupParams.get('gmail_connect');
       if (gmailResult === 'connected') showToast('Personal Gmail connected. Initial sync will start automatically.', 'success');
       else if (gmailResult === 'failed') showToast('Personal Gmail connection failed. Check the owner account, callback configuration and server logs.', 'error', 7000);
       else if (gmailResult === 'cancelled') showToast('Personal Gmail connection was cancelled.', 'info');
@@ -3393,7 +3399,7 @@
           googleButton.hidden = true;
         });
     }
-    const googleAuthResult = new URLSearchParams(window.location.search).get('google_auth');
+    const googleAuthResult = startupParams.get('google_auth');
     if (googleAuthResult === 'failed' && $('authStatusMsg')) {
       $('authStatusMsg').textContent = 'Google sign-in could not be completed. Please try again.';
     } else if (googleAuthResult === 'cancelled' && $('authStatusMsg')) {

@@ -18,6 +18,7 @@ services:
         required: false
     environment:
       JOB_RADAR_DB: /data/jobs.db
+      JOB_BEEPER_ENABLE_GLOBAL_ATS_DISCOVERY: ${JOB_BEEPER_ENABLE_GLOBAL_ATS_DISCOVERY:-true}
       JOB_BEEPER_NAUKRI_RELAY_MODE: ${JOB_BEEPER_NAUKRI_RELAY_MODE:-github}
       # This service is loopback-only and used through an SSH tunnel; production stays Secure=true.
       JOB_BEEPER_COOKIE_SECURE: ${JOB_BEEPER_COOKIE_SECURE:-false}

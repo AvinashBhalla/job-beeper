@@ -493,7 +493,7 @@ class UserNotificationServiceTests(unittest.TestCase):
         text = post.call_args.kwargs['json']['text']
         for field in (
             "Posted: Unknown", "Discovered: 07 Nov 2026, 3:30 PM IST",
-            "Experience: 4-7 Years (listing header); JD: 3-5 years",
+            "Experience: 3-5 years (JD) · Listing header: 4-7 Years",
             "Key skills: React Native, TypeScript", "✓ target location", "Apply → https://example.com/1",
         ):
             self.assertIn(field, text)
