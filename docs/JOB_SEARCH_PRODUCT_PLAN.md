@@ -70,7 +70,9 @@ Before rollout, finish Linux regression on the candidate, read the complete boar
 
 At the 24-hour checkpoint at 14:45 IST, all 13 rollout boards had a successful latest poll and all 13 had cleared their initial inventory baseline. The batch added 40 distinct canonical opportunities after baseline, with 30 observed within an hour of the source publication time. None matched the opted-in development pilot, and there were zero queued or sent cohort alerts. An isolated replay of an actual MongoDB posting observed 103 seconds after publication exercised matching and generated one simulated alert across two ingestions. A live delivery and receipt from the rollout batch are still pending.
 
-Nine of the 13 rollout boards already have matching production registry candidates. The checked public endpoints for Mistral AI, Axiado, Canva, and Caxton still need production registry records. The predecessor's isolated migration rehearsal was retired after refreshing the schema and global evaluations because of VM contention. Repeat the upgrade and rollback rehearsal against a fresh backup using the current release image before promotion.
+Nine of the 13 rollout boards already have matching production registry candidates. The checked public endpoints for Mistral AI, Axiado, Canva, and Caxton still need production registry records. Production promotion still needs a qualifying live alert from this batch, confirmation of receipt in the private pilot chat, and a review of current description and experience coverage before existing sources are moved to the candidate.
+
+GitHub `v2-live-radar` is the integration branch for the next release. The VM archived the exact tips of the ten GitHub branches merged in PRs #102–111 before removing the branch names. The archive is `~/.local/share/jobbeeper/git-archives/github-merged-20261124T104121Z.bundle` with an adjacent tip manifest. The two Google Alerts branches retain unique history and stay separate from this release. The VM's checked-out development and legacy worktrees retain their local changes.
 
 #### Continuous board discovery and member navigation
 
@@ -142,7 +144,7 @@ The shared parser handles written-out minima, explicit experience labels, and a 
 | SmartRecruiters `6789`, Bosch | Matched the German title and Erlangen. No numeric experience requirement was confirmed. [SmartRecruiters posting](https://jobs.smartrecruiters.com/BoschGroup/744000163410898-systemarchitekt-asic-soc-halbleiterentwicklung-w-m-div-) |
 | Workable `2188` and Darwinbox `379` | The apply links returned the application shell to the HTTP check. The full original JD could not be independently compared from that response. |
 
-The prior Instahyre build passed 673 Linux tests before the cross-provider changes.
+Development image `50f91c7` passed all 679 Linux tests and 60 targeted tests on Windows. The Linux regression log is `/tmp/jobbeeper-50f91c7-tests.XNQz0R/regression.log` on the VM. On the deployed development database, the Arintra member evaluation is now 0% with a 7–11-year requirement and the candidate-limit rejection. The message formatter produced the six original skills and omitted the stale experience reason during a preview. The original sent row remains in the ledger. The deployed job-detail serializer gave Bridgestone 2–4 years and returned the original title, location, and apply link across the sampled records.
 
 ### Source Health administration
 
