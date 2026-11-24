@@ -110,7 +110,7 @@ app = FastAPI(title="Job Radar V2", version="2.0.0")
 
 cors_origins = [
     origin.strip()
-    for origin in os.getenv("JOB_RADAR_CORS_ORIGINS", "*").split(",")
+    for origin in os.getenv("JOB_RADAR_CORS_ORIGINS", "").split(",")
     if origin.strip()
 ]
 
@@ -126,6 +126,12 @@ app.add_middleware(
 @app.middleware("http")
 async def prevent_api_response_caching(request: Request, call_next):
     response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"

@@ -2288,6 +2288,7 @@
     const requestId = ++jobsFeedRequestSequence;
     const refreshBtn = $('refreshFeedBtn');
     if (refreshBtn) refreshBtn.classList.add('is-loading');
+    renderFeedLoading();
 
     const sortParameters = {
       newest: { sort_by: 'created_at', sort_order: 'desc' },
@@ -2357,7 +2358,20 @@
       if (requestId === jobsFeedRequestSequence && refreshBtn) {
         refreshBtn.classList.remove('is-loading');
       }
+      if (requestId === jobsFeedRequestSequence) $('jobsListContainer')?.setAttribute('aria-busy', 'false');
     }
+  }
+
+  function renderFeedLoading() {
+    const container = $('jobsListContainer');
+    if (!container) return;
+    container.setAttribute('aria-busy', 'true');
+    container.innerHTML = Array.from({ length: 3 }, () => `
+      <div class="opportunity-skeleton" aria-hidden="true">
+        <span class="skeleton-score"></span>
+        <span class="skeleton-content"><span></span><span></span><span></span></span>
+        <span class="skeleton-action"></span>
+      </div>`).join('');
   }
 
   async function loadSourceStatusTelemetry() {

@@ -191,3 +191,7 @@ The mobile navigation keeps `Preferences` and `Account` as separate destinations
 Opportunity rows use a wrapped, width-constrained source and action area at split-pane widths. The `aggregated` marker means the job belongs to a canonical opportunity that may represent equivalent records from multiple providers. It does not mean the job was fetched from every provider shown in the row.
 
 The member regression pass covers the complete feed query before pagination, first-visit loading, search debounce, source, score, age, remote, alertable, sort and page navigation controls. An empty result now distinguishes an actual active filter from a time window with no jobs and does not show a misleading Clear all filters action.
+
+### Online hardening boundary
+
+Browser code cannot be made impossible to reverse engineer. The safe boundary is that secrets, bot tokens, provider credentials, matching authority and paid-source calls remain server-side. The API now defaults to same-origin CORS, adds browser isolation and transport headers, avoids source maps in deployment, and should be served only behind HTTPS with rate limits, dependency updates, access logging and secret rotation. Obfuscation may reduce casual copying but is not a security control.
