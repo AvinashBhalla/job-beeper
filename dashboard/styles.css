@@ -216,6 +216,7 @@ html.theme-transitioning *::after {
 
 html, body {
   height: 100%;
+  overflow-x: hidden;
   background-color: var(--bg-canvas);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -1074,7 +1075,9 @@ a:hover {
 /* Feed Scroll List */
 .feed-scroll-list {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-10) var(--space-16);
   display: flex;
   flex-direction: column;
@@ -2089,7 +2092,7 @@ a:hover {
   }
   .mobile-bottom-navigation {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .feed-split-layout {
     flex-direction: column;
