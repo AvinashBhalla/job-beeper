@@ -76,6 +76,8 @@ Adding employers to a supported provider and adding a provider are separate task
 
 The member portal loads at `/`. Search and filters stay in the dashboard, and section and job selection stay in browser history state. Older dashboard links still open the requested view and then display the portal address. Authorized API requests continue to carry the filters needed by the server to search and sort the full inventory.
 
+The public Perficient listing confirmed an additional JD format. It spells out a preferred 12-year minimum in solution engineering and lists a separate 13–17-year band in the header. The Instahyre parser now reads the written-out minimum as `12+ years` and retains the badge as secondary evidence. The requisition also mentions seven years of leadership within that experience. [Perficient on Instahyre](https://www.instahyre.com/job-493239-head-of-solution-engineering-sitecore-at-perficient-bangalore-nagpur/)
+
 ### Source Health administration
 
 Source Health opens with enabled sources, plain-language status, jobs added in the past 24 hours, and last check time in IST. Paused sources and optional tools are collapsed. Use **Configure sources** to open the provider toggles in Preferences, then **Save Preferences**. Use **Employer boards** to find, verify, and activate a public career board. Directory and manifest imports are under **Candidate imports**. **Technical diagnostics** contains board schedules, host limits, and raw run errors. These tools load when opened, and **Refresh status** also refreshes the open tools.

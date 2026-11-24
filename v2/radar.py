@@ -1531,7 +1531,7 @@ def init_db() -> None:
 # Bump when _experience_provenance_details() parsing rules change. Existing
 # rows are migrated with version 1 because their persisted values were produced
 # by the current parser before the unchanged-text reuse optimization.
-EXPERIENCE_EXTRACTION_VERSION = 2
+EXPERIENCE_EXTRACTION_VERSION = 3
 
 
 def upsert_jobs(
@@ -3630,6 +3630,17 @@ def extract_linkedin_labeled_experience(text: str) -> tuple[float | None, float 
     return None, None
 
 
+_EXPERIENCE_NUMBER_WORDS = (
+    "zero one two three four five six seven eight nine ten eleven twelve "
+    "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty"
+).split()
+_INSTAHYRE_JD_MINIMUM_RE = re.compile(
+    r"^[ \t]*(?:[-*•]\s+)?(\d{1,2}|" + "|".join(_EXPERIENCE_NUMBER_WORDS)
+    + r")\s+or\s+more\s+years?\s+(?:of|in)\s+",
+    re.I | re.M,
+)
+
+
 def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
     """Resolve job-level experience bounds and where the evidence came from.
 
@@ -3673,6 +3684,12 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
 
     if source == "instahyre":
+        minimum = _INSTAHYRE_JD_MINIMUM_RE.search(description)
+        if minimum:
+            value = minimum[1].casefold()
+            low = int(value) if value.isdecimal() else _EXPERIENCE_NUMBER_WORDS.index(value)
+            if 0 <= low <= 60:
+                return {"min_years": low, "max_years": None, "provenance": "description", "confidence": "medium"}
         badge = _job_source_details(job).get("listing_experience")
         if isinstance(badge, str):
             low, high = extract_experience(badge)

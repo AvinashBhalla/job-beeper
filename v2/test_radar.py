@@ -3437,6 +3437,18 @@ class InstahyreCollectorTests(unittest.TestCase):
         self.assertFalse(match["match"])
         self.assertEqual((match["experience_min_years"], match["experience_max_years"]), (13, 17))
 
+    def test_instahyre_spelled_out_jd_minimum_takes_priority(self):
+        job = {
+            "source": "instahyre", "title": "Head of Solution Engineering - Sitecore",
+            "description": "Preferred qualifications include:\n"
+                           "- Twelve or more years in enterprise solution engineering, "
+                           "including seven or more at director level.",
+            "source_details": {"listing_experience": "13–17 Years"},
+        }
+        result = radar._experience_provenance_details(job)
+        self.assertEqual((result["min_years"], result["max_years"], result["provenance"]),
+                         (12, None, "description"))
+
     def test_instahyre_jd_minimum_replaces_both_badge_bounds(self):
         job = radar.normalize_job(
             "instahyre", "1", "Example", "Frontend Engineer", "Bangalore",
