@@ -91,6 +91,10 @@ class UserScopedJobFeedTests(unittest.TestCase):
         all_time = self.client.get("/api/jobs?all_time=true&page=2&per_page=1").json()
         self.assertEqual(all_time["pagination"]["total"], recent["pagination"]["total"] + 1)
         self.assertEqual(all_time["pagination"]["page"], 2)
+        older_job = all_time["jobs"][0]
+        detail = self.client.get(f"/api/jobs/{older_job['id']}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["title"], older_job["title"])
 
 
     def test_preference_save_returns_specific_validation_for_missing_target_role(self):

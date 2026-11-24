@@ -11044,16 +11044,18 @@ def job_detail(
                       e.experience_min_years AS evaluation_experience_min_years,
                       e.experience_max_years AS evaluation_experience_max_years
                FROM jobs j
-               JOIN user_job_evaluations e
+               LEFT JOIN user_job_evaluations e
                  ON e.job_id=j.id AND e.user_id=?
                WHERE j.id=?
+                 AND (? OR e.job_id IS NOT NULL)
                  AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)""",
-            (user["id"], job_id, user["id"]),
+            (user["id"], job_id, not preferences["onboarding_complete"], user["id"]),
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
     result = dict(row)
     _serialize_job_description(result)
+    result.pop("source_details_json", None)
     result["experience_min_years"] = (
         result.pop("evaluation_experience_min_years")
         if result.get("evaluation_experience_min_years") is not None
