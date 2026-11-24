@@ -2272,9 +2272,8 @@
       if (resumePanel) resumePanel.hidden = Boolean(state.isAdmin || data.preferences?.onboarding_complete);
       const telegramPanel = $('telegramConnectPanel');
       if (telegramPanel) telegramPanel.hidden = Boolean(state.isAdmin);
-      if (!state.isAdmin && !data.preferences?.onboarding_complete) {
-        window.showSection?.('preferencesSection', false);
-      }
+      // Empty preferences no longer block the feed. Members can browse the
+      // shared inventory first and personalize matching when ready.
     } catch (e) {
       state.config = null;
       showToast('Live backend configuration unavailable. Check the dashboard API URL.', 'error', 5000);

@@ -181,3 +181,7 @@ All 662 V2 tests passed on the VM at `6ecd31d`. The signed-in integrated browser
 | Referral research and follow-up | For a job the user selects, find relevant people using permitted sources, explain each contact's relevance, and draft a referral request or follow-up. Track replies and stop scheduled follow-ups on reply or opt-out. Send only through authorized integrations and with explicit user control over the recipient, channel, and message. Use a manual handoff where LinkedIn invitations or messaging lack approved integration access. |
 
 Keep the existing Python application and separate provider, extraction, and delivery responsibilities in code. Add a dedicated collector process if measurements show that collection interrupts web requests or alerts. Consider a different runtime only for a measured processing bottleneck.
+
+### Empty-preference browsing · 24 November 2026
+
+New members can open the shared jobs feed before completing matching preferences. The dashboard still applies its freshness, source, search, score, remote-only, alertable and sort controls, with the default view covering the last 72 hours. Selecting `Any posting date` removes the age cutoff. Personalized matching and alert eligibility begin after the member saves a target role plus a location or Remote only.
