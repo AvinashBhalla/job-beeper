@@ -541,6 +541,36 @@ class UserNotificationServiceTests(unittest.TestCase):
                          ('{"instahyre_detail_verified":true,"instahyre_detail_fetch_status":"complete"}',))
         self.assertIsNotNone(user_notifications._claim_one(self.db))
 
+    def test_new_experience_blocks_an_alert_queued_with_a_stale_match(self):
+        enabled_at = "2026-11-07T00:00:00+00:00"
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,?,?)",
+                         (enabled_at, enabled_at))
+            preferences = {"candidate_experience_years": 2, "max_experience_years": 3}
+            conn.execute("UPDATE user_preferences SET preferences_json=? WHERE user_id=1", (radar.json.dumps(preferences),))
+            fingerprint = user_notifications.user_preferences.preferences_fingerprint(
+                {**user_notifications.user_preferences.PREFERENCE_DEFAULTS, **preferences}, 3,
+            )
+            conn.execute("UPDATE user_job_evaluations SET preference_fingerprint=? WHERE user_id=1", (fingerprint,))
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, enabled_at), 1)
+        item = user_notifications._claim_one(self.db)
+        self.assertTrue(user_notifications._still_deliverable(self.db, item))
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("UPDATE jobs SET experience_min_years=7, experience_max_years=11 WHERE id=1")
+        self.assertFalse(user_notifications._still_deliverable(self.db, item))
+
+    def test_template_placeholders_are_removed_from_telegram_skills(self):
+        message = telegram.format_notification({
+            "experience_min_years": 7, "experience_max_years": 11,
+            "source_details_json": radar.json.dumps({
+                "key_skills": ["[[ '+' + hiddenSkillsCount['description'] + ' more' ]]", "Java", "+2 more", "Kafka"]
+            }),
+            "match_reasons_json": '["experience not stated in captured source data"]',
+        })
+        self.assertIn("Key skills: Java, Kafka", message)
+        self.assertNotIn("hiddenSkillsCount", message)
+        self.assertNotIn("experience not stated", message)
+
     def test_repeated_enable_preserves_the_original_no_backlog_boundary(self):
         first = user_notifications.set_enabled(self.db, 1, True)
         with patch.object(user_notifications, "_stamp", return_value="2099-01-01T00:00:00+00:00"):

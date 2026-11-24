@@ -12,6 +12,7 @@ import requests
 
 from v2 import user_preferences
 from v2.instahyre_details import ALERT_EXPERIENCE_READY_SQL
+from v2.job_requirements import ALERT_EXPERIENCE_COLUMNS, experience_mismatch
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite
 
 API = "https://api.telegram.org"
@@ -268,9 +269,8 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
         row = conn.execute(f"""SELECT l.id,l.user_id,l.attempt_count,l.backlog_override,
           l.canonical_opportunity_id,t.chat_id,j.title,j.company,j.location,j.url,
           j.source,j.source_posted_at,j.posted_precision,j.discovered_at,j.source_details_json,
-          j.description != '' AS has_description,
-          COALESCE(j.experience_min_years,e.experience_min_years) AS experience_min_years,
-          COALESCE(j.experience_max_years,e.experience_max_years) AS experience_max_years,
+          j.description, j.description != '' AS has_description,
+          {ALERT_EXPERIENCE_COLUMNS},
           e.score,e.reasons_json AS match_reasons_json
           FROM user_notification_ledger l
           JOIN user_notification_settings s ON s.user_id=l.user_id AND s.enabled=1
@@ -320,7 +320,8 @@ def _still_deliverable(
     with _connect(Path(db_path)) as conn:
         row = conn.execute(f"""SELECT l.user_id,l.canonical_opportunity_id,
           l.backlog_override,s.gmail_backfill_paused,s.enabled_at,t.chat_id,j.discovered_at,
-          j.source_owner_user_id,e.preference_fingerprint,e.match,e.score,p.preferences_json
+          j.source_owner_user_id,e.preference_fingerprint,e.match,e.score,p.preferences_json,
+          {ALERT_EXPERIENCE_COLUMNS}
           FROM user_notification_ledger l
           JOIN user_notification_settings s ON s.user_id=l.user_id AND s.enabled=1
           JOIN user_telegram_chats t ON t.user_id=l.user_id AND t.chat_type='private'
@@ -379,6 +380,11 @@ def _still_deliverable(
         {**user_preferences.PREFERENCE_DEFAULTS, **preferences}, matcher_rules_version
     )
     if row["preference_fingerprint"] != expected_fingerprint or int(row["score"]) < threshold:
+        return False
+    low, high = row["experience_min_years"], row["experience_max_years"]
+    if experience_mismatch(low, high, {**user_preferences.PREFERENCE_DEFAULTS, **preferences}):
+        return False
+    if (low, high) != (item.get("experience_min_years"), item.get("experience_max_years")):
         return False
     fresh_after = _stamp(_now() - timedelta(hours=max_age_hours))
     return row["discovered_at"] >= fresh_after

@@ -14,6 +14,7 @@ import requests
 
 from v2.radar import DB_PATH, UTC, db_lock, iso, now
 from v2.instahyre_details import ALERT_EXPERIENCE_READY_SQL
+from v2.job_requirements import ALERT_EXPERIENCE_COLUMNS, clean_skills, experience_mismatch, listed_skills
 from v2.sqlite_store import connect as connect_sqlite
 
 log = logging.getLogger("job-radar.telegram")
@@ -114,8 +115,9 @@ def format_notification(item: dict[str, Any]) -> str:
     except (TypeError, ValueError):
         details = {}
     details = details if isinstance(details, dict) else {}
-    key_skills = details.get("key_skills")
-    skills = ", ".join(skill[:60] for skill in key_skills[:8] if isinstance(skill, str)) if isinstance(key_skills, list) else ""
+    source_skills = clean_skills(details.get("key_skills"))
+    key_skills = source_skills or listed_skills(item.get("description") or "")
+    skills = ", ".join(key_skills[:8])
     listing_experience = details.get("listing_experience")
     if isinstance(listing_experience, str) and listing_experience.strip():
         header_experience = re.sub(r"\s*[-–—]\s*", "-", listing_experience.strip().casefold())
@@ -131,7 +133,11 @@ def format_notification(item: dict[str, Any]) -> str:
 
     reason_lines = []
     if isinstance(reasons, list):
-        reason_lines = [f"✓ {reason[:180]}" for reason in reasons[:5] if isinstance(reason, str)]
+        reason_lines = [
+            f"✓ {reason[:180]}" for reason in reasons
+            if isinstance(reason, str)
+            and (experience_min is None and experience_max is None or "experience not stated" not in reason)
+        ][:5]
 
     lines = [
         f"🚨 {score}% MATCH",
@@ -142,7 +148,7 @@ def format_notification(item: dict[str, Any]) -> str:
         f"🕐 Posted: {_format_timestamp(posted, posted_precision)}",
         f"🔎 Discovered: {_format_timestamp(discovered)}",
         f"🧾 Experience: {experience}",
-        f"Key skills: {skills or 'Not captured'}",
+        f"{'Key skills' if source_skills or not skills else 'Skills mentioned in the JD'}: {skills or 'Not captured'}",
         f"Source: {source}",
         "",
         *(reason_lines or ["Match reasons: None recorded"]),
@@ -222,11 +228,10 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
             j.posted_precision,
             j.discovered_at,
             j.source_details_json,
-            j.description != '' AS has_description,
+            j.description, j.description != '' AS has_description,
             e.score,
             e.reasons_json AS match_reasons_json,
-            COALESCE(j.experience_min_years,e.experience_min_years) AS experience_min_years,
-            COALESCE(j.experience_max_years,e.experience_max_years) AS experience_max_years
+            {ALERT_EXPERIENCE_COLUMNS}
         FROM notification_ledger nl
         JOIN jobs j ON j.id = nl.candidate_job_id
         JOIN job_evaluations e ON e.job_id = nl.candidate_job_id
@@ -292,7 +297,7 @@ def recover_stale_claims(max_age_minutes: int = 10) -> int:
         return cursor.rowcount
 
 
-def deliver_queued_notifications(limit: int = 10) -> int:
+def deliver_queued_notifications(limit: int = 10, preferences: dict | None = None) -> int:
     credentials = _credentials()
     if not credentials:
         return 0
@@ -308,6 +313,17 @@ def deliver_queued_notifications(limit: int = 10) -> int:
 
         if not item:
             break
+
+        if preferences is not None:
+            mismatch = experience_mismatch(item["experience_min_years"], item["experience_max_years"], preferences)
+            if mismatch:
+                with db_lock, connect_sqlite(DB_PATH) as conn:
+                    conn.execute("""UPDATE notification_ledger
+                        SET status='suppressed',updated_at=?,last_error=?
+                        WHERE canonical_opportunity_id=? AND status='sending'""",
+                        (iso(now()), mismatch, item["canonical_opportunity_id"]))
+                    conn.commit()
+                continue
 
         message = format_notification(item)
 

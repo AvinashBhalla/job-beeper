@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from v2.job_requirements import clean_skills, description_to_markdown, experience_mismatch, listed_skills
 from v2 import ats_directory, auth, board_discovery, board_scheduler, company_watch_manifest, global_ats_discovery, google_oauth, google_alerts_gmail, google_alerts_job_verifier, hirebase, resume_parser, telegram_linking, user_preferences, user_notifications, user_applications
 
 from v2 import instahyre_details, public_job_boards, recruitee
@@ -908,6 +909,11 @@ def normalize_job(
             # Keep the discovery time authoritative rather than showing a future post.
             posted_at = None
             posted_precision = "unknown"
+    if str(description_format).lower() == "html":
+        description = description_to_markdown(
+            BeautifulSoup(html_lib.unescape(description or ""), "html.parser")
+        )
+        description_format = "markdown" if description else "plain"
     return {
         "source": source,
         "source_job_id": str(source_id),
@@ -942,7 +948,9 @@ def _job_for_canonical(conn: sqlite3.Connection, job_id: int) -> dict[str, Any] 
     if not row:
         return None
     job = dict(row)
-    if job.get("experience_min_years") is not None or job.get("experience_max_years") is not None:
+    if job.get("experience_extraction_version") == EXPERIENCE_EXTRACTION_VERSION and (
+        job.get("experience_min_years") is not None or job.get("experience_max_years") is not None
+    ):
         job["jd_experience_min_years"] = job.get("experience_min_years")
         job["jd_experience_max_years"] = job.get("experience_max_years")
     # Reuse only a fresh, exact-JD Gemini cache result that has validated
@@ -1531,7 +1539,7 @@ def init_db() -> None:
 # Bump when _experience_provenance_details() parsing rules change. Existing
 # rows are migrated with version 1 because their persisted values were produced
 # by the current parser before the unchanged-text reuse optimization.
-EXPERIENCE_EXTRACTION_VERSION = 4
+EXPERIENCE_EXTRACTION_VERSION = 5
 
 
 def upsert_jobs(
@@ -1789,6 +1797,7 @@ def upsert_jobs(
                     or j["experience_max_years"] != existing[8]
                     or j["experience_provenance"] != existing[9]
                     or j["experience_confidence"] != existing[10]
+                    or int(existing[12] or 0) != EXPERIENCE_EXTRACTION_VERSION
                 )
                 evaluation_inputs_changed = (
                     next_description != existing_description
@@ -2017,7 +2026,7 @@ async def google_alerts_gmail_worker() -> None:
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
-MATCHER_RULES_VERSION = 7
+MATCHER_RULES_VERSION = 8
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
@@ -2233,13 +2242,15 @@ def refresh_user_job_evaluations(
                  FROM jobs j
                  LEFT JOIN user_job_evaluations e
                    ON e.job_id=j.id AND e.user_id=?
-                 WHERE (e.job_id IS NULL OR e.preference_fingerprint != ?)
-                   AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)"""
-        params: list[Any] = [int(user_id), fingerprint, int(user_id)]
+                 WHERE (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)"""
+        params: list[Any] = [int(user_id), int(user_id)]
         if job_ids:
             placeholders = ",".join("?" for _ in job_ids)
             sql += f" AND j.id IN ({placeholders})"
             params.extend(int(job_id) for job_id in job_ids)
+        else:
+            sql += " AND (e.job_id IS NULL OR e.preference_fingerprint != ?)"
+            params.append(fingerprint)
         sql += " ORDER BY j.first_seen_at ASC, j.id ASC"
         rows = conn.execute(sql, params).fetchall()
         for row in rows:
@@ -3396,6 +3407,13 @@ def _job_source_details(job: dict[str, Any]) -> dict[str, Any]:
 def _serialize_job_description(job: dict[str, Any]) -> None:
     job["description_format"] = "markdown" if job.get("description_format") == "markdown" else "plain"
     job["source_details"] = _job_source_details(job)
+    skills = clean_skills(job["source_details"].get("key_skills"))
+    if not skills:
+        skills = listed_skills(job.get("description") or "")
+        if skills:
+            job["source_details"]["key_skills_from_description"] = True
+    if skills or "key_skills" in job["source_details"]:
+        job["source_details"]["key_skills"] = skills
     if job["source"] != "instahyre" or job["description_format"] != "plain":
         return
     keyword_stub = re.fullmatch(r"Keywords: ([^\r\n]+)", job.get("description") or "")
@@ -3634,7 +3652,7 @@ _EXPERIENCE_NUMBER_WORDS = (
     "zero one two three four five six seven eight nine ten eleven twelve "
     "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty"
 ).split()
-_INSTAHYRE_JD_MINIMUM_RE = re.compile(
+_JD_MINIMUM_RE = re.compile(
     r"^[ \t]*(?:[-*•]\s+)?(\d{1,2}|" + "|".join(_EXPERIENCE_NUMBER_WORDS)
     + r")\s+or\s+more\s+years?\s+(?:of|in)\s+",
     re.I | re.M,
@@ -3675,7 +3693,10 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         r"\1",
         description,
         flags=re.I,
-    ) if source == "instahyre" else description
+    )
+    low, high = extract_linkedin_labeled_experience(experience_text)
+    if low is not None and 0 <= low <= (high if high is not None else low) <= 60:
+        return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
     low, high = extract_jd_experience(experience_text)
     explicit_context = bool(re.search(
         r"\b(?:overall|total|professional)\b[^.!?]{0,120}\bexperience\b"
@@ -3686,18 +3707,19 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         description,
         re.I,
     ))
-    if (low is not None or high is not None) and (
+    if low is not None and 0 <= low <= (high if high is not None else low) <= 60 and (
         explicit_context or (low, high) == _software_experience_range(description)
     ):
         return {"min_years": low, "max_years": high, "provenance": "description", "confidence": "medium"}
 
+    minimum = _JD_MINIMUM_RE.search(description)
+    if minimum:
+        value = minimum[1].casefold()
+        low = int(value) if value.isdecimal() else _EXPERIENCE_NUMBER_WORDS.index(value)
+        if 0 <= low <= 60:
+            return {"min_years": low, "max_years": None, "provenance": "description", "confidence": "medium"}
+
     if source == "instahyre":
-        minimum = _INSTAHYRE_JD_MINIMUM_RE.search(description)
-        if minimum:
-            value = minimum[1].casefold()
-            low = int(value) if value.isdecimal() else _EXPERIENCE_NUMBER_WORDS.index(value)
-            if 0 <= low <= 60:
-                return {"min_years": low, "max_years": None, "provenance": "description", "confidence": "medium"}
         badge = _job_source_details(job).get("listing_experience")
         if isinstance(badge, str):
             low, high = extract_experience(badge)
@@ -4039,68 +4061,25 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
 
     exp_min = job.get("jd_experience_min_years")
     exp_max = job.get("jd_experience_max_years")
-    if job.get("source") == "instahyre":
-        # Use the same JD-first policy for matching and the stored job details.
-        if exp_min is None and exp_max is None:
-            experience = _experience_provenance_details(job)
-            exp_min, exp_max = experience["min_years"], experience["max_years"]
-    else:
-        if exp_min is None and exp_max is None:
+    if exp_min is None and exp_max is None:
+        experience = _experience_provenance_details(job)
+        exp_min, exp_max = experience["min_years"], experience["max_years"]
+        if exp_min is None and exp_max is None and not job.get("source"):
             exp_min, exp_max = extract_jd_experience(description)
-        if exp_min is None and exp_max is None:
-            exp_min, exp_max = extract_experience(combined)
+
+    mismatch = experience_mismatch(exp_min, exp_max, config)
+    if mismatch:
+        return {
+            "match": False,
+            "score": 0,
+            "reasons": [mismatch],
+            "experience_min_years": exp_min,
+            "experience_max_years": exp_max,
+        }
 
     candidate_years = config.get("candidate_experience_years")
-    max_years = float(config.get("max_experience_years", 3))
-    minimum_job_years = config.get("min_experience_years")
-
     if exp_min is not None or exp_max is not None:
         effective_min = exp_min if exp_min is not None else exp_max
-
-        if (
-            candidate_years is not None
-            and effective_min is not None
-            and effective_min > float(candidate_years)
-        ):
-            return {
-                "match": False,
-                "score": 0,
-                "reasons": [
-                    f"experience minimum {effective_min:g} exceeds "
-                    f"candidate {float(candidate_years):g} years"
-                ],
-                "experience_min_years": exp_min,
-                "experience_max_years": exp_max,
-            }
-
-        if (
-            minimum_job_years is not None
-            and exp_max is not None
-            and exp_max < float(minimum_job_years)
-        ):
-            return {
-                "match": False,
-                "score": 0,
-                "reasons": [
-                    f"job maximum experience {exp_max:g} is below "
-                    f"configured minimum {float(minimum_job_years):g} years"
-                ],
-                "experience_min_years": exp_min,
-                "experience_max_years": exp_max,
-            }
-
-        if exp_max is not None and exp_max > max_years:
-            return {
-                "match": False,
-                "score": 0,
-                "reasons": [
-                    f"experience range exceeds configured maximum "
-                    f"of {max_years:g} years"
-                ],
-                "experience_min_years": exp_min,
-                "experience_max_years": exp_max,
-            }
-
         score += 15
         experience_label = (
             f"{effective_min:g}"
@@ -5062,9 +5041,7 @@ def instahyre_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 description = instahyre_details.description_to_markdown(BeautifulSoup(description, "html.parser"))
                 description_format = "markdown" if description else "plain"
             keywords = item.get("keywords")
-            skills = list(dict.fromkeys(
-                value.strip() for value in keywords if isinstance(value, str) and value.strip()
-            )) if isinstance(keywords, list) else []
+            skills = clean_skills(keywords)
 
             jobs.append(normalize_job(
                 "instahyre",
@@ -5174,10 +5151,7 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                             office_names.append(label)
                 location = ", ".join(office_names)
 
-            description_html = html_lib.unescape(str(item.get("content") or ""))
-            description = BeautifulSoup(
-                description_html, "html.parser"
-            ).get_text(" ", strip=True)
+            description = str(item.get("content") or "")
             departments = item.get("departments") or []
             department_names = [
                 str(dept.get("name")).strip()
@@ -5214,6 +5188,7 @@ def greenhouse_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
                 published_at,
                 posted_precision,
                 description,
+                description_format="html",
                 source_details={"board_registry_id": board.get("registry_id"), "board_key": token.lower()},
             ))
 
@@ -5321,17 +5296,17 @@ def ashby_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             html_description = item.get("descriptionHtml")
             plain_description = item.get("descriptionPlain")
             if isinstance(html_description, str) and html_description.strip():
-                description = BeautifulSoup(html_lib.unescape(html_description), "html.parser").get_text(" ", strip=True)
-            elif isinstance(plain_description, str):
-                description = re.sub(r"\s+", " ", plain_description).strip()
+                description, description_format = html_description, "html"
             else:
-                description = ""
+                description = plain_description.strip() if isinstance(plain_description, str) else ""
+                description_format = "plain"
 
             published_at, posted_precision = _parse_ashby_published_at(item.get("publishedAt"))
             try:
                 jobs.append(normalize_job(
                     "ashby", source_id, company, title.strip(), location,
                     url, published_at, posted_precision, description,
+                    description_format=description_format,
                     source_details={"board_registry_id": board.get("registry_id"), "board_key": name.lower()},
                 ))
             except (TypeError, ValueError) as exc:
@@ -6712,10 +6687,7 @@ def workable_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             published_at = parse_relative(published_raw) if isinstance(published_raw, str) else None
             precision = "date" if published_at else "unknown"
             description_html = item.get("description")
-            description = (
-                BeautifulSoup(html_lib.unescape(description_html), "html.parser").get_text(" ", strip=True)
-                if isinstance(description_html, str) else ""
-            )
+            description = description_html if isinstance(description_html, str) else ""
             posting_url = item.get("url") or item.get("application_url") or f"https://apply.workable.com/{account}/"
             if not isinstance(posting_url, str) or not posting_url.startswith("https://"):
                 posting_url = f"https://apply.workable.com/{account}/"
@@ -6734,6 +6706,7 @@ def workable_collect(config: dict[str, Any]) -> list[dict[str, Any]]:
             jobs.append(normalize_job(
                 "workable", source_id, company or str(payload.get("name") or account),
                 title, location, posting_url, published_at, precision, description,
+                description_format="html",
                 source_details=details,
             ))
     if successful_boards == 0:
@@ -7636,7 +7609,7 @@ def run_source(
                 from v2.telegram import credentials_available, deliver_queued_notifications
 
                 if _legacy_notifications_enabled(config, credentials_available()):
-                    delivered = deliver_queued_notifications(50)
+                    delivered = deliver_queued_notifications(50, config)
                     if delivered:
                         log.info("telegram: delivered=%s source=%s", delivered, source)
             except Exception:

@@ -1454,7 +1454,10 @@
 
     section.classList.toggle('is-hidden', rows.length === 0 && skills.length === 0);
     const skillsHeading = $('inspSourceKeySkillsHeading');
-    if (skillsHeading) skillsHeading.classList.toggle('is-hidden', skills.length === 0);
+    if (skillsHeading) {
+      skillsHeading.textContent = details.key_skills_from_description ? 'Skills mentioned in the JD' : 'Key Skills';
+      skillsHeading.classList.toggle('is-hidden', skills.length === 0);
+    }
   }
 
   function closeJobInspector() {

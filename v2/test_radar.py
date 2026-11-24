@@ -62,6 +62,55 @@ class LegacyNotificationGateTests(unittest.TestCase):
 
 
 class MatcherTests(unittest.TestCase):
+    def test_shared_jd_requirements_apply_to_different_providers(self):
+        for source in ("greenhouse", "lever", "ashby", "workable", "smartrecruiters", "future_board"):
+            with self.subTest(source=source):
+                job = normalize_job(
+                    source, "example", "Example", "Software Engineer", "Bangalore",
+                    "https://example.com/job", None, "unknown",
+                    "<p>Key skills: Python, SQL</p><ul><li>8+ years of experience in software, "
+                    "with at least 2 years of people management experience.</li></ul>",
+                    description_format="html",
+                )
+                self.assertEqual(job["description_format"], "markdown")
+                self.assertIn("\n- 8+ years", job["description"])
+                result = match_details(job, BASE_CONFIG)
+                self.assertEqual((result["experience_min_years"], result["experience_max_years"]), (8, None))
+                self.assertFalse(result["match"])
+                radar._serialize_job_description(job)
+                self.assertEqual(job["source_details"]["key_skills"], ["Python", "SQL"])
+
+    def test_open_ended_requirement_checks_configured_maximum_without_candidate_experience(self):
+        config = {**BASE_CONFIG, "candidate_experience_years": None}
+        job = make_job("Software Engineer", "Must have 7+ years of professional experience.")
+        result = match_details(job, config)
+        self.assertFalse(result["match"])
+        self.assertEqual(result["experience_min_years"], 7)
+
+    def test_existing_member_evaluation_refreshes_when_job_evidence_changes(self):
+        with (
+            TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            patch.object(radar, "DB_PATH", Path(tmp) / "jobs.db"),
+            patch.object(radar, "get_config", return_value=BASE_CONFIG),
+        ):
+            radar.init_db()
+            member = auth.create_user(radar.DB_PATH, "refresh@example.com", "test-password-123")
+            prefs = {**user_preferences.PREFERENCE_DEFAULTS, **BASE_CONFIG}
+            job = normalize_job("lever", "example", "Example", "Software Engineer", "Bangalore",
+                                "https://example.com/job", None, "unknown")
+            upsert_jobs([job], BASE_CONFIG)
+            with radar.connect_sqlite(radar.DB_PATH) as conn:
+                job_id = conn.execute("SELECT id FROM jobs").fetchone()[0]
+            radar.refresh_user_job_evaluations(member["id"], prefs, [job_id])
+            with radar.connect_sqlite(radar.DB_PATH) as conn:
+                self.assertEqual(conn.execute("SELECT match FROM user_job_evaluations").fetchone()[0], 1)
+                conn.execute("UPDATE jobs SET description='Requires 7+ years of professional experience.' WHERE id=?",
+                             (job_id,))
+            self.assertEqual(radar.refresh_user_job_evaluations(member["id"], prefs, [job_id]), 1)
+            with radar.connect_sqlite(radar.DB_PATH) as conn:
+                evaluated = conn.execute("SELECT match,experience_min_years FROM user_job_evaluations").fetchone()
+            self.assertEqual(tuple(evaluated), (0, 7))
+
 
     def setUp(self):
         self._runtime_config_dir = TemporaryDirectory()
