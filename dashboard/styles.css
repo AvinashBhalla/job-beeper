@@ -1365,8 +1365,11 @@ a:hover {
 
   .opportunity-source-text {
     flex: 0 1 100%;
+    min-width: 0;
     text-align: left;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .opportunity-actions-col {
@@ -1378,6 +1381,13 @@ a:hover {
     flex-direction: row;
     flex-wrap: wrap;
     padding-top: 0;
+    min-width: 0;
+  }
+
+  .opportunity-actions-col .btn-action-primary,
+  .opportunity-actions-col .btn-action-secondary {
+    flex: 0 1 auto;
+    max-width: 100%;
   }
 }
 
@@ -1393,6 +1403,15 @@ a:hover {
 
   .opportunity-title {
     font-size: 15px;
+  }
+
+  .opportunity-headline-row {
+    display: block;
+  }
+
+  .opportunity-source-text {
+    display: block;
+    margin-top: 4px;
   }
 
   .opportunity-actions-col .btn-action-primary,

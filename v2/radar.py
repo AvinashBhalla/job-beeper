@@ -4873,6 +4873,7 @@ def _hydrate_instahyre_listings(jobs: list[dict[str, Any]]) -> None:
                 if response.status_code in {401, 403, 429}:
                     retry_after = _retry_after_seconds(response) or 0
                     runtime["detail_cooldown_until"] = time.monotonic() + max(6 * 3600, retry_after)
+                    job["source_details"]["instahyre_detail_fetch_status"] = f"blocked_http_{response.status_code}"
                     log.info("instahyre: detail pages unavailable (HTTP %s); continuing with search feed", response.status_code)
                     break
                 if not response.ok or response.is_redirect:

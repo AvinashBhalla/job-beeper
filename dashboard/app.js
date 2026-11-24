@@ -1280,7 +1280,11 @@
 
     const descEl = $('inspDescription');
     if (descEl) {
-      const description = job.description || 'The source did not expose a full description in this scan. Use the Apply Direct link to view the complete posting.';
+      const blockedInstahyre = job.source === 'instahyre'
+        && String(job.source_details?.instahyre_detail_fetch_status || '').startsWith('blocked_http_');
+      const description = job.description || (blockedInstahyre
+        ? 'Instahyre blocked the automated detail scan for this listing. Use Apply Direct to view the complete posting; structured fields from the listing feed remain available below.'
+        : 'The source did not expose a full description in this scan. Use the Apply Direct link to view the complete posting.');
       if (job.description_format === 'markdown') {
         descEl.innerHTML = renderMarkdownDescription(description);
       } else {
