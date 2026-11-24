@@ -53,7 +53,7 @@ class UserScopedJobFeedTests(unittest.TestCase):
         radar.upsert_jobs(jobs, config)
         # Deliberately mark one global notification as sent. A normal user must
         # still receive only the neutral not_eligible state, never ledger details.
-        with sqlite3.connect(self.db_path) as conn:
+        with radar.connect_sqlite(self.db_path) as conn:
             opportunity_id = conn.execute(
                 "SELECT canonical_opportunity_id FROM jobs WHERE source_job_id='python-1'"
             ).fetchone()[0]

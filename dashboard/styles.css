@@ -899,6 +899,7 @@ a:hover {
 .feed-master-pane {
   flex: 1;
   min-width: 0;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1334,7 +1335,7 @@ a:hover {
   }
 }
 
-@media (max-width: 860px) {
+@container (max-width: 650px) {
   .opportunity-row {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr);
