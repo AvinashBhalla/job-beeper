@@ -479,7 +479,8 @@
       source_job_id: raw.source_job_id || raw.id,
       company: raw.company || 'Unknown Company',
       title: raw.title || 'Untitled Role',
-      location: raw.location || raw.jd_location || 'Location not specified',
+      location: (raw.location || raw.jd_location || '').split(',')
+        .map(part => part.trim()).filter(Boolean).join(', ') || 'Location not specified',
       url: raw.url || '#',
       description: raw.description || '',
       description_format: raw.description_format === 'markdown' ? 'markdown' : 'plain',
