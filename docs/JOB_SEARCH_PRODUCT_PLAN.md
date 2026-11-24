@@ -88,6 +88,42 @@ The Linux regression passed all 671 tests on `5a17a44`. The following revision `
 
 The worker refreshed the Common Crawl catalogue at 14:31 IST. The first live Workday index lookup at 14:38 IST returned HTTP 504 and added zero candidates. The provider cursor advanced to Keka. Scheduled job polling is separate from the candidate scan and continues with its existing host limits.
 
+### Hiring posts and international boards
+
+#### Hiring posts and articles
+
+Start with the official Hacker News API and the monthly **Who is hiring?** thread. The November 2026 thread returned 300 direct reply IDs. All six sampled replies had a timestamp and an outbound link. Poll for new and changed direct replies at a bounded cadence. Keep the original post URL and timestamp, exclude removed replies and generic recruiting messages, and identify posts advertising a specific opening. [HN API](https://github.com/HackerNews/API) · [November hiring thread](https://news.ycombinator.com/item?id=50338728)
+
+Use the existing public job-posting verifier when a post links to an employer vacancy. Attach the post as a source reference when that job already exists. Display posts without a confirmed posting as **Hiring posts** with a short factual summary and the original link. Keep these leads out of Telegram during the pilot. Measure verified openings, duplicates, publication-to-discovery latency, and edits or removals.
+
+Expand through employer blogs, newsletters, RSS and permitted search results. Validate the original source before promoting a search result to a job. Keep member-authorized email leads private to the recipient. LinkedIn's Posts API has restricted member permissions and organization role requirements. Reddit requires permission for commercial data use. Start with authorized access or user-shared links on those platforms. [LinkedIn Posts API](https://learn.microsoft.com/en-ca/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2025-07) · [Reddit data access](https://support.reddithelp.com/hc/en-us/articles/14945211791892-Developer-Platform-Accessing-Reddit-Data)
+
+#### International coverage
+
+| Priority | Source | Pilot |
+| --- | --- | --- |
+| Global remote | Himalayas | The public API returned five records with IDs, publication and expiry dates, country and timezone restrictions, and application URLs. Implement expiry and early closure, visible source attribution, and the original application link before publishing. [Himalayas API](https://himalayas.app/api) |
+| Sweden | Platsbanken | A software developer query returned 636 hits and five sample records with Swedish descriptions, locations, closing dates, and application details. Start with software and data roles. Use JobStream for changes and removals. Evaluate JobAd Links for broader board coverage. [JobStream](https://data.arbetsformedlingen.se/dataservice/jobstream/) · [JobAd Links](https://links.api.jobtechdev.se/) |
+| Japan | TokyoDev, Japan Dev, Hello Work | Evaluate partner feeds and Hello Work access eligibility. Pilot tech roles and record language requirements, visa sponsorship, and relocation only when stated. [TokyoDev](https://www.tokyodev.com/about) · [Japan Dev](https://japan-dev.com/) · [Hello Work API guide](https://www.hellowork.mhlw.go.jp/doc/service_manual_minkan.pdf) |
+
+Keep original titles and locations. Treat remote eligibility, work authorization, and workplace location as separate fields. Compare unique jobs, direct apply links, closure handling, and discovery latency before expanding the next country cohort.
+
+#### Requested provider status
+
+- **LinkedIn Jobs** is active in production with recurring rate limits. Preserve persisted cooldowns. Public hiring posts need separate permissions and intake.
+- **Workday** is configured in production. The latest 24-hour check found 24 rate-limited runs and zero jobs added. Recheck a verified alternative employer only after cooldown. An approved feed is the fallback.
+- **Indeed** needs an authorized intake path. The publisher plugin requires partner access and displays job search in the browser. For shared ingestion, pursue an approved feed. Member-authorized email alerts can support a private pilot once a real sample is available. [Indeed publisher documentation](https://docs.indeed.com/indeed-plus/publisher-js-plugin)
+- **Wellfound and Hirist** are pending. Wellfound offers daily or weekly saved-search emails. Hirist needs a permitted endpoint or feed after its public index denied the VM request. [Wellfound saved searches](https://help.wellfound.com/article/782-saved-searches)
+- **Himalayas** is the first new connector in this expansion. The API probe is complete and integration is pending.
+
+#### Production hold and Instahyre detail coverage
+
+The fresh production backup contained 29,238 jobs and passed integrity and checksum checks. The tested application image started its migration on a network-isolated copy. The production draft preserved all 10 schedules and added 13 schedules with silent first snapshots. All nine existing cohort registry records passed a live endpoint check. The current production image rejects the dotted Mistral AI board name. The new image accepts it. The isolated rehearsal was stopped after the owner raised a new extraction issue. The production binary, schedule, and delivery settings stayed on the prior release. Verified registry metadata was retained.
+
+Meesho listing `419980` had search skills but no recorded detail attempt when reported. The development VM used the existing collector to retrieve and save the source's actual formatted description on job `6774`, preserving its identity. It found an 8+ year primary requirement and a separate 2–3 year people-management requirement. A same-title Meesho careers record was for a different role, so its experience was not substituted. [Meesho on Instahyre](https://www.instahyre.com/job-419980-principal-data-scientist-at-meesho-bangalore/)
+
+A development snapshot found complete, verified descriptions on 186 of 376 recent Instahyre observations and 64 records with blank descriptions. The four-request budget now prioritizes three new listings when both new work and backlog are present, with one reserved for backlog still present in the source scan. An authorized detail response is still required for any remaining listing. Intake through the ordinary schedule and its coverage across multiple scans must be checked before release. Instahyre alerts now require a complete verified description and source-backed experience under the current extraction rules. Search previews, manual summaries, and stale evaluations are held even when already queued.
+
 ### Source Health administration
 
 Source Health opens with enabled sources, plain-language status, jobs added in the past 24 hours, and last check time in IST. Paused sources and optional tools are collapsed. Use **Configure sources** to open the provider toggles in Preferences, then **Save Preferences**. Use **Employer boards** to find, verify, and activate a public career board. Directory and manifest imports are under **Candidate imports**. **Technical diagnostics** contains board schedules, host limits, and raw run errors. These tools load when opened, and **Refresh status** also refreshes the open tools.

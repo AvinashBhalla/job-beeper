@@ -1251,7 +1251,9 @@
     const inspectorExperienceConfidence = job.experience_confidence !== 'unknown'
       ? ' · ' + job.experience_confidence + ' evidence'
       : '';
-    $('inspExperience').textContent = job.experience_label + ' · ' + inspectorExperienceSource + inspectorExperienceConfidence;
+    $('inspExperience').textContent = job.source === 'instahyre' && !job.description && job.experience_provenance === 'unknown'
+      ? 'Pending verification'
+      : job.experience_label + ' · ' + inspectorExperienceSource + inspectorExperienceConfidence;
     $('inspLocation').textContent = job.location;
     $('inspWorkMode').textContent = job.work_mode;
     $('inspSourcePosted').textContent = fmtTimestamp(job.source_posted_at, job.posted_precision);
@@ -1318,7 +1320,7 @@
       const description = job.description || (blockedInstahyre
         ? 'Instahyre restricted automated access to the full posting. Open Apply Direct to read it.'
         : job.source === 'instahyre'
-          ? 'JobBeeper has the Instahyre search listing. Open Apply Direct to read the complete posting.'
+          ? 'The complete Instahyre description is pending verification. Open Apply Direct to read the original posting.'
           : 'JobBeeper has no full description for this listing. Open Apply Direct to read the complete posting.');
       if (job.description_format === 'markdown') {
         descEl.innerHTML = renderMarkdownDescription(description);

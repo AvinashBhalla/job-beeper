@@ -8,12 +8,27 @@ from bs4 import BeautifulSoup, Tag
 
 
 MAX_PAGE_BYTES = 512 * 1024
-# Keep incomplete Instahyre observations visible in the feed while their
-# notification eligibility waits for source-backed experience.
-ALERT_EXPERIENCE_READY_SQL = """(j.source != 'instahyre' OR (
+MIN_EXPERIENCE_EXTRACTION_VERSION = 4
+# Search previews and operator summaries remain visible but do not qualify
+# for alerts. A complete capture also needs reliable experience evidence.
+ALERT_EXPERIENCE_READY_SQL = f"""(j.source != 'instahyre' OR (
     j.experience_provenance IN ('description', 'employer_stated')
     AND COALESCE(j.experience_min_years, j.experience_max_years) IS NOT NULL
+    AND j.experience_extraction_version >= {MIN_EXPERIENCE_EXTRACTION_VERSION}
+    AND length(trim(j.description)) > 0
+    AND CASE WHEN json_valid(j.source_details_json) THEN
+        json_type(j.source_details_json, '$.instahyre_detail_verified') = 'true'
+        AND COALESCE(json_extract(j.source_details_json, '$.instahyre_detail_fetch_status'), 'complete') = 'complete'
+    ELSE 0 END
 ))"""
+
+
+def has_complete_detail(description: str, details: dict) -> bool:
+    return bool(
+        description.strip()
+        and details.get("instahyre_detail_verified") is True
+        and details.get("instahyre_detail_fetch_status") in (None, "complete")
+    )
 
 
 def is_listing_url(url: str, source_id: str) -> bool:
@@ -84,7 +99,7 @@ def parse_listing(page: str | bytes, source_id: str) -> tuple[str, dict]:
         return "", {}
 
     details = {}
-    badge = soup.select_one("#floating-header .experience")
+    badge = soup.select_one("#floating-header .experience, .employer-profile-info-wrapper .job-locations .experience")
     if badge:
         value = badge.get_text(" ", strip=True)
         if re.fullmatch(r"\d+(?:\s*(?:[-–—]|to)\s*\d+|\+)?\s+(?:years?|yrs?)", value, re.I):

@@ -3419,7 +3419,53 @@ class InstahyreCollectorTests(unittest.TestCase):
         self.assertTrue(match["match"])
         self.assertEqual((match["experience_min_years"], match["experience_max_years"]), (3, 5))
         self.assertEqual(radar.alertability_details({"source": "instahyre"}, {"match": True}, BASE_CONFIG),
-                         {"alertable": False, "reasons": ["waiting for source-backed Instahyre experience"]})
+                         {"alertable": False, "reasons": ["waiting for the verified Instahyre job description"]})
+
+    def test_meesho_mobile_badge_and_jd_management_requirement(self):
+        for management in ("2–3", "2"):
+            with self.subTest(management=management):
+                page = self.DETAIL_HTML.replace("446772", "419980").replace(
+                    '<div id="floating-header"><span class="experience">3-5 Years</span></div>',
+                    '<div class="employer-profile-info-wrapper"><div class="job-locations">'
+                    '<span class="experience">9-13 Years</span></div></div>',
+                ).replace(
+                    "2–5 years of building and operating production software.",
+                    f"8+ years of experience in data science, with at least {management} years of people management experience.",
+                )
+                description, details = radar.instahyre_details.parse_listing(page, "419980")
+                evidence = radar._experience_provenance_details({
+                    "source": "instahyre", "description": description, "source_details": details,
+                })
+                self.assertEqual(details["listing_experience"], "9-13 Years")
+                self.assertIn(f"at least {management} years of people management", description)
+                self.assertEqual((evidence["min_years"], evidence["max_years"], evidence["provenance"]),
+                                 (8, None, "description"))
+
+    def test_detail_budget_reserves_one_slot_for_backlog(self):
+        def observation(job_id):
+            return radar.normalize_job(
+                "instahyre", str(job_id), "Employer", "Engineer", "Bangalore",
+                f"https://www.instahyre.com/job-{job_id}-engineer/", None, "unknown",
+            )
+
+        with (
+            TemporaryDirectory(ignore_cleanup_errors=True) as tmp,
+            patch.object(radar, "DB_PATH", Path(tmp) / "jobs.db"),
+            patch.object(radar, "get_config", return_value=BASE_CONFIG),
+            patch.object(radar, "source_state", {}),
+            patch.object(radar.google_alerts_job_verifier, "_robots_allows", return_value=False) as allowed,
+        ):
+            radar.init_db()
+            backlog = [observation(job_id) for job_id in (1, 2, 3, 4)]
+            backlog[0]["description"] = "Operator-verified summary."
+            backlog[0]["source_details"].update(
+                instahyre_detail_verified=True, instahyre_detail_fetch_status="verified_in_browser",
+            )
+            fresh = [observation(job_id) for job_id in (5, 6, 7, 8)]
+            radar.upsert_jobs(backlog)
+            radar._hydrate_instahyre_listings(backlog + fresh)
+        self.assertEqual([call.args[0] for call in allowed.call_args_list],
+                         [job["url"] for job in fresh[:3] + backlog[:1]])
 
     def test_instahyre_uses_listing_badge_when_jd_has_no_years(self):
         job = {

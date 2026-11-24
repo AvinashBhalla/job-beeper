@@ -1531,7 +1531,7 @@ def init_db() -> None:
 # Bump when _experience_provenance_details() parsing rules change. Existing
 # rows are migrated with version 1 because their persisted values were produced
 # by the current parser before the unchanged-text reuse optimization.
-EXPERIENCE_EXTRACTION_VERSION = 3
+EXPERIENCE_EXTRACTION_VERSION = 4
 
 
 def upsert_jobs(
@@ -2017,7 +2017,7 @@ async def google_alerts_gmail_worker() -> None:
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
-MATCHER_RULES_VERSION = 6
+MATCHER_RULES_VERSION = 7
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
@@ -3668,7 +3668,15 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         if type(low) in {int, float} and type(high) in {int, float} and 0 <= low <= high <= 60:
             return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
 
-    low, high = extract_jd_experience(description)
+    # A subordinate experience requirement belongs in the JD, but should not
+    # replace the overall minimum from the first part of the same sentence.
+    experience_text = re.sub(
+        r"(\b\d+(?:\.\d+)?\s*\+\s*years?\s+of\s+experience\b[^.!?\n]{0,180}?),\s+with\s+at\s+least\b[^.!?\n]*",
+        r"\1",
+        description,
+        flags=re.I,
+    ) if source == "instahyre" else description
+    low, high = extract_jd_experience(experience_text)
     explicit_context = bool(re.search(
         r"\b(?:overall|total|professional)\b[^.!?]{0,120}\bexperience\b"
         r"|\bwork\s+experience\b"
@@ -4133,8 +4141,17 @@ def alertability_details(job: dict[str, Any], details: dict[str, Any], config: d
     if job.get("source") in public_job_boards.LABELS and not job.get("description"):
         return {"alertable": False, "reasons": ["waiting for the employer job description"]}
 
-    if job.get("source") == "instahyre" and job.get("experience_provenance") not in {"description", "employer_stated"}:
-        return {"alertable": False, "reasons": ["waiting for source-backed Instahyre experience"]}
+    if job.get("source") == "instahyre":
+        if not instahyre_details.has_complete_detail(
+            str(job.get("description") or ""), _job_source_details(job)
+        ):
+            return {"alertable": False, "reasons": ["waiting for the verified Instahyre job description"]}
+        if (
+            job.get("experience_provenance") not in {"description", "employer_stated"}
+            or (job.get("experience_min_years") is None and job.get("experience_max_years") is None)
+            or (job.get("experience_extraction_version") or 0) < instahyre_details.MIN_EXPERIENCE_EXTRACTION_VERSION
+        ):
+            return {"alertable": False, "reasons": ["waiting for source-backed Instahyre experience"]}
 
     return {"alertable": True, "reasons": ["passes match threshold and notification policy"]}
 
@@ -4872,16 +4889,28 @@ def _hydrate_instahyre_listings(jobs: list[dict[str, Any]]) -> None:
     ids = [job["source_job_id"] for job in pending]
     placeholders = ",".join("?" for _ in ids)
     with connect_sqlite(DB_PATH) as conn:
-        existing = {
-            job_id: _job_source_details({"source_details_json": details_json})
-            for job_id, details_json in conn.execute(
-                f"SELECT source_job_id,source_details_json FROM jobs "
-                f"WHERE source='instahyre' AND source_job_id IN ({placeholders})",
-                ids,
-            )
-        }
-    pending = [job for job in pending if not existing.get(job["source_job_id"], {}).get("instahyre_detail_verified")]
+        rows = conn.execute(
+            f"SELECT source_job_id,source_details_json,description FROM jobs "
+            f"WHERE source='instahyre' AND source_job_id IN ({placeholders})",
+            ids,
+        ).fetchall()
+    existing = {
+        job_id: _job_source_details({"source_details_json": details_json})
+        for job_id, details_json, _ in rows
+    }
+    complete = {
+        job_id for job_id, _, description in rows
+        if instahyre_details.has_complete_detail(description or "", existing[job_id])
+    }
+    pending = [job for job in pending if job["source_job_id"] not in complete]
     pending.sort(key=lambda job: existing.get(job["source_job_id"], {}).get("instahyre_detail_attempted_at", ""))
+    fresh = [job for job in pending if job["source_job_id"] not in existing]
+    backlog = [job for job in pending if job["source_job_id"] in existing]
+    if fresh and backlog:
+        # Give fresh listings first access to the existing request budget and
+        # reserve a slot for backlog so it can still drain under steady arrivals.
+        new_slots = INSTAHYRE_DETAILS_PER_SCAN - 1
+        pending = fresh[:new_slots] + backlog + fresh[new_slots:]
     for job in pending[:INSTAHYRE_DETAILS_PER_SCAN]:
         job["source_details"]["instahyre_detail_attempted_at"] = iso(now())
         if not google_alerts_job_verifier._robots_allows(job["url"]):
@@ -4913,6 +4942,7 @@ def _hydrate_instahyre_listings(jobs: list[dict[str, Any]]) -> None:
         description, details = instahyre_details.parse_listing(bytes(body), job["source_job_id"])
         job["source_details"].update(details)
         if description:
+            job["source_details"]["instahyre_detail_fetch_status"] = "complete"
             job["description"] = description
             job["description_format"] = "markdown"
 
