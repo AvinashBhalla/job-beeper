@@ -1264,6 +1264,73 @@ a:hover {
   }
 }
 
+@media (max-width: 860px) {
+  .opportunity-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-8);
+    overflow: hidden;
+  }
+
+  .opportunity-score-col {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    min-width: 0;
+  }
+
+  .opportunity-main-col {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .opportunity-headline-row {
+    align-items: flex-start;
+  }
+
+  .opportunity-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .opportunity-source-text {
+    flex: 0 1 100%;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .opportunity-actions-col {
+    grid-column: 2;
+    grid-row: 2;
+    width: auto;
+    max-width: none;
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .opportunity-row {
+    grid-template-columns: 46px minmax(0, 1fr);
+    padding: var(--space-12);
+  }
+
+  .opportunity-score-col {
+    font-size: 11px;
+  }
+
+  .opportunity-title {
+    font-size: 15px;
+  }
+
+  .opportunity-actions-col .btn-action-primary,
+  .opportunity-actions-col .btn-action-secondary {
+    min-height: 32px;
+  }
+}
+
 /* Action Buttons */
 .btn-action-primary {
   display: inline-flex;
