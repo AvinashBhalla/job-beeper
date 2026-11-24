@@ -2015,7 +2015,7 @@ async def google_alerts_gmail_worker() -> None:
 
 # Increment whenever deterministic matching/alertability rules change so
 # persisted evaluations are invalidated and recomputed under the new rules.
-MATCHER_RULES_VERSION = 4
+MATCHER_RULES_VERSION = 5
 
 
 def _config_fingerprint(config: dict[str, Any]) -> str:
@@ -4015,6 +4015,12 @@ def match_details(job: dict[str, Any], config: dict[str, Any] | None = None) -> 
     # explicit requirement; never let a generic title/snippet override JD data.
     exp_min = job.get("jd_experience_min_years")
     exp_max = job.get("jd_experience_max_years")
+    if job.get("source") == "instahyre":
+        header_min, header_max = extract_experience(str(_job_source_details(job).get("listing_experience") or ""))
+        if header_min is not None and 0 <= header_min <= (header_max if header_max is not None else header_min) <= 60:
+            # Instahyre separates the role's overall range from skill-specific
+            # experience in the description. Screen the profile against the role.
+            exp_min, exp_max = header_min, header_max
     if exp_min is None and exp_max is None:
         exp_min, exp_max = extract_jd_experience(description)
     if exp_min is None and exp_max is None:
@@ -4111,9 +4117,9 @@ def alertability_details(job: dict[str, Any], details: dict[str, Any], config: d
     if job.get("source") in public_job_boards.LABELS and not job.get("description"):
         return {"alertable": False, "reasons": ["waiting for the employer job description"]}
 
-    # Unknown experience is neutral for profile matching. Explicit incompatible
-    # experience is already rejected by match_details(); do not add a hidden
-    # second gate after the configured match threshold has passed.
+    if job.get("source") == "instahyre" and job.get("experience_provenance") not in {"description", "employer_stated"}:
+        return {"alertable": False, "reasons": ["waiting for source-backed Instahyre experience"]}
+
     return {"alertable": True, "reasons": ["passes match threshold and notification policy"]}
 
 
@@ -10840,8 +10846,9 @@ def jobs(
         item["match_reasons"] = parse_json_list(item.pop("evaluation_reasons_json", None))
         exp_min = item.pop("evaluation_experience_min_years", None)
         exp_max = item.pop("evaluation_experience_max_years", None)
-        item["experience_min_years"] = exp_min if exp_min is not None else item.get("experience_min_years")
-        item["experience_max_years"] = exp_max if exp_max is not None else item.get("experience_max_years")
+        if item["source"] != "instahyre":
+            item["experience_min_years"] = exp_min if exp_min is not None else item.get("experience_min_years")
+            item["experience_max_years"] = exp_max if exp_max is not None else item.get("experience_max_years")
         item["experience_provenance"] = item.get("experience_provenance") or "unknown"
         item["experience_confidence"] = item.get("experience_confidence") or "unknown"
         if item["experience_provenance"] == "unknown":
@@ -11056,16 +11063,11 @@ def job_detail(
     result = dict(row)
     _serialize_job_description(result)
     result.pop("source_details_json", None)
-    result["experience_min_years"] = (
-        result.pop("evaluation_experience_min_years")
-        if result.get("evaluation_experience_min_years") is not None
-        else result.get("experience_min_years")
-    )
-    result["experience_max_years"] = (
-        result.pop("evaluation_experience_max_years")
-        if result.get("evaluation_experience_max_years") is not None
-        else result.get("experience_max_years")
-    )
+    exp_min = result.pop("evaluation_experience_min_years")
+    exp_max = result.pop("evaluation_experience_max_years")
+    if result["source"] != "instahyre":
+        result["experience_min_years"] = exp_min if exp_min is not None else result.get("experience_min_years")
+        result["experience_max_years"] = exp_max if exp_max is not None else result.get("experience_max_years")
     result["experience_provenance"] = result.get("experience_provenance") or "unknown"
     result["experience_confidence"] = result.get("experience_confidence") or "unknown"
     if result["experience_provenance"] == "unknown":

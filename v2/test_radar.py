@@ -3410,6 +3410,13 @@ class InstahyreCollectorTests(unittest.TestCase):
         })
         self.assertEqual((extracted["min_years"], extracted["max_years"], extracted["provenance"]), (3, 5, "description"))
         self.assertEqual(details["listing_experience"], "4-7 Years")
+        job = {"source": "instahyre", "title": "Frontend Engineer", "location": "Bangalore",
+               "description": description, "source_details": details}
+        match = radar.match_details(job, {**BASE_CONFIG, "candidate_experience_years": 3.5, "max_experience_years": 7})
+        self.assertFalse(match["match"])
+        self.assertEqual((match["experience_min_years"], match["experience_max_years"]), (4, 7))
+        self.assertEqual(radar.alertability_details({"source": "instahyre"}, {"match": True}, BASE_CONFIG),
+                         {"alertable": False, "reasons": ["waiting for source-backed Instahyre experience"]})
 
     def test_detail_access_denied_keeps_the_search_feed_and_backs_off(self):
         jobs = [radar.normalize_job(

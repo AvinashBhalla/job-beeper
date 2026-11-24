@@ -11,6 +11,7 @@ from typing import Any
 import requests
 
 from v2 import user_preferences
+from v2.instahyre_details import ALERT_EXPERIENCE_READY_SQL
 from v2.sqlite_store import DB_LOCK, connect as connect_sqlite
 
 API = "https://api.telegram.org"
@@ -214,7 +215,7 @@ def _queue_new_matches(
     fresh_after = _stamp(_now() - timedelta(hours=max_age_hours))
     stamp = _stamp()
     cursor = conn.execute(
-        """INSERT OR IGNORE INTO user_notification_ledger
+        f"""INSERT OR IGNORE INTO user_notification_ledger
           (user_id,canonical_opportunity_id,candidate_job_id,status,
            backlog_override,created_at,updated_at)
         SELECT ?,j.canonical_opportunity_id,j.id,'queued',
@@ -224,6 +225,7 @@ def _queue_new_matches(
           ON go.user_id=? AND go.canonical_opportunity_id=j.canonical_opportunity_id
         JOIN user_job_evaluations e ON e.job_id=j.id AND e.user_id=?
         WHERE e.match=1 AND e.score>=? AND e.preference_fingerprint=?
+          AND {ALERT_EXPERIENCE_READY_SQL}
           AND COALESCE(j.source_initial_baseline,0)=0
           AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=?)
           AND NOT EXISTS (
@@ -263,7 +265,7 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
               WHERE COALESCE(j.source_initial_baseline,0)=1
                  OR COALESCE(nl.baseline_suppressed,0)=1
             )""", (stamp,))
-        row = conn.execute("""SELECT l.id,l.user_id,l.attempt_count,l.backlog_override,
+        row = conn.execute(f"""SELECT l.id,l.user_id,l.attempt_count,l.backlog_override,
           l.canonical_opportunity_id,t.chat_id,j.title,j.company,j.location,j.url,
           j.source,j.source_posted_at,j.posted_precision,j.discovered_at,j.source_details_json,
           j.description != '' AS has_description,
@@ -276,6 +278,7 @@ def _claim_one(db_path: Path) -> dict[str, Any] | None:
           JOIN jobs j ON j.id=l.candidate_job_id
           JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
           WHERE (l.status='queued' OR (l.status='failed' AND l.next_attempt_at IS NOT NULL AND l.next_attempt_at<=?))
+            AND {ALERT_EXPERIENCE_READY_SQL}
             AND COALESCE(j.source_initial_baseline,0)=0
             AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=l.user_id)
             AND (l.backlog_override=0 OR COALESCE(s.gmail_backfill_paused,0)=0)
@@ -315,7 +318,7 @@ def _still_deliverable(
     send it based only on the fact that it was eligible when it was first queued.
     """
     with _connect(Path(db_path)) as conn:
-        row = conn.execute("""SELECT l.user_id,l.canonical_opportunity_id,
+        row = conn.execute(f"""SELECT l.user_id,l.canonical_opportunity_id,
           l.backlog_override,s.gmail_backfill_paused,s.enabled_at,t.chat_id,j.discovered_at,
           j.source_owner_user_id,e.preference_fingerprint,e.match,e.score,p.preferences_json
           FROM user_notification_ledger l
@@ -325,6 +328,7 @@ def _still_deliverable(
           JOIN user_job_evaluations e ON e.user_id=l.user_id AND e.job_id=j.id
           JOIN user_preferences p ON p.user_id=l.user_id
           WHERE l.id=? AND l.status='sending' AND t.chat_id=?
+            AND {ALERT_EXPERIENCE_READY_SQL}
             AND COALESCE(j.source_initial_baseline,0)=0
             AND (j.source_owner_user_id IS NULL OR j.source_owner_user_id=l.user_id)
             AND (l.backlog_override=0 OR COALESCE(s.gmail_backfill_paused,0)=0)

@@ -61,6 +61,7 @@ class UserNotificationServiceTests(unittest.TestCase):
             for column in (
                 "source_posted_at TEXT", "posted_precision TEXT", "description TEXT NOT NULL DEFAULT ''",
                 "source_details_json TEXT", "experience_min_years REAL", "experience_max_years REAL",
+                "experience_provenance TEXT",
             ):
                 conn.execute(f"ALTER TABLE jobs ADD COLUMN {column}")
             conn.execute("""
@@ -479,7 +480,7 @@ class UserNotificationServiceTests(unittest.TestCase):
     def test_dispatch_sends_only_to_owner_chat_and_marks_sent(self):
         with user_notifications._connect(self.db) as conn:
             conn.execute("""UPDATE jobs SET source='instahyre', experience_min_years=3,
-                experience_max_years=5, source_details_json=? WHERE id=1""",
+                experience_max_years=5, experience_provenance='description', source_details_json=? WHERE id=1""",
                 ('{"key_skills":["React Native","TypeScript"],"listing_experience":"4-7 Years"}',))
             conn.execute("UPDATE user_job_evaluations SET reasons_json=? WHERE user_id=1 AND job_id=1", ('["target location"]',))
             conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,'2026-11-07T00:00:00+00:00','2026-11-07T00:00:00+00:00')")
@@ -492,12 +493,30 @@ class UserNotificationServiceTests(unittest.TestCase):
         text = post.call_args.kwargs['json']['text']
         for field in (
             "Posted: Unknown", "Discovered: 07 Nov 2026, 3:30 PM IST",
-            "Experience: 3-5 years (listing header: 4-7 Years)",
+            "Experience: 4-7 Years (listing header); JD: 3-5 years",
             "Key skills: React Native, TypeScript", "✓ target location", "Apply → https://example.com/1",
         ):
             self.assertIn(field, text)
         with user_notifications._connect(self.db) as conn:
             self.assertEqual(conn.execute('SELECT status FROM user_notification_ledger').fetchone()[0], 'sent')
+
+    def test_instahyre_waits_for_source_backed_experience_before_claiming(self):
+        enabled_at = '2026-11-07T00:00:00+00:00'
+        with user_notifications._connect(self.db) as conn:
+            conn.execute("INSERT INTO user_notification_settings(user_id,enabled,enabled_at,updated_at) VALUES(1,1,?,?)",
+                         (enabled_at, enabled_at))
+            conn.execute("UPDATE jobs SET source='instahyre', experience_provenance='inferred', experience_min_years=4 WHERE id=1")
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, enabled_at), 0)
+            # Also cover an incomplete job already queued by a previous build.
+            conn.execute("UPDATE jobs SET source='naukri' WHERE id=1")
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, enabled_at), 1)
+            conn.execute("UPDATE jobs SET source='instahyre' WHERE id=1")
+        self.assertIsNone(user_notifications._claim_one(self.db))
+        with user_notifications._connect(self.db) as conn:
+            self.assertEqual(conn.execute("SELECT status FROM user_notification_ledger").fetchone()[0], "queued")
+            self.assertEqual(user_notifications._queue_new_matches(conn, 1, enabled_at), 0)
+            conn.execute("UPDATE jobs SET experience_provenance='employer_stated' WHERE id=1")
+        self.assertIsNotNone(user_notifications._claim_one(self.db))
 
     def test_repeated_enable_preserves_the_original_no_backlog_boundary(self):
         first = user_notifications.set_enabled(self.db, 1, True)

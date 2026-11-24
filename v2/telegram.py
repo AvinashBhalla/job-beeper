@@ -13,6 +13,7 @@ from typing import Any
 import requests
 
 from v2.radar import DB_PATH, UTC, db_lock, iso, now
+from v2.instahyre_details import ALERT_EXPERIENCE_READY_SQL
 from v2.sqlite_store import connect as connect_sqlite
 
 log = logging.getLogger("job-radar.telegram")
@@ -121,7 +122,7 @@ def format_notification(item: dict[str, Any]) -> str:
         if experience_min is None and experience_max is None:
             experience = f"{listing_experience[:40]} (listing header)"
         elif header_experience != experience:
-            experience += f" (listing header: {listing_experience[:40]})"
+            experience = f"{listing_experience[:40]} (listing header); JD: {experience}"
 
     try:
         reasons = json.loads(item.get("match_reasons_json") or "[]")
@@ -206,7 +207,7 @@ def _next_retry(attempt_count: int) -> str:
 def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
     conn.row_factory = sqlite3.Row
     timestamp = iso(now())
-    row = conn.execute("""
+    row = conn.execute(f"""
         SELECT
             nl.canonical_opportunity_id,
             nl.candidate_job_id,
@@ -231,6 +232,7 @@ def _claim_one(conn: sqlite3.Connection) -> dict[str, Any] | None:
         JOIN job_evaluations e ON e.job_id = nl.candidate_job_id
         WHERE e.match=1
           AND e.alertable=1
+          AND {ALERT_EXPERIENCE_READY_SQL}
           AND (
                 nl.status='queued'
                 OR (

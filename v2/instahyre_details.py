@@ -8,6 +8,12 @@ from bs4 import BeautifulSoup, Tag
 
 
 MAX_PAGE_BYTES = 512 * 1024
+# Keep incomplete Instahyre observations visible in the feed while their
+# notification eligibility waits for source-backed experience.
+ALERT_EXPERIENCE_READY_SQL = """(j.source != 'instahyre' OR (
+    j.experience_provenance IN ('description', 'employer_stated')
+    AND COALESCE(j.experience_min_years, j.experience_max_years) IS NOT NULL
+))"""
 
 
 def is_listing_url(url: str, source_id: str) -> bool:
