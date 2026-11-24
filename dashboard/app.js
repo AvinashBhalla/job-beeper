@@ -925,9 +925,8 @@
   function handleHashRoute() {
     const hash = (location.hash || '').slice(1);
     if (hash.startsWith('job/')) {
-      const id = decodeURIComponent(hash.slice(4));
       window.showSection('jobsSection', false);
-      showJobInspector(id, false);
+      void openJobFromRoute(hash.slice(4));
     } else if (hash === 'applied') {
       window.showSection('appliedSection', false);
     } else if (hash === 'preferences' || hash === 'filters') {
@@ -1168,8 +1167,26 @@
   // =========================================================================
   // 10. Inspector Research Pane Logic
   // =========================================================================
-  function showJobInspector(jobId, pushHistory = true) {
-    const job = state.jobs.find(j => String(j.id) === String(jobId));
+  async function openJobFromRoute(id) {
+    if (!/^\d+$/.test(id)) return;
+    const onFeed = state.jobs.find(job => job.id === id);
+    if (onFeed) {
+      showJobInspector(onFeed, false);
+      return;
+    }
+
+    const hash = location.hash;
+    try {
+      const response = await authClient.request(`/jobs/${id}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(response.status === 404 ? 'Job not found.' : 'Could not open the job.');
+      const job = normalizeJob(await response.json());
+      if (location.hash === hash) showJobInspector(job, false);
+    } catch (error) {
+      if (location.hash === hash) showToast(error.message, 'error', 5000);
+    }
+  }
+
+  function showJobInspector(job, pushHistory = true) {
     if (!job) return;
 
     state.selectedJobId = String(job.id);
@@ -3055,7 +3072,7 @@
         } else if (applyDirectBtn) {
           e.stopPropagation();
         } else if (row) {
-          showJobInspector(row.dataset.jobId, true);
+          showJobInspector(state.jobs.find(job => job.id === row.dataset.jobId));
         }
       });
     }

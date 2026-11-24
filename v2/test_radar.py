@@ -2790,6 +2790,9 @@ class MatcherTests(unittest.TestCase):
                 )
                 self.assertEqual(item["description_format"], "markdown")
                 self.assertEqual(item["source_details"], source_details)
+                detail = radar.job_detail(item["id"], user=admin)
+                self.assertEqual(detail["description_format"], "markdown")
+                self.assertEqual(detail["source_details"], source_details)
 
                 # A later legacy/plain relay record must not downgrade an
                 # already enriched Markdown description or erase metadata.
@@ -3330,6 +3333,10 @@ class InstahyreCollectorTests(unittest.TestCase):
         )
         self.assertEqual(jobs[0]["description"], "")
         self.assertEqual(jobs[0]["source_details"], {"key_skills": ["Product", "Software", "Technology"]})
+        legacy = {**jobs[0], "source_details": {}, "description": "Keywords: Product, Software, Technology"}
+        radar._serialize_job_description(legacy)
+        self.assertEqual(legacy["description"], "")
+        self.assertEqual(legacy["source_details"], jobs[0]["source_details"])
 
     def test_detail_experience_and_skills_survive_search_only_rescan(self):
         description, details = radar.instahyre_details.parse_listing(self.DETAIL_HTML, "446772")

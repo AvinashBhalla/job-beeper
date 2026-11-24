@@ -3385,6 +3385,19 @@ def _job_source_details(job: dict[str, Any]) -> dict[str, Any]:
     return details if isinstance(details, dict) else {}
 
 
+def _serialize_job_description(job: dict[str, Any]) -> None:
+    job["description_format"] = "markdown" if job.get("description_format") == "markdown" else "plain"
+    job["source_details"] = _job_source_details(job)
+    if job["source"] != "instahyre" or job["description_format"] != "plain":
+        return
+    keyword_stub = re.fullmatch(r"Keywords: ([^\r\n]+)", job.get("description") or "")
+    if keyword_stub:
+        job["source_details"].setdefault(
+            "key_skills", [skill.strip() for skill in keyword_stub[1].split(",") if skill.strip()],
+        )
+        job["description"] = ""
+
+
 def job_location_for_matching(
     job: dict[str, Any],
     remote_only: bool = False,
@@ -10807,18 +10820,8 @@ def jobs(
     result = []
     for row in rows:
         item = dict(row)
-        item["description_format"] = (
-            "markdown" if item.get("description_format") == "markdown" else "plain"
-        )
-        item["source_details"] = _job_source_details(item)
+        _serialize_job_description(item)
         item.pop("source_details_json", None)
-        if item["source"] == "instahyre" and item["description_format"] == "plain":
-            keyword_stub = re.fullmatch(r"Keywords: ([^\r\n]+)", item.get("description") or "")
-            if keyword_stub:
-                item["source_details"].setdefault(
-                    "key_skills", [skill.strip() for skill in keyword_stub[1].split(",") if skill.strip()],
-                )
-                item["description"] = ""
         item["likely_match"] = bool(item.pop("evaluation_match", 0) or 0)
         score = item.pop("evaluation_score", None)
         item["match_score"] = int(score or 0)
@@ -11046,6 +11049,7 @@ def job_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Job not found")
     result = dict(row)
+    _serialize_job_description(result)
     result["experience_min_years"] = (
         result.pop("evaluation_experience_min_years")
         if result.get("evaluation_experience_min_years") is not None
