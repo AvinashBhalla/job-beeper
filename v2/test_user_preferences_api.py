@@ -74,7 +74,7 @@ class UserScopedJobFeedTests(unittest.TestCase):
             "/api/auth/login", json={"email": email, "password": password}
         )
 
-    def test_incomplete_user_cannot_open_jobs_feed(self):
+    def test_incomplete_user_can_browse_jobs_feed(self):
         user = auth.create_user(self.db_path, "incomplete@example.com", "incomplete-user-password")
         self.assertEqual(
             self.client.post(
@@ -84,9 +84,8 @@ class UserScopedJobFeedTests(unittest.TestCase):
             200,
         )
         response = self.client.get("/api/jobs")
-        self.assertEqual(response.status_code, 403)
-        self.assertIn("target role", response.json()["detail"])
-        self.assertIn("Remote only", response.json()["detail"])
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.json()["pagination"]["total"], 2)
 
 
     def test_preference_save_returns_specific_validation_for_missing_target_role(self):

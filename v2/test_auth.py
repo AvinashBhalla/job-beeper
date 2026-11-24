@@ -183,6 +183,7 @@ class AuthApiTests(unittest.TestCase):
         auth.init_auth_schema(self.db_path)
         from v2 import user_preferences
         user_preferences.init_preferences_schema(self.db_path)
+        radar.init_db()
         self.admin = auth.create_user(self.db_path, "admin@example.com", "correct horse battery staple", role="admin")
         self.user = auth.create_user(self.db_path, "user@example.com", "another correct horse battery staple")
         self.client = TestClient(radar.app, base_url="https://testserver")
@@ -441,7 +442,12 @@ class AuthApiTests(unittest.TestCase):
         for method, path, *body in endpoints:
             kwargs = {"json": body[0]} if body else {}
             response = self.client.request(method, path, **kwargs)
-            self.assertEqual(response.status_code, 403, f"user {method} {path}: {response.status_code}")
+            if path in {"/api/jobs", "/api/daily-summary"}:
+                self.assertEqual(response.status_code, 200, f"member browse endpoint {method} {path}: {response.status_code}")
+            elif path == "/api/jobs/1":
+                self.assertEqual(response.status_code, 404, f"missing member job detail {method} {path}: {response.status_code}")
+            else:
+                self.assertEqual(response.status_code, 403, f"user {method} {path}: {response.status_code}")
 
     def test_user_preferences_require_authentication_and_role_location_onboarding(self):
         self.assertEqual(self.client.get("/api/preferences").status_code, 401)

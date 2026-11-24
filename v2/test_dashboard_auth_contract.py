@@ -224,7 +224,7 @@ const { createClient, resolveApiBase } = require('./dashboard/auth.js');
             "page: String(state.feedPage)",
             "per_page: String(state.feedPageSize)",
             "params.set('search', searchQuery)",
-            "status: state.isAdmin ? 'all' : 'matched'",
+            "status: state.isAdmin || !state.userPreferences?.onboarding_complete ? 'all' : 'matched'",
             "sort_by: sortParameters.sort_by",
             "sort_order: sortParameters.sort_order",
             "params.set('source', state.filters.source)",
