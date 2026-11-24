@@ -3680,12 +3680,6 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         low, high = extract_linkedin_labeled_experience(description)
         if low is not None or high is not None:
             return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
-    if source in {"cutshort", "peoplestrong"} and isinstance(job.get("source_details"), dict):
-        details = job["source_details"]
-        low, high = details.get("experience_min_years"), details.get("experience_max_years")
-        if type(low) in {int, float} and type(high) in {int, float} and 0 <= low <= high <= 60:
-            return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
-
     # A subordinate experience requirement belongs in the JD, but should not
     # replace the overall minimum from the first part of the same sentence.
     experience_text = re.sub(
@@ -3719,12 +3713,15 @@ def _experience_provenance_details(job: dict[str, Any]) -> dict[str, Any]:
         if 0 <= low <= 60:
             return {"min_years": low, "max_years": None, "provenance": "description", "confidence": "medium"}
 
-    if source == "instahyre":
-        badge = _job_source_details(job).get("listing_experience")
-        if isinstance(badge, str):
-            low, high = extract_experience(badge)
-            if low is not None and 0 <= low <= (high if high is not None else low) <= 60:
-                return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
+    details = _job_source_details(job)
+    low, high = details.get("experience_min_years"), details.get("experience_max_years")
+    if type(low) in {int, float} and type(high) in {int, float} and 0 <= low <= high <= 60:
+        return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
+    badge = details.get("listing_experience")
+    if isinstance(badge, str):
+        low, high = extract_experience(badge)
+        if low is not None and 0 <= low <= (high if high is not None else low) <= 60:
+            return {"min_years": low, "max_years": high, "provenance": "employer_stated", "confidence": "high"}
 
     low, high = extract_experience(f"{job.get('title', '')} {description}")
     if low is not None or high is not None:

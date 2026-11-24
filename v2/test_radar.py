@@ -87,6 +87,17 @@ class MatcherTests(unittest.TestCase):
         self.assertFalse(result["match"])
         self.assertEqual(result["experience_min_years"], 7)
 
+    def test_provider_metadata_is_a_fallback_after_jd_evidence(self):
+        job = {
+            "source": "future_board",
+            "source_details_json": '{"experience_min_years":3,"experience_max_years":9}',
+        }
+        fallback = radar._experience_provenance_details(job)
+        self.assertEqual((fallback["min_years"], fallback["max_years"], fallback["provenance"]),
+                         (3, 9, "employer_stated"))
+        jd = radar._experience_provenance_details({**job, "description": "Experience: 2-4 years"})
+        self.assertEqual((jd["min_years"], jd["max_years"], jd["provenance"]), (2, 4, "description"))
+
     def test_existing_member_evaluation_refreshes_when_job_evidence_changes(self):
         with (
             TemporaryDirectory(ignore_cleanup_errors=True) as tmp,

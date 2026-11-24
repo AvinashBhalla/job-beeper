@@ -132,6 +132,18 @@ The Arintra alert used an evaluation saved at 15:12 IST with no experience bound
 
 The shared parser handles written-out minima, explicit experience labels, and a subordinate management requirement following the main numeric requirement. When no skills are structured, the portal and Telegram can display labeled skills or recognized technical terms found in the description. Both clean template placeholders from stored tags. Greenhouse, Ashby and Workable now pass HTML to the shared formatter. Provider adapters remain responsible for obtaining the original description and structured fields, as well as preserving trustworthy apply links. Missing evidence and unsupported wording still need review.
 
+| Development record | Comparison with the original posting or provider |
+| --- | --- |
+| Greenhouse `6810`, Databricks | Matched title and Madrid location. The original description had no numerical experience requirement and mentioned Python, Java and Spark. [Databricks posting](https://databricks.com/company/careers/open-positions/job?gh_jid=8653583002) |
+| Lever `6062`, Palantir | Matched title, Madrid, and the 1+ year requirement. The shared extractor recovered technical terms already present in the posting, including Python, Java and TypeScript. [Lever posting](https://jobs.lever.co/palantir/53fb4c05-f949-4146-a046-5c063c36a628) |
+| Ashby `6803`, Mistral AI | The stored link opens the application form. The official feed for the same ID confirmed the title, Paris, and 8+ years. [Ashby provider feed](https://api.ashbyhq.com/posting-api/job-board/mistral.ai) |
+| Keka `6652`, Bridgestone | The listing and JD header show 2–4 years in Bengaluru. The JD separately mentions 2+ years of forecasting-related experience. The shared parser now keeps the 2–4 range. [Keka posting](https://bridgestone1.keka.com/careers/jobdetails/96676) |
+| Cutshort `5598`, Dailyhunt | Matched the 3–9-year range, Bengaluru location, title, and Java skill. Saved numeric metadata is supported as a fallback across providers. [Cutshort posting](https://cutshort.io/job/Big-Data-Java-Programming-Bengaluru-Bangalore-Dailyhunt-eHabuo9w) |
+| SmartRecruiters `6789`, Bosch | Matched the German title and Erlangen. No numeric experience requirement was confirmed. [SmartRecruiters posting](https://jobs.smartrecruiters.com/BoschGroup/744000163410898-systemarchitekt-asic-soc-halbleiterentwicklung-w-m-div-) |
+| Workable `2188` and Darwinbox `379` | The apply links returned the application shell to the HTTP check. The full original JD could not be independently compared from that response. |
+
+The prior Instahyre build passed 673 Linux tests before the cross-provider changes.
+
 ### Source Health administration
 
 Source Health opens with enabled sources, plain-language status, jobs added in the past 24 hours, and last check time in IST. Paused sources and optional tools are collapsed. Use **Configure sources** to open the provider toggles in Preferences, then **Save Preferences**. Use **Employer boards** to find, verify, and activate a public career board. Directory and manifest imports are under **Candidate imports**. **Technical diagnostics** contains board schedules, host limits, and raw run errors. These tools load when opened, and **Refresh status** also refreshes the open tools.
