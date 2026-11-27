@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import asyncio
 import datetime as dt
 from email.utils import parsedate_to_datetime
@@ -25,8 +26,11 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from posthog import Posthog
+from posthog.integrations.asgi import PosthogASGIMiddleware
 
 from v2.dedupe import auto_link_allowed, canonical_identity, canonical_match_score, canonicalize_url
+from v2.settings import get_settings
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_PATH = ROOT.parent / "dashboard"
@@ -38,6 +42,8 @@ warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 log = logging.getLogger("job-radar")
+posthog_log = logging.getLogger("job-radar.posthog_logs")
+posthog_log.propagate = False
 
 UTC = dt.timezone.utc
 UA = {
@@ -57,6 +63,63 @@ LINKEDIN_FAST_TPR = "r21600"
 LINKEDIN_DEEP_TPR = "r21600"
 
 app = FastAPI(title="Job Radar V2", version="2.0.0")
+
+settings = get_settings()
+posthog_client: Posthog | None = None
+posthog_log_provider: Any | None = None
+
+
+def capture_posthog_event(event: str, properties: dict[str, Any]) -> None:
+    if not posthog_client:
+        return
+    try:
+        posthog_client.capture(event, properties=properties)
+    except Exception:
+        log.warning("PostHog event capture failed event=%s", event, exc_info=True)
+
+
+def configure_posthog_log_capture() -> Any | None:
+    """Export only explicit operational logs emitted through ``posthog_log``."""
+    try:
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+        from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+
+        logger_provider = LoggerProvider()
+        exporter = OTLPLogExporter(
+            endpoint=f"{settings.posthog_host.rstrip('/')}/i/v1/logs",
+            headers={"Authorization": f"Bearer {settings.posthog_project_token}"},
+        )
+        logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+        posthog_log.addHandler(LoggingHandler(logger_provider=logger_provider))
+        posthog_log.setLevel(logging.INFO)
+        return logger_provider
+    except Exception:
+        log.warning("PostHog log capture could not be configured", exc_info=True)
+        return None
+
+
+if settings.posthog_project_token and settings.posthog_host:
+    posthog_client = Posthog(
+        project_api_key=settings.posthog_project_token,
+        host=settings.posthog_host,
+        enable_exception_autocapture=True,
+        timeout=3,
+        max_retries=0,
+    )
+    posthog_log_provider = configure_posthog_log_capture()
+    atexit.register(posthog_client.shutdown)
+    app.add_middleware(PosthogASGIMiddleware, client=posthog_client)
+elif not settings.is_production:
+    for variable in ("POSTHOG_PROJECT_TOKEN", "POSTHOG_HOST"):
+        if not getattr(settings, variable.lower()):
+            log.warning(
+                "%s variable required by PostHog is missing or un-configured, "
+                "this causes events to be silently missed. This error stops "
+                "appearing once %s is configured",
+                variable,
+                variable,
+            )
 
 cors_origins = [
     origin.strip()
@@ -2534,6 +2597,13 @@ def run_source(source: str, config: dict[str, Any]) -> None:
                 delivered = deliver_queued_notifications(50)
                 if delivered:
                     log.info("telegram: delivered=%s source=%s", delivered, source)
+                    capture_posthog_event(
+                        "telegram_notifications_delivered",
+                        {
+                            "delivery_trigger": "source_scan",
+                            "notification_count": delivered,
+                        },
+                    )
         except Exception:
             log.exception("telegram immediate delivery failed source=%s", source)
 
@@ -2555,7 +2625,19 @@ def run_source(source: str, config: dict[str, Any]) -> None:
             )
             runtime["rate_limit_cooldown_seconds"] = int(cooldown_remaining)
         source_state[source] = runtime
+        capture_posthog_event(
+            "source_scan_completed",
+            {
+                "source": source,
+                "jobs_seen": len(jobs),
+                "new_jobs": new_jobs,
+            },
+        )
         log.info("%s: seen=%s new=%s", source, len(jobs), new_jobs)
+        posthog_log.info(
+            "source_scan_completed",
+            extra={"source": source, "jobs_seen": len(jobs), "new_jobs": new_jobs},
+        )
     except Exception as exc:
         finished = now()
         record_run(source, started_at, finished, 0, 0, str(exc))
@@ -2584,6 +2666,13 @@ async def notification_worker() -> None:
                 delivered = await asyncio.to_thread(deliver_queued_notifications, 10)
                 if delivered:
                     log.info("telegram: delivered=%s", delivered)
+                    capture_posthog_event(
+                        "telegram_notifications_delivered",
+                        {
+                            "delivery_trigger": "background_worker",
+                            "notification_count": delivered,
+                        },
+                    )
         except Exception:
             log.exception("telegram worker failed")
 
@@ -2631,6 +2720,7 @@ async def startup() -> None:
     ensure_config_token()
     app.state.scheduler_task = asyncio.create_task(scheduler())
     app.state.notification_worker_task = asyncio.create_task(notification_worker())
+    posthog_log.info("service_started", extra={"service_version": app.version})
 
 
 @app.on_event("shutdown")
@@ -2640,6 +2730,17 @@ async def shutdown() -> None:
         task = getattr(app.state, task_name, None)
         if task:
             await task
+    if posthog_client:
+        try:
+            posthog_client.flush(timeout_seconds=3)
+        except Exception:
+            log.warning("PostHog event flush failed", exc_info=True)
+    if posthog_log_provider:
+        try:
+            posthog_log_provider.force_flush(timeout_millis=5000)
+            posthog_log_provider.shutdown()
+        except Exception:
+            log.warning("PostHog log capture shutdown failed", exc_info=True)
 
 
 @app.get("/health")
@@ -2669,6 +2770,22 @@ def update_config(payload: dict[str, Any], x_config_token: str | None = Header(d
     saved = save_config(payload)
     refresh_job_evaluations(saved)
     refresh_notification_decisions(saved)
+    capture_posthog_event(
+        "config_updated",
+        {
+            "config_version": saved["config_version"],
+            "notifications_enabled": saved["notifications_enabled"],
+            "enabled_source_count": sum(saved["source_enabled"].values()),
+        },
+    )
+    posthog_log.info(
+        "configuration_updated",
+        extra={
+            "config_version": saved["config_version"],
+            "notifications_enabled": saved["notifications_enabled"],
+            "enabled_source_count": sum(saved["source_enabled"].values()),
+        },
+    )
     return {"config": saved, "runtime_path": str(RUNTIME_CONFIG_PATH)}
 
 
