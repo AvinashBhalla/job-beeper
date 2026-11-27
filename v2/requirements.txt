@@ -2,4 +2,9 @@ fastapi>=0.115,<1
 uvicorn[standard]>=0.34,<1
 requests>=2.31,<3
 beautifulsoup4>=4.12,<5
+pydantic-settings>=2,<3
+posthog>=7.69,<8
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp
 tzdata
